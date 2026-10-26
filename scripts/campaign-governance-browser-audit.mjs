@@ -584,7 +584,7 @@ try {
   await host.page.getByLabel("Holding name", { exact: true }).fill("Live award shield");
   await host.page.getByLabel("Holding value", { exact: true }).fill("10 gp");
   await host.page.getByLabel("Holding owner", { exact: true }).selectOption("hero");
-  await host.page.getByRole("button", { name: "Add holding", exact: true }).click();
+  await host.page.getByRole("button", { name: "Add loot", exact: true }).click();
   await expect(player.page.locator('input[value="Live award shield"]')).toBeVisible({
     timeout: 10000,
   });

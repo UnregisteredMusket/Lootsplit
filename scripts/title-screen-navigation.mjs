@@ -108,7 +108,8 @@ export async function navigateApplication(page, destination) {
     // between count/nth/getAttribute and make an unrelated index wait forever.
     const hrefs = await page.locator("a[href]").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")));
     for (const href of hrefs) {
-      if (href === null) continue;
+      // In-page anchors such as "Skip to content" (#main) are not route links.
+      if (href === null || href.startsWith("#")) continue;
       const link = page.locator(`a[href=${JSON.stringify(href)}]:visible`).first();
       if (!await link.isVisible()) continue;
       const url = new URL(href, page.url());

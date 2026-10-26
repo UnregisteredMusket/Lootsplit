@@ -125,7 +125,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
       <h2 className="font-display text-2xl">Open5e reference</h2>
       <p className="mt-2 text-sm text-muted">
         {onSelect
-          ? "Search equipment or magic items, review the value, then choose the recipient and quantity. Nothing is added until you confirm Add holding."
+          ? "Search equipment or magic items, review the value, then choose the recipient and quantity. Nothing is added until you confirm Add loot."
           : seat.role === "player"
             ? "Search and read item, spell and creature references. References do not change your character or inventory. Your DM controls access."
             : "Search the open rules. Review an item, set its shop price, then add a copy to your catalog. Imported copies stay on this device and never change automatically."}

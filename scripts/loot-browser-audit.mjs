@@ -20,13 +20,20 @@ try {
     await openApplication(page, origin + "/party?section=funds&action=add");
     const name = page.getByLabel("Holding name", { exact: true });
     await name.waitFor();
+    // Each field keeps a visible label once filled (no placeholder-only labels).
+    const form = page.getByRole("dialog", { name: "Add loot", exact: true });
+    for (const label of ["Name", "Value", "Quantity", "Owner", "Category", "Notes & source"])
+      assert.ok(
+        await form.locator("label").filter({ hasText: label }).first().isVisible(),
+        `${width}: visible "${label}" label`,
+      );
     const owner = await page.getByLabel("Holding owner", { exact: true }).inputValue();
     assert.ok(owner);
     await name.fill("Navigation audit custom relic");
     await page.getByLabel("Holding value", { exact: true }).fill("2 gp");
     await page.getByLabel("Holding quantity", { exact: true }).fill("2");
     await page.getByLabel("Holding notes", { exact: true }).fill("Custom loot note");
-    await page.getByRole("button", { name: "Add holding", exact: true }).click();
+    await page.getByRole("button", { name: "Add loot", exact: true }).click();
     await page.waitForFunction(
       () => document.querySelector('[aria-label="Holding name"]')?.value === "",
     );
@@ -77,7 +84,7 @@ try {
     assert.match(await page.getByLabel("Holding notes", { exact: true }).inputValue(), /CC BY 4.0/);
     await page.getByLabel("Holding quantity", { exact: true }).fill("3");
     await page.screenshot({ path: `test-results/loot/review-${width}.png` });
-    await page.getByRole("button", { name: "Add holding", exact: true }).click();
+    await page.getByRole("button", { name: "Add loot", exact: true }).click();
     await page.waitForFunction(
       () => document.querySelector('[aria-label="Holding name"]')?.value === "",
     );
