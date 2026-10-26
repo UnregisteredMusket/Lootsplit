@@ -1,3 +1,4 @@
+import { openTabsAndWindows } from "./workspace-windows-browser.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -360,7 +361,7 @@ try {
       "Guest fleet stays in memory",
     );
     // A companion window reuses only the same authorized reconnect ticket.
-    await guest.getByRole("button", { name: "Tabs & windows", exact: true }).click();
+    await openTabsAndWindows(guest);
     await guest.getByLabel("Screen to open", { exact: true }).selectOption("/features/properties");
     await expect(
       guest.getByLabel("Screen to open").locator('option[value="/encounters"]'),

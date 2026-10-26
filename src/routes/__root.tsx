@@ -27,6 +27,7 @@ import { APP_VISITOR_COOKIE } from "@/lib/deployment/public-urls.mjs";
 import { SplitViewProvider, usePane } from "@/components/split-view";
 import { retainBeside } from "@/lib/quire/split-view";
 import { NotFoundPage } from "@/components/website/not-found";
+import { CommandPaletteHost } from "@/components/command-palette";
 import { NOT_FOUND_TITLE, isUnmatchedRoute, useUnmatchedRoute } from "@/lib/website/not-found-route";
 import appCss from "../styles.css?url";
 
@@ -125,6 +126,8 @@ function RootDocument() {
                         <QuestUpdateToasts />
                         <SplitViewProvider>
                           <Outlet />
+                          {/* Ctrl/⌘ K palette and keyboard shortcuts for every app screen. */}
+                          <CommandPaletteHost />
                         </SplitViewProvider>
                       </PlayerDisplayProvider>
                     </EconomyProvider>

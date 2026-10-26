@@ -438,8 +438,9 @@ function DmQuests({ initialQuest }: { initialQuest?: string }) {
   const all = questsOf(t);
   const initial = all.find((q) => q.id === initialQuest);
   const [tab, setTab] = useState<QuestTab>(initial ? questTabOf(initial) : "play");
-  const [selected, setSelected] = useState<string>(initialQuest ?? "");
-  const [creating, setCreating] = useState(false);
+  // `?quest=new` (the command palette's New quest) opens the editor for a new draft.
+  const [selected, setSelected] = useState<string>(initialQuest === "new" ? "" : (initialQuest ?? ""));
+  const [creating, setCreating] = useState(initialQuest === "new");
   const [query, setQuery] = useState("");
   const quest = all.find((q) => q.id === selected);
   const questTabNow = quest ? questTabOf(quest) : undefined;

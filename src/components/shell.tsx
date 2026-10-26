@@ -1,6 +1,7 @@
 import { ShellMapActions } from "./shell-map-actions";
 import { FeatureCards } from "./feature-navigation";
 import { WorkspaceWindows } from "./workspace-windows";
+import { CommandPaletteButton } from "./command-palette";
 import { SubmenuBackdrop } from "./submenu-backdrop";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
@@ -303,6 +304,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
               <div className="header-actions">
                 <SplitHeaderControls />
                 <WorkspaceWindows />
+                <CommandPaletteButton />
                 <AppLink
                   className="header-icon"
                   href="/share?chat=1"

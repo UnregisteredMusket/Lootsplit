@@ -1,0 +1,10 @@
+{
+  "title": "Search everything, and keyboard shortcuts",
+  "summary": "A search button in the app header (or Ctrl+K / ⌘K) finds any screen, character, NPC, shop, place, map or item, and opens common jobs like Add loot or New quest.",
+  "items": [
+    "Type a few letters, then use the arrow keys and Enter, or tap a result. Players only find what their own screens already show.",
+    "Actions such as Award loot, End session, Advance 8 h and New quest open the usual screen or form; nothing happens until you confirm there.",
+    "Press ? for the shortcut list: / to search, and g then d, p, m, k or l to jump to the Desk, Party, Maps, Market or Library. Letter shortcuts never fire while you type.",
+    "On phones and narrow windows the Tabs & windows button moves into Settings & Management → Appearance, leaving room for the campaign name and the new search button."
+  ]
+}
