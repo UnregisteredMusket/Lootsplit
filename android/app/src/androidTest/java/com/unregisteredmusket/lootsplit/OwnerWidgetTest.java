@@ -854,7 +854,9 @@ public class OwnerWidgetTest {
                     android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);
                     for(int i=0;list!=null&&i<list.getChildCount()&&!header.get();i++){
                         View child=list.getChildAt(i);View row=child.findViewById(R.id.tile_header_a),seg=child.findViewById(R.id.tile_seg_7d_a);
-                        if(row!=null&&seg!=null&&seg.getVisibility()==View.VISIBLE&&row.hasOnClickListeners()){segment.set(Math.min(seg.getHeight(),seg.getWidth()));header.set(row.performClick());}
+                        // Wait for the re-rendered 7d tile (API 24–30 reload the collection asynchronously).
+                        boolean week=seg!=null&&seg.getContentDescription()!=null&&seg.getContentDescription().toString().endsWith("selected");
+                        if(row!=null&&week&&seg.getVisibility()==View.VISIBLE&&row.hasOnClickListeners()){segment.set(Math.min(seg.getHeight(),seg.getWidth()));header.set(row.performClick());}
                     }
                 });
                 if(!header.get())android.os.SystemClock.sleep(100);
