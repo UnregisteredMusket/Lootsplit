@@ -77,13 +77,13 @@ try {
   });
   assert.ok(signup.ok(), `signup ${signup.status()}`);
   await openApplication(page, origin + "/");
-  await page.getByText("Campaign control", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   await page.evaluate(async (table) => {
     const economy = await import("/src/lib/quire/economy.ts");
     await economy.applyCloudTable(table);
   }, buildWayfarers());
   await reloadApplication(page);
-  await page.getByText("Campaign control", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
 
   // Single screen: character sheet with split controls in the header.
   await page.goto(origin + "/characters?id=party%3Amira");
@@ -260,7 +260,7 @@ try {
   await page.getByRole("button", { name: "Open beside", exact: true }).click();
   const playerMenu = page.getByRole("menu", { name: "Open beside" });
   await expect(playerMenu.getByRole("menuitem", { name: /^Party & inventory/ })).toBeVisible();
-  for (const hidden of [/^Encounters/, /^Session Time/, /^Music & Ambience/, /^Review Inbox/, /^Shop Management/])
+  for (const hidden of [/^Encounters/, /^Session Time/, /^Music & Ambience/, /^Review Inbox/, /^Shop schedules/])
     assert.equal(await playerMenu.getByRole("menuitem", { name: hidden }).count(), 0, String(hidden));
   await expect(playerMenu.getByRole("menuitem", { name: /^My Finances/ })).toBeVisible();
   await page.keyboard.press("Escape");

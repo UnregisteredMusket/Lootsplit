@@ -145,7 +145,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
       exact: true,
     })
     .click();
-  await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
+  await expect(dm.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toBeVisible();
   await waitForDmCampaign(dm);
   // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
@@ -655,7 +655,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   await answerThemedDialog(other);
   await other.waitForURL((url) => url.origin === origin && url.pathname === "/");
   await continueIntoApp(other);
-  await other.getByText("Campaign control", { exact: true }).waitFor();
+  await other.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   assert.ok(
     await other.evaluate(() => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2),
   );
@@ -674,7 +674,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.waitForURL((url) => url.origin === origin && url.pathname === "/");
   await continueIntoApp(page);
-  await page.getByText("Campaign control", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   assert.ok(
     await page.evaluate(() => localStorage.getItem("quire.campaign.v1").startsWith("account-")),
   );
@@ -1244,7 +1244,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
           .filter({ hasText: firstCode })
           .getByRole("button", { name: "Resume", exact: true })
           .click();
-        await expect(target.getByText("Campaign control", { exact: true })).toBeVisible();
+        await expect(target.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toBeVisible();
       }
       await expect
         .poll(() =>
@@ -1552,7 +1552,7 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   await restore.click();
   await answerThemedDialog(page);
   await page.waitForURL((url) => url.pathname === "/");
-  await expect(page.getByText("Campaign control", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toBeVisible();
   await expect(page.locator(".loot-opening")).toHaveCount(0);
   const libraryResponse = await page.context().request.get(origin + "/api/account/library");
   expect(libraryResponse.ok()).toBeTruthy();

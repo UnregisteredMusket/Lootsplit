@@ -62,7 +62,7 @@ export function PlayerHome() {
           Campaign, messages & session status →
         </AppLink>
         <AppLink className="settings-link" href="/features/downtime">
-          Downtime & NPC training →
+          Time & downtime →
         </AppLink>
       </section>
       <section className="desk-shortcuts" aria-label="Player features">

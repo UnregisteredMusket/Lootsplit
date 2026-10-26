@@ -272,10 +272,10 @@ async function campaignDevice(options) {
   });
   if (!signup.ok()) throw Error(`Signup ${signup.status()}: ${await signup.text()}`);
   await openApplication(device.page, origin + "/");
-  await device.page.getByText("Campaign control", { exact: true }).waitFor();
+  await device.page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   await seedCampaign(device.page);
   await reloadApplication(device.page);
-  await device.page.getByText("Campaign control", { exact: true }).waitFor();
+  await device.page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   return device;
 }
 

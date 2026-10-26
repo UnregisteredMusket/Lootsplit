@@ -90,10 +90,10 @@ export async function prepareDmFixture(page, origin, { useAccountLink = false } 
     await continueIntoApp(page);
   }
   const claim = page.getByRole("button", { name: "Claim this device’s existing DM campaign", exact: true });
-  const ready = page.getByText("Campaign control", { exact: true });
+  const ready = page.getByRole("heading", { name: "Desk", exact: true, level: 1 });
   await claim.or(ready).first().waitFor();
   if (await claim.isVisible()) await claim.click();
-  await page.getByText("Campaign control", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   if (navigationMarker) {
     if (await page.evaluate(() => window.dmFixtureNavigationAudit) !== navigationMarker)
       throw Error("Account fixture app link replaced the document.");

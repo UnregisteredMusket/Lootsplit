@@ -130,3 +130,17 @@ The public website (`/welcome`, `/features`, `/downloads`, `/updates`, `/help`, 
 - Do not map `--ink`/`--paper` to the app's appearance tokens without a new owner decision.
 - Website contrast and accessibility are still checked by the website and axe audits at every width.
 - The app's own screens keep every appearance option; nothing about app themes changed.
+
+## UI glossary (design plan, owner decision 7, 2026-10-26)
+
+One name per thing in the interface, Help and audits. Renames keep every route, hash and stored ID; only labels change.
+
+| Use | Not | Where |
+| --- | --- | --- |
+| Desk | Campaign control | DM home `/` (page title, Settings link "Desk & sessions") |
+| Shop schedules | Shop Management | `/features/shops` (opening days and restocks; shops are run from Market) |
+| Time & downtime | Downtime | `/features/downtime` (screen title, shortcut label, player Home link) |
+| Add loot | Add holding | Party → Add loot |
+| Review Inbox, with a count | Pending reviews | `/features/review`, Desk readout and tab badge |
+| Party & inventory (players) / Party (DM) | Inventory | `/party` |
+| The campaign's real name, or "Shared campaign · CODE" | Party overview | Campaign switcher |
