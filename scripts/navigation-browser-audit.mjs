@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { tradeFixture } from "../src/lib/quire/test-fixtures/trade-economy.ts";
 import { prepareTradeSeason, previewTradeSeason } from "../src/lib/quire/trade-economy.ts";
-import { featureScreens } from "../src/lib/quire/feature-navigation.ts";
+import { featureTitle } from "../src/lib/quire/feature-navigation.ts";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(origin, /^http:\/\/(localhost|127\.0\.0\.1):/, "Disposable navigation fixtures only");
@@ -86,9 +86,11 @@ async function destination(page, href, label) {
   }
   if (target.pathname.startsWith("/features/")) {
     await expect(
+      // The DM's title or the player's ("Quests" / "Quest log").
       page.getByRole("heading", {
-        name: featureScreens[target.pathname.split("/")[2]].title,
-        exact: true,
+        name: new RegExp(
+          `^(${[true, false].map((dm) => featureTitle(target.pathname.split("/")[2], dm).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})$`,
+        ),
       }),
     ).toBeVisible();
     await expect(
