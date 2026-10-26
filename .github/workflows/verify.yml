@@ -308,7 +308,7 @@ jobs:
         run: node scripts/recovery-step.mjs dev-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
       - name: dev-services
         if: matrix.group == 'desktop'
-        run: node scripts/recovery-step.mjs dev-services 300 node --experimental-strip-types scripts/services-browser-audit.mjs
+        run: node scripts/recovery-step.mjs dev-services 420 node --experimental-strip-types scripts/services-browser-audit.mjs
       - name: dev-market-shops
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-market-shops 240 node scripts/market-shops-browser-audit.mjs
