@@ -65,6 +65,7 @@ import { searchCampaignReference } from "@/lib/quire/cloud-client";
 import { useReferenceAccess } from "@/lib/quire/use-reference-access";
 import type { OpenEntry } from "@/lib/quire/open5e";
 import { downloadJson } from "@/lib/quire/table";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 type Sheet = z.infer<typeof sheetSchema>;
 type Ability = keyof Sheet["scores"];
@@ -327,7 +328,14 @@ export function CharacterWorkspace({
     }
   }
   async function create(sheet = blankSheet(), standalone = false) {
-    if (dirtyRef.current && !window.confirm("Discard unsaved changes to open a new character?"))
+    if (
+      dirtyRef.current &&
+      !(await requestConfirm({
+        title: "Discard unsaved changes?",
+        body: "You are about to open a new character.",
+        tone: "discard",
+      }))
+    )
       return;
     setCreating(true);
     try {
@@ -392,12 +400,16 @@ export function CharacterWorkspace({
                 <select
                   aria-label="Choose character"
                   value={selected}
-                  onChange={(e) => {
+                  onChange={async (e) => {
+                    const id = e.target.value;
                     if (
                       !dirtyRef.current ||
-                      window.confirm("Discard unsaved changes and switch characters?")
+                      (await requestConfirm({
+                        title: "Discard unsaved changes and switch characters?",
+                        tone: "discard",
+                      }))
                     )
-                      chooseCharacter(e.target.value);
+                      chooseCharacter(id);
                   }}
                 >
                   <option value="">Choose a character</option>
@@ -901,8 +913,14 @@ function CharacterEditor({
           </button>
           <button
             disabled={busy}
-            onClick={() => {
-              if (!dirty || window.confirm("Discard unsaved changes and reload this character?")) {
+            onClick={async () => {
+              if (
+                !dirty ||
+                (await requestConfirm({
+                  title: "Discard unsaved changes and reload this character?",
+                  tone: "discard",
+                }))
+              ) {
                 setSheetToolsOpen(false);
                 setReload((n) => n + 1);
               }
@@ -1430,25 +1448,31 @@ function CharacterEditor({
                           Restore short-rest resources
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (
-                              window.confirm(
-                                "Restore HP, spell slots, and short/long-rest resources?",
-                              )
+                              await requestConfirm({
+                                title: "Take a long rest?",
+                                body: "HP, spell slots, and short/long-rest resources are restored.",
+                                confirmLabel: "Long rest",
+                              })
                             )
-                              setSheet({
-                                ...sheet,
-                                hp: sheet.maxHp,
-                                deathSuccesses: 0,
-                                deathFailures: 0,
-                                slots: sheet.slots.map((s) => ({
-                                  ...s,
-                                  used: 0,
-                                })),
-                                resources: sheet.resources.map((r) =>
-                                  r.recovery !== "manual" ? { ...r, current: r.max } : r,
-                                ),
-                              });
+                              // Applied to the sheet as it is now: it may have updated meanwhile.
+                              setSheet(
+                                (sheet) =>
+                                  sheet && {
+                                    ...sheet,
+                                    hp: sheet.maxHp,
+                                    deathSuccesses: 0,
+                                    deathFailures: 0,
+                                    slots: sheet.slots.map((s) => ({
+                                      ...s,
+                                      used: 0,
+                                    })),
+                                    resources: sheet.resources.map((r) =>
+                                      r.recovery !== "manual" ? { ...r, current: r.max } : r,
+                                    ),
+                                  },
+                              );
                           }}
                         >
                           Long rest

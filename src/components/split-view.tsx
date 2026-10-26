@@ -25,6 +25,7 @@ import { ArrowLeftRight, ChevronDown, Columns2, Maximize2, Minimize2, Square, X 
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
 import { cn } from "@/lib/cn";
+import { confirmDiscard } from "@/lib/quire/confirm-store";
 import {
   DEFAULT_SPLIT_LAYOUT,
   SPLIT_MIN_VIEWPORT,
@@ -123,13 +124,31 @@ export function useSplitView(): SplitApi {
 }
 
 const PANE_CLOSE = "lootsplit:before-pane-close";
-/** Ask the screen in a pane whether it may be replaced (unsaved drafts confirm first). */
-export function allowPaneClose(side: PaneSide) {
-  return window.dispatchEvent(new CustomEvent(PANE_CLOSE, { detail: side, cancelable: true }));
+type PaneCloseDetail = { side: PaneSide; subjects: string[] };
+let paneDiscarded = false;
+/**
+ * Ask the screen in a pane whether it may be replaced. With unsaved drafts this returns false and
+ * asks in a themed dialog; "Discard changes" then runs `retry` (the same action) once.
+ */
+export function allowPaneClose(side: PaneSide, retry?: () => void) {
+  if (paneDiscarded) return true;
+  const detail: PaneCloseDetail = { side, subjects: [] };
+  if (window.dispatchEvent(new CustomEvent(PANE_CLOSE, { detail, cancelable: true }))) return true;
+  void confirmDiscard(detail.subjects).then((discard) => {
+    if (!discard || !retry) return;
+    paneDiscarded = true;
+    try {
+      retry();
+    } finally {
+      paneDiscarded = false;
+    }
+  });
+  return false;
 }
-export function onPaneClose(side: PaneSide, listener: (event: Event) => void) {
+export function onPaneClose(side: PaneSide, listener: (event: CustomEvent<PaneCloseDetail>) => void) {
   const handler = (event: Event) => {
-    if ((event as CustomEvent<PaneSide>).detail === side) listener(event);
+    const close = event as CustomEvent<PaneCloseDetail>;
+    if (close.detail.side === side) listener(close);
   };
   window.addEventListener(PANE_CLOSE, handler);
   return () => window.removeEventListener(PANE_CLOSE, handler);
@@ -321,11 +340,18 @@ export function SplitViewProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", key);
   }, [active]);
 
+  // "Discard changes" in the draft prompt repeats the pane action that asked.
+  const retryRef = useRef({
+    openBeside: (_href: string) => {},
+    closePane: (_side: PaneSide) => {},
+    swap: () => {},
+  });
   const openBeside = useCallback(
     (href: string) => {
       const safe = sanitizePaneHref(href, latest.current.dm);
       if (!safe || !getWide()) return;
-      if (latest.current.beside && !allowPaneClose("secondary")) return;
+      if (latest.current.beside && !allowPaneClose("secondary", () => retryRef.current.openBeside(href)))
+        return;
       saveLayout((layout) => rememberBeside(layout, safe));
       setFullWidth(null);
       setFocused("secondary");
@@ -338,7 +364,7 @@ export function SplitViewProvider({ children }: { children: ReactNode }) {
     (side: PaneSide) => {
       const { beside: current, pane: router, secondaryHref: shown } = latest.current;
       if (!current) return;
-      if (!allowPaneClose("secondary")) return;
+      if (!allowPaneClose("secondary", () => retryRef.current.closePane(side))) return;
       setFullWidth(null);
       setFocused("primary");
       saveLayout((layout) => ({ ...layout, open: false }));
@@ -358,7 +384,7 @@ export function SplitViewProvider({ children }: { children: ReactNode }) {
       latest.current;
     const nextBeside = sanitizePaneHref(left, isDm);
     if (!current || !nextBeside) return;
-    if (!allowPaneClose("secondary")) return;
+    if (!allowPaneClose("secondary", () => retryRef.current.swap())) return;
     const target = shown ?? router?.state.location.href ?? current;
     const destination = parts(main, target);
     void main.navigate({
@@ -367,6 +393,9 @@ export function SplitViewProvider({ children }: { children: ReactNode }) {
       replace: true,
     } as never);
   }, [main]);
+  useEffect(() => {
+    retryRef.current = { openBeside, closePane, swap };
+  }, [openBeside, closePane, swap]);
 
   const navigatePane = useCallback(
     (side: PaneSide, href: string) => {

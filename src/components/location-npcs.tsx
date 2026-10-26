@@ -27,6 +27,7 @@ import { ShareRumour } from "./service-talk";
 import { NpcBarterConfigForm } from "./npc-barter-desk";
 import { npcAnswersBarter } from "@/lib/quire/npc-barter";
 import { npcPinOpensHub } from "@/lib/quire/place-hub";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export function LocationNpcs() {
   const t = useWorldTable(),
@@ -415,7 +416,11 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
       </CommandForm>
       <Button
         onClick={() => {
-          if (window.confirm("Close this unsaved NPC draft?")) close();
+          void requestConfirm({
+            title: "Close this unsaved NPC draft?",
+            tone: "discard",
+            confirmLabel: "Discard draft",
+          }).then((discard) => discard && close());
         }}
       >
         Close editor

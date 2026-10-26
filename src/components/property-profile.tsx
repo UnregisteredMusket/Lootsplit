@@ -15,6 +15,7 @@ import type { Holding } from "@/lib/quire/types";
 import { LocationOptions } from "./market-locations";
 import { MarketImageUpload } from "./market-image-upload";
 import { Button, Field, TextInput } from "./ui";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export function PropertyProfileFields({
   draft,
@@ -235,10 +236,14 @@ export function OwnedPropertyProfile({ holding }: { holding: Holding }) {
           <Button
             variant="secondary"
             disabled={busy || imageBusy}
-            onClick={() => {
+            onClick={async () => {
               if (
                 dirty &&
-                !window.confirm("Discard unsaved property particulars and reload current details?")
+                !(await requestConfirm({
+                  title: "Discard unsaved property particulars?",
+                  body: "Current details reload.",
+                  tone: "discard",
+                }))
               )
                 return;
               setBefore(initial);

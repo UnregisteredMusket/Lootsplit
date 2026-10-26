@@ -13,9 +13,10 @@ import {
   switchCampaign,
 } from "@/lib/quire/campaigns";
 import { useSeat } from "@/lib/quire/seat";
-import { Button, Confirm, TextInput } from "@/components/ui";
+import { Button, Confirm, Fold, TextInput } from "@/components/ui";
 
-export function Campaigns() {
+/** Device campaigns. `heading={false}` where the surrounding dialog or card already names it. */
+export function Campaigns({ heading = true }: { heading?: boolean }) {
   const seat = useSeat();
   const { download } = useEconomy();
   const [busy, setBusy] = useState(false);
@@ -46,8 +47,8 @@ export function Campaigns() {
 
   return (
     <section className="mt-6 rounded-lg border border-border p-4">
-      <h2 className="font-display text-2xl tracking-tight">Campaigns</h2>
-      <p className="mt-2 text-sm text-muted">
+      {heading ? <h2 className="font-display text-2xl tracking-tight">Campaigns</h2> : null}
+      <p className={heading ? "mt-2 text-sm text-muted" : "text-sm text-muted"}>
         Each campaign has its own shops, money, catalog, names, and PDFs. The app uses the one that
         is open.
       </p>
@@ -91,21 +92,6 @@ export function Campaigns() {
         >
           Export current campaign
         </Button>
-        <Button
-          variant="danger"
-          disabled={busy}
-          onClick={() => {
-            if (getCloudWatch().joined) {
-              toast.error(
-                "Leave or end the room in Multiplayer before deleting this device’s campaign.",
-              );
-              return;
-            }
-            setRemoving(active.id);
-          }}
-        >
-          Delete current campaign
-        </Button>
       </div>
       {busy ? (
         <p role="status" className="mt-3 text-muted">
@@ -137,14 +123,37 @@ export function Campaigns() {
           New campaign
         </Button>
       </form>
+      {/* Destructive actions sit apart from Export and New campaign (design audit D7). */}
+      <Fold title="Danger zone" hint="Delete the open campaign from this device.">
+        <p className="mb-3 text-sm text-muted">
+          Export a copy first if you want to keep it. Device backups and other campaigns remain.
+        </p>
+        <Button
+          variant="danger"
+          disabled={busy}
+          onClick={() => {
+            if (getCloudWatch().joined) {
+              toast.error(
+                "Leave or end the room in Multiplayer before deleting this device’s campaign.",
+              );
+              return;
+            }
+            setRemoving(active.id);
+          }}
+        >
+          Delete current campaign
+        </Button>
+      </Fold>
       <Confirm
         open={removing !== null}
         onOpenChange={(open) => {
           if (!open) setRemoving(null);
         }}
-        title="Remove this campaign?"
+        title={
+          removing === active.id ? `Delete ${active.name} from this device?` : "Remove this campaign?"
+        }
         body="Delete this campaign’s shops, money, catalog and PDFs from this device? Export a copy first if you want to keep it. Device backups and other campaigns remain. This does not delete a hosted room or another player’s data. Deleting the last campaign opens a new campaign."
-        confirmLabel="Remove"
+        confirmLabel={removing === active.id ? "Delete campaign" : "Remove campaign"}
         onConfirm={() => {
           const id = removing;
           setRemoving(null);

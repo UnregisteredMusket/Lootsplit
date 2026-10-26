@@ -16,7 +16,7 @@ import { readWorld, type CampaignMap } from "@/lib/quire/world-schema";
 import type { MapCombatBinding } from "@/lib/quire/map-combat-schema";
 import { encounterRequest } from "@/lib/encounters/client";
 import { finishMapEncounter, type MapEncounterDetail } from "@/lib/encounters/map-transition";
-import { useDraftGuard, allowContextChange } from "@/lib/quire/use-draft-guard";
+import { useDraftGuard, afterContextChange, allowContextChange } from "@/lib/quire/use-draft-guard";
 import { Button } from "./ui";
 import { SearchSelect } from "./search-select";
 import { AppLink } from "./app-link";
@@ -227,7 +227,7 @@ export function MapCombatWorkspace({
             <Button
               disabled={busy}
               onClick={() => {
-                if (allowContextChange()) setTracker((v) => !v);
+                afterContextChange(() => setTracker((v) => !v));
               }}
             >
               {tracker ? "Close tracker" : "Open encounter tracker"}
@@ -235,7 +235,7 @@ export function MapCombatWorkspace({
             <Button
               disabled={locked}
               onClick={() => {
-                if (allowContextChange()) void returnToMap();
+                afterContextChange(() => void returnToMap());
               }}
             >
               {binding.phase === "prepared"

@@ -37,6 +37,7 @@ import type { Holding, Shop, StockLine, Wealth } from "@/lib/quire/types";
 import { RemoveButton } from "@/components/quire-ui";
 import { CatalogStockPicker, ShopStockList } from "@/components/shop-stock-manager";
 import { Button, Confirm, Segmented, Slider, TextInput } from "@/components/ui";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export function ShopContent({
   shopId,
@@ -121,12 +122,14 @@ export function ShopContent({
         {seat.role === "dm" ? (
           <Button
             variant="secondary"
-            onClick={() => {
+            onClick={async () => {
               if (
                 shop.schedule &&
-                !window.confirm(
-                  "Manually changing availability disables this shop’s schedule. Continue?",
-                )
+                !(await requestConfirm({
+                  title: shop.closed ? "Open this shop by hand?" : "Close this shop by hand?",
+                  body: "Manually changing availability disables this shop’s schedule.",
+                  confirmLabel: shop.closed ? "Open shop" : "Close shop",
+                }))
               )
                 return;
               void economy.updateShop({ ...shop, closed: !shop.closed });

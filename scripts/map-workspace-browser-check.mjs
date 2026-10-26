@@ -4,6 +4,7 @@ import { mapCamera, expectMapFillsScreen } from "./fullscreen-map-browser-check.
 import { openMapSettings, closeMapSettings, selectWorkspaceMap } from "./map-workspace-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { navigateApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { themedDialog } from "./themed-dialogs.mjs";
 
 /** Extends the real connected-map fixture; no production data or account secrets. */
 export async function checkMapWorkspace(page, origin, output, width) {
@@ -56,9 +57,11 @@ export async function checkMapWorkspace(page, origin, output, width) {
   };
   page.on("dialog", reject);
   await closeMapSettings(page);
+  assert.equal(await themedDialog(page).count(), 0, "Closing Settings never asks to discard");
   await openMapSettings(page);
   await expect(parent).toHaveAttribute("data-value", "");
   assert.equal(dialogs, 0, "Reopening the same Settings draft never discards it");
+  assert.equal(await themedDialog(page).count(), 0, "Reopening Settings never asks to discard");
   page.off("dialog", reject);
   await chooseOption(parent, "region-map");
   await closeMapSettings(page);

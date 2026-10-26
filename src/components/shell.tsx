@@ -4,7 +4,12 @@ import { WorkspaceWindows } from "./workspace-windows";
 import { SubmenuBackdrop } from "./submenu-backdrop";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
-import { allowContextChange } from "@/lib/quire/use-draft-guard";
+import {
+  afterContextChange,
+  allowContextChange,
+  confirmContextChange,
+} from "@/lib/quire/use-draft-guard";
+import { dismissDialog } from "@/lib/quire/confirm-store";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
 import { getCampaigns, subscribeCampaigns, serverCampaigns } from "@/lib/quire/campaigns";
@@ -103,6 +108,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
     let live = true;
     void import("@capacitor/app").then(({ App }) => {
       void App.addListener("backButton", ({ canGoBack }) => {
+        if (dismissDialog()) return; // A themed confirmation or prompt cancels first.
         if (overlayRef.current) {
           setManagement(false);
           setCampaignOpen(false);
@@ -115,9 +121,11 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
           close.click();
           return;
         }
-        if (!allowContextChange()) return;
-        if (canGoBack) window.history.back();
-        else void App.exitApp();
+        const back = () => {
+          if (canGoBack) window.history.back();
+          else void App.exitApp();
+        };
+        if (allowContextChange(back)) back();
       }).then((handle) => {
         if (!live) {
           void handle.remove();
@@ -139,7 +147,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
   useEffect(() => {
     split.registerActions({
       openCampaign: () => {
-        if (allowContextChange()) setCampaignOpen(true);
+        afterContextChange(() => setCampaignOpen(true));
       },
       changeRole: () => void requestRoleChange(),
       openManagement: () => setManagement(true),
@@ -250,7 +258,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
               <button
                 className="campaign-switcher"
                 onClick={() => {
-                  if (allowContextChange()) setCampaignOpen(true);
+                  afterContextChange(() => setCampaignOpen(true));
                 }}
                 aria-label="Select campaign"
                 aria-haspopup="dialog"
@@ -332,7 +340,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
                   seatKnown,
                   unreadCount,
                   openCampaign: () => {
-                    if (allowContextChange()) setCampaignOpen(true);
+                    afterContextChange(() => setCampaignOpen(true));
                   },
                   changeRole: () => void requestRoleChange(),
                   openManagement: () => setManagement(true),
@@ -390,7 +398,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
   );
 
   async function requestRoleChange() {
-    if (!seatKnown || !allowContextChange()) return;
+    if (!seatKnown || !(await confirmContextChange())) return;
     const reason = roleChangeBlocked();
     if (reason) return;
     const lock = await loadSeatLock().catch(() => null);

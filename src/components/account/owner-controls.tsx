@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { accountRequest } from "@/lib/account/client";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { OwnerAnalytics } from "./owner-analytics";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 type OwnerData = {
   stats: {
@@ -154,12 +155,14 @@ export function OwnerControls() {
         type="button"
         className="portal-button secondary"
         disabled={busy}
-        onClick={() => {
+        onClick={async () => {
           if (
             dirty &&
-            !window.confirm(
-              "Discard unsaved owner announcement or donation link changes and reload the owner panel?",
-            )
+            !(await requestConfirm({
+              title: "Discard unsaved owner announcement or donation link changes?",
+              body: "The owner panel reloads.",
+              tone: "discard",
+            }))
           )
             return;
           setError("");

@@ -9,6 +9,7 @@ import { openApplication, reloadApplication, navigateApplication } from "./title
 import { chooseOption } from "./search-select-browser.mjs";
 import { closeMapSettings, selectMapType } from "./map-workspace-browser.mjs";
 import { buildWayfarers } from "./product-screenshot-fixture.mjs";
+import { autoAnswerThemedDialogs } from "./themed-dialogs.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!["127.0.0.1", "localhost"].includes(new URL(origin).hostname))
@@ -258,6 +259,7 @@ async function newDevice({ width = 1280, height = 800, scale = 1 } = {}) {
   page.setDefaultTimeout(25000);
   page.on("pageerror", (e) => console.log(`  page error: ${e.message}`));
   page.on("dialog", (d) => void d.accept());
+  await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
   return { context, page };
 }
 

@@ -61,7 +61,7 @@ export function MapWorkspaceChrome({
     )
     .slice(0, 40);
   const choose = (result: MapSearchResult) => {
-    if (!allowContextChange()) return;
+    if (!allowContextChange(() => choose(result))) return;
     selectResult(result);
     setSearching(false);
     setQuery("");

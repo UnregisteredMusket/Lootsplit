@@ -294,7 +294,7 @@ export function useRoutePlanner({
     setCalibrating(undefined);
   }
   function close() {
-    if (!allowContextChange()) return;
+    if (!allowContextChange(close)) return;
     setOpen(false);
     setPoints([]);
     setTerrain([]);

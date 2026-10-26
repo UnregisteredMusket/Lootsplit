@@ -11,6 +11,7 @@ import { mkdir } from "node:fs/promises";
 import { generateEncounter } from "../src/lib/encounters/model.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
 import { localAccountDb } from "./account-dev-db.mjs";
+import { autoAnswerThemedDialogs } from "./themed-dialogs.mjs";
 const origin = process.env.ENCOUNTER_ORIGIN || process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = process.env.ENCOUNTER_SCREENSHOTS || "test-results/encounters";
 await mkdir(output, { recursive: true });
@@ -44,6 +45,7 @@ try {
     page.setDefaultTimeout(30000);
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("dialog", (d) => d.accept());
+    await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
     return { context, page, id };
   }
   const dm = await actor("DM", "192.0.2.221"),
@@ -413,13 +415,14 @@ try {
   await expect(p.getByLabel("Journal entry text", { exact: true })).toHaveValue(
     "Preserve this text while reading linked records.",
   );
-  const draftWarnings = [];
-  const recordDraftWarning = (dialog) => draftWarnings.push(dialog.message());
-  p.on("dialog", recordDraftWarning);
+  // The themed draft warning is answered "Discard changes" by the actor's auto-answer.
+  const warningsBefore = (await p.evaluate(() => window.__themedDialogs?.log ?? [])).length;
   // The campaign's ordinary session card also reaches this exact entry.
   await p.getByRole("link", { name: "Return to Desk", exact: true }).click();
   await p.getByText("Campaign control", { exact: true }).waitFor();
-  p.off("dialog", recordDraftWarning);
+  const draftWarnings = (await p.evaluate(() => window.__themedDialogs?.log ?? [])).slice(
+    warningsBefore,
+  );
   assert.ok(draftWarnings.some((message) => /Discard unsaved journal changes/.test(message)));
   await p.getByRole("link", { name: "Open session controls →", exact: true }).click();
   await p

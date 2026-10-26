@@ -28,6 +28,7 @@ import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { AppLink } from "@/components/app-link";
 import { Button, Fold, Modal } from "@/components/ui";
 import type { ShopCategory } from "@/lib/quire/types";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export const Route = createFileRoute("/market")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -319,12 +320,14 @@ function MarketPage() {
                   </button>
                   <button
                     className="quick-action"
-                    onClick={() => {
+                    onClick={async () => {
                       if (
                         shop.schedule &&
-                        !window.confirm(
-                          "Manually changing availability disables this shop’s schedule. Continue?",
-                        )
+                        !(await requestConfirm({
+                          title: shop.closed ? "Open this shop by hand?" : "Close this shop by hand?",
+                          body: "Manually changing availability disables this shop’s schedule.",
+                          confirmLabel: shop.closed ? "Open shop" : "Close shop",
+                        }))
                       )
                         return;
                       void updateShop({ ...shop, closed: !shop.closed });
@@ -367,9 +370,11 @@ function MarketPage() {
         title={`Restock ${restockShop?.name || "shop"}`}
         onOpenChange={(open) => {
           if (!open) {
-            if (restockQuantity !== "5" && !window.confirm("Discard unsaved restock amount?"))
-              return;
-            setRestockId("");
+            if (restockQuantity === "5") setRestockId("");
+            else
+              void requestConfirm({ title: "Discard unsaved restock amount?", tone: "discard" }).then(
+                (discard) => discard && setRestockId(""),
+              );
           }
         }}
       >

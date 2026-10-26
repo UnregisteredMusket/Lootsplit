@@ -7,6 +7,7 @@ import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
 import { blankEncounter } from "../src/lib/encounters/model.mjs";
 import { openApplication } from "./title-screen-navigation.mjs";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(localhost|127\.0\.0\.1):/.test(origin))
@@ -284,8 +285,8 @@ try {
     await setReferenceControl("Allow lookup during active encounters", false);
     await expect(page.getByText(/Reference lookup is paused while an encounter/)).toBeVisible();
     await openApplication(dmPage, origin + `/encounters?encounter=${id}`);
-    dmPage.once("dialog", (dialog) => dialog.accept());
     await dmPage.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
+    await answerThemedDialog(dmPage);
     await expect(
       dmPage.getByText("Encounter concluded. Review recipients and loot before transferring.", {
         exact: true,

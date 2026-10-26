@@ -11,6 +11,7 @@ import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { AppLink } from "./app-link";
 import { CoinAmountInput, FinanceReadiness } from "./finance-input";
 import { Button, TextInput } from "./ui";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export function CampaignOperations({
   section = "all",
@@ -142,10 +143,14 @@ function ShopPlan({
   const nextRestock = shop.schedule?.restockEveryDays
     ? shop.schedule.lastRestockDay + shop.schedule.restockEveryDays
     : undefined;
-  function reload() {
+  async function reload() {
     if (
       dirty &&
-      !window.confirm("Discard unsaved shop schedule changes and reload current settings?")
+      !(await requestConfirm({
+        title: "Discard unsaved shop schedule changes?",
+        body: "Current settings reload.",
+        tone: "discard",
+      }))
     )
       return;
     const next = initial;
@@ -196,16 +201,18 @@ function ShopPlan({
             max="30"
             required
             value={draft.cycle}
-            onChange={(e) => {
+            onChange={async (e) => {
               const cycle = Number(e.target.value);
               if (
                 days.some((d) => d >= cycle) &&
-                !window.confirm(
-                  "The shorter cycle excludes selected opening days. Keep those selections for review? They must be corrected before saving.",
-                )
+                !(await requestConfirm({
+                  title: "Keep the excluded opening days for review?",
+                  body: "The shorter cycle excludes selected opening days. They must be corrected before saving.",
+                  confirmLabel: "Keep for review",
+                }))
               )
                 return;
-              setDraft({ ...draft, cycle });
+              setDraft((current) => ({ ...current, cycle }));
             }}
           />
         </label>
@@ -306,7 +313,12 @@ function ShopPlan({
             onClick={async () => {
               if (
                 dirty &&
-                !window.confirm("Discard your unsaved schedule and disable the stored schedule?")
+                !(await requestConfirm({
+                  title: "Discard your unsaved schedule?",
+                  body: "The stored schedule is disabled too.",
+                  tone: "danger",
+                  confirmLabel: "Discard and disable schedule",
+                }))
               )
                 return;
               try {
@@ -453,8 +465,14 @@ export function PropertyFinancialPlan({ holding }: { holding: Holding }) {
         <Button
           type="button"
           variant="secondary"
-          onClick={() => {
-            if (dirty && !window.confirm("Discard unsaved property plan changes and reload?"))
+          onClick={async () => {
+            if (
+              dirty &&
+              !(await requestConfirm({
+                title: "Discard unsaved property plan changes and reload?",
+                tone: "discard",
+              }))
+            )
               return;
             const next = initial;
             setDraft(next);

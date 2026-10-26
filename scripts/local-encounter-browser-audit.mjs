@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { checkManualInitiative } from "./initiative-browser-check.mjs";
+import { autoAnswerThemedDialogs } from "./themed-dialogs.mjs";
 const origin = process.env.ENCOUNTER_ORIGIN || "http://127.0.0.1:8080";
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
@@ -14,6 +15,7 @@ try {
   await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
   const page = await context.newPage();
   page.on("dialog", (d) => d.accept());
+  await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await openApplication(page, origin + "/encounters");

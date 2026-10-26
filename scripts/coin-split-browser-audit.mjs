@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { autoAnswerThemedDialogs } from "./themed-dialogs.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
@@ -137,6 +138,7 @@ try {
     // Encounter award, One purse (design audit D1): the recipient picker stays in the text column,
     // so "One purse" and its note keep a readable width instead of one letter per line.
     page.on("dialog", (d) => d.accept());
+    await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
     const onePurseId = await page.evaluate(async () => {
       const { localEncounterRequest: call } = await import("/src/lib/encounters/local.ts");
       const { blankEncounter, blankLoot } = await import("/src/lib/encounters/model.mjs");

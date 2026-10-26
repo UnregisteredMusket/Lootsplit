@@ -17,6 +17,7 @@ import type { Shop } from "@/lib/quire/types";
 import { Button, Fold, Select, TextInput } from "./ui";
 import { MarketImageUpload } from "./market-image-upload";
 import { MarketNameImport } from "./market-name-import";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export function LocationOptions({ market }: { market: MarketLocations }) {
   const byId = new Map(market.locations.map((l) => [l.id, l]));
@@ -328,8 +329,15 @@ function LocationEditor({
           <Button
             variant="danger"
             disabled={busy || imageBusy || used}
-            onClick={() => {
-              if (window.confirm(`Remove ${location.name}?`)) void save(true);
+            onClick={async () => {
+              if (
+                await requestConfirm({
+                  title: `Remove ${location.name}?`,
+                  tone: "danger",
+                  confirmLabel: "Remove location",
+                })
+              )
+                void save(true);
             }}
           >
             Remove location

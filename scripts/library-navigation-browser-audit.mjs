@@ -3,6 +3,7 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
 import { mkdir } from "node:fs/promises";
+import { answerThemedDialog, themedDialog } from "./themed-dialogs.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(localhost|127\.0\.0\.1):/.test(origin))
   throw Error("Navigation fixtures require disposable loopback data.");
@@ -107,17 +108,17 @@ try {
       await text.fill("A synthetic draft must survive cancelled navigation.");
       const here = page.url(),
         dialogs = [];
-      let discard = false;
-      const dialog = async (d) => {
-        dialogs.push(d.message());
-        await (discard ? d.accept() : d.dismiss());
+      // The themed "Discard changes / Keep editing" question answers each guarded navigation.
+      const guarded = async (discard, navigation) => {
+        const answer = answerThemedDialog(page, { accept: discard });
+        await navigation();
+        dialogs.push(await answer);
       };
-      page.on("dialog", dialog);
-      await page.getByRole("link", { name: /^Return to / }).click();
-      await expect.poll(() => dialogs.length).toBe(1);
+      await guarded(false, () => page.getByRole("link", { name: /^Return to / }).click());
+      assert.match(dialogs[0], /Discard unsaved journal changes/);
       assert.equal(page.url(), here);
-      await page.goBack();
-      await expect.poll(() => dialogs.length).toBe(2);
+      await guarded(false, () => page.goBack());
+      assert.equal(dialogs.length, 2);
       await expect.poll(() => page.url()).toBe(here);
       await expect(title).toHaveValue(`Retained ${theme} journal`);
       await expect(text).toHaveValue("A synthetic draft must survive cancelled navigation.");
@@ -125,27 +126,23 @@ try {
       await page.screenshot({
         path: `test-results/library-navigation/journal-${theme}-${width}.png`,
       });
-      discard = true;
-      await page.goBack();
+      await guarded(true, () => page.goBack());
       await page.locator(".information-strip").waitFor();
-      assert.equal(dialogs.length, 3, "One prompt for intentional Back");
+      assert.equal(await themedDialog(page).count(), 0, "One prompt for intentional Back");
       await page.goForward();
       await expect(title).toHaveValue("");
       await page.getByRole("link", { name: /^Return to / }).click();
       await page.locator(".information-strip").waitFor();
       await page.goBack();
       await title.fill("Guarded forward draft");
-      discard = false;
       const forwardHere = page.url();
-      await page.goForward();
-      await expect.poll(() => dialogs.length).toBe(4);
+      await guarded(false, () => page.goForward());
       await expect.poll(() => page.url()).toBe(forwardHere);
       await expect(title).toHaveValue("Guarded forward draft");
-      discard = true;
-      await page.goForward();
+      await guarded(true, () => page.goForward());
       await page.locator(".information-strip").waitFor();
       assert.equal(dialogs.length, 5);
-      page.off("dialog", dialog);
+      assert.equal(await themedDialog(page).count(), 0);
       await stillOpen();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     }
@@ -176,24 +173,25 @@ try {
     const introduction = page.getByLabel("Introduction", { exact: true });
     await introduction.fill("An unsaved account introduction");
     const profileDialogs = [];
-    let discardProfile = false;
-    const profileDialog = async (d) => {
-      profileDialogs.push(d.message());
-      await (discardProfile ? d.accept() : d.dismiss());
+    const profileGuarded = async (discard, navigation) => {
+      const answer = answerThemedDialog(page, { accept: discard });
+      await navigation();
+      profileDialogs.push(await answer);
     };
-    page.on("dialog", profileDialog);
-    await page.getByRole("link", { name: "Open the app", exact: true }).first().click();
-    await expect.poll(() => profileDialogs.length).toBe(1);
+    await profileGuarded(false, () =>
+      page.getByRole("link", { name: "Open the app", exact: true }).first().click(),
+    );
+    assert.match(profileDialogs[0], /Discard unsaved profile changes/);
     await expect(introduction).toHaveValue("An unsaved account introduction");
-    await page.goBack();
-    await expect.poll(() => profileDialogs.length).toBe(2);
+    await profileGuarded(false, () => page.goBack());
     await expect(introduction).toHaveValue("An unsaved account introduction");
     await stillOpen();
-    discardProfile = true;
-    await page.getByRole("link", { name: "Open the app", exact: true }).first().click();
+    await profileGuarded(true, () =>
+      page.getByRole("link", { name: "Open the app", exact: true }).first().click(),
+    );
     await page.locator(".information-strip").waitFor();
     assert.equal(profileDialogs.length, 3);
-    page.off("dialog", profileDialog);
+    assert.equal(await themedDialog(page).count(), 0);
     await stillOpen();
     await page.locator(".campaign-switcher").click();
     await page.getByRole("link", { name: "Saved account campaigns →", exact: true }).click();

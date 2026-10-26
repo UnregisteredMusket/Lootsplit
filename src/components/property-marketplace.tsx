@@ -36,6 +36,7 @@ import { ESTATE_CATALOGUE } from "@/lib/quire/estate-catalogue";
 import { isImportedEstateListingId } from "@/lib/quire/estate";
 import { TemplateWorkshop } from "./property-operations";
 import "./property-marketplace.css";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 function PropertyImage({
   listing,
@@ -496,12 +497,12 @@ export function PropertyMarketplace() {
         open={editing !== null}
         onOpenChange={(open) => {
           if (open || editorState.busy) return;
-          if (
-            editorState.dirty &&
-            !window.confirm("Discard your unsaved property listing or template draft?")
-          )
-            return;
-          setEditing(null);
+          if (!editorState.dirty) setEditing(null);
+          else
+            void requestConfirm({
+              title: "Discard your unsaved property listing or template draft?",
+              tone: "discard",
+            }).then((discard) => discard && setEditing(null));
         }}
         title={editing === "new" ? "Post a property deed" : "Edit property listing"}
       >
@@ -887,8 +888,14 @@ function PropertyListingEditor({
         <Button
           variant="secondary"
           disabled={templateState.busy}
-          onClick={() => {
-            if (window.confirm("Discard this unsaved template and return to your listing draft?"))
+          onClick={async () => {
+            if (
+              await requestConfirm({
+                title: "Discard this unsaved template?",
+                body: "You return to your listing draft, which is retained.",
+                tone: "discard",
+              })
+            )
               returnToListing();
           }}
         >
@@ -1045,10 +1052,14 @@ function PropertyListingEditor({
             <Button
               variant="secondary"
               disabled={busy || imageBusy}
-              onClick={() => {
+              onClick={async () => {
                 if (
                   dirty &&
-                  !window.confirm("Discard your unsaved listing draft and reload current details?")
+                  !(await requestConfirm({
+                    title: "Discard your unsaved listing draft?",
+                    body: "Current details reload.",
+                    tone: "discard",
+                  }))
                 )
                   return;
                 if (!current) {
@@ -1083,11 +1094,14 @@ function PropertyListingEditor({
             <Button
               variant="danger"
               disabled={busy || imageBusy || locked || stale}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    `Remove ${before.name} from the property register? Owned deeds and receipts will be retained.`,
-                  )
+                  await requestConfirm({
+                    title: `Remove ${before.name} from the property register?`,
+                    body: "Owned deeds and receipts will be retained.",
+                    tone: "danger",
+                    confirmLabel: "Remove property listing",
+                  })
                 )
                   void save(true);
               }}

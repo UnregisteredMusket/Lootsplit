@@ -3,6 +3,7 @@ import { navigateApplication } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
+import { autoAnswerThemedDialogs } from "./themed-dialogs.mjs";
 
 /** Called from the full map audit on development and immutable Worker fixtures. */
 export async function checkPlayerDisplay(page, context, width, output) {
@@ -90,6 +91,7 @@ export async function checkPlayerDisplay(page, context, width, output) {
   );
   await expect(viewer.getByRole("img", { name: "Keep map", exact: true })).toBeVisible();
   page.on("dialog", (dialog) => dialog.accept());
+  await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
   await page.getByLabel("Round", { exact: true }).fill("3");
   // An unfinished edit is deliberately absent from the shared display.
   await expect(viewer.getByRole("heading", { name: "Round 1", exact: true })).toBeVisible();

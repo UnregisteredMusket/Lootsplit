@@ -130,6 +130,7 @@ import type {
   Wealth,
 } from "./types.ts";
 import type { RarityFlags, ShelfDraft } from "./compose.ts";
+import { requestConfirm } from "./confirm-store.ts";
 
 const ECONOMY = ["purses", "holdings", "shops", "stock", "ledger", "meta"] as const;
 
@@ -2344,9 +2345,11 @@ export async function applyBill(file: BillFile): Promise<number> {
       );
     }
     if (
-      !window.confirm(
-        `Approve this manual player report? These changes are not server-verified.\n\n${changes.join("\n\n")}\n\nOnly approve funds and items authorized by your campaign.`,
-      )
+      !(await requestConfirm({
+        title: "Approve this manual player report?",
+        body: `These changes are not server-verified.\n\n${changes.join("\n\n")}\n\nOnly approve funds and items authorized by your campaign.`,
+        confirmLabel: "Approve report",
+      }))
     )
       throw new Error("Player report was not approved. No campaign data changed.");
     if (campaign !== activeDatabaseName() || getSeat().role !== "dm")

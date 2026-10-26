@@ -17,6 +17,7 @@ const featureAudits = {
   "journey-planner": "scripts/journey-planner-browser-audit.mjs",
   "party-split": "scripts/party-split-browser-audit.mjs",
   services: "scripts/services-browser-audit.mjs",
+  "themed-confirm": "scripts/themed-confirm-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))

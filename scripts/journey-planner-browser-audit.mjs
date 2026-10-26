@@ -10,6 +10,7 @@ import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { checkJourneyPhaseB } from "./journey-planner-browser-steps.mjs";
 import { checkJourneyDiscoverability } from "./journey-discoverability-browser-steps.mjs";
+import { autoAnswerThemedDialogs } from "./themed-dialogs.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = "test-results/journey-planner";
@@ -120,6 +121,7 @@ try {
     page.on("pageerror", (e) => errors.push(e.message));
     // Closing a drawn route asks before discarding it; the audit confirms.
     page.on("dialog", (dialog) => void dialog.accept());
+    await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
     await openApplication(page, origin + "/maps");
     await seedJourneyCampaign(page);
     await reloadApplication(page, origin + "/maps?map=vale-map");

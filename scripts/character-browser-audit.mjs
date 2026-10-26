@@ -4,6 +4,7 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080",
   output = process.env.CHARACTER_SCREENSHOTS || "test-results/characters";
 await mkdir(output, { recursive: true });
@@ -229,8 +230,8 @@ try {
   const exported = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export sheet / draft", exact: true }).click();
   assert.match((await exported).suggestedFilename(), /Mira_Ashfall-character.json$/);
-  page.once("dialog", dialog => dialog.dismiss());
   await page.getByRole("button", { name: "Reload sheet", exact: true }).click();
+  await answerThemedDialog(page, { accept: false });
   await page.getByRole("dialog", { name: "Sheet tools", exact: true }).waitFor();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   assert.equal(await sheetTools.evaluate(el => document.activeElement === el), true);

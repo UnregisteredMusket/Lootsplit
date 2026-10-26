@@ -44,6 +44,31 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
+  {
+    // Native dialogs are unthemed system boxes in the Android WebView and block the page:
+    // use useConfirm / usePrompt (src/lib/quire/confirm-store.ts) instead (design audit D7).
+    files: ["src/**/*.{ts,tsx,js,jsx,mjs}"],
+    ignores: ["src/**/*.test.{ts,tsx,mjs}"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...["confirm", "prompt", "alert"].map((name) => ({
+          name,
+          message: "Use useConfirm()/usePrompt() from @/lib/quire/confirm-store.",
+        })),
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...["window", "globalThis", "self"].flatMap((object) =>
+          ["confirm", "prompt", "alert"].map((property) => ({
+            object,
+            property,
+            message: "Use useConfirm()/usePrompt() from @/lib/quire/confirm-store.",
+          })),
+        ),
+      ],
+    },
+  },
   // Disable rules that conflict with Prettier formatting.
   prettier,
 );

@@ -17,6 +17,7 @@ import { FantasyIcon } from "./fantasy-icon";
 import { ArrowLeftRight, Coins, PackageOpen, Search, UserRound, X } from "lucide-react";
 import { toCopper } from "@/lib/quire/money";
 import { NpcBarterDesk } from "./npc-barter-desk";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 export function CampaignTrading() {
   const t = useWorldTable(),
     world = readWorld(t.journal.world),
@@ -392,7 +393,11 @@ function TradeEditor({
       </CommandForm>
       <Button
         onClick={() => {
-          if (window.confirm("Close this unsaved offer?")) close();
+          void requestConfirm({
+            title: "Close this unsaved offer?",
+            tone: "discard",
+            confirmLabel: "Discard offer",
+          }).then((discard) => discard && close());
         }}
       >
         Close offer editor

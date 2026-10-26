@@ -15,6 +15,7 @@ import { readFinance, type Terms, type Debt } from "@/lib/quire/finance";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import type { CommandInput } from "@/lib/quire/commands";
 import { Button } from "./ui";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 const defaults: Terms = {
   name: "",
   purseId: "",
@@ -101,8 +102,16 @@ export function CampaignFinance({
   const debt = f.loans.reduce((n, l) => n + l.principal + l.interest, 0);
   const cash = purses.reduce((n, p) => n + toCopper(p.coins), 0);
   const inventory = holdings.reduce((n, h) => n + h.quantity * h.unitCopper, 0);
-  const edit = (l: Debt) => {
-    if (termsDirty && !window.confirm("Discard unsaved loan terms and edit another loan?")) return;
+  const edit = async (l: Debt) => {
+    if (
+      termsDirty &&
+      !(await requestConfirm({
+        title: "Discard unsaved loan terms?",
+        body: "You are about to edit another loan.",
+        tone: "discard",
+      }))
+    )
+      return;
     setLoanEntryRevision((v) => v + 1);
     setTerms(l);
     setTermsBefore(l);
@@ -465,7 +474,7 @@ export function CampaignFinance({
               )}
               {l.principal + l.interest > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  <Button disabled={busy || !!pending} variant="secondary" onClick={() => edit(l)}>
+                  <Button disabled={busy || !!pending} variant="secondary" onClick={() => void edit(l)}>
                     Edit terms
                   </Button>
                   <form
@@ -517,10 +526,14 @@ export function CampaignFinance({
                 <Button
                   disabled={busy || !!pending}
                   variant="secondary"
-                  onClick={() => {
+                  onClick={async () => {
                     if (
                       termsDirty &&
-                      !window.confirm("Discard unsaved loan terms and record this existing debt?")
+                      !(await requestConfirm({
+                        title: "Discard unsaved loan terms?",
+                        body: "You are about to record this existing debt.",
+                        tone: "discard",
+                      }))
                     )
                       return;
                     // A request opened from a bank link starts from that bank's terms (NPC services).
@@ -696,8 +709,12 @@ export function CampaignFinance({
             {(editing || source) && (
               <Button
                 variant="secondary"
-                onClick={() => {
-                  if (termsDirty && !window.confirm("Discard unsaved loan terms?")) return;
+                onClick={async () => {
+                  if (
+                    termsDirty &&
+                    !(await requestConfirm({ title: "Discard unsaved loan terms?", tone: "discard" }))
+                  )
+                    return;
                   setLoanEntryRevision((v) => v + 1);
                   setEditing("");
                   setSource("");
@@ -737,10 +754,14 @@ export function CampaignFinance({
               <Button
                 disabled={busy || !!pending}
                 variant="secondary"
-                onClick={() => {
+                onClick={async () => {
                   if (
                     ruleDirty &&
-                    !window.confirm("Discard unsaved recurring schedule and edit another?")
+                    !(await requestConfirm({
+                      title: "Discard unsaved recurring schedule?",
+                      body: "You are about to edit another schedule.",
+                      tone: "discard",
+                    }))
                   )
                     return;
                   setRuleEntryRevision((v) => v + 1);
