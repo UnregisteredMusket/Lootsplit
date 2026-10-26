@@ -87,9 +87,12 @@ test("display names: shared rooms show the DM's name or the code fallback", () =
   // Device campaigns keep their own names, including the old default.
   assert.equal(campaignDisplayName({ joined: false, role: "dm", deviceName: "Party overview" }), "Party overview");
   assert.equal(campaignTabTitle("The Wayfarers", "Mira"), "Mira · The Wayfarers");
-  assert.equal(membershipDisplayName({ name: "Campaign", code: "ABCD12", campaignName: "The Wayfarers" }), "The Wayfarers");
-  assert.equal(membershipDisplayName({ name: "Tuesday game", code: "ABCD12", campaignName: "The Wayfarers" }), "Tuesday game");
-  assert.equal(membershipDisplayName({ name: "Party overview", code: "ABCD12" }), "Shared campaign · ABCD12");
+  assert.equal(membershipDisplayName({ name: "Campaign", campaignName: "The Wayfarers" }), "The Wayfarers");
+  assert.equal(membershipDisplayName({ name: "Tuesday game", campaignName: "The Wayfarers" }), "Tuesday game");
+  assert.equal(membershipDisplayName({ name: "Party overview" }), "Unnamed campaign");
+  // The fallback text is never treated as a real name (a device copy may have been saved with it).
+  assert.equal(roomCampaignName("Shared campaign · ABCD12"), undefined);
+  assert.equal(campaignDisplayName({ ...base, role: "dm", deviceName: "Shared campaign · OLD1" }), "Shared campaign · ABCD12");
 });
 
 test("the DM's campaign name reaches players; only the DM can change it", async () => {

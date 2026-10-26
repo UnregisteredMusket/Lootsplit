@@ -1,4 +1,4 @@
-import { campaignDisplayName } from "../quire/campaign-name";
+import { roomCampaignName } from "../quire/campaign-name";
 import { reloadCampaignContext } from "../quire/navigation-launch.ts";
 import { getCampaigns, createCampaign } from "../quire/campaigns";
 import { getSeat } from "../quire/table";
@@ -51,16 +51,11 @@ export async function linkCurrentCampaign() {
   const credentials = await prepareAccountMembership();
   const state = getCampaigns();
   const cloud = getCloudTable();
-  // A player's library entry takes the DM's campaign name (or "Shared campaign · CODE"),
-  // never this device's default name.
-  const name = campaignDisplayName({
-    deviceName: state.campaigns.find((c) => c.id === state.activeId)?.name,
-    joined: cloud.joined,
-    role: cloud.role,
-    code: cloud.code,
-    roomName: cloud.campaignName,
-  });
-  await accountRequest("link", { ...credentials, name });
+  const deviceName = state.campaigns.find((c) => c.id === state.activeId)?.name || "Campaign";
+  // A player's library entry takes the DM's campaign name when the room has one; otherwise
+  // (and for the DM) the device campaign's name, as before.
+  const roomName = cloud.joined && cloud.role === "player" ? roomCampaignName(cloud.campaignName) : undefined;
+  await accountRequest("link", { ...credentials, name: roomName ?? deviceName });
 }
 export async function restoreAccountBackup(id: string, name: string) {
   if (getCloudTable().joined || hasPendingChanges() || getSeat().role !== "dm")

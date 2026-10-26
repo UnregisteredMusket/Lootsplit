@@ -11,7 +11,9 @@ const DEFAULT_NAMES = new Set(["party overview", "campaign", "new campaign", "du
 
 export function isDefaultCampaignName(name: string | undefined | null): boolean {
   const clean = (name ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-  return !clean || DEFAULT_NAMES.has(clean);
+  // The display fallback ("Shared campaign · CODE") is never a name either, even if a library
+  // entry or device campaign was saved with it.
+  return !clean || DEFAULT_NAMES.has(clean) || /^shared campaign( · [a-z0-9]+)?$/.test(clean);
 }
 
 /** The name stored on a room: trimmed, at most 60 characters, never a device default. */
@@ -64,17 +66,10 @@ export function campaignTabTitle(campaign: string, character?: string): string {
 }
 
 /**
- * The membership card title on My account: the name chosen in the account library, unless it is
- * a device default ("Campaign", "Party overview"), then the DM's name, then the code fallback.
+ * The membership card title on My account (its eyebrow already shows the code): the name chosen
+ * in the account library, unless it is a device default ("Campaign", "Party overview"), then the
+ * DM's name, then "Unnamed campaign".
  */
-export function membershipDisplayName(member: {
-  name: string;
-  code: string;
-  campaignName?: string;
-}): string {
-  return (
-    roomCampaignName(member.name) ??
-    roomCampaignName(member.campaignName) ??
-    sharedCampaignFallback(member.code)
-  );
+export function membershipDisplayName(member: { name: string; campaignName?: string }): string {
+  return roomCampaignName(member.name) ?? roomCampaignName(member.campaignName) ?? "Unnamed campaign";
 }
