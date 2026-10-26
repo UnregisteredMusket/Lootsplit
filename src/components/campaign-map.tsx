@@ -24,7 +24,7 @@ import {
   mapReferenceName,
 } from "@/lib/quire/connected-maps";
 import type { MapRecordReference } from "@/lib/quire/connected-maps-schema";
-import { allowContextChange } from "@/lib/quire/use-draft-guard";
+import { afterContextChange, allowContextChange } from "@/lib/quire/use-draft-guard";
 import { loadHandouts, type Handout } from "@/lib/quire/handouts";
 import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
@@ -224,10 +224,10 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     if (entry) setEntryCamera({ mapId: id, view: entry, nonce: crypto.randomUUID() });
     else setEntryCamera(undefined);
     if (requestedMap === id) {
-      if (allowContextChange()) {
+      afterContextChange(() => {
         setSelected(id);
         setTypeFilter("");
-      }
+      });
     } else
       void navigate({ to: "/maps", search: { map: id } }).then(() => {
         if (router.state.location.search.map === id) {
@@ -946,7 +946,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                   point={point}
                   done={() => endPlacing(placeRequest.reference)}
                   cancel={() => {
-                    if (allowContextChange()) endPlacing();
+                    afterContextChange(() => endPlacing());
                   }}
                 />
               ) : undefined
@@ -1140,7 +1140,7 @@ function MapEditor({
     <MapFrame
       editor
       onClose={() => {
-        if (allowContextChange()) close();
+        afterContextChange(() => close());
       }}
     >
       <section className="journal-entry">
@@ -1838,7 +1838,7 @@ function MapViewport({
       planner.close();
       return;
     }
-    if (!allowContextChange()) return;
+    if (!allowContextChange(() => openPlanner())) return;
     tools.cancel();
     sketches.cancel();
     stopPlacing();
@@ -1894,7 +1894,12 @@ function MapViewport({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [framing, map.id, artworkReady]);
   const openSettings = () => {
-    if (!drawerOpen && (tools.inspecting || service || combatOpen) && !allowContextChange()) return;
+    if (
+      !drawerOpen &&
+      (tools.inspecting || service || combatOpen) &&
+      !allowContextChange(() => openSettings())
+    )
+      return;
     tools.hideInspector();
     setDetails([]);
     setService(undefined);
@@ -1903,7 +1908,7 @@ function MapViewport({
     setDrawerOpen(!drawerOpen);
   };
   const openCombat = () => {
-    if (!allowContextChange()) return;
+    if (!allowContextChange(() => openCombat())) return;
     setCombatOpen(true);
     setMoreTools(false);
     setDetails([]);
@@ -1913,6 +1918,7 @@ function MapViewport({
     tools.hideInspector();
   };
   const chooseTool = (tool: Parameters<typeof tools.activateTool>[0]) => {
+    if (!allowContextChange(() => chooseTool(tool))) return;
     if (planner.active && !["pan", "select"].includes(tool)) planner.close();
     if (!tools.activateTool(tool)) return;
     stopPlacing();
@@ -1927,7 +1933,7 @@ function MapViewport({
     root.current?.focus();
   };
   const focusRecord = (record: MapRecord) => {
-    if (!allowContextChange()) return;
+    if (!allowContextChange(() => focusRecord(record))) return;
     if (record.point)
       setView((v) => ({
         ...v,
@@ -1979,12 +1985,15 @@ function MapViewport({
         if (drawerOpen) setDrawerOpen(false);
         else if (moreTools) setMoreTools(false);
         else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
-          if (!allowContextChange()) return;
-          setHereOpen(false);
-          setService(undefined);
-          setDetails([]);
-          setCombatOpen(false);
-          tools.hideInspector();
+          const closeAll = () => {
+            setHereOpen(false);
+            setService(undefined);
+            setDetails([]);
+            setCombatOpen(false);
+            tools.hideInspector();
+          };
+          if (!allowContextChange(() => (closeAll(), root.current?.focus()))) return;
+          closeAll();
         } else if (planner.active) {
           planner.close();
         } else if (
@@ -1994,12 +2003,15 @@ function MapViewport({
           sketches.active ||
           !["pan", "select"].includes(tools.tool)
         ) {
-          if (!allowContextChange()) return;
-          tools.cancel();
-          sketches.cancel();
-          stopPlacing();
-          setPinging(false);
-          setContextOpen(false);
+          const cancelTools = () => {
+            tools.cancel();
+            sketches.cancel();
+            stopPlacing();
+            setPinging(false);
+            setContextOpen(false);
+          };
+          if (!allowContextChange(() => (cancelTools(), root.current?.focus()))) return;
+          cancelTools();
         } else return;
         e.preventDefault();
         root.current?.focus();
@@ -2021,15 +2033,19 @@ function MapViewport({
         !signals.viewOnly &&
         !drawerOpen &&
         !service &&
-        !combatOpen &&
-        allowContextChange()
+        !combatOpen
       ) {
-        e.preventDefault();
-        tools.cancel();
-        sketches.cancel();
-        stopPlacing();
-        setPinging(!pinging);
-        root.current?.focus();
+        const ping = () => {
+          tools.cancel();
+          sketches.cancel();
+          stopPlacing();
+          setPinging(!pinging);
+          root.current?.focus();
+        };
+        if (allowContextChange(ping)) {
+          e.preventDefault();
+          ping();
+        }
       }
       if (tool && !drawerOpen && !service && !combatOpen) {
         e.preventDefault();
@@ -2112,20 +2128,21 @@ function MapViewport({
         navigation={navigation}
         results={searchResults}
         selectResult={(result) => {
-          if (!allowContextChange()) return;
-          if (result.mapId === map.id) {
-            if (result.record) focusRecord(result.record);
-          } else
-            selectMap(
-              result.mapId,
-              result.record?.point ? { ...result.record.point, zoom: 1.5 } : undefined,
-            );
+          afterContextChange(() => {
+            if (result.mapId === map.id) {
+              if (result.record) focusRecord(result.record);
+            } else
+              selectMap(
+                result.mapId,
+                result.record?.point ? { ...result.record.point, zoom: 1.5 } : undefined,
+              );
+          });
         }}
         settingsOpen={drawerOpen}
         toggleSettings={openSettings}
         hidden={interfaceHidden}
         setHidden={(hidden) => {
-          if (allowContextChange()) setInterfaceHidden(hidden);
+          afterContextChange(() => setInterfaceHidden(hidden));
         }}
       />
       <div
@@ -2327,14 +2344,15 @@ function MapViewport({
                     disabled={signals.viewOnly}
                     aria-pressed={pinging}
                     onClick={() => {
-                      if (!allowContextChange()) return;
-                      tools.cancel();
-                      sketches.cancel();
-                      stopPlacing();
-                      setPinging(!pinging);
-                      setContextOpen(false);
-                      setDrawerOpen(false);
-                      root.current?.focus();
+                      afterContextChange(() => {
+                        tools.cancel();
+                        sketches.cancel();
+                        stopPlacing();
+                        setPinging(!pinging);
+                        setContextOpen(false);
+                        setDrawerOpen(false);
+                        root.current?.focus();
+                      });
                     }}
                   >
                     <Crosshair size={19} />
@@ -2375,14 +2393,15 @@ function MapViewport({
                       aria-label="Place marker"
                       aria-pressed={placementKind === "marker"}
                       onClick={() => {
-                        if (!allowContextChange()) return;
-                        tools.cancel();
-                        sketches.cancel();
-                        setPinging(false);
-                        beginMarker();
-                        setDrawerOpen(false);
-                        setContextOpen(false);
-                        root.current?.focus();
+                        afterContextChange(() => {
+                          tools.cancel();
+                          sketches.cancel();
+                          setPinging(false);
+                          beginMarker();
+                          setDrawerOpen(false);
+                          setContextOpen(false);
+                          root.current?.focus();
+                        });
                       }}
                     >
                       <MapPin size={19} />
@@ -2394,10 +2413,11 @@ function MapViewport({
                     title="Drawing & annotations"
                     aria-pressed={sketches.active}
                     onClick={() => {
-                      if (!allowContextChange()) return;
-                      chooseTool("pan");
-                      sketches.setActive(true);
-                      setContextOpen(true);
+                      afterContextChange(() => {
+                        chooseTool("pan");
+                        sketches.setActive(true);
+                        setContextOpen(true);
+                      });
                     }}
                   >
                     <Pencil size={19} />
@@ -2484,13 +2504,14 @@ function MapViewport({
                       title="Place existing record"
                       aria-label="Place existing record"
                       onClick={() => {
-                        if (!allowContextChange()) return;
-                        tools.cancel();
-                        sketches.cancel();
-                        setPinging(false);
-                        beginRecord();
-                        setDrawerOpen(true);
-                        setSettingsTab("settings");
+                        afterContextChange(() => {
+                          tools.cancel();
+                          sketches.cancel();
+                          setPinging(false);
+                          beginRecord();
+                          setDrawerOpen(true);
+                          setSettingsTab("settings");
+                        });
                       }}
                     >
                       <Store size={19} />
@@ -2571,11 +2592,11 @@ function MapViewport({
               {sketches.active ? sketches.controls : tools.contextControls}
               <button
                 onClick={() => {
-                  if (allowContextChange()) {
+                  afterContextChange(() => {
                     tools.cancel();
                     sketches.cancel();
                     setContextOpen(false);
-                  }
+                  });
                 }}
               >
                 Cancel tool
@@ -2642,13 +2663,14 @@ function MapViewport({
           className="map-here-button map-glass"
           title="What you can use at the party's location"
           onClick={() => {
-            if (!allowContextChange()) return;
-            setDetails([]);
-            setService(undefined);
-            setDrawerOpen(false);
-            setCombatOpen(false);
-            tools.hideInspector();
-            setHereOpen(true);
+            afterContextChange(() => {
+              setDetails([]);
+              setService(undefined);
+              setDrawerOpen(false);
+              setCombatOpen(false);
+              tools.hideInspector();
+              setHereOpen(true);
+            });
           }}
         >
           {here.mode === "road" ? "Here: on the road" : "Here"}
@@ -2730,12 +2752,12 @@ function MapViewport({
                 }
                 if (e.key.toLowerCase() === "p" && !signals.viewOnly) {
                   e.preventDefault();
-                  if (allowContextChange()) {
+                  afterContextChange(() => {
                     tools.cancel();
                     sketches.cancel();
                     stopPlacing();
                     setPinging(!pinging);
-                  }
+                  });
                   return;
                 }
               }
@@ -3021,38 +3043,40 @@ function MapViewport({
                         !moved.current &&
                         !pinging &&
                         !sketches.active &&
-                        ["pan", "select"].includes(tools.tool) &&
-                        (!(service || combatOpen) || allowContextChange())
+                        ["pan", "select"].includes(tools.tool)
                       ) {
-                        setService(undefined);
-                        setCombatOpen(false);
-                        setHereOpen(false);
-                        const token = type.records.find(
-                          (r) =>
-                            r.kind === "Combatant" ||
-                            (r.kind === "Ship" && map.tokens?.some((t) => t.id === r.id)),
-                        );
-                        if (token && onTokenSelect) {
-                          setDetails([]);
-                          if (event.detail === 0) tools.choose(token.id, event.shiftKey);
-                        } else if (!placing) {
-                          if (type.records.length === 1 && type.records[0].targetMapId)
-                            selectMap(type.records[0].targetMapId, type.records[0].entry);
-                          else if (
-                            type.records.length === 1 &&
-                            type.records[0].reference?.kind === "location" &&
-                            openLocation(type.records[0].reference.id)
-                          )
+                        const openPin = () => {
+                          setService(undefined);
+                          setCombatOpen(false);
+                          setHereOpen(false);
+                          const token = type.records.find(
+                            (r) =>
+                              r.kind === "Combatant" ||
+                              (r.kind === "Ship" && map.tokens?.some((t) => t.id === r.id)),
+                          );
+                          if (token && onTokenSelect) {
                             setDetails([]);
-                          else if (type.records.length === 1 && type.records[0].reference) {
-                            // One record with a service opens straight into its place card.
-                            setDetails(type.records);
-                            setService(type.records[0].reference);
-                            setServiceExpanded(false);
-                            setDrawerOpen(false);
-                            tools.hideInspector();
-                          } else setDetails(type.records);
-                        }
+                            if (event.detail === 0) tools.choose(token.id, event.shiftKey);
+                          } else if (!placing) {
+                            if (type.records.length === 1 && type.records[0].targetMapId)
+                              selectMap(type.records[0].targetMapId, type.records[0].entry);
+                            else if (
+                              type.records.length === 1 &&
+                              type.records[0].reference?.kind === "location" &&
+                              openLocation(type.records[0].reference.id)
+                            )
+                              setDetails([]);
+                            else if (type.records.length === 1 && type.records[0].reference) {
+                              // One record with a service opens straight into its place card.
+                              setDetails(type.records);
+                              setService(type.records[0].reference);
+                              setServiceExpanded(false);
+                              setDrawerOpen(false);
+                              tools.hideInspector();
+                            } else setDetails(type.records);
+                          }
+                        };
+                        if (!(service || combatOpen) || allowContextChange(openPin)) openPin();
                       }
                     }}
                   >
@@ -3108,10 +3132,10 @@ function MapViewport({
                 <strong>Encounter</strong>
                 <Button
                   onClick={() => {
-                    if (allowContextChange()) {
+                    afterContextChange(() => {
                       setCombatOpen(false);
                       root.current?.focus();
-                    }
+                    });
                   }}
                 >
                   Close encounter panel
@@ -3137,42 +3161,43 @@ function MapViewport({
                 root.current?.focus();
               }}
               open={(row) => {
-                if (!allowContextChange()) return;
-                const drawn = drawnRecord(row.reference);
-                setHereOpen(false);
-                if (drawn) {
-                  focusRecord(drawn);
-                  return;
-                }
-                const kind = (
-                  {
-                    shop: "Shop",
-                    npc: "NPC",
-                    character: "Character",
-                    property: "Property",
-                    listing: "Listing",
-                    exchange: "Exchange",
-                    facility: "Dock",
-                    location: "Location",
-                    entry: "Journal",
-                    handout: "Handout",
-                  } as const
-                )[row.reference.kind];
-                setDetails([
-                  {
-                    id: row.reference.id,
-                    label: row.label,
-                    kind,
-                    reference: row.reference,
-                    href: libraryRecordHref(row.reference.kind, row.reference.id),
-                    detached: true,
-                  },
-                ]);
-                setService(row.reference);
-                setServiceExpanded(false);
-                setDrawerOpen(false);
-                tools.hideInspector();
-                setCardFocus(crypto.randomUUID());
+                afterContextChange(() => {
+                  const drawn = drawnRecord(row.reference);
+                  setHereOpen(false);
+                  if (drawn) {
+                    focusRecord(drawn);
+                    return;
+                  }
+                  const kind = (
+                    {
+                      shop: "Shop",
+                      npc: "NPC",
+                      character: "Character",
+                      property: "Property",
+                      listing: "Listing",
+                      exchange: "Exchange",
+                      facility: "Dock",
+                      location: "Location",
+                      entry: "Journal",
+                      handout: "Handout",
+                    } as const
+                  )[row.reference.kind];
+                  setDetails([
+                    {
+                      id: row.reference.id,
+                      label: row.label,
+                      kind,
+                      reference: row.reference,
+                      href: libraryRecordHref(row.reference.kind, row.reference.id),
+                      detached: true,
+                    },
+                  ]);
+                  setService(row.reference);
+                  setServiceExpanded(false);
+                  setDrawerOpen(false);
+                  tools.hideInspector();
+                  setCardFocus(crypto.randomUUID());
+                });
               }}
               canLocate={(reference) =>
                 !!drawnRecord(reference) || recordMapSpots(recordTable, reference, viewer, maps).length > 0
@@ -3216,23 +3241,24 @@ function MapViewport({
               table={serviceTable}
               service={service}
               openService={(r) => {
-                if (!allowContextChange()) return;
-                setDetails([r]);
-                setService(r.reference);
-                setServiceExpanded(false);
-                setDrawerOpen(false);
-                tools.hideInspector();
+                afterContextChange(() => {
+                  setDetails([r]);
+                  setService(r.reference);
+                  setServiceExpanded(false);
+                  setDrawerOpen(false);
+                  tools.hideInspector();
+                });
               }}
               expanded={serviceExpanded}
               setExpanded={setServiceExpanded}
               close={() => {
-                if (allowContextChange()) {
+                afterContextChange(() => {
                   setDetails([]);
                   setService(undefined);
                   setServiceExpanded(false);
                   setHighlight(undefined);
                   root.current?.focus();
-                }
+                });
               }}
               selectMap={selectMap}
               locationMaps={locationMaps}

@@ -38,6 +38,7 @@ import { rememberSave } from "@/lib/quire/saves";
 import { loadSeatLock } from "@/lib/quire/lock";
 import { roomStatusLabels } from "@/lib/quire/room-state";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
+import { requestConfirm, requestPrompt } from "@/lib/quire/confirm-store";
 
 type Mode = "local" | "turns" | "live";
 
@@ -676,7 +677,7 @@ export function CloudTable() {
                     <Button disabled={unavailable} variant="secondary" onClick={() => run(() => manageParticipant("invite", item.id))}>Create fresh invitation</Button>
                   )}
                 {item.invitation && (
-                    <Button variant="secondary" onClick={() => { const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: cloud.sessionId, invitation: item.invitation! }); void navigator.clipboard.writeText(url).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url)); }}>Copy fresh invitation</Button>
+                    <Button variant="secondary" onClick={() => { const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: cloud.sessionId, invitation: item.invitation! }); void navigator.clipboard.writeText(url).then(() => toast.success("Fresh invitation copied"), () => void requestPrompt({ title: "Copy fresh invitation", label: "Invitation link", body: "Copying was blocked. Select the link and copy it yourself.", defaultValue: url, confirmLabel: "Done" })); }}>Copy fresh invitation</Button>
                   )}
               </div>
               ))}
@@ -713,8 +714,8 @@ export function CloudTable() {
                         >
                           Dismiss player
                         </Button>
-                        <Button variant="ghost" disabled={unavailable} onClick={() => { if (window.confirm("Kick this player? Rejoining requires a fresh invitation. Pending turns must be resolved first.")) run(() => manageParticipant("kick", item.id)); }}>Kick</Button>
-                        <Button variant="ghost" disabled={unavailable} onClick={() => { if (window.confirm("Ban this player from this campaign? Campaign access and reports will be blocked.")) run(() => manageParticipant("ban", item.id)); }}>Ban</Button>
+                        <Button variant="ghost" disabled={unavailable} onClick={async () => { if (await requestConfirm({ title: `Kick ${item.name || "this player"}?`, body: "Rejoining requires a fresh invitation. Pending turns must be resolved first.", tone: "danger", confirmLabel: "Kick player" })) run(() => manageParticipant("kick", item.id)); }}>Kick</Button>
+                        <Button variant="ghost" disabled={unavailable} onClick={async () => { if (await requestConfirm({ title: `Ban ${item.name || "this player"} from this campaign?`, body: "Campaign access and reports will be blocked.", tone: "danger", confirmLabel: "Ban player" })) run(() => manageParticipant("ban", item.id)); }}>Ban</Button>
                       </>
                     ) : null}
                   </div>

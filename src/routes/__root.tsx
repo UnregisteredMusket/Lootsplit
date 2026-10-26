@@ -3,6 +3,7 @@ import { CampaignGate } from "@/components/account/campaign-gate";
 import { MobileOwnerWidgetBridge } from "@/components/account/mobile-owner-widget";
 import { AppNotifications } from "@/components/app-notifications";
 import { RouteLoading } from "@/components/route-loading";
+import { DialogHost } from "@/components/confirm-dialog";
 import { APP_DESCRIPTION } from "@/lib/help/content";
 import { MemberActivity } from "@/components/account/activity";
 import {
@@ -96,6 +97,8 @@ function RootDocument() {
         {import.meta.env.VITE_MOBILE === "true" && <MobileOwnerWidgetBridge />}
         {!playerDisplay && <MemberActivity />}
         <RouteLoading />
+        {/* Themed confirm/prompt dialogs for every screen and the split-view pane (audit D7). */}
+        <DialogHost />
         {playerDisplay ? (
           <Outlet />
         ) : (

@@ -1,5 +1,5 @@
 import { filterAccountCampaigns } from "@/lib/account/campaign-library";
-import { allowContextChange, useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { confirmContextChange, useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { roomLifecycleLabels } from "@/lib/quire/room-state";
 import { BackupPreview } from "@/components/account/backup-preview";
 import { accountBackupSummary, backupConfirmation } from "@/lib/account/backup-presentation";
@@ -57,6 +57,7 @@ import {
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { downloadJson } from "@/lib/quire/table";
+import { requestConfirm, requestPrompt } from "@/lib/quire/confirm-store";
 export const Route = createFileRoute("/account")({ component: Account });
 function Account() {
   const [library, setLibrary] = useState<AccountLibrary | null>(null),
@@ -186,7 +187,7 @@ function Account() {
     }
   }
   async function signOut() {
-    if (!allowContextChange()) return;
+    if (!(await confirmContextChange())) return;
     if (hasPendingChanges())
       throw new Error("Submit or resolve your pending campaign actions before signing out.");
     await accountRequest("auth/sign-out", {});
@@ -213,9 +214,12 @@ function Account() {
   const remove = (kind: string, id: string) =>
     action(async () => {
       if (
-        !window.confirm(
-          `Remove this ${kind} from your account library? Device copies and shared rooms will remain.`,
-        )
+        !(await requestConfirm({
+          title: `Remove this ${kind} from your account library?`,
+          body: "Device copies and shared rooms will remain.",
+          tone: "danger",
+          confirmLabel: `Remove ${kind}`,
+        }))
       )
         return;
       await accountRequest("remove", { kind, id });
@@ -475,7 +479,12 @@ function Account() {
                           className="portal-button secondary"
                           disabled={busy}
                           onClick={action(async () => {
-                            const name = window.prompt("Campaign name in your library", m.name);
+                            const name = await requestPrompt({
+                              title: "Rename campaign",
+                              label: "Campaign name in your library",
+                              defaultValue: m.name,
+                              confirmLabel: "Rename",
+                            });
                             if (!name) return;
                             await accountRequest("campaign", {
                               action: "rename",
@@ -496,9 +505,15 @@ function Account() {
                                 throw new Error(
                                   "Submit or export pending changes before deleting this campaign.",
                                 );
-                              const confirm = window.prompt(
-                                `Delete shared campaign ${m.name} for everyone? A private cloud backup of its saved state will be kept. Device copies remain. Type ${m.code} to confirm.`,
-                              );
+                              const confirm = await requestPrompt({
+                                title: `Delete shared campaign ${m.name} for everyone?`,
+                                body: "A private cloud backup of its saved state will be kept. Device copies remain.",
+                                label: `Type ${m.code} to confirm`,
+                                tone: "danger",
+                                confirmLabel: "Delete campaign",
+                                validate: (value) =>
+                                  value === m.code ? null : `Type ${m.code} exactly to delete.`,
+                              });
                               if (confirm !== m.code) return;
                               await accountRequest("campaign", {
                                 action: "delete",
@@ -527,7 +542,7 @@ function Account() {
                             (m.closed && m.role === "dm" && library.hosting?.atLimit === true)
                           }
                           onClick={action(async () => {
-                            if (!allowContextChange()) return;
+                            if (!(await confirmContextChange())) return;
                             // Another device may have saved a newer room since this page
                             // opened. Names are a warning only, never campaign identity.
                             const fresh = await accountRequest<AccountLibrary>("library");
@@ -548,9 +563,11 @@ function Account() {
                             );
                             if (
                               newer &&
-                              !window.confirm(
-                                `Another campaign named “${target.name}” was opened or saved more recently (${newer.code}). These are separate rooms; portraits, loot and progress do not sync between them. Continue opening this older entry (${target.code})?`,
-                              )
+                              !(await requestConfirm({
+                                title: `Open the older “${target.name}” (${target.code})?`,
+                                body: `Another campaign named “${target.name}” was opened or saved more recently (${newer.code}). These are separate rooms; portraits, loot and progress do not sync between them.`,
+                                confirmLabel: "Open older entry",
+                              }))
                             )
                               return;
                             const member = await accountRequest<AccountMembership>("resume", {
@@ -694,7 +711,7 @@ function Account() {
                   These campaigns are stored on this device, separately from your shared memberships
                   and cloud backups.
                 </p>
-                <Campaigns />
+                <Campaigns heading={false} />
               </section>
             </>
           )}
@@ -876,15 +893,17 @@ function Account() {
                                 : undefined
                             }
                             onClick={action(async () => {
-                              if (!allowContextChange()) return;
+                              if (!(await confirmContextChange())) return;
                               const { payload } = await accountRequest<{ payload: unknown }>(
                                 "read-backup",
                                 { id: b.id },
                               );
                               if (
-                                window.confirm(
-                                  backupConfirmation(accountBackupSummary(payload), true),
-                                )
+                                await requestConfirm({
+                                  title: "Restore shared records?",
+                                  body: backupConfirmation(accountBackupSummary(payload), true),
+                                  confirmLabel: "Restore shared records",
+                                })
                               )
                                 await restoreSharedAccountBackup(b.id);
                             })}
@@ -896,15 +915,17 @@ function Account() {
                           className="portal-button secondary"
                           disabled={busy}
                           onClick={action(async () => {
-                            if (!allowContextChange()) return;
+                            if (!(await confirmContextChange())) return;
                             const { payload } = await accountRequest<{ payload: unknown }>(
                               "read-backup",
                               { id: b.id },
                             );
                             if (
-                              window.confirm(
-                                backupConfirmation(accountBackupSummary(payload), false),
-                              )
+                              await requestConfirm({
+                                title: "Restore as a new device campaign?",
+                                body: backupConfirmation(accountBackupSummary(payload), false),
+                                confirmLabel: "Restore as new",
+                              })
                             )
                               await restoreAccountBackup(b.id, b.name);
                           })}
@@ -992,12 +1013,14 @@ function Account() {
                         </button>
                         <button
                           className="portal-text-button"
-                          onClick={() => {
+                          onClick={async () => {
                             if (
                               profileDirty &&
-                              !window.confirm(
-                                "Discard unsaved profile changes and edit another character?",
-                              )
+                              !(await requestConfirm({
+                                title: "Discard unsaved profile changes?",
+                                body: "You are about to edit another character.",
+                                tone: "discard",
+                              }))
                             )
                               return;
                             setProfileBaseline({
@@ -1053,17 +1076,20 @@ function Account() {
                       Start from a current character (optional)
                       <select
                         value={profileSource}
-                        onChange={(e) => {
-                          const p = economy.purses.find((p) => p.id === e.target.value);
+                        onChange={async (e) => {
+                          const source = e.target.value;
+                          const p = economy.purses.find((p) => p.id === source);
                           if (
                             p &&
                             profileDirty &&
-                            !window.confirm(
-                              "Discard unsaved profile changes and start from another character?",
-                            )
+                            !(await requestConfirm({
+                              title: "Discard unsaved profile changes?",
+                              body: "You are about to start from another character.",
+                              tone: "discard",
+                            }))
                           )
                             return;
-                          setProfileSource(e.target.value);
+                          setProfileSource(source);
                           if (p) {
                             setProfileName(p.name);
                             setPortrait(p.portrait || "");
@@ -1141,10 +1167,13 @@ function Account() {
                       <button
                         type="button"
                         className="portal-button secondary"
-                        onClick={() => {
+                        onClick={async () => {
                           if (
                             profileDirty &&
-                            !window.confirm("Discard unsaved character profile changes?")
+                            !(await requestConfirm({
+                              title: "Discard unsaved character profile changes?",
+                              tone: "discard",
+                            }))
                           )
                             return;
                           setProfileBaseline({ name: "", description: "", portrait: "" });
@@ -1182,9 +1211,12 @@ function Account() {
                   onClick={action(async () => {
                     if (
                       library.hasRecoveryKey &&
-                      !window.confirm(
-                        "Replace your current recovery key? The old key will stop working.",
-                      )
+                      !(await requestConfirm({
+                        title: "Replace your current recovery key?",
+                        body: "The old key will stop working.",
+                        tone: "danger",
+                        confirmLabel: "Replace recovery key",
+                      }))
                     )
                       return;
                     const r = await accountRequest<{ key: string }>("recovery-key", {});

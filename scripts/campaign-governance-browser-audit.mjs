@@ -6,6 +6,7 @@ import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
 import { formatCopper, toCopper } from "../src/lib/quire/money.ts";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(localhost|127\.0\.0\.1):/.test(origin))
   throw Error("Governance audit requires a disposable local server.");
@@ -1107,10 +1108,10 @@ try {
     });
   });
   assert.equal((await state(host.page)).ledger.length, 1);
-  host.page.once("dialog", (d) => d.accept());
   await host.page
     .getByRole("button", { name: "Reset Test mode — clear all data", exact: true })
     .click();
+  await answerThemedDialog(host.page);
   for (let n = 0; n < 80 && (await state(host.page)).ledger.length; n++)
     await host.page.waitForTimeout(250);
   assert.equal((await state(host.page)).ledger.length, 0);

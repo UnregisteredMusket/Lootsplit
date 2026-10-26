@@ -214,7 +214,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "first-campaign",
         title: "Start a campaign or join your party",
         paragraphs: [
-          "Sign in to create or claim your owned DM campaign. The campaign selector creates or switches owned local campaigns; My account resumes saved shared campaigns. Each campaign keeps its own characters, purses, inventory, shops and financial history. New blank campaigns do not contain your other campaign’s assets. Guests join an open room through its current invitation.",
+          "Sign in to create or claim your owned DM campaign. The campaign selector creates or switches owned local campaigns; My account resumes saved shared campaigns. Each campaign keeps its own characters, purses, inventory, shops and financial history. New blank campaigns do not contain your other campaign’s assets. To delete the open campaign from this device, open the campaign selector’s Danger zone; Export it first if you want to keep a copy. Guests join an open room through its current invitation.",
           "The DM adds characters and shared party funds in Party → Funds & inventory. Mark each character as Player or NPC; only player characters can be assigned to players. To join a shared game, open Campaign, enter the room code and choose an available character. An account is optional for guest room play. Everyone needs access to the website or a compatible app.",
         ],
         links: [

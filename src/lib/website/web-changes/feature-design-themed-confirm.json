@@ -1,0 +1,10 @@
+{
+  "title": "Clearer confirmations",
+  "summary": "Questions such as \"Discard changes?\" or \"Delete this?\" now open in Lootsplitter's own style instead of a plain browser box, and deleting a campaign has its own Danger zone.",
+  "items": [
+    "Discard questions offer Keep editing and Discard changes; deletions name what is deleted and show it in red.",
+    "They work the same on phones, in the Android app, in split view and over other dialogs; Escape or Back cancels and returns you where you were.",
+    "Typing a campaign code to delete a shared campaign now says when the code does not match.",
+    "In the campaign selector, Delete current campaign moved into a Danger zone fold below New campaign, and the repeated Campaigns heading is gone."
+  ]
+}

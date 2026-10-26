@@ -305,7 +305,7 @@ export function CampaignPanel({
     >
       <p className="text-muted mb-3">Current campaign · {campaign}</p>
       {dm ? (
-        <Campaigns />
+        <Campaigns heading={false} />
       ) : (
         <p>
           Resume another campaign from your saved account memberships, or leave this room before

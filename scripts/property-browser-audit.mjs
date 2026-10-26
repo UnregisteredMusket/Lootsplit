@@ -9,6 +9,7 @@ import {
   reloadApplication,
   navigateApplication,
 } from "./title-screen-navigation.mjs";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(
@@ -256,10 +257,10 @@ try {
       "Opening a preset does not save it",
     );
     // Cancellation is explicit and restores the original draft and selection focus.
-    dm.once("dialog", (dialog) => dialog.accept());
     await setup
       .getByRole("button", { name: "Return to listing without saving template", exact: true })
       .click();
+    await answerThemedDialog(dm);
     await expect(templatePicker).toBeFocused();
     await expect(setup.getByLabel("Listing name", { exact: true })).toHaveValue(
       "The Dawnward Star — retained draft",
@@ -358,8 +359,8 @@ try {
       await dm.setViewportSize({ width, height: 950 });
       await session.detach();
     }
-    dm.once("dialog", (dialog) => dialog.accept());
     await setup.getByRole("button", { name: "Close", exact: true }).click();
+    await answerThemedDialog(dm);
     await expect(setup).toHaveCount(0);
     async function createProperty(name, location, type, price, images = false) {
       await dm.getByRole("button", { name: "New property listing", exact: true }).click();

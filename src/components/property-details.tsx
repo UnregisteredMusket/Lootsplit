@@ -22,6 +22,7 @@ import { locationLabel, readMarketLocations } from "@/lib/quire/shop-locations";
 import { EstateWorkshop, PropertyOperations } from "./property-operations";
 import { canAccessEstate, estateSetupNeeds } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean; propertyId?: string }) {
   const { holdings, purses, journal, ledger, listings } = useEconomy(),
     seat = useSeat();
@@ -219,12 +220,14 @@ function PropertyEditor({ holding: h }: { holding: Holding }) {
       <Button
         type="button"
         variant="secondary"
-        onClick={() => {
+        onClick={async () => {
           if (
             dirty &&
-            !window.confirm(
-              "Discard unsaved property description changes and reload current details?",
-            )
+            !(await requestConfirm({
+              title: "Discard unsaved property description changes?",
+              body: "Current details reload.",
+              tone: "discard",
+            }))
           )
             return;
           const next = { name: h.name, notes: h.notes };

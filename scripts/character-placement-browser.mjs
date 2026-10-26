@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { expect } from "playwright/test";
 import { chooseOption } from "./search-select-browser.mjs";
 import { navigateApplication } from "./title-screen-navigation.mjs";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 
 /** Extend the existing world audit using its already authenticated disposable DM/guest pair. */
 export async function auditCharacterPlacement(page, guest, origin, npcId, width, output) {
@@ -72,11 +73,9 @@ export async function auditCharacterPlacement(page, guest, origin, npcId, width,
   await expect(
     page.getByRole("button", { name: "Approve & advance session time", exact: true }),
   ).toBeEnabled();
-  page.once("dialog", async (dialog) => {
-    assert.match(dialog.message(), /Discard unsaved .*session time/i);
-    await dialog.accept();
-  });
+  const discardWarning = answerThemedDialog(page);
   await navigateApplication(page, origin + "/party");
+  assert.match(await discardWarning, /Discard unsaved .*session time/i);
   await chooseOption(select, npcId);
   await expect(panel.getByText(/^In party ·/)).toBeVisible();
   await expect(panel.getByRole("heading", { name: /^Downtime:/ })).toHaveCount(0);

@@ -4,6 +4,7 @@ import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(origin))
   throw Error("Local disposable testing only");
@@ -86,12 +87,10 @@ try {
       role: "Campaign DM/player assignments are separate",
     }[kind];
     await expect(owner.page.locator(".staff-action-preview")).toContainText(expected);
-    owner.page.once("dialog", async (d) => {
-      assert.match(d.message(), /recorded in the moderation log/);
-      assert.ok(d.message().includes(expected));
-      await d.accept();
-    });
     await owner.page.getByRole("button", { name: "Apply member action" }).click();
+    const message = await answerThemedDialog(owner.page);
+    assert.match(message, /recorded in the moderation log/);
+    assert.ok(message.includes(expected));
     await owner.page.getByText("Member action saved.", { exact: true }).waitFor();
   }
   await action("warn", "Please keep profiles friendly.");
@@ -142,8 +141,8 @@ try {
   assert.equal(linked.status(), 200);
   await reloadApplication(owner.page);
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).waitFor();
-  owner.page.once("dialog", (d) => d.accept(code));
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();
+  await answerThemedDialog(owner.page, { value: code });
   await owner.page
     .getByText("Shared campaign deleted. Its saved state is in Cloud backups.", { exact: true })
     .waitFor();

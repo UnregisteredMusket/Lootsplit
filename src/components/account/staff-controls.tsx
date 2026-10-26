@@ -10,6 +10,7 @@ import {
   type StaffAction,
 } from "@/lib/quire/staff-action-preview";
 import "./account-admin.css";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 type Member = {
   id: string;
   name: string;
@@ -75,9 +76,11 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
     if (
       !sameMember &&
       dirty &&
-      !window.confirm(
-        "Discard the unsaved moderation action and reason before managing another member?",
-      )
+      !(await requestConfirm({
+        title: "Discard the unsaved moderation action and reason?",
+        body: "You are about to manage another member.",
+        tone: "discard",
+      }))
     )
       return;
     setBusy(true);
@@ -109,9 +112,12 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
         ? `\nScheduled expiry: ${new Date(until).toLocaleString()}.`
         : "";
     if (
-      !window.confirm(
-        `${preview.summary}\n\n${preview.effects.join("\n")}${expiry}\n\nThis action and reason are recorded in the moderation log. Apply this member action?`,
-      )
+      !(await requestConfirm({
+        title: "Apply this member action?",
+        body: `${preview.summary}\n\n${preview.effects.join("\n")}${expiry}\n\nThis action and reason are recorded in the moderation log.`,
+        tone: ["ban", "revoke", "clear-profile"].includes(action) ? "danger" : "default",
+        confirmLabel: "Apply member action",
+      }))
     )
       return;
     setBusy(true);
@@ -397,12 +403,14 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
           <button
             className="portal-button secondary"
             disabled={busy}
-            onClick={() => {
+            onClick={async () => {
               if (
                 dirty &&
-                !window.confirm(
-                  "Discard the unsaved moderation action and reason and close member details?",
-                )
+                !(await requestConfirm({
+                  title: "Discard the unsaved moderation action and reason?",
+                  body: "Member details will close.",
+                  tone: "discard",
+                }))
               )
                 return;
               setSelected(null);

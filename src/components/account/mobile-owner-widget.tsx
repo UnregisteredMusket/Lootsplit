@@ -9,7 +9,7 @@ import {
   OwnerWidget,
   type OwnerWidgetStatus,
 } from "@/lib/mobile/owner-widget";
-import { allowContextChange } from "@/lib/quire/use-draft-guard";
+import { confirmContextChange } from "@/lib/quire/use-draft-guard";
 
 /** A widget tap uses the existing router and preserves the running app's draft guards. */
 export function MobileOwnerWidgetBridge() {
@@ -20,7 +20,7 @@ export function MobileOwnerWidgetBridge() {
     const open = async () => {
       try {
         const request = await OwnerWidget.consumeOpenRequest();
-        if (alive && request.open && allowContextChange()) {
+        if (alive && request.open && (await confirmContextChange())) {
           await navigate({ to: "/account", hash: request.destination || "home-screen-widget" });
           window.dispatchEvent(new Event("lootsplit-monitor-destination"));
           window.dispatchEvent(new Event("lootsplit-monitor-sign-in"));

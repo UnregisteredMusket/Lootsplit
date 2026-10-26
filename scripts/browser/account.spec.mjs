@@ -18,6 +18,7 @@ import {
   waitForDmCampaign,
 } from "./account-fixtures.mjs";
 import { continueIntoApp, prepareDmFixture } from "../title-screen-navigation.mjs";
+import { answerThemedDialog, autoAnswerThemedDialogs } from "../themed-dialogs.mjs";
 
 test("network-boundary", async ({ devices, baseURL: origin }) => {
   let connections = 0;
@@ -601,6 +602,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   console.log("Account audit: restore into new campaign");
   other.on("dialog", (d) => d.accept());
   await other.getByRole("button", { name: "Restore as new", exact: true }).click();
+  await answerThemedDialog(other);
   await other.waitForURL((url) => url.origin === origin && url.pathname === "/");
   await continueIntoApp(other);
   await other.getByText("Campaign control", { exact: true }).waitFor();
@@ -1045,16 +1047,11 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   await expect(
     old.getByText("Open on this device · Current campaign", { exact: true }),
   ).toBeVisible();
-  let warning = "";
-  phone.once("dialog", async (dialog) => {
-    warning = dialog.message();
-    await dialog.dismiss();
-  });
   await old.getByRole("button", { name: "Resume", exact: true }).click();
-  await expect.poll(() => warning).toContain("separate rooms");
+  expect(await answerThemedDialog(phone, { accept: false })).toContain("separate rooms");
   expect(new URL(phone.url()).pathname).toBe("/account");
-  phone.once("dialog", (dialog) => dialog.accept());
   await old.getByRole("button", { name: "Resume", exact: true }).click();
+  await answerThemedDialog(phone);
   await phone.waitForURL((url) => url.pathname === "/");
   await visit(phone, "/share");
   await expect(phone.locator(".room-code")).toHaveText(firstCode);
@@ -1429,11 +1426,11 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
     if (new URL(p.url()).pathname !== "/account") await visit(p, "/account");
     await expect(p.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     const card = p.locator("article.portal-card").filter({ hasText: code });
-    const acceptSeparate = (dialog) => dialog.accept();
-    p.on("dialog", acceptSeparate);
+    // A same-named newer room may ask first ("separate rooms"); accept it if it does.
+    const acceptSeparate = await autoAnswerThemedDialogs(p);
     await card.getByRole("button", { name: label, exact: true }).click();
     await p.waitForURL((url) => url.origin === origin && url.pathname === "/");
-    p.off("dialog", acceptSeparate);
+    await acceptSeparate.stop();
     await waitForDmCampaign(p);
     assert.equal(
       await p.locator(".loot-opening").count(),
@@ -1486,15 +1483,15 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
     requestKey: crypto.randomUUID(),
   });
   await page.setViewportSize({ width: 390, height: 900 });
-  page.once("dialog", (dialog) => dialog.accept(member.code));
   await page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();
+  await answerThemedDialog(page, { value: member.code });
   await expect(
     page.getByRole("status").filter({ hasText: "Shared campaign deleted" }),
   ).toBeVisible();
   const restore = page.getByRole("button", { name: "Restore shared records", exact: true });
   await expect(restore).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
   await restore.click();
+  await answerThemedDialog(page);
   await page.waitForURL((url) => url.pathname === "/");
   await expect(page.getByText("Campaign control", { exact: true })).toBeVisible();
   await expect(page.locator(".loot-opening")).toHaveCount(0);

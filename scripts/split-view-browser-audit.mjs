@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { continueIntoApp, openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { buildWayfarers } from "./product-screenshot-fixture.mjs";
+import { autoAnswerThemedDialogs } from "./themed-dialogs.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!["127.0.0.1", "localhost"].includes(new URL(origin).hostname))
@@ -27,6 +28,7 @@ page.setDefaultTimeout(25000);
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("dialog", (d) => void d.accept());
+await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
 const api = [];
 page.on("request", (request) => {
   const url = new URL(request.url());

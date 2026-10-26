@@ -12,6 +12,7 @@ import { expect } from "playwright/test";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { checkPlaceHub, noHorizontalScroll } from "./place-hub-browser-check.mjs";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 export async function checkConnectedMaps({ browser, origin, output }) {
   assert.match(origin, /^http:\/\/(localhost|127\.0\.0\.1):/);
   const results = [];
@@ -328,8 +329,8 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await openMoreMapTools(page);
       await frame.getByRole("button", { name: "Open encounter map controls", exact: true }).click();
       await combat.getByRole("button", { name: "Open encounter tracker", exact: true }).click();
-      page.once("dialog", (dialog) => dialog.accept());
       await combat.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
+      await answerThemedDialog(page);
       await expect(combat).toContainText(
         "Encounter concluded. Review recipients and loot before transferring.",
       );

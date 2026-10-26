@@ -65,6 +65,7 @@ import {
   nextTurn,
   sortInitiative,
 } from "@/lib/encounters/model.mjs";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
@@ -248,16 +249,18 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
       });
     return () => c.abort();
   }, [refresh, allowDevice]); // Destination changes do not reload or discard an open draft.
-  function canLeave() {
+  async function canLeave() {
     return (
       !dirty.current ||
-      window.confirm(
-        "Discard unsaved encounter changes? Export your draft first if you want to keep it.",
-      )
+      (await requestConfirm({
+        title: "Discard unsaved encounter changes?",
+        body: "Export your draft first if you want to keep it.",
+        tone: "discard",
+      }))
     );
   }
   async function create(encounter = blankEncounter()) {
-    if (!canLeave()) return;
+    if (!(await canLeave())) return;
     setBusy(true);
     setError("");
     try {
@@ -309,8 +312,8 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
               <SearchSelect
                 aria-label="Save in"
                 value={code}
-                onValueChange={(selectedValue) => {
-                  if (canLeave()) {
+                onValueChange={async (selectedValue) => {
+                  if (await canLeave()) {
                     dirty.current = false;
                     createKey.current = "";
                     setCode(selectedValue);
@@ -395,8 +398,8 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
                       key={r.id}
                       className="encounter-library-row"
                       aria-pressed={selected === r.id}
-                      onClick={() => {
-                        if (canLeave()) {
+                      onClick={async () => {
+                        if (await canLeave()) {
                           dirty.current = false;
                           setSelected(r.id);
                         }
@@ -945,8 +948,14 @@ function EncounterEditor({
           </button>
           <button
             disabled={busy}
-            onClick={() => {
-              if (!dirty || window.confirm("Discard unsaved changes and reload?")) {
+            onClick={async () => {
+              if (
+                !dirty ||
+                (await requestConfirm({
+                  title: "Discard unsaved changes and reload?",
+                  tone: "discard",
+                }))
+              ) {
                 discardDraft.current = true;
                 setReload((v) => v + 1);
               }
@@ -973,11 +982,13 @@ function EncounterEditor({
           {!review && !readOnly && (
             <button
               disabled={readiness.conclude.length > 0}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    "Conclude the encounter and prepare its loot for review? Nothing transfers yet.",
-                  )
+                  await requestConfirm({
+                    title: "Conclude the encounter?",
+                    body: "Its loot is prepared for review. Nothing transfers yet.",
+                    confirmLabel: "Conclude & review loot",
+                  })
                 ) {
                   setTab("loot");
                   void action("conclude");
@@ -1133,11 +1144,13 @@ function EncounterEditor({
                     seat.role !== "dm" ||
                     !!summaryEntry
                   }
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      window.confirm(
-                        "Add this preview to the party journal? Party readers will be able to see it.",
-                      )
+                      await requestConfirm({
+                        title: "Add this preview to the party journal?",
+                        body: "Party readers will be able to see it.",
+                        confirmLabel: "Add to party journal",
+                      })
                     )
                       void publishAwardSummary();
                   }}
@@ -2398,11 +2411,13 @@ function EncounterEditor({
                 </div>
                 <button
                   disabled={readiness.transfer.length > 0}
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      window.confirm(
-                        `Transfer the reviewed loot from “${draft.name}” to the selected campaign inventories?`,
-                      )
+                      await requestConfirm({
+                        title: "Transfer the reviewed loot?",
+                        body: `The reviewed loot from “${draft.name}” goes to the selected campaign inventories.`,
+                        confirmLabel: "Transfer loot",
+                      })
                     )
                       void action("award");
                   }}

@@ -5,6 +5,7 @@ import { clientKind } from "@/lib/website/client-presentation";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { APP_VERSION } from "@/lib/quire/version";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 
 const statuses = ["new", "reviewing", "planned", "fixed", "closed"];
 const areas = [
@@ -232,9 +233,16 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
     [error, setError] = useState(""),
     [selected, setSelected] = useState<string | null>(null);
   const [detailDirty, setDetailDirty] = useState(false);
-  function chooseReport(id: string | null) {
+  async function chooseReport(id: string | null) {
     if (id === selected) return;
-    if (detailDirty && !window.confirm("Discard unsaved administrator response changes?")) return;
+    if (
+      detailDirty &&
+      !(await requestConfirm({
+        title: "Discard unsaved administrator response changes?",
+        tone: "discard",
+      }))
+    )
+      return;
     setDetailDirty(false);
     setSelected(id);
   }
@@ -270,16 +278,19 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
             <select
               aria-label="Report inbox"
               value={scope}
-              onChange={(e) => {
+              onChange={async (e) => {
+                const next = e.target.value;
                 if (
                   detailDirty &&
-                  !window.confirm(
-                    "Discard unsaved administrator response changes and switch inbox?",
-                  )
+                  !(await requestConfirm({
+                    title: "Discard unsaved administrator response changes?",
+                    body: "You are about to switch inbox.",
+                    tone: "discard",
+                  }))
                 )
                   return;
                 setDetailDirty(false);
-                setScope(e.target.value);
+                setScope(next);
                 setOffset(0);
                 setSelected(null);
               }}
@@ -326,7 +337,7 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
       <ul className="bug-list">
         {reports.map((r) => (
           <li key={r.id}>
-            <button onClick={() => chooseReport(r.id)}>
+            <button onClick={() => void chooseReport(r.id)}>
               <strong>{r.title}</strong>
               <span>
                 {r.status} · {r.priority} · {new Date(r.created_at).toLocaleDateString()}
@@ -356,7 +367,7 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
           key={selected}
           id={selected}
           admin={admin}
-          close={() => chooseReport(null)}
+          close={() => void chooseReport(null)}
           onDirtyChange={setDetailDirty}
           saved={() => setReload((n) => n + 1)}
         />
@@ -442,10 +453,13 @@ function ReportDetail({
         <button
           className="portal-button secondary"
           disabled={busy}
-          onClick={() => {
+          onClick={async () => {
             if (
               dirty &&
-              !window.confirm("Discard unsaved response changes and reload this report?")
+              !(await requestConfirm({
+                title: "Discard unsaved response changes and reload this report?",
+                tone: "discard",
+              }))
             )
               return;
             setReload((n) => n + 1);

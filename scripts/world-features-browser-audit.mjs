@@ -19,6 +19,7 @@ import {
 } from "./title-screen-navigation.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 import { FANTASY_LOOKS, themeVars } from "../src/lib/quire/theme.ts";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 
 async function tradingLook(page, appearance) {
   const look = FANTASY_LOOKS[appearance];
@@ -330,8 +331,8 @@ try {
     await expect(page.locator(".map-editor-frame")).toHaveClass(/map-fullscreen/);
     await page.getByLabel("Map name", { exact: true }).fill("Port atlas revised");
     await page.screenshot({ path: `${output}/fullscreen-editor-${width}.png` });
-    page.once("dialog", (dialog) => dialog.dismiss());
     await page.keyboard.press("Escape");
+    await answerThemedDialog(page, { accept: false });
     await expect(page.locator(".map-editor-frame")).toHaveClass(/map-fullscreen/);
     await expect(page.getByLabel("Map name", { exact: true })).toHaveValue("Port atlas revised");
     await page.getByRole("button", { name: "Save map", exact: true }).click();
@@ -707,8 +708,8 @@ try {
       npcEditor.getByRole("heading", { name: "Configure NPC", exact: true }),
     ).toBeInViewport();
     await expect(npcEditor.getByLabel("NPC name", { exact: true })).toHaveValue("Mara");
-    page.once("dialog", (dialog) => dialog.accept());
     await npcEditor.getByRole("button", { name: "Close editor", exact: true }).click();
+    await answerThemedDialog(page);
     await expect(npcEditor).toHaveCount(0);
     await maraDetails.locator("summary").click();
     await fits(page);

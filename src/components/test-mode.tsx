@@ -15,6 +15,7 @@ import { emptyCloudTable } from "@/lib/quire/cloud";
 import { setSeat } from "@/lib/quire/table";
 import { getCampaigns, switchCampaign } from "@/lib/quire/campaigns";
 import { Fold, Button } from "./ui";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 export function TestModeSettings({ inMenu = false }: { inMenu?: boolean }) {
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const [owner, setOwner] = useState(false),
@@ -110,7 +111,15 @@ export function TestResetButton() {
       className="text-negative"
       disabled={busy}
       onClick={async () => {
-        if (!window.confirm("Reset this Test campaign and clear all its simulated data?")) return;
+        if (
+          !(await requestConfirm({
+            title: "Reset this Test campaign?",
+            body: "All its simulated data is cleared.",
+            tone: "danger",
+            confirmLabel: "Reset Test campaign",
+          }))
+        )
+          return;
         setBusy(true);
         try {
           await accountRequest("owner/test-mode", {

@@ -15,6 +15,7 @@ import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronDown, Minus, Plus, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import type { ConfirmTone } from "@/lib/quire/confirm-store";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Tone = "dark" | "paper";
@@ -115,13 +116,13 @@ export function Fold({
   );
 }
 
-export function TextInput({
-  tone = "dark",
-  className,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement> & { tone?: Tone }) {
+export const TextInput = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & { tone?: Tone }
+>(function TextInput({ tone = "dark", className, ...props }, ref) {
   return (
     <input
+      ref={ref}
       {...props}
       className={cn(
         "min-h-11 w-full rounded-sm border px-3 text-base outline-none",
@@ -132,7 +133,7 @@ export function TextInput({
       )}
     />
   );
-}
+});
 
 export function TextArea({
   tone = "dark",
@@ -280,19 +281,35 @@ export function Modal({
   title,
   children,
   returnFocus,
+  container: portal,
+  role,
+  "data-themed-dialog": themed,
+  "data-tone": tone,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   children: ReactNode;
   returnFocus?: string;
+  /** Portal target; defaults to the surrounding OverlayContainer (fullscreen maps) or body. */
+  container?: HTMLElement;
+  /** "alertdialog" for a destructive question asked in a form (themed prompts). */
+  role?: "alertdialog";
+  "data-themed-dialog"?: string;
+  "data-tone"?: string;
 }) {
-  const container = useContext(OverlayContainer);
+  const overlay = useContext(OverlayContainer);
+  const container = portal ?? overlay;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal container={container ?? undefined}>
-        <Dialog.Overlay className="modal-overlay fixed inset-0 z-40" />
+        <Dialog.Overlay
+          className={cn("modal-overlay fixed inset-0", themed ? "z-[60]" : "z-40")}
+        />
         <Dialog.Content
+          data-themed-dialog={themed}
+          data-tone={tone}
+          {...(role ? { role } : {})}
           className="modal-pop rounded-xl border border-border bg-elevated p-4 text-fg"
           aria-describedby={undefined}
           onCloseAutoFocus={
@@ -322,6 +339,12 @@ export function Modal({
   );
 }
 
+export type { ConfirmTone };
+
+/**
+ * Themed confirmation (role="alertdialog"; Escape and Cancel close it, focus returns to the
+ * trigger). Prefer `useConfirm()` from `@/lib/quire/confirm-store` for one-off questions.
+ */
 export function Confirm({
   open,
   onOpenChange,
@@ -329,32 +352,53 @@ export function Confirm({
   body,
   confirmLabel,
   onConfirm,
+  tone = "danger",
+  cancelLabel = "Cancel",
+  container: portal,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  body: string;
+  body?: ReactNode;
   confirmLabel: string;
   onConfirm: () => void;
+  /** danger: destructive (red action). discard: throw away a draft ("Keep editing" leads). */
+  tone?: ConfirmTone;
+  cancelLabel?: string;
+  container?: HTMLElement;
 }) {
-  const container = useContext(OverlayContainer);
+  const overlay = useContext(OverlayContainer);
+  const container = portal ?? overlay;
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal container={container ?? undefined}>
-        <AlertDialog.Overlay className="modal-overlay fixed inset-0 z-40" />
-        <AlertDialog.Content className="modal-pop rounded-xl border border-border bg-elevated p-4 text-fg">
+        <AlertDialog.Overlay className="modal-overlay fixed inset-0 z-[60]" />
+        <AlertDialog.Content
+          {...(body ? {} : { "aria-describedby": undefined })}
+          data-themed-dialog="confirm"
+          data-tone={tone}
+          className="modal-pop rounded-xl border border-border bg-elevated p-4 text-fg"
+        >
           <AlertDialog.Title className="font-display text-2xl leading-tight tracking-tight">
             {title}
           </AlertDialog.Title>
-          <AlertDialog.Description className="mt-2 text-sm text-muted">
-            {body}
-          </AlertDialog.Description>
+          {body ? (
+            <AlertDialog.Description className="mt-2 whitespace-pre-line text-sm text-muted">
+              {body}
+            </AlertDialog.Description>
+          ) : null}
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <AlertDialog.Cancel asChild>
-              <Button variant="secondary">Cancel</Button>
+              <Button variant={tone === "discard" ? "primary" : "secondary"} data-dialog-cancel>
+                {cancelLabel}
+              </Button>
             </AlertDialog.Cancel>
             <AlertDialog.Action asChild>
-              <Button variant="danger" onClick={onConfirm}>
+              <Button
+                variant={tone === "danger" ? "danger" : tone === "discard" ? "secondary" : "primary"}
+                data-dialog-confirm
+                onClick={onConfirm}
+              >
                 {confirmLabel}
               </Button>
             </AlertDialog.Action>

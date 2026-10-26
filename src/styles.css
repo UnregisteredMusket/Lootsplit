@@ -901,6 +901,13 @@ input,select,textarea { max-width: 100%; }
   max-height: calc(100dvh - 3rem - env(safe-area-inset-top));
   overscroll-behavior: contain;
 }
+/* Themed confirmations and prompts (confirm-dialog.tsx) open above any other dialog. */
+.modal-pop[data-themed-dialog] {
+  z-index: 61;
+}
+.modal-pop[data-themed-dialog][data-tone="danger"] {
+  border-color: var(--color-danger);
+}
 .library-banner {
   background:
     linear-gradient(90deg, var(--color-bg), transparent),

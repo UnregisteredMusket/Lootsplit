@@ -769,8 +769,9 @@ export function useMapTabletopTools(
       )}
     </>
   );
-  const activateTool = (next: MapTool) => {
-    if (!allowContextChange()) return false;
+  const activateTool = (next: MapTool): boolean => {
+    // After "Discard changes" the same tool is chosen again (its result is no longer awaited).
+    if (!allowContextChange(() => void activateTool(next))) return false;
     if (["fog-brush", "fog-rectangle", "fog-polygon", "wall", "light"].includes(next) && !dm)
       return false;
     if (next === "template" && !dm && !settings.playerTemplates) return false;

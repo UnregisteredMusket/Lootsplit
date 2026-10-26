@@ -3,6 +3,7 @@ import { chromium } from "playwright";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
+import { answerThemedDialog } from "./themed-dialogs.mjs";
 const output = process.env.BACKUP_SCREENSHOTS || "test-results/backups";
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
@@ -482,15 +483,12 @@ try {
   await page.evaluate(() => {
     window.sessionDraftDocument = "same-document";
   });
-  const leaveWarning = page.waitForEvent("dialog");
-  const attemptedLeave = page
+  const leaveWarning = answerThemedDialog(page, { accept: false });
+  await page
     .locator('nav[aria-label="Sections"]:visible')
     .getByRole("link", { name: "Party", exact: true })
     .click();
-  const warning = await leaveWarning;
-  assert.match(warning.message(), /Discard unsaved session name/);
-  await warning.dismiss();
-  await attemptedLeave;
+  assert.match(await leaveWarning, /Discard unsaved session name/);
   await expect(sessions.getByLabel("Session name", { exact: true })).toHaveValue(
     "Preserved next session",
   );
