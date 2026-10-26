@@ -294,7 +294,7 @@ async function save(page, name) {
 
 /** Desktop shots that also get a 390-wide phone capture, `<name>-phone` (W-4): the website
  * serves it below 700 px so phone visitors can read the screen. Same synthetic campaign. */
-const PHONE_VARIANTS = new Set(["ledger", "character", "market", "maps", "encounter", "properties", "downtime", "room", "journal"]);
+const PHONE_VARIANTS = new Set(["loot", "party", "trade", "barter", "ships", "ledger", "character", "market", "maps", "encounter", "properties", "downtime", "room", "journal"]);
 const PHONE = { width: 390, height: 560, scale: 2 };
 
 async function shot(name, options, fn) {
@@ -345,7 +345,8 @@ try {
   // 2. Encounter loot review before the one-time transfer.
   await shot("loot", {}, async (page) => {
     await navigateApplication(page, origin + "/encounters?review=1");
-    await page.getByText("READY FOR LOOT REVIEW", { exact: false }).first().waitFor();
+    // Phones also render a hidden copy of the status; wait for the visible one.
+    await page.getByText("READY FOR LOOT REVIEW", { exact: false }).locator("visible=true").first().waitFor();
     await scrollTo(page, page.getByText("Transfer reviewed loot", { exact: false }), 96);
   });
 
