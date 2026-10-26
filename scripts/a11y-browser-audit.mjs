@@ -38,7 +38,8 @@ const SEEDED = {
     ["/?view=home", "text=Party at a glance"],
     ["/party", "text=Funds & inventory"],
     ["/party?section=fairness", "text=What counts?"],
-    ["/market", "text=Golden grain"],
+    // The global board is folded on Market; its link opens it, so both are checked.
+    ["/market#global-market", "text=Golden grain"],
     [SHOP, "text=The Brass Lantern"],
     [SHEET, "[role=tab]"],
     ["/features/npcs", "text=Find an NPC"],
@@ -48,7 +49,8 @@ const SEEDED = {
     ["/?view=home", "text=Open character sheet"],
     ["/party", "text=Inventory & purse"],
     ["/party?section=fairness", "text=Party average"],
-    ["/market", "text=Golden grain"],
+    // The global board is folded on Market; its link opens it, so both are checked.
+    ["/market#global-market", "text=Golden grain"],
     [SHOP, "[aria-label='Item to sell']"],
     [SHEET, "[role=tab]"],
     ["/features/npcs", "text=Find an NPC"],
