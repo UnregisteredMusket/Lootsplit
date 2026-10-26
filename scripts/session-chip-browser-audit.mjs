@@ -76,7 +76,9 @@ try {
       await go("/");
 
       // 1. Header chip (wide) or Settings (phones) opens the session sheet.
-      const chip = page.locator("header").getByRole("button", { name: /^Session 12 · day 42\. Session controls$/ });
+      const chip = page
+        .locator("header")
+        .getByRole("button", { name: /^Session 12 · day 42\. Session controls$/ });
       const sheet = page.getByRole("dialog", { name: "Session 12 · day 42", exact: true });
       const settings = page.getByRole("dialog", { name: "Settings & Management", exact: true });
       if (phone) {
@@ -90,14 +92,18 @@ try {
       }
       await expect(sheet).toBeVisible();
       await expect(sheet).toContainText("Running: Session 12 · Smugglers of Gullhaven.");
-      await expect(sheet.getByRole("heading", { name: "Since last session", exact: true })).toBeVisible();
+      await expect(
+        sheet.getByRole("heading", { name: "Since last session", exact: true }),
+      ).toBeVisible();
       await expect(sheet).toContainText("Loot awarded");
       await expect(sheet).toContainText("Characters away");
       await noOverflow("session sheet");
       await page.screenshot({ path: `${output}/sheet-${width}x${height}.png` });
       await sheet.getByRole("link", { name: "End & start next", exact: true }).click();
       await expect(sheet).toHaveCount(0);
-      await expect(page.locator("#sessions").getByLabel("Session name", { exact: true })).toBeVisible();
+      await expect(
+        page.locator("#sessions").getByLabel("Session name", { exact: true }),
+      ).toBeVisible();
 
       // 2. The Desk digest, read-only and above the Information tiles.
       const since = page.getByRole("region", { name: "Since last session", exact: true });
@@ -107,17 +113,25 @@ try {
 
       // 3. Quick HP: absent without a running encounter, −1 / +1 through the sheet while one runs.
       const partyTile = page.getByRole("region", { name: "Party information", exact: true });
-      await expect(partyTile.getByRole("group", { name: "Mira Ashfall hit points" })).toHaveCount(0);
+      await expect(partyTile.getByRole("group", { name: "Mira Ashfall hit points" })).toHaveCount(
+        0,
+      );
       await page.evaluate(async () => {
         const { localEncounterRequest: call } = await import("/src/lib/encounters/local.ts");
         const { blankEncounter } = await import("/src/lib/encounters/model.mjs");
-        await call("encounters/create", { id: "chip-fight", encounter: { ...blankEncounter(), name: "Chip audit fight" } });
+        await call("encounters/create", {
+          id: "chip-fight",
+          encounter: { ...blankEncounter(), name: "Chip audit fight" },
+        });
         await call("encounters/start", { id: "local-chip-fight", revision: 0 });
       });
       await go("/");
       const hp = partyTile.getByRole("group", { name: "Mira Ashfall hit points", exact: true });
       if (!(await partyTile.isVisible()))
-        await page.locator(".information-selectors").getByRole("button", { name: "Party", exact: true }).click();
+        await page
+          .locator(".information-selectors")
+          .getByRole("button", { name: "Party", exact: true })
+          .click();
       await expect(hp).toBeVisible();
       const reading = partyTile.getByRole("link").filter({ hasText: "Mira Ashfall" });
       await expect(reading).toContainText("38/44 HP");
@@ -128,7 +142,10 @@ try {
       const sheetHp = await page.evaluate(async () => {
         const { economySnapshot } = await import("/src/lib/quire/economy.ts");
         const t = await economySnapshot();
-        return { ledger: t.ledger.length, purse: t.purses.find((p) => p.name === "Mira Ashfall")?.coins };
+        return {
+          ledger: t.ledger.length,
+          purse: t.purses.find((p) => p.name === "Mira Ashfall")?.coins,
+        };
       });
       assert.ok(sheetHp.purse, "Mira still has her purse");
       await page.screenshot({ path: `${output}/desk-${width}x${height}.png`, fullPage: false });
@@ -140,7 +157,9 @@ try {
         const pin = page.getByRole("button", { name: "Pin to Desk", exact: true });
         await expect(pin).toHaveAttribute("aria-pressed", "false");
         await pin.click();
-        await expect(page.getByRole("button", { name: "Pinned to Desk", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await expect(
+          page.getByRole("button", { name: "Pinned to Desk", exact: true }),
+        ).toHaveAttribute("aria-pressed", "true");
         await go("/");
         const pinned = page.getByRole("region", { name: "Pinned", exact: true });
         await expect(pinned.getByRole("link", { name: "Quests", exact: true })).toBeVisible();
@@ -151,7 +170,10 @@ try {
         await expect(page.getByRole("button", { name: "Pin to Desk", exact: true })).toBeVisible();
         await go("/");
         await expect(pinned.getByRole("link", { name: "Quests", exact: true })).toHaveCount(0);
-        const ledgerAfter = await page.evaluate(async () => (await (await import("/src/lib/quire/economy.ts")).economySnapshot()).ledger.length);
+        const ledgerAfter = await page.evaluate(
+          async () =>
+            (await (await import("/src/lib/quire/economy.ts")).economySnapshot()).ledger.length,
+        );
         assert.equal(ledgerAfter, ledgerBefore, "pins and HP changes post no ledger lines");
       }
       assert.deepEqual(errors, [], `${width}: no page errors`);
