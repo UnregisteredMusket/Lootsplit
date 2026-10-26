@@ -6,7 +6,9 @@ import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { readJournal } from "./journal.ts";
 import {
   audienceLabel,
+  noteOwner,
   npcQuests,
+  questChanges,
   questsByTab,
   questsHere,
   questUpdated,
@@ -14,6 +16,7 @@ import {
   writeQuestState,
 } from "./quest-view.ts";
 import type { Quest } from "./quests-schema.ts";
+import { forgetQuestState } from "./campaigns.ts";
 
 const quest = (id: string, extra: Partial<Quest> = {}): Quest => ({
   id,
@@ -118,4 +121,50 @@ test("Follow and Updated are per device and survive blocked storage in memory", 
   } finally {
     Object.defineProperty(globalThis, "localStorage", { configurable: true, value: saved, writable: true });
   }
+});
+
+test("Quest updated toasts: none on first load; a newly visible quest toasts once as new", () => {
+  const first = questChanges(null, [quest("a")]);
+  assert.deepEqual(first.changed, []);
+  const revealedLater = questChanges(first.next, [quest("a"), quest("b", { updatedAt: 3 })]);
+  assert.deepEqual(revealedLater.changed.map((c) => [c.quest.id, c.isNew]), [["b", true]]);
+  const again = questChanges(revealedLater.next, [quest("a"), quest("b", { updatedAt: 3 })]);
+  assert.deepEqual(again.changed, []);
+  const updated = questChanges(again.next, [quest("a", { updatedAt: 9 }), quest("b", { updatedAt: 3 })]);
+  assert.deepEqual(updated.changed.map((c) => [c.quest.id, c.isNew]), [["a", false]]);
+  // Archived quests never toast.
+  assert.deepEqual(questChanges(updated.next, [quest("c", { archived: true })]).changed, []);
+});
+
+test("a private quest note is written as one of the seat's characters who know the quest", () => {
+  const purses = [{ id: "aria", kind: "character" }, { id: "bram", kind: "character" }, { id: "fund", kind: "party" }];
+  assert.equal(noteOwner(quest("q", { audience: { kind: "characters", purseIds: ["bram"] } }), ["fund", "aria", "bram"], purses), "bram");
+  assert.equal(noteOwner(quest("q"), ["fund", "aria", "bram"], purses), "aria");
+  assert.equal(noteOwner(quest("q", { audience: { kind: "characters", purseIds: ["cass"] } }), ["aria"], purses), undefined);
+});
+
+test("deleting a campaign forgets its quest Follow/Updated marks only", () => {
+  const store = new Map<string, string>([
+    ["quire.quests.v1.gone.player.aria", "{}"],
+    ["quire.quests.v1.gone.dm.", "{}"],
+    ["quire.quests.v1.gone2.player.aria", "{}"],
+    ["quire.seat.v1.gone", "{}"],
+  ]);
+  const saved = globalThis.localStorage;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      get length() {
+        return store.size;
+      },
+      key: (i: number) => [...store.keys()][i] ?? null,
+      removeItem: (k: string) => void store.delete(k),
+    },
+  });
+  try {
+    forgetQuestState("gone");
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: saved, writable: true });
+  }
+  assert.deepEqual([...store.keys()], ["quire.quests.v1.gone2.player.aria", "quire.seat.v1.gone"]);
 });

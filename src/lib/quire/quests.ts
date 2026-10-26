@@ -51,6 +51,17 @@ function partyMember(t: Pick<CloudTable, "purses" | "journal">, p: Purse) {
   return questCharacter(t, p) && characterVisible(t, p) && (inParty(t, p) || !p.nonParty);
 }
 
+/**
+ * The characters a quest reaches: party members for a party quest (and for a draft, as a preview
+ * of a party reveal), or the listed visible characters.
+ */
+export function questAudienceCharacters(t: Pick<CloudTable, "purses" | "journal">, quest: Pick<Quest, "audience">): Purse[] {
+  if (quest.audience.kind === "characters") {
+    const listed = new Set(quest.audience.purseIds);
+    return t.purses.filter((p) => listed.has(p.id) && questCharacter(t, p) && characterVisible(t, p));
+  }
+  return t.purses.filter((p) => partyMember(t, p));
+}
 /** True when this seat may read the quest. The DM always can. */
 export function questReadable(table: Pick<CloudTable, "purses" | "journal">, quest: Pick<Quest, "audience">, seat: Seat) {
   if (seat.role === "dm") return true;

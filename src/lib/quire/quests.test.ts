@@ -14,6 +14,7 @@ import { applyCommand, type Command } from "./commands.ts";
 import { preserveJournalMetadata, readJournal } from "./journal.ts";
 import { projectRecord } from "./session-records.ts";
 import { projectQuests, questsOf } from "./quests.ts";
+import { previewQuestAs } from "./quest-preview.ts";
 import { campaignMapSchema } from "./world-schema.ts";
 import { applyCloudTable, economySnapshot, executeLocalCommand } from "./economy.ts";
 import { DM_SEAT, setSeat } from "./table.ts";
@@ -402,7 +403,8 @@ test("review: a reward label shows a player only the amounts on lines they can r
   // Mirelle (away from the party) reads only her own line; never the NPC's 900 gp.
   const mirelle = projectRecord(t, player("mirelle"));
   assert.deepEqual(questsOf(mirelle)[0]!.rewardLinks.map((l) => l.label), ["Wolf den · 1 gp"]);
-  assert.equal(JSON.stringify(mirelle.journal).includes("921"), false);
+  // Match the amounts as labels: a bare "921" can occur inside a timestamp (it did once in CI).
+  for (const amount of ["921 gp", "900 gp", "920 gp"]) assert.equal(JSON.stringify(mirelle.journal).includes(amount), false, amount);
   // Cass travels with the party: party members' lines (Aria's), not the NPC's or the away player's.
   assert.deepEqual(questsOf(projectRecord(t, player("cass")))[0]!.rewardLinks.map((l) => l.label), ["Wolf den · 20 gp"]);
 });
@@ -428,4 +430,23 @@ test("review: linking a receipt is not an Updated change for players", () => {
   t = run(t, { id: "w1", kind: "quest-link-reward", questId: "q1", revision: rev(t), link: { kind: "ledger", id: "advance" } });
   assert.equal(questsOf(t)[0]!.updatedAt, before);
   assert.equal(questsOf(projectRecord(t, player("mirelle")))[0]!.updatedAt, before);
+});
+
+test("View as player uses the real projection for the chosen character", () => {
+  let t = revealedCampaign({ kind: "characters", purseIds: ["aria"] });
+  // A shared line about an objective hidden again, and a giver the player cannot read.
+  t = run(t, { id: "o7", kind: "quest-objective", questId: "q1", revision: rev(t), objectiveId: "o-secret", action: "reveal" });
+  t = run(t, { id: "o8", kind: "quest-objective", questId: "q1", revision: rev(t), objectiveId: "o-secret", action: "hide" });
+  t = run(t, { id: "s9", kind: "quest-save", questId: "q1", revision: rev(t), quest: draft({ giverNpcId: "spy" }) });
+  const preview = previewQuestAs(t, "q1", "aria");
+  const json = JSON.stringify(preview.quest);
+  for (const secret of ["The spy took her", "Learn who stole her", "Hollin is lying", "o-secret", "spy"])
+    assert.equal(json.includes(secret), false, secret);
+  assert.deepEqual(preview.quest!.log.map((l) => l.text), ["The party learned of this quest.", "Tracks lead east."]);
+  // A character outside the audience sees nothing.
+  assert.equal(previewQuestAs(t, "q1", "cass").quest, undefined);
+  // A draft is previewed as a party reveal; the stored draft is unchanged.
+  const d = run(campaign(), { id: "d1", kind: "quest-save", questId: null, revision: null, quest: draft() });
+  assert.equal(previewQuestAs(d, "d1", "bram").quest?.title, "Hollin's Missing Mare");
+  assert.equal(questsOf(d)[0]!.audience.kind, "none");
 });

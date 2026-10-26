@@ -203,6 +203,21 @@ function refreshRegistry() {
   }
 }
 
+/** Quest Follow/Updated marks are per campaign (quest-view.ts `questStateKey`); drop them with it. */
+export function forgetQuestState(campaignId: string) {
+  try {
+    const prefix = `quire.quests.v1.${campaignId}.`;
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(prefix)) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    // Blocked storage holds nothing to clear.
+  }
+}
+
 function completeDeletion(target: Campaign, fallback: CampaignState) {
   // The durable intent is a recovery hint, not an authoritative replacement registry.
   // Another tab (including an older client) may have committed newer metadata while IDB was blocked.
@@ -219,6 +234,7 @@ function completeDeletion(target: Campaign, fallback: CampaignState) {
         : campaigns[0]!.id;
   state = { campaigns, activeId };
   persist();
+  forgetQuestState(target.id);
   localStorage.removeItem(DELETION);
   deleting = false;
   closeQuireDb();

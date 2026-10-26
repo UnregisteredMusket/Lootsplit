@@ -156,6 +156,14 @@ try {
       const { economySnapshot } = await import("/src/lib/quire/economy.ts");
       return (await economySnapshot()).journal?.quests?.quests?.[0]?.objectives?.[0]?.state === "done";
     });
+    // View as player: the real projection for Tamsin (no hidden objective, DM notes or DM-only line).
+    await dmEditor.getByRole("button", { name: "View as player" }).click();
+    const preview = page.getByRole("dialog", { name: "What players see" });
+    await preview.getByText("Follow the tracks north of Harrowgate").waitFor();
+    const previewText = await preview.innerText();
+    for (const secret of SECRETS) assert.equal(previewText.includes(secret), false, `preview shows: ${secret}`);
+    await preview.getByRole("button", { name: "Close" }).click();
+    await preview.waitFor({ state: "detached" });
     await noOverflow(page, `dm detail ${width}`);
     await page.screenshot({ path: `test-results/quest-log/dm-detail-${width}.png`, fullPage: true });
     // Nothing moved.
@@ -239,7 +247,7 @@ try {
     await context.close();
   }
   console.log(
-    "PASS quest log: DM draft with hidden objective and DM notes, reveal to one character with a private message, DM-only chronicle line, objective done, Desk card and NPC strip; player view without hidden parts, follow, private note, Quest updated toast, Home card, Here sheet; another player sees nothing; close to Done; nothing moved; 1280/390/320 px without sideways scrolling.",
+    "PASS quest log: DM draft with hidden objective and DM notes, reveal to one character with a private message, DM-only chronicle line, objective done, View as player, Desk card and NPC strip; player view without hidden parts, follow, private note, Quest updated toast, Home card, Here sheet; another player sees nothing; close to Done; nothing moved; 1280/390/320 px without sideways scrolling.",
   );
 } finally {
   await browser.close();
