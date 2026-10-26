@@ -8,6 +8,7 @@ import { useMemo, type ReactNode } from "react";
 import { Coins, Gem, Minus, RotateCcw, Swords } from "lucide-react";
 import { AppLink } from "@/components/app-link";
 import { LedgerArt } from "@/components/ledger-art";
+import { EmptyState } from "@/components/terminal";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { partyFunds } from "@/lib/quire/coin-split";
@@ -109,6 +110,11 @@ export function FairnessLedger({
   const { table, viewer, ready } = useFairness();
   const economy = useEconomy();
   const view = useMemo(() => fairnessLedger(table, viewer, period), [table, viewer, period]);
+  // Nothing handed out yet, campaign to date (design plan P10): explain instead of zero rows.
+  const campaign = useMemo(
+    () => (period === "campaign" ? view : fairnessLedger(table, viewer, "campaign")),
+    [period, view, table, viewer],
+  );
   if (!ready) return <p className="mt-6 text-muted">Loading…</p>;
   const all = [...view.rows, ...view.others];
   if (character && all.some((r) => r.purseId === character))
@@ -132,6 +138,29 @@ export function FairnessLedger({
   const allUnvalued = view.unvalued.reduce((s, u) => s + u.units, 0);
   const rowLink = (r: FairRow) => periodHref(view.period, r.purseId);
   const label = periodName(view);
+  const nothingYet =
+    campaign.sum === 0 &&
+    campaign.unvalued.length === 0 &&
+    [...campaign.rows, ...campaign.others].every((r) => r.total === 0) &&
+    view.unreadable === 0;
+  if (nothingYet && all.length > 0)
+    return (
+      <div className="fair-ledger" id="fairness">
+        <div className="mt-4">
+          <EmptyState
+            title="No loot handed out yet"
+            body="Coin splits, encounter awards and treasure-pool results will appear here, with each character's total and the gap to the party average."
+            action={
+              <span className="flex flex-col items-center gap-1 text-sm">
+                <a href="#what-counts">What counts?</a>
+                {undivided ? <span className="text-muted">Still undivided: {undivided}</span> : null}
+              </span>
+            }
+          />
+        </div>
+        <WhatCounts />
+      </div>
+    );
   return (
     <div className="fair-ledger" id="fairness">
       <PeriodSelect

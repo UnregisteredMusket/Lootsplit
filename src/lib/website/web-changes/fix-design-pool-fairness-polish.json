@@ -1,0 +1,11 @@
+{
+  "title": "Treasure pool and Fairness tidy-up",
+  "summary": "The party screen is easier to scan: shorter tabs, a calmer treasure pool and a clear message before any loot is shared.",
+  "items": [
+    "Players now find the party screen as \"Party & inventory\".",
+    "Party tabs no longer wrap, and the pool's count sits inside the Pool tab.",
+    "A treasure-pool item nobody has claimed shows \"No claims yet\" and how many can claim, instead of a list of \"Not yet\" rows.",
+    "Claim all as Pass marks Pass on every item you haven't marked yet; the Need, Greed and Pass buttons stay in place while claims update.",
+    "Fairness explains that no loot has been handed out yet instead of showing rows of 0 cp."
+  ]
+}

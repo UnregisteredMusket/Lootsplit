@@ -91,6 +91,39 @@ try {
     page.on("dialog", (d) => d.accept());
     await autoAnswerThemedDialogs(page); // themed confirmations (window.confirm is banned)
     await openApplication(page, origin + "/party?section=fairness");
+    // Design plan P10: before any loot is handed out, an empty state explains it, with no 0 cp rows.
+    await page.evaluate(async () => {
+      const { applyCloudTable } = await import("/src/lib/quire/economy.ts");
+      const { readJournal } = await import("/src/lib/quire/journal.ts");
+      const coins = (gp = 0) => ({ cp: 0, sp: 0, ep: 0, gp, pp: 0 });
+      await applyCloudTable({
+        purses: [
+          { id: "hoard", name: "The Hoard", kind: "party", coins: coins(100) },
+          { id: "aria", name: "Aria Thorne", kind: "character", coins: coins(5) },
+          { id: "bram", name: "Bram Ironfoot", kind: "character", coins: coins(5) },
+        ],
+        holdings: [], shops: [], stock: [], ledger: [], listings: [], loans: [], sheets: [], notes: [],
+        journal: readJournal({}),
+      });
+    });
+    await reloadApplication(page, origin + "/party?section=fairness");
+    for (const seat of ["dm", "player"]) {
+      if (seat === "player") {
+        await asPlayer(page, "aria");
+        await reloadApplication(page, origin + "/party?section=fairness");
+      }
+      await page.getByText("No loot handed out yet", { exact: true }).waitFor();
+      await page.getByText(/Coin splits, encounter awards and treasure-pool results will appear here/).waitFor();
+      assert.equal(await page.getByRole("table", { name: "Loot received per character" }).count(), 0, `${seat}: no 0 cp rows`);
+      assert.equal(await page.getByText("level with the average").count(), 0);
+      await page.locator("#party-panel-fairness").getByRole("link", { name: "What counts?", exact: true }).first().waitFor();
+      await noOverflow(page, `fairness empty ${seat} ${width}`);
+      await shot(page, `empty-${seat}-${width}`);
+    }
+    await page.evaluate(async () => {
+      const t = await import("/src/lib/quire/table.ts");
+      t.setSeat(t.DM_SEAT);
+    });
     await seed(page);
     await reloadApplication(page, origin + "/party?section=fairness");
 
@@ -188,7 +221,7 @@ try {
     await context.close();
   }
   console.log(
-    "PASS: Fairness tab (DM, party member, player away), period switch, breakdown with not-counted lines and older items at 0 cp, favour preview and receipt, at 1280/390/320 px without sideways scrolling.",
+    "PASS: Fairness empty state (DM and player), Fairness tab (DM, party member, player away), period switch, breakdown with not-counted lines and older items at 0 cp, favour preview and receipt, at 1280/390/320 px without sideways scrolling.",
   );
 } catch (error) {
   console.error("FAIL: loot fairness browser audit", error);

@@ -259,7 +259,7 @@ try {
   }
   await page.getByRole("button", { name: "Open beside", exact: true }).click();
   const playerMenu = page.getByRole("menu", { name: "Open beside" });
-  await expect(playerMenu.getByRole("menuitem", { name: /^Inventory/ })).toBeVisible();
+  await expect(playerMenu.getByRole("menuitem", { name: /^Party & inventory/ })).toBeVisible();
   for (const hidden of [/^Encounters/, /^Session Time/, /^Music & Ambience/, /^Review Inbox/, /^Shop Management/])
     assert.equal(await playerMenu.getByRole("menuitem", { name: hidden }).count(), 0, String(hidden));
   await expect(playerMenu.getByRole("menuitem", { name: /^My Finances/ })).toBeVisible();

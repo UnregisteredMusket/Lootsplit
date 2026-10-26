@@ -100,7 +100,7 @@ export function paneScreens(dm: boolean): PaneScreen[] {
   const main: Omit<PaneScreen, "key" | "group">[] = [
     { href: "/?view=home", title: dm ? "DM Desk" : "Home" },
     { href: "/characters", title: "Character sheet" },
-    { href: "/party", title: dm ? "Party" : "Inventory" },
+    { href: "/party", title: dm ? "Party" : "Party & inventory" },
     { href: "/market", title: "Market" },
     { href: "/library", title: "Library" },
     { href: "/maps", title: "Maps" },

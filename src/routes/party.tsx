@@ -101,10 +101,12 @@ function PartyPage() {
   const [splitSource, setSplitSource] = useState("");
   const poolCount = usePoolCount();
   // Party sections: the DM's Characters / Funds & inventory, and the treasure pool for everyone.
-  const tabs: Array<[string, string]> = [
+  // Short, non-wrapping labels (design plan P10) so the pool's count sits inside its own tab.
+  // The accessible name keeps the full name where the visible label is shorter.
+  const tabs: Array<[string, string, string?]> = [
     ...(seat.role === "dm" ? ([["characters", "Characters"]] as Array<[string, string]>) : []),
-    ["funds", seat.role === "dm" ? "Funds & inventory" : "Inventory & purse"],
-    ["pool", "Treasure pool"],
+    seat.role === "dm" ? ["funds", "Funds & inventory"] : ["funds", "Inventory", "Inventory & purse"],
+    ["pool", "Pool", poolCount > 0 ? `Treasure pool, ${poolCount} lot${poolCount === 1 ? "" : "s"}` : "Treasure pool"],
     ["fairness", "Fairness"],
   ];
   const shownSection = seat.role !== "dm" && section === "characters" ? "funds" : section;
@@ -121,7 +123,8 @@ function PartyPage() {
     <Shell>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="eyebrow">Party overview</p>
+          {/* Glossary: players see "Party & inventory" (the nav label too); DMs keep "Party". */}
+          <p className="eyebrow">{seat.role === "dm" ? "Party overview" : "Party & inventory"}</p>
           <h1 className="font-display text-4xl tracking-tight">
             {seat.role === "dm" ? "Party" : "Inventory & purse"}
           </h1>
@@ -149,13 +152,14 @@ function PartyPage() {
           role="tablist"
           aria-label="Party sections"
         >
-          {tabs.map(([k, label], index) => (
+          {tabs.map(([k, label, name], index) => (
             <button
               type="button"
               id={`party-tab-${k}`}
               role="tab"
               aria-selected={shownSection === k}
               aria-controls={`party-panel-${k}`}
+              aria-label={name}
               tabIndex={shownSection === k ? 0 : -1}
               key={k}
               onClick={() => setSection(k)}
@@ -179,7 +183,7 @@ function PartyPage() {
               {label}
               {k === "fairness" ? <span className="fair-new">New</span> : null}
               {k === "pool" && poolCount > 0 ? (
-                <span className="loot-count" aria-label={`${poolCount} lots`}>
+                <span className="loot-count" aria-hidden="true">
                   {poolCount}
                 </span>
               ) : null}

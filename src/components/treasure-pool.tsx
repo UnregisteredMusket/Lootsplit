@@ -7,6 +7,8 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AppLink } from "@/components/app-link";
 import { Button } from "@/components/ui";
+import { toast } from "sonner";
+import { requestConfirm } from "@/lib/quire/confirm-store";
 import { LedgerArt } from "@/components/ledger-art";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
@@ -214,6 +216,9 @@ export function TreasurePool({ onAddLoot, onAddFund }: { onAddLoot?: () => void;
               ))}
             </div>
           )}
+          {!readOnly && (dm ? claimants.length > 0 : mine.length > 0) && lots.length > 0 ? (
+            <ClaimAllPass t={t} lots={lots} options={dm ? claimants : mine} dm={dm} />
+          ) : null}
           {!lots.length ? (
             <p className="mt-4 text-sm text-muted">
               The pool is empty. {dm ? "Add loot to a party fund with “Put in the treasure pool”, or send encounter items to the pool." : "When the DM adds treasure, it appears here for claims."}
@@ -236,6 +241,78 @@ export function TreasurePool({ onAddLoot, onAddFund }: { onAddLoot?: () => void;
   );
 }
 
+/**
+ * Q22: mark Pass on every lot not claimed yet (one claim each): a player's own characters, or the
+ * character the DM is marking for at a table that shares one device.
+ */
+function ClaimAllPass({ t, lots, options, dm }: { t: LootTable; lots: Holding[]; options: Purse[]; dm: boolean }) {
+  const economy = useEconomy();
+  const state = readLootClaims(t);
+  const [forId, setForId] = useState(options[0]?.id ?? "");
+  const mine = dm ? options.filter((p) => p.id === forId).slice(0, 1) : options;
+  const todo = lots.flatMap((h) =>
+    mine
+      .filter((p) => !lotClaims(t, h.id, state).some((c) => c.purseId === p.id))
+      .map((p) => ({ h, p })),
+  );
+  const [busy, setBusy] = useState(false);
+  // One command ID per run of unmarked claims; each claim derives its own, so a retry is applied once.
+  const action = useCommandId(todo.map(({ h, p }) => `${h.id}:${p.id}`).join("|"));
+  const lotsLeft = new Set(todo.map(({ h }) => h.id)).size;
+  if (!todo.length && !dm) return null;
+  return (
+    <div className="loot-pass-all">
+      {dm && options.length > 1 ? (
+        <select
+          aria-label="Pass for"
+          value={forId}
+          onChange={(e) => setForId(e.target.value)}
+          className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
+        >
+          {options.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      <Button
+        variant="secondary"
+        disabled={busy || !todo.length}
+        onClick={async () => {
+          const yes = await requestConfirm({
+            title: `Pass on ${lotsLeft} unmarked lot${lotsLeft === 1 ? "" : "s"}?`,
+            body: `Marks Pass for ${mine.map((p) => p.name).join(" and ")} on every lot not marked yet. Need and Greed already chosen stay.${dm ? " Recorded as marked by the DM." : ""} Claims can change until the item is resolved.`,
+            confirmLabel: "Claim all as Pass",
+          });
+          if (!yes) return;
+          setBusy(true);
+          let done = 0;
+          try {
+            for (const [i, { h, p }] of todo.entries()) {
+              const refusal = await economy.lootClaim(
+                { holdingId: h.id, purseId: p.id, choice: "pass", before: null },
+                { commandId: `${action.commandId}-${i}` },
+              );
+              if (refusal) {
+                toast.error(`${h.name}: ${refusal}`);
+                return;
+              }
+              done++;
+            }
+            action.renew();
+            toast.success(`Marked Pass on ${done} claim${done === 1 ? "" : "s"}.`);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Marking Pass…" : `Claim all as Pass · ${lotsLeft}`}
+      </Button>
+    </div>
+  );
+}
+
 function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Purse[]; readOnly: boolean }) {
   const economy = useEconomy();
   const seat = useSeat();
@@ -254,7 +331,6 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
   const action = useCommandId(`${h.id}|${who?.id}|${current?.choice ?? ""}`);
   const outAction = useCommandId(`out|${h.id}`);
   const shownChoice = pending ?? current?.choice ?? null;
-  const count = (c: LootChoice) => claims.filter((x) => x.choice === c).length;
   async function mark(choice: LootChoice) {
     if (!who || pending || readOnly) return;
     if (choice === current?.choice) return;
@@ -294,7 +370,10 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
       {h.notes && <p className="loot-lot-notes">“{h.notes}”</p>}
       {who && !readOnly ? (
         <>
-          {!dm && !current && <p className="loot-status">● You haven't chosen yet</p>}
+          {/* Always one status line, so Need / Greed / Pass keep their place as claims update (Q22). */}
+          {!dm ? (
+            <p className="loot-status">{current ? `Your claim: ${CHOICE_LABEL[current.choice]}` : "● You haven't chosen yet"}</p>
+          ) : null}
           <div className="loot-claim-for">
             {options.length > 1 ? (
               <label>
@@ -310,7 +389,8 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
             ) : (
               <span>{dm ? `Recording a claim for ${who.name}` : `${who.name}'s claim`}</span>
             )}
-            {current && <span className="text-xs text-muted">Changed {when(current.at)}</span>}
+            {/* Always present, so the row keeps its height as claims change (Q22). */}
+            <span className="text-xs text-muted">{current ? `Changed ${when(current.at)}` : "Not marked yet"}</span>
           </div>
           <div className="loot-seg" role="radiogroup" aria-label={`${who.name}'s claim on ${h.name}`} aria-busy={!!pending}>
             {CHOICES.map(({ choice, hint }) => (
@@ -347,10 +427,30 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
           {error} Nothing changed.
         </div>
       )}
+      {!claims.length ? (
+        // Nobody has claimed yet: one line instead of a "Not yet" row per character (P10).
+        <details className="loot-claims loot-claims-none">
+          <summary className="loot-claims-title">
+            No claims yet · {claimants.length} can claim
+          </summary>
+          <ul className="loot-claim-list">
+            {claimants.map((p) => (
+              <li key={p.id}>
+                <span>
+                  <span>
+                    {p.name}
+                    {seat.purseIds.includes(p.id) ? " (you)" : ""}
+                  </span>
+                </span>
+                <Pill choice="none" />
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : (
       <div className="loot-claims">
         <p className="loot-claims-title">
-          Party claims{claims.length ? ` · ${claimSummary(t, h.id)}` : ""}
-          {!claims.length && count("need") === 0 ? " · none yet" : ""}
+          Party claims · {claimSummary(t, h.id)}
         </p>
         <ul className="loot-claim-list">
           {claimants.map((p) => {
@@ -370,6 +470,7 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
           })}
         </ul>
       </div>
+      )}
       {dm && (
         <div className="loot-actions">
           <Button

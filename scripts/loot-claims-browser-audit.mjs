@@ -104,7 +104,32 @@ try {
     await reloadApplication(page, origin + "/party?section=pool");
     await page.getByText("Treasure pool · The Hoard", { exact: true }).waitFor();
     await page.getByRole("tab", { name: /Treasure pool/ }).first().waitFor();
+    // Design plan P10: the lot count sits inside the Pool tab, and no Party tab label wraps.
+    const partyTabs = page.getByRole("tablist", { name: "Party sections", exact: true });
+    const poolTab = partyTabs.getByRole("tab", { name: "Treasure pool, 4 lots", exact: true });
+    assert.match(await poolTab.innerText(), /^Pool\s*4$/);
+    const [tabBox, badgeBox] = [await poolTab.boundingBox(), await poolTab.locator(".loot-count").boundingBox()];
+    assert.ok(
+      badgeBox.x >= tabBox.x && badgeBox.x + badgeBox.width <= tabBox.x + tabBox.width + 0.5 &&
+        badgeBox.y >= tabBox.y && badgeBox.y + badgeBox.height <= tabBox.y + tabBox.height + 0.5,
+      `${width}: the pool count sits inside the Pool tab`,
+    );
+    for (const tab of await partyTabs.getByRole("tab").all())
+      assert.equal(await tab.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && getComputedStyle(el).whiteSpace === "nowrap"), true, `${width}: a Party tab label wraps or overflows`);
+    // A lot nobody has claimed: one line, expandable to the names.
+    const scrollLot = page.locator(".loot-lot").filter({ hasText: "Spell scroll (Shield)" });
+    await scrollLot.getByText("No claims yet · 3 can claim", { exact: true }).waitFor();
+    assert.equal(await scrollLot.locator(".loot-claim-list li").first().isVisible(), false);
+    await scrollLot.getByText("No claims yet · 3 can claim", { exact: true }).click();
+    await scrollLot.locator(".loot-claim-list li", { hasText: "Cass of the Reeds" }).waitFor();
     const potion = page.locator(".loot-lot").filter({ hasText: "Potion of healing" });
+    // The Need button's offset inside its card (the page itself may scroll).
+    const needOffset = async () => {
+      const [card, need] = [await potion.boundingBox(), await potion.getByRole("radio", { name: /^Need/ }).boundingBox()];
+      return need.y - card.y;
+    };
+    await potion.getByLabel("Claim for", { exact: true }).selectOption("aria");
+    const needBefore = await needOffset();
     // The DM marks a claim for the table (one shared device): nothing moves.
     const before = await readBooks(page);
     await potion.getByLabel("Claim for", { exact: true }).selectOption("aria");
@@ -114,6 +139,8 @@ try {
       return ((await economySnapshot()).journal?.lootClaims?.claims ?? []).length === 1;
     });
     await potion.locator(".loot-claim-list").getByText("marked by the DM", { exact: true }).waitFor();
+    // Q22: Need / Greed / Pass keep their place while the claims below them update.
+    assert.equal(Math.round((await needOffset()) - needBefore), 0, `${width}: Need moved after a claim`);
     const marked = await readBooks(page);
     assert.deepEqual(marked.holdings, before.holdings);
     assert.deepEqual(marked.purses, before.purses);
@@ -246,11 +273,29 @@ try {
     assert.deepEqual(pooled.map((h) => [h.purseId, h.name, h.quantity]), [["hoard", "Potion of greater healing", 2]]);
     assert.equal(after.holdings.filter((h) => h.name === "Captain's iron key" && h.purseId === "aria").length, 1);
     await page.screenshot({ path: `test-results/loot-claims/encounter-receipt-${width}.png`, fullPage: true });
+    // Q22: Claim all as Pass marks Pass on every lot the chosen character has not marked; nothing moves.
+    await openApplication(page, origin + "/party?section=pool");
+    const beforePass = await readBooks(page);
+    const unmarked = beforePass.holdings.filter(
+      (h) => h.pool && !beforePass.claims.some((c) => c.holdingId === h.id && c.purseId === "cass"),
+    );
+    assert.ok(unmarked.length > 0);
+    await page.getByLabel("Pass for", { exact: true }).selectOption("cass");
+    await page.getByRole("button", { name: `Claim all as Pass · ${unmarked.length}`, exact: true }).click();
+    await page.getByText(`Marked Pass on ${unmarked.length} claim${unmarked.length === 1 ? "" : "s"}.`, { exact: true }).waitFor();
+    const afterPass = await readBooks(page);
+    assert.deepEqual(
+      afterPass.claims.filter((c) => c.purseId === "cass" && c.choice === "pass").map((c) => c.holdingId).sort(),
+      unmarked.map((h) => h.id).sort(),
+    );
+    assert.deepEqual(afterPass.holdings, beforePass.holdings);
+    assert.deepEqual(afterPass.purses, beforePass.purses);
+    assert.equal(await page.getByRole("button", { name: /^Claim all as Pass/ }).isDisabled(), true);
     assert.deepEqual(errors, []);
     await context.close();
   }
   console.log(
-    "PASS treasure pool: Party tab, claim marked for the table moves nothing, Review Inbox round-robin preview, stale preview refused with the form kept, one atomic resolution and receipt, device replay applied once, one Activity row, Add loot to the pool, encounter award to the pool; 1280/390/320 px without sideways scrolling.",
+    "PASS treasure pool: Party tab with its count inside and unwrapped labels, unclaimed lots collapsed, stable claim buttons, Claim all as Pass, claim marked for the table moves nothing, Review Inbox round-robin preview, stale preview refused with the form kept, one atomic resolution and receipt, device replay applied once, one Activity row, Add loot to the pool, encounter award to the pool; 1280/390/320 px without sideways scrolling.",
   );
 } finally {
   await browser.close();
