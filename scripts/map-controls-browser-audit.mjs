@@ -32,6 +32,7 @@ const SIZES = [
   [320, 640],
   [844, 390],
   [1280, 680],
+  [568, 320],
 ];
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
@@ -258,7 +259,8 @@ async function checkChrome(page, { role, appearance, width, height }) {
   assert.equal(page.url(), url, `${tag}: opening settings changes no route`);
   await sameDocument(page, `${tag} settings`);
   await page.getByRole("button", { name: "Close settings", exact: true }).click();
-  if (width <= 650 && height > 550) await checkMobileMapControls(page);
+  // Phones, including narrow landscape (568×320): every control a 44 px unobstructed target.
+  if (width <= 650) await checkMobileMapControls(page);
   await page.screenshot({ path: `${output}/map-${tag}.png` });
   checks.push(`${tag}: layout, tokens, fonts, settings without navigation`);
 }

@@ -3799,7 +3799,9 @@ input,select,textarea { max-width: 100%; }
 .map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"]) .map-tool { width:44px; min-width:44px; height:44px; min-height:44px; border-radius:12px; }
 .map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar-toggle.map-glass { width:44px; height:44px; border-radius:14px; flex:none; }
 /* The additional (DM) tools open beside the rail as a two-column panel, never sideways across the map. */
-.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar-more { top:auto; bottom:0; right:calc(100% + 8px); width:auto; max-width:none; max-height:100%; overflow:auto; display:grid; grid-template-columns:repeat(2,44px); gap:2px; padding:5px; border-radius:16px; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar-more { top:0; bottom:auto; right:calc(100% + 8px); width:auto; max-width:none; max-height:100%; overflow:auto; display:grid; grid-template-columns:repeat(2,44px); gap:2px; padding:5px; border-radius:16px; }
+/* Landscape phones: three columns from the top, clear of the zoom pill at the bottom. */
+.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-hotbar-more { grid-template-columns:repeat(3,44px); }
 /* Show tool names: labelled rail on desktop (first use until dismissed). */
 .map-workspace .map-hotbar-anchor[data-tool-names] .map-hotbar { width:176px; }
 .map-workspace .map-hotbar-anchor[data-tool-names] .map-tool { width:100%; justify-content:flex-start; gap:10px; padding:0 10px; height:44px; min-height:44px; }
@@ -3817,9 +3819,9 @@ input,select,textarea { max-width: 100%; }
 .map-tool-names-hint .map-hint-primary { background:var(--color-accent); color:var(--color-bg); border-color:transparent; }
 /* Landscape phones: the rail scrolls with 40 px tools and a fade at its foot. */
 .map-workspace .map-hotbar-anchor[data-layout="landscape"] { top:56px; bottom:8px; right:max(8px,env(safe-area-inset-right)); }
-.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-tool { width:40px; min-width:40px; height:40px; min-height:40px; }
+.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-tool { width:44px; min-width:44px; height:44px; min-height:44px; }
 .map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-hotbar { padding:3px; -webkit-mask-image:linear-gradient(#000 calc(100% - 22px),transparent); mask-image:linear-gradient(#000 calc(100% - 22px),transparent); padding-bottom:22px; }
-.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-hotbar-toggle.map-glass { width:40px; height:40px; }
+.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-hotbar-toggle.map-glass { width:44px; height:44px; }
 /* Panels beside the rail clear its width (--map-tools-w is measured by the map). */
 .map-workspace.map-view-frame .map-settings-drawer { right:calc(max(14px,env(safe-area-inset-right)) + var(--map-tools-w) + 8px); }
 .map-workspace .map-tool-context { right:calc(max(14px,env(safe-area-inset-right)) + var(--map-tools-w) + 8px); }
@@ -3845,7 +3847,6 @@ input,select,textarea { max-width: 100%; }
 }
 @media(max-height:550px) and (orientation:landscape) {
  .map-workspace.map-view-frame .map-navigation { bottom:8px; right:calc(max(8px,env(safe-area-inset-right)) + var(--map-tools-w) + 8px); width:auto; max-width:none; flex-direction:row; }
- .map-workspace.map-view-frame .map-navigation button { width:36px; min-width:36px; height:36px; min-height:36px; }
  .map-workspace .map-side-panel { top:56px; bottom:8px; max-height:none; }
 }
 /* Below 720 px tall (desktop): Table, View and Setup fold into "More tools" at the rail foot. */

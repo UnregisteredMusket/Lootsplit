@@ -86,11 +86,10 @@ export async function checkMobileMapControls(page) {
   const unobstructed = (button) =>
     button.evaluate((el) => {
       const r = el.getBoundingClientRect();
-      return (
-        r.width >= 44 &&
-        r.height >= 44 &&
-        el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
-      );
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return r.width >= 44 && r.height >= 44 && el.contains(hit)
+        ? true
+        : `${el.getAttribute("aria-label")}: ${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.x)},${Math.round(r.y)}, hit ${hit?.className || hit?.tagName}`;
     });
   for (const button of await toolbar.getByRole("button").all()) {
     await button.scrollIntoViewIfNeeded();
