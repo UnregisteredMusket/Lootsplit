@@ -660,6 +660,12 @@ public class OwnerWidgetTest {
             AtomicReference<String> signedOutGlyph=new AtomicReference<>("");
             instrumentation.runOnMainSync(()->signedOutGlyph.set(((TextView)hosted.get().findViewById(R.id.companion_light)).getText().toString()));
             assertEquals("Signed-out glyph is a neutral dash, never ?","–",signedOutGlyph.get());
+            // The audit screen is resumed again after the reopened settings closed; wait for its layout pass.
+            AtomicReference<Boolean> laidOut=new AtomicReference<>(false);deadline=android.os.SystemClock.elapsedRealtime()+8000;
+            while(!laidOut.get()&&android.os.SystemClock.elapsedRealtime()<deadline){
+                instrumentation.runOnMainSync(()->laidOut.set(hosted.get().getWidth()>0&&hosted.get().getHeight()>0));
+                if(!laidOut.get())android.os.SystemClock.sleep(50);
+            }
             AtomicReference<Throwable> failure=new AtomicReference<>();
             instrumentation.runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-companion-signed-out");}catch(Throwable e){failure.set(e);}});
             if(failure.get()!=null)throw new AssertionError("Companion framework capture",failure.get());
