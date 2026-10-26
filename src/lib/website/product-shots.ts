@@ -56,6 +56,11 @@ export type ProductShot = keyof typeof productShots;
 /** Screens that also have a 390-wide phone capture, public/product/<name>-phone.webp (W-4),
  * taken from the same synthetic campaign by scripts/capture-product-screenshots.mjs. */
 const PHONE_CAPTURES = new Set<ProductShot>([
+  "loot",
+  "party",
+  "trade",
+  "barter",
+  "ships",
   "ledger",
   "character",
   "market",
