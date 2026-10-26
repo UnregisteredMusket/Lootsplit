@@ -1,4 +1,4 @@
-import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType, openMoreMapTools } from "./map-workspace-browser.mjs";
+import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType } from "./map-workspace-browser.mjs";
 import { navigateApplication } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";

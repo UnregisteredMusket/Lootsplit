@@ -1,0 +1,10 @@
+{
+  "title": "Fog, walls, lights and combat setup on the left",
+  "summary": "The Dungeon Master's fog, walls, lights, combat tokens and grid now sit in the setup rail, each with its options right beside it.",
+  "items": [
+    "Fog brush, rectangle and polygon show Undo, Redo, Reveal all, Conceal all and Consolidate fog next to the tool; Ctrl+Z and Ctrl+Shift+Z undo and redo fog.",
+    "Walls & doors and Lights list what is already on the map while you draw.",
+    "Combat token and Grid & scale open their own panels; Objects & inspector opens the inspector.",
+    "The More map tools button is gone because everything it held now has its own place. Players find the inspector in the tools rail."
+  ]
+}

@@ -82,16 +82,18 @@ import {
   Ruler,
   Shapes,
   Pencil,
-  CloudFog,
-  Sun,
-  PanelRight,
   Grid3X3,
-  Undo2,
-  Redo2,
   Crosshair,
   Maximize,
   House,
   Layers,
+  CircleDot,
+  Paintbrush,
+  SquareDashed,
+  Pentagon,
+  BrickWall,
+  Lightbulb,
+  List,
   DoorOpen,
   MapPinned,
   Users,
@@ -100,7 +102,6 @@ import {
   Plus,
   Minus,
   X,
-  MoreHorizontal,
   ChevronDown,
   Menu,
   Route as RouteIcon,
@@ -159,7 +160,7 @@ const MapCombatWorkspace = lazy(() =>
   import("./map-combat-workspace").then((m) => ({ default: m.MapCombatWorkspace })),
 );
 
-type SetupTool = "party" | "marker" | "entrance" | "record" | "anchor";
+type SetupTool = "party" | "marker" | "entrance" | "record" | "anchor" | "token" | "grid";
 /** The setup rail's Place group (DM). `label` stays the accessible name audits and help use. */
 const SETUP_TOOLS = [
   { tool: "party", label: "Party position", name: "Party position", shortcut: "P", Icon: Users },
@@ -167,6 +168,8 @@ const SETUP_TOOLS = [
   { tool: "entrance", label: "Entrance", name: "Entrance", shortcut: "E", Icon: DoorOpen },
   { tool: "record", label: "Place record", name: "Place record", shortcut: "R", Icon: Store },
   { tool: "anchor", label: "Location link", name: "Location link", shortcut: "L", Icon: MapPinned },
+  { tool: "token", label: "Combat token", name: "Combat token", shortcut: "T", Icon: CircleDot },
+  { tool: "grid", label: "Grid & scale", name: "Grid & scale", shortcut: "G", Icon: Grid3X3 },
 ] as const satisfies readonly { tool: SetupTool; label: string; name: string; shortcut: string; Icon: unknown }[];
 const setupName = (tool: SetupTool) => SETUP_TOOLS.find((t) => t.tool === tool)!.name;
 const SETUP_PLACEMENT = {
@@ -175,7 +178,19 @@ const SETUP_PLACEMENT = {
   entrance: "record",
   record: "record",
   anchor: "anchor",
+  token: "token",
+  grid: "",
 } as const;
+/** Setup tools whose panel opens when armed (no map click needed first). */
+const PANEL_FIRST: readonly SetupTool[] = ["token", "grid"];
+/** Reveal group: tabletop tools armed from the setup rail (their options open beside it). */
+const REVEAL_TOOLS = [
+  { tool: "fog-brush", label: "Fog brush", shortcut: "F", Icon: Paintbrush },
+  { tool: "fog-rectangle", label: "Fog rectangle", shortcut: undefined, Icon: SquareDashed },
+  { tool: "fog-polygon", label: "Fog polygon", shortcut: undefined, Icon: Pentagon },
+  { tool: "wall", label: "Walls & doors", shortcut: "W", Icon: BrickWall },
+  { tool: "light", label: "Lights", shortcut: "I", Icon: Lightbulb },
+] as const;
 
 export function CampaignMaps() {
   const seat = useSeat(),
@@ -810,9 +825,71 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
         </label>
       </CommandForm>
     );
+  const tileToggle = map?.grid && (
+    <Button
+      aria-pressed={effectiveTileMode}
+      disabled={!!combatPresentation}
+      onClick={() => {
+        setTileMode(!tileMode);
+        if (setupTool === "token") setPlacement(tileMode ? "" : "token");
+        setPoint(undefined);
+      }}
+    >
+      {combatPresentation
+        ? effectiveTileMode
+          ? "Encounter grid active"
+          : "Encounter theatre view"
+        : tileMode
+          ? "Leave tile mode"
+          : "Enter tile mode"}
+    </Button>
+  );
   const setupPanel =
-    map && dm && setupTool && point ? (
-      setupTool === "party" ? (
+    map && dm && setupTool && (point || PANEL_FIRST.includes(setupTool)) ? (
+      setupTool === "token" ? (
+        map.grid && effectiveTileMode ? (
+          <CombatControls
+            key={`setup-combat-${map.id}`}
+            map={map}
+            table={t}
+            point={placement === "token" ? point : undefined}
+            selected={selectedToken}
+            select={(id) => {
+              setSelectedToken(id);
+              setPoint(undefined);
+            }}
+            begin={() => {
+              setPlacement("token");
+              setPoint(undefined);
+            }}
+            done={() => setPoint(undefined)}
+          />
+        ) : (
+          <>
+            <p>
+              {map.grid
+                ? "Combat tokens are placed and moved in tile mode."
+                : "This map has no combat grid yet. Add one in Grid & scale."}
+            </p>
+            {tileToggle}
+          </>
+        )
+      ) : setupTool === "grid" ? (
+        <>
+          <p>
+            {map.grid
+              ? `Combat grid: ${map.grid.columns} × ${map.grid.rows} tiles, ${map.grid.feetPerTile} ft per tile, diagonals ${map.grid.diagonal === "alternating" ? "alternate 5/10/5" : "count as one tile"}.`
+              : "No combat grid on this map."}{" "}
+            {map.scale
+              ? `Scale bar: ${map.scale.distance} ${map.scale.unit}.`
+              : "No scale bar yet: Plan journey (J) asks for one on a map without a grid."}
+          </p>
+          <div className="world-toolbar">
+            <Button onClick={() => setEditing(map)}>Edit grid, scale and map</Button>
+            {tileToggle}
+          </div>
+        </>
+      ) : setupTool === "party" ? (
         <PartyPlacement
           bare
           key={`setup-party-${map.id}`}
@@ -1057,10 +1134,6 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               if (!combatPresentation) setTileMode(!tileMode);
             }}
             gridLocked={!!combatPresentation}
-            beginRecord={() => {
-              setPlacement("record");
-              setPoint(undefined);
-            }}
             placementKind={placement}
             recordTable={t}
             entryCamera={entryCamera}
@@ -1176,7 +1249,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                         key={`combat-${map.id}`}
                         map={map}
                         table={t}
-                        point={placement === "token" ? point : undefined}
+                        point={placement === "token" && setupTool !== "token" ? point : undefined}
                         selected={selectedToken}
                         select={(id) => {
                           setSelectedToken(id);
@@ -1212,7 +1285,9 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                     tool: setupTool,
                     arm: (tool) => {
                       setSetupTool(tool);
-                      setPlacement(SETUP_PLACEMENT[tool]);
+                      setPlacement(
+                        tool === "token" && !effectiveTileMode ? "" : SETUP_PLACEMENT[tool],
+                      );
                       setPoint(undefined);
                     },
                     panel: setupPanel,
@@ -1590,7 +1665,6 @@ function MapViewport({
   viewScope,
   toggleGrid,
   gridLocked,
-  beginRecord,
   placementKind,
   navigation,
   entryCamera,
@@ -1631,7 +1705,6 @@ function MapViewport({
   viewScope: { key: string; ephemeral: boolean };
   toggleGrid: () => void;
   gridLocked: boolean;
-  beginRecord: () => void;
   placementKind: string;
   navigation: ReactNode;
   recordTable: CloudTable;
@@ -2264,11 +2337,55 @@ function MapViewport({
     // Once per opened panel.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setupOpen]);
-  /** Shift shortcuts for the setup rail (DM): ⇧P ⇧M ⇧E ⇧R ⇧L. */
+  // Reveal tools (DM) open their options beside the setup rail, with fog actions or their lists.
+  const revealTool =
+    useDm && REVEAL_TOOLS.some((t) => t.tool === tools.tool) && !sketches.active && !pinging
+      ? tools.tool
+      : undefined;
+  /** Ctrl/⌘+Z and Ctrl/⌘+Shift+Z undo and redo fog while a fog tool is armed (DM). */
+  const fogHistoryKey = (e: { key: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; preventDefault: () => void }) => {
+    if (!useDm || !tools.tool.startsWith("fog-") || !(e.ctrlKey || e.metaKey)) return false;
+    if (e.key.toLowerCase() !== "z") return false;
+    e.preventDefault();
+    if (e.shiftKey) {
+      if (tools.canRedoFog) void tools.redoFog();
+    } else if (tools.canUndoFog) void tools.undoFog();
+    return true;
+  };
+  const openObjects = () => {
+    afterContextChange(() => {
+      setDrawerOpen(false);
+      setHereOpen(false);
+      setLayersOpen(false);
+      tools.openInspector();
+    });
+  };
+  const setupButton = ({ tool, label, name, shortcut, Icon }: (typeof SETUP_TOOLS)[number]) => (
+    <MapTool
+      key={tool}
+      icon={<Icon size={19} />}
+      label={label}
+      name={name}
+      shortcut={`⇧${shortcut}`}
+      keys={`Shift+${shortcut}`}
+      pressed={setup?.tool === tool}
+      expanded={PANEL_FIRST.includes(tool) ? setup?.tool === tool : undefined}
+      onClick={() => armSetup(tool)}
+    />
+  );
+  /** Shift shortcuts for the setup rail (DM): Place ⇧P ⇧M ⇧E ⇧R ⇧L, Reveal ⇧F ⇧W ⇧I,
+   * Combat ⇧T ⇧G, Objects ⇧O. */
   const setupShortcut = (key: string) => {
-    const tool = SETUP_TOOLS.find((t) => t.shortcut === key.toUpperCase());
-    if (!setup || !tool) return false;
-    armSetup(tool.tool);
+    if (!setup) return false;
+    const upper = key.toUpperCase();
+    const tool = SETUP_TOOLS.find((t) => t.shortcut === upper);
+    if (tool) armSetup(tool.tool);
+    else {
+      const reveal = REVEAL_TOOLS.find((t) => t.shortcut === upper);
+      if (reveal) chooseTool(reveal.tool);
+      else if (upper === "O") openObjects();
+      else return false;
+    }
     return true;
   };
   /** Panel and tool shortcuts shared by the map canvas and the rest of the workspace. */
@@ -2383,6 +2500,13 @@ function MapViewport({
         e.preventDefault();
         root.current?.focus();
       }
+      if (
+        !(e.target as HTMLElement).closest(
+          'input,textarea,select,[contenteditable="true"],.map-viewport',
+        ) &&
+        fogHistoryKey(e)
+      )
+        return;
       if (
         (e.target as HTMLElement).closest(
           'input,textarea,select,[contenteditable="true"],.map-viewport',
@@ -2532,6 +2656,18 @@ function MapViewport({
           controls="map-layers"
           onClick={toggleLayers}
         />
+        {!useDm && (
+          // Players: the inspector (DMs: Objects & inspector in the setup rail).
+          <MapTool
+            icon={<Menu size={19} />}
+            label="Inspector"
+            expanded={tools.inspecting}
+            onClick={() => {
+              setDrawerOpen(false);
+              tools.openInspector();
+            }}
+          />
+        )}
       </MapToolGroup>
     </>
   );
@@ -2846,19 +2982,6 @@ function MapViewport({
                     lowerGroups
                   )}
                 </div>
-                <MapTool
-                  icon={<MoreHorizontal size={20} />}
-                  label="More map tools"
-                  className="map-more-tools"
-                  expanded={moreTools}
-                  onClick={() => {
-                    if (!moreTools) {
-                      setContextOpen(false);
-                      setLayersOpen(false);
-                    }
-                    setMoreTools(!moreTools);
-                  }}
-                />
               </MapToolbar>
             )}
             {hotbarOpen && layout === "short" && railMore && (
@@ -2889,109 +3012,6 @@ function MapViewport({
                 <Pencil size={20} />
               )}
             </button>
-            {hotbarOpen && moreTools && (
-              <div
-                className="map-hotbar-more map-glass"
-                role="toolbar"
-                aria-label="Additional map tools"
-              >
-                {useDm && (
-                  <>
-                    <button
-                      className="map-icon-button"
-                      title="Fog brush"
-                      aria-label="Fog brush"
-                      aria-pressed={tools.tool === "fog-brush"}
-                      onClick={() => chooseTool("fog-brush")}
-                    >
-                      <CloudFog size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
-                      title="Fog rectangle"
-                      aria-label="Fog rectangle"
-                      aria-pressed={tools.tool === "fog-rectangle"}
-                      onClick={() => chooseTool("fog-rectangle")}
-                    >
-                      <Grid3X3 size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
-                      title="Fog polygon"
-                      aria-label="Fog polygon"
-                      aria-pressed={tools.tool === "fog-polygon"}
-                      onClick={() => chooseTool("fog-polygon")}
-                    >
-                      <Shapes size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
-                      title="Wall / door"
-                      aria-label="Wall / door"
-                      aria-pressed={tools.tool === "wall"}
-                      onClick={() => chooseTool("wall")}
-                    >
-                      <PanelRight size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
-                      title="Light"
-                      aria-label="Light"
-                      aria-pressed={tools.tool === "light"}
-                      onClick={() => chooseTool("light")}
-                    >
-                      <Sun size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
-                      title="Place existing record"
-                      aria-label="Place existing record"
-                      onClick={() => {
-                        afterContextChange(() => {
-                          tools.cancel();
-                          sketches.cancel();
-                          setPinging(false);
-                          beginRecord();
-                          setDrawerOpen(true);
-                          setSettingsTab("settings");
-                        });
-                      }}
-                    >
-                      <Store size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
-                      title="Undo fog"
-                      aria-label="Undo fog"
-                      disabled={!tools.canUndoFog}
-                      onClick={() => void tools.undoFog()}
-                    >
-                      <Undo2 size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
-                      title="Redo fog"
-                      aria-label="Redo fog"
-                      disabled={!tools.canRedoFog}
-                      onClick={() => void tools.redoFog()}
-                    >
-                      <Redo2 size={19} />
-                    </button>
-                  </>
-                )}
-                <button
-                  className="map-icon-button"
-                  title="Inspector"
-                  aria-label="Inspector"
-                  onClick={() => {
-                    setDrawerOpen(false);
-                    tools.openInspector();
-                  }}
-                >
-                  <Menu size={19} />
-                </button>
-              </div>
-            )}
           </div>
           {railNames && <ToolNamesHint />}
           {setup && (
@@ -3007,18 +3027,31 @@ function MapViewport({
               >
                 <div className="map-hotbar-tools">
                   <MapToolGroup caption="Place">
-                    {SETUP_TOOLS.map(({ tool, label, name, shortcut, Icon }) => (
+                    {SETUP_TOOLS.slice(0, 5).map(setupButton)}
+                  </MapToolGroup>
+                  <MapToolGroup caption="Reveal">
+                    {REVEAL_TOOLS.map(({ tool, label, shortcut, Icon }) => (
                       <MapTool
                         key={tool}
                         icon={<Icon size={19} />}
                         label={label}
-                        name={name}
-                        shortcut={`⇧${shortcut}`}
-                        keys={`Shift+${shortcut}`}
-                        pressed={setup.tool === tool}
-                        onClick={() => armSetup(tool)}
+                        shortcut={shortcut && `⇧${shortcut}`}
+                        keys={shortcut && `Shift+${shortcut}`}
+                        pressed={tools.tool === tool}
+                        onClick={() => chooseTool(tool)}
                       />
                     ))}
+                  </MapToolGroup>
+                  <MapToolGroup caption="Combat">{SETUP_TOOLS.slice(5).map(setupButton)}</MapToolGroup>
+                  <MapToolGroup caption="Objects">
+                    <MapTool
+                      icon={<List size={19} />}
+                      label="Objects & inspector"
+                      shortcut="⇧O"
+                      keys="Shift+O"
+                      expanded={tools.inspecting}
+                      onClick={openObjects}
+                    />
                   </MapToolGroup>
                 </div>
               </MapToolbar>
@@ -3134,7 +3167,10 @@ function MapViewport({
             </aside>
           )}
           {contextOpen && !drawerOpen && (
-            <aside className="map-tool-context map-glass" aria-label="Tool options">
+            <aside
+              className={`map-tool-context map-glass${revealTool ? " map-tool-context-setup" : ""}`}
+              aria-label="Tool options"
+            >
               <div className="map-panel-heading">
                 <strong>
                   {sketches.active ? "Draw & notes" : pinging ? "Ping" : tools.toolLabel}
@@ -3165,7 +3201,22 @@ function MapViewport({
                   </select>
                 </label>
               ) : (
-                tools.contextControls
+                <>
+                  {tools.contextControls}
+                  {revealTool?.startsWith("fog-") && tools.fogActions}
+                  {revealTool === "wall" && (
+                    <section aria-label="Walls and doors on this map">
+                      <h3>Walls & doors on this map</h3>
+                      {tools.wallsList}
+                    </section>
+                  )}
+                  {revealTool === "light" && (
+                    <section aria-label="Lights on this map">
+                      <h3>Lights on this map</h3>
+                      {tools.lightsList}
+                    </section>
+                  )}
+                </>
               )}
               <button
                 onClick={() => {
@@ -3259,7 +3310,9 @@ function MapViewport({
         {full && (
           <p className="map-active-tool" role="status">
             {setup?.tool
-              ? `${setupName(setup.tool)}: ${point ? "fill in its panel, or click the map to move the pin" : "click the map to place it"}`
+              ? PANEL_FIRST.includes(setup.tool)
+                ? setupName(setup.tool)
+                : `${setupName(setup.tool)}: ${point ? "fill in its panel, or click the map to move the pin" : "click the map to place it"}`
               : pinging
               ? `Ping · ${color} ${pingShapes[color]}`
               : sketches.active
@@ -3299,6 +3352,7 @@ function MapViewport({
             aria-label="Interactive campaign map"
             tabIndex={0}
             onKeyDown={(e) => {
+              if (fogHistoryKey(e)) return;
               if (!e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey && setupShortcut(e.key)) {
                 e.preventDefault();
                 return;
