@@ -1,0 +1,8 @@
+{
+  "title": "Talking to NPCs after a refresh",
+  "summary": "Players who open an NPC from a link, or refresh the NPC page, can speak to that NPC again.",
+  "items": [
+    "The button reads Speak to NPC and sends your character's message, instead of trying to answer as the NPC and being refused.",
+    "The NPC conversation speaks as your own character from the start, with your own goods to offer."
+  ]
+}
