@@ -51,7 +51,7 @@ const concluded = (page, body, conclude = true) =>
     { body, conclude },
   );
 const copper = (c) => c.cp + c.sp * 10 + c.ep * 50 + c.gp * 100 + c.pp * 1000;
-const pendingReviews = (page) => page.locator(".readout").filter({ hasText: "Pending reviews" });
+const pendingReviews = (page) => page.locator(".readout").filter({ hasText: "Review Inbox" });
 try {
   for (const [width, height] of [[390, 844], [320, 700], [1280, 900]]) {
     const context = await browser.newContext({ viewport: { width, height } });
