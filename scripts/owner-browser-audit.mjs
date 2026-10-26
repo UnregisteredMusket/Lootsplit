@@ -31,7 +31,7 @@ try {
   assert.equal(signup.status(), 200);
   id = (await signup.json()).user.id;
   await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(id, Date.now()).run();
-  await openApplication(page, origin + "/account");
+  await openApplication(page, origin + "/account#account-administration");
   await page.getByRole("heading", { name: "Owner controls", exact: true }).waitFor();
   await page.route("**/api/account/owner/analytics", (route) =>
     route.fulfill({
@@ -71,7 +71,7 @@ try {
     await page.getByRole("link", { name: "Visit Open5e" }).getAttribute("href"),
     "https://open5e.com",
   );
-  await openApplication(page, origin + "/account");
+  await openApplication(page, origin + "/account#account-administration");
   await page.getByLabel("Donation page URL").fill("");
   await page.getByRole("button", { name: "Save donation link", exact: true }).click();
   await page.getByText("Donations are hidden until you add a link.", { exact: true }).waitFor();
@@ -86,7 +86,9 @@ try {
   });
   await DB.prepare("DELETE FROM site_roles WHERE user_id=?").bind(id).run();
   await reloadApplication(page);
-  await page.getByRole("heading", { name: "Audit Owner’s library", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "My account", level: 1 }).waitFor();
+  // A member has no Administration section; the old anchor falls back to Campaigns.
+  await expect(page.getByRole("tab", { name: "Administration", exact: true })).toHaveCount(0);
   assert.equal(await page.getByRole("heading", { name: "Owner controls", exact: true }).count(), 0);
   await expect(page.getByRole("button", { name: "Open game analytics", exact: true })).toHaveCount(
     0,

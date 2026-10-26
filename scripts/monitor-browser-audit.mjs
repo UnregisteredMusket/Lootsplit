@@ -35,7 +35,7 @@ try {
   assert.equal(signup.status(), 200);
   id = (await signup.json()).user.id;
   await DB.prepare("INSERT INTO site_roles VALUES (?,'admin',?)").bind(id, Date.now()).run();
-  await openApplication(page, origin + "/account");
+  await openApplication(page, origin + "/account#account-administration");
   assert.equal(await page.locator(".owner-monitor").count(), 0);
   await page.getByRole("button", { name: "Open server monitor", exact: true }).click();
   await page.getByText("Total accounts", { exact: true }).waitFor();
@@ -57,7 +57,9 @@ try {
   await page.getByText("Status unavailable", { exact: true }).waitFor();
   assert.equal(await page.getByText("Total accounts", { exact: true }).count(), 0);
   await reloadApplication(page);
-  await page.getByRole("heading", { name: "Monitor Audit’s library", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "My account", level: 1 }).waitFor();
+  // A moderator keeps Administration (member tools) but not the server monitor.
+  await page.getByRole("tab", { name: "Administration", exact: true }).click();
   assert.equal(
     await page.getByRole("heading", { name: "Server monitoring", exact: true }).count(),
     0,

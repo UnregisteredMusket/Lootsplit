@@ -121,7 +121,7 @@ try {
   await viewer.page.getByLabel("What is wrong with this profile?").fill("Audit report");
   await viewer.page.getByRole("button", { name: "Send report" }).click();
   await viewer.page.getByText("Thanks. Site staff will review this profile.").waitFor();
-  await openApplication(staff.page, origin + "/account");
+  await openApplication(staff.page, origin + "/account#account-administration");
   const reports = staff.page.locator("section", { has: staff.page.getByRole("heading", { name: "Community profile reports" }) });
   await reports.getByText("“Audit report”", { exact: false }).waitFor();
   assert.equal(await reports.getByRole("button", { name: "Hide profile" }).first().isDisabled(), true, "a reason is required");
