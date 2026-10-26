@@ -176,7 +176,10 @@ try {
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
   await reloadApplication(p);
   await chooseOption(p.getByLabel("Save in", { exact: true }), code);
-  await p.locator(".encounter-library").getByRole("button", { name: /New encounter/ }).click();
+  await p
+    .locator(".encounter-library")
+    .getByRole("button", { name: /New encounter/ })
+    .click();
   await expectInitiativeOrder(p, initiativeOrder);
   await p.getByRole("button", { name: "Start encounter", exact: true }).click();
   await p.getByRole("button", { name: "Next turn", exact: true }).click();
@@ -586,6 +589,12 @@ try {
   await expect(characterReview).toBeVisible({ timeout: 90000 });
   await expect(characterReview).toContainText("Scan Hero");
   await expect(characterReview).toContainText("HP 47/53 · AC 19");
+  // Unpriced imported equipment takes its SRD value; names without a match stay unpriced.
+  await expect(characterReview).toContainText(/Item values: 1 of 2 unpriced items matched/);
+  await expect(characterReview).toContainText(/Shield: 10 gp each/);
+  await expect(characterReview).toContainText(/No SRD match, left without a value: Potion/);
+  const scanned = JSON.parse(await characterReview.locator("pre").textContent());
+  assert.equal(scanned.equipment.find((i) => i.name === "Shield")?.unitCopper, 1000);
   await characterReview
     .getByRole("button", { name: "Use reviewed character", exact: true })
     .click();

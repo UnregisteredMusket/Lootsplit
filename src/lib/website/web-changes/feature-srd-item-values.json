@@ -1,0 +1,10 @@
+{
+  "title": "Imported items get SRD values",
+  "summary": "Equipment imported from a character sheet now takes its value from the SRD (via Open5e) instead of arriving at zero.",
+  "items": [
+    "Unpriced items on an imported sheet are matched against the SRD 5.1 and 5.2 equipment and magic items, preferring the sheet's edition; the match works offline.",
+    "Magic items without a listed price use the SRD 5.2.1 value for their rarity, halved for potions, scrolls and ammunition.",
+    "The import review lists each value it found and every item without a match; values you already entered are kept.",
+    "Character sheets now show each item's value, and Fill missing values from the SRD prices items imported before this update."
+  ]
+}

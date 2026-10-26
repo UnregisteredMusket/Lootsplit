@@ -904,7 +904,11 @@ export async function saveHolding(input: Holding): Promise<void> {
     } else if (holding.pool) {
       if (old) throw Error("Use Put in the treasure pool to pool an existing item.");
       assertPoolable(
-        { purses: await request<Purse[]>(tx.objectStore("purses").getAll()), holdings: rows, journal },
+        {
+          purses: await request<Purse[]>(tx.objectStore("purses").getAll()),
+          holdings: rows,
+          journal,
+        },
         holding,
       );
       pooledNow = true;
@@ -1050,10 +1054,16 @@ export async function removePurse(id: string): Promise<void> {
       throw Error("Remove this maker's forge configuration before deleting the NPC account.");
     if (journal.services?.providers.some((p) => p.npcId === id))
       throw Error("Remove the services this NPC provides before deleting the NPC account.");
-    if (journal.services?.orders.some((o) => o.terms.letter?.recipientNpcId === id && serviceOrderOpen(o)))
+    if (
+      journal.services?.orders.some(
+        (o) => o.terms.letter?.recipientNpcId === id && serviceOrderOpen(o),
+      )
+    )
       throw Error("Resolve letters in transit to this NPC before deleting the NPC account.");
     if (journal.services?.providers.some((p) => p.link?.roles?.some((r) => r.npcId === id)))
-      throw Error("Remove this NPC from the hire roles that name them before deleting the NPC account.");
+      throw Error(
+        "Remove this NPC from the hire roles that name them before deleting the NPC account.",
+      );
     if (journal.services?.orders.some((o) => o.purseId === id && serviceOrderOpen(o)))
       throw Error("Resolve this character's open service orders before deleting the account.");
     if (
@@ -1210,7 +1220,10 @@ function readReceipts(row: unknown): LocalReceipt[] {
 }
 
 /** Fingerprint a caller-identified action before its transaction opens. */
-async function actionReceipt(id: string | undefined, identity: () => string): Promise<ActionReceipt | null> {
+async function actionReceipt(
+  id: string | undefined,
+  identity: () => string,
+): Promise<ActionReceipt | null> {
   return id ? { id, hash: await actionDigest(identity()) } : null;
 }
 
@@ -1227,7 +1240,9 @@ async function alreadyApplied(tx: IDBTransaction, receipt: ActionReceipt | null)
   const prior = receipts.find((r) => r.id === receipt.id);
   if (prior) {
     if (prior.hash !== receipt.hash)
-      throw Error("This action ID was already used for a different action. Refresh before retrying.");
+      throw Error(
+        "This action ID was already used for a different action. Refresh before retrying.",
+      );
     return true;
   }
   meta.put({
@@ -1269,10 +1284,18 @@ export async function buyFromShop(
   options: TradeOptions = {},
 ): Promise<void> {
   const quantity = tradeQuantity(input.quantity);
-  const command = { kind: "buy" as const, stockId: input.stockId, purseId: input.purseId, quantity };
+  const command = {
+    kind: "buy" as const,
+    stockId: input.stockId,
+    purseId: input.purseId,
+    quantity,
+  };
   // Device campaigns run the authoritative shared command (review P3c).
   if (getSeat().role !== "player")
-    return executeLocalCommand({ ...command, ...(options.commandId ? { id: options.commandId } : {}) });
+    return executeLocalCommand({
+      ...command,
+      ...(options.commandId ? { id: options.commandId } : {}),
+    });
   const id = options.commandId || crypto.randomUUID();
   commandSchema.parse({ ...command, id });
   const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id }));
@@ -1290,7 +1313,11 @@ export async function buyFromShop(
     if (
       (shop.blackMarket && !journal.world?.blackMarketActive) ||
       (getSeat().role === "player" &&
-        !shopVisible(shop, { journal }, actingGroups({ journal, purses: [purse] }, purse.id, getSeat().purseIds)))
+        !shopVisible(
+          shop,
+          { journal },
+          actingGroups({ journal, purses: [purse] }, purse.id, getSeat().purseIds),
+        ))
     )
       throw Error("This vendor is not available at the current location.");
     if (shop.closed) throw new Error("This shop is closed.");
@@ -1375,10 +1402,18 @@ export async function sellToShop(
   options: TradeOptions = {},
 ): Promise<void> {
   const quantity = tradeQuantity(input.quantity);
-  const command = { kind: "sell" as const, holdingId: input.holdingId, shopId: input.shopId, quantity };
+  const command = {
+    kind: "sell" as const,
+    holdingId: input.holdingId,
+    shopId: input.shopId,
+    quantity,
+  };
   // Device campaigns run the authoritative shared command (review P3c).
   if (getSeat().role !== "player")
-    return executeLocalCommand({ ...command, ...(options.commandId ? { id: options.commandId } : {}) });
+    return executeLocalCommand({
+      ...command,
+      ...(options.commandId ? { id: options.commandId } : {}),
+    });
   const id = options.commandId || crypto.randomUUID();
   commandSchema.parse({ ...command, id });
   const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id }));
@@ -1401,7 +1436,11 @@ export async function sellToShop(
         !shopVisible(
           shop,
           { journal },
-          actingGroups({ journal, purses: seller ? [seller] : [] }, holding.purseId, getSeat().purseIds),
+          actingGroups(
+            { journal, purses: seller ? [seller] : [] },
+            holding.purseId,
+            getSeat().purseIds,
+          ),
         ))
     )
       throw Error("This vendor is not available at the current location.");
@@ -1427,7 +1466,13 @@ export async function sellToShop(
     if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
     else tx.objectStore("holdings").put({ ...holding, quantity: holding.quantity - quantity });
     const entry = {
-      ...logLine(purse.id, shop.id, `Sold ${quantity} ${holding.name} to ${shop.name}`, paid, "sale"),
+      ...logLine(
+        purse.id,
+        shop.id,
+        `Sold ${quantity} ${holding.name} to ${shop.name}`,
+        paid,
+        "sale",
+      ),
       id,
     };
     tx.objectStore("ledger").put(entry);
@@ -1514,9 +1559,14 @@ export async function giveToPlayer(
   // player link keeps its pending gift for the DM's activity report, because
   // the recipient's account is not on the player's device.
   if (getSeat().role !== "player")
-    return executeLocalCommand({ ...command, ...(options.commandId ? { id: options.commandId } : {}) });
+    return executeLocalCommand({
+      ...command,
+      ...(options.commandId ? { id: options.commandId } : {}),
+    });
   const giftId = options.commandId || crypto.randomUUID();
-  const receipt = await actionReceipt(options.commandId, () => canonicalJson({ ...command, id: giftId }));
+  const receipt = await actionReceipt(options.commandId, () =>
+    canonicalJson({ ...command, id: giftId }),
+  );
   const copper = Math.max(0, Math.round(input.copper));
   if (!Number.isSafeInteger(copper)) throw new Error("Enter a valid coin amount.");
   if (input.fromId === input.toId) throw new Error("Choose another player.");
@@ -1613,7 +1663,13 @@ export async function giveToPlayer(
     // The recipient is credited when the DM approves the player's activity report.
     tx.objectStore("meta").put({ id: "gifts", gifts: pending });
     tx.objectStore("ledger").put({
-      ...logLine(from.id, null, `Gave ${toName} ${giftParts(gift)}`, copper > 0 ? -copper : 0, "transfer"),
+      ...logLine(
+        from.id,
+        null,
+        `Gave ${toName} ${giftParts(gift)}`,
+        copper > 0 ? -copper : 0,
+        "transfer",
+      ),
       id: gift.id,
     });
     return true;
@@ -1672,7 +1728,12 @@ export async function buyListing(
   options: TradeOptions = {},
 ): Promise<void> {
   const quantity = tradeQuantity(input.quantity);
-  const command = { kind: "listing" as const, listingId: input.listingId, purseId: input.purseId, quantity };
+  const command = {
+    kind: "listing" as const,
+    listingId: input.listingId,
+    purseId: input.purseId,
+    quantity,
+  };
   const shared = { ...command, ...(options.commandId ? { id: options.commandId } : {}) };
   // Device campaigns run the authoritative shared command (review P3c); so do
   // imported estate listings, which need their operating record.
@@ -1681,7 +1742,9 @@ export async function buyListing(
   if (currentListing?.estateTemplateKey) return executeLocalCommand(shared);
   const receiptId = options.commandId || crypto.randomUUID();
   commandSchema.parse({ ...command, id: receiptId });
-  const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id: receiptId }));
+  const receipt = await actionReceipt(options.commandId, () =>
+    commandIdentity({ ...command, id: receiptId }),
+  );
   await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
     if (await alreadyApplied(tx, receipt)) return;
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
@@ -1701,7 +1764,11 @@ export async function buyListing(
           listing,
           { journal },
           getSeat().role === "player"
-            ? actingGroups({ journal, purses: buyer ? [buyer] : [] }, input.purseId, getSeat().purseIds)
+            ? actingGroups(
+                { journal, purses: buyer ? [buyer] : [] },
+                input.purseId,
+                getSeat().purseIds,
+              )
             : undefined,
         )
       )
@@ -1768,18 +1835,18 @@ export async function buyListing(
       ),
     });
     tx.objectStore("meta").put({
-        id: "sales",
-        sales: [
-          ...sales,
-          {
-            id: receiptId + "-sale",
-            at: Date.now(),
-            listingId: listing.id,
-            quantity,
-            purseId: purse.id,
-          },
-        ],
-      });
+      id: "sales",
+      sales: [
+        ...sales,
+        {
+          id: receiptId + "-sale",
+          at: Date.now(),
+          listingId: listing.id,
+          quantity,
+          purseId: purse.id,
+        },
+      ],
+    });
     const percent = score === null ? 0 : charismaOffPercent(score);
     const summary =
       `Bought ${quantity} ${listing.name} from the market` +
@@ -1914,6 +1981,10 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
 export async function importCharacterSheet(purseId: string, file: File): Promise<string[]> {
   const body = await readCharacterSheet(file);
   const sheet: CharacterSheet = { ...body, purseId, importedAt: Date.now() };
+  // Loaded before the transaction: IndexedDB commits a transaction that waits on other work.
+  const srd = await import("./srd-item-values.ts")
+    .then(async (m) => ({ index: await m.loadSrdIndex(), value: m.valueEquipment }))
+    .catch(() => null);
   await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
     const purses = await request<Purse[]>(tx.objectStore("purses").getAll());
     const holdings = await request<Holding[]>(tx.objectStore("holdings").getAll());
@@ -1929,7 +2000,10 @@ export async function importCharacterSheet(purseId: string, file: File): Promise
     // Reimporting never duplicates or replaces existing spendable campaign assets.
     if (getSeat().role === "dm") {
       if (!before.equipment.length && imported.equipment.length)
-        next.equipment = imported.equipment;
+        // Unpriced imported items take their SRD value (bundled from Open5e).
+        next.equipment = srd
+          ? srd.value(srd.index, imported.equipment, imported.edition).equipment
+          : imported.equipment;
       if (toCopper(before.coins) === 0 && toCopper(sheet.coins) > 0) next.coins = sheet.coins;
     }
     editCharacter(table, getSeat(), { purseId, before, sheet: next }, crypto.randomUUID());
@@ -2006,7 +2080,13 @@ export async function setCoins(
     );
   const next = tidy(coins);
   const receipt = await actionReceipt(options.commandId, () =>
-    canonicalJson({ kind: "set-coins", id: options.commandId, purseId, coins: next, summary: summary ?? "" }),
+    canonicalJson({
+      kind: "set-coins",
+      id: options.commandId,
+      purseId,
+      coins: next,
+      summary: summary ?? "",
+    }),
   );
   await atomic(["purses", "ledger", "meta"], async (tx) => {
     if (await alreadyApplied(tx, receipt)) return;
@@ -2040,7 +2120,13 @@ export async function postCopper(
   if (!Number.isSafeInteger(copper) || copper === 0)
     throw new Error("Enter a valid amount in whole copper.");
   const receipt = await actionReceipt(options.commandId, () =>
-    canonicalJson({ kind: "post", id: options.commandId, purseId, copper, summary: summary.trim() }),
+    canonicalJson({
+      kind: "post",
+      id: options.commandId,
+      purseId,
+      copper,
+      summary: summary.trim(),
+    }),
   );
   await atomic(["purses", "ledger", "meta"], async (tx) => {
     if (await alreadyApplied(tx, receipt)) return;
@@ -2766,7 +2852,9 @@ function localSeat() {
  * that lets a retry of the same action be recognized on this device.
  */
 async function identify(input: CommandRequest) {
-  const command = { ...input, id: input.id || crypto.randomUUID() } as Parameters<typeof applyCommand>[2];
+  const command = { ...input, id: input.id || crypto.randomUUID() } as Parameters<
+    typeof applyCommand
+  >[2];
   const receipt = await actionReceipt(input.id, () => commandIdentity(command));
   return { command, receipt };
 }
@@ -2797,7 +2885,9 @@ export async function executeLocalCommand(
     // A player-only device link holds part of the party: its treasure pool is read-only
     // (owner decision, 2026-10-23). The DM's device rolls and may enter Pen & Paper totals.
     if (seat.role !== "dm" && command.kind.startsWith("loot-"))
-      throw Error("The treasure pool is read-only on a player link. Ask the DM to mark claims at the table.");
+      throw Error(
+        "The treasure pool is read-only on a player link. Ask the DM to mark claims at the table.",
+      );
     const next = applyCommand(source, seat, command, {
       source: "local",
       random: randomTradeRoll,
@@ -2865,7 +2955,8 @@ export async function executeFinanceBatch(
   if (!inputs.length || !inputs.every((i) => financeKind(i.kind) || groupBatchKind(i.kind)))
     throw Error("Not a finance command batch.");
   const commands = inputs.map(
-    (input) => ({ ...input, id: input.id || crypto.randomUUID() }) as Parameters<typeof applyCommand>[2],
+    (input) =>
+      ({ ...input, id: input.id || crypto.randomUUID() }) as Parameters<typeof applyCommand>[2],
   );
   const receipt = await actionReceipt(batchId, () => canonicalJson(commands.map(commandIdentity)));
   await commitFinance(invoked, commands, receipt, assertScope);
@@ -2886,7 +2977,14 @@ async function commitFinance(
   // Every finance command reads the real shops and stock, as a shared room does:
   // applyCommand runs the shared validators (a smith profile needs its shop).
   // Unchanged shop and stock rows are not rewritten below.
-  const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "shops", "stock", "ledger", "meta"];
+  const stores: Parameters<typeof atomic>[0] = [
+    "purses",
+    "holdings",
+    "shops",
+    "stock",
+    "ledger",
+    "meta",
+  ];
   let applied = false;
   await atomic(stores, async (tx) => {
     if (await alreadyApplied(tx, receipt)) return;
