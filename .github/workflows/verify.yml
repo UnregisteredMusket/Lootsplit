@@ -185,6 +185,9 @@ jobs:
       - name: dev-community
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs dev-community 240 node scripts/community-browser-audit.mjs
+      - name: dev-human-check
+        if: matrix.group == 'accounts'
+        run: node scripts/recovery-step.mjs dev-human-check 180 node scripts/human-check-browser-audit.mjs
       - name: dev-monitor
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs dev-monitor 240 node scripts/monitor-browser-audit.mjs
