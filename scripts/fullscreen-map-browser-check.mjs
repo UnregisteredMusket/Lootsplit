@@ -212,7 +212,8 @@ export async function checkFullscreenMap(page, output, width) {
     }
   }
   await page.getByRole("button", { name: "Map settings", exact: true }).click();
-  await page.getByRole("tab", { name: "Settings", exact: true }).focus();
+  // Focus inside the grouped settings (their search), then Escape closes them.
+  await page.getByRole("searchbox", { name: "Search settings", exact: true }).focus();
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
   await expect(region).toBeFocused();

@@ -579,6 +579,35 @@ try {
       `${role}: labelled rail on first use, roving arrows, Layers/Here/Ping options without navigation`,
     );
 
+    // All map settings: grouped, searchable, opened without navigation (map controls PR 5).
+    await page.locator(".map-top-actions .map-settings-toggle").click();
+    const drawer = page.locator("#map-settings");
+    await expect(drawer.getByText("All map settings", { exact: true })).toBeVisible();
+    const groups = ["This map", "Places & party", "Players & display", "Combat", "View", "Shortcuts & help"];
+    for (const name of role === "dm" ? [...groups, "Exploration"] : groups)
+      await expect(drawer.getByRole("region", { name, exact: true })).toBeVisible();
+    if (role === "player")
+      await expect(drawer.getByRole("region", { name: "Exploration", exact: true })).toHaveCount(0);
+    const search = drawer.getByRole("searchbox", { name: "Search settings", exact: true });
+    await search.fill(role === "dm" ? "lighting" : "ping color");
+    await expect(
+      drawer.getByRole("region", { name: role === "dm" ? "Exploration" : "View", exact: true }),
+    ).toBeVisible();
+    await expect(drawer.getByRole("region", { name: "Places & party", exact: true })).toBeHidden();
+    await search.fill("no such setting zz");
+    await expect(drawer.getByText("No settings match. Try another word.")).toBeVisible();
+    await search.fill("");
+    await drawer
+      .getByRole("navigation", { name: "Settings groups" })
+      .getByRole("button", { name: "Shortcuts & help", exact: true })
+      .click();
+    await expect(drawer.getByRole("region", { name: "Shortcuts & help", exact: true })).toBeInViewport();
+    await expect(drawer.getByText("Plan journey", { exact: true })).toBeVisible();
+    assert.equal(page.url().includes("map=tide-cove"), true, `${role}: settings keep the map`);
+    await sameDocument(page, `${role} grouped settings`);
+    await page.getByRole("button", { name: "Close settings", exact: true }).click();
+    checks.push(`${role}: grouped settings with search, group index and shortcuts, no navigation`);
+
     // Every role, look and size: names shown (dark), then hidden from Settings (light).
     for (const appearance of ["dark", "light"]) {
       await look(page, appearance);

@@ -170,7 +170,13 @@ const SETUP_TOOLS = [
   { tool: "anchor", label: "Location link", name: "Location link", shortcut: "L", Icon: MapPinned },
   { tool: "token", label: "Combat token", name: "Combat token", shortcut: "T", Icon: CircleDot },
   { tool: "grid", label: "Grid & scale", name: "Grid & scale", shortcut: "G", Icon: Grid3X3 },
-] as const satisfies readonly { tool: SetupTool; label: string; name: string; shortcut: string; Icon: unknown }[];
+] as const satisfies readonly {
+  tool: SetupTool;
+  label: string;
+  name: string;
+  shortcut: string;
+  Icon: unknown;
+}[];
 const setupName = (tool: SetupTool) => SETUP_TOOLS.find((t) => t.tool === tool)!.name;
 const SETUP_PLACEMENT = {
   party: "party",
@@ -191,6 +197,41 @@ const REVEAL_TOOLS = [
   { tool: "wall", label: "Walls & doors", shortcut: "W", Icon: BrickWall },
   { tool: "light", label: "Lights", shortcut: "I", Icon: Lightbulb },
 ] as const;
+
+/** One group of All map settings (map controls PR 5). */
+function SettingsGroup({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section
+      className="map-settings-group"
+      data-settings-group={id}
+      id={`map-settings-${id}`}
+      aria-labelledby={`map-settings-${id}-title`}
+    >
+      <h2 id={`map-settings-${id}-title`}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+/** Settings › Shortcuts & help: [keys, action, DM only]. */
+const MAP_SHORTCUTS: [string, string, boolean][] = [
+  ["V / S", "Pan, Select / move", false],
+  ["P", "Ping (its options hold the colour)", false],
+  ["M / T", "Measure, Area template", false],
+  ["D", "Draw & notes", false],
+  ["J", "Plan journey", false],
+  ["E", "Here", false],
+  ["L", "Layers", false],
+  ["I", "Initiative", true],
+  ["⇧P ⇧M ⇧E ⇧R ⇧L", "Party position, Marker, Entrance, Place record, Location link", true],
+  ["⇧F ⇧W ⇧I", "Fog brush, Walls & doors, Lights", true],
+  ["⇧T ⇧G ⇧O", "Combat token, Grid & scale, Objects & inspector", true],
+  ["Ctrl/⌘+Z, Ctrl/⌘+⇧Z", "Undo or redo fog while a fog tool is armed", true],
+  ["Backspace", "Back to the parent map (Alt+↑ from the controls)", false],
+  ["/", "Search maps, places and people", false],
+  ["H", "Hide or show the interface", false],
+  ["+ / − / Home", "Zoom in, zoom out, fit the map", false],
+  ["Esc", "Close a panel, then return to Pan", false],
+];
 
 export function CampaignMaps() {
   const seat = useSeat(),
@@ -674,32 +715,27 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
       </label>
     </nav>
   );
-  const management = (
+  // All map settings, in groups (map controls PR 5). The empty workspace shows them together.
+  const partySummary = (
+    <p className="text-muted">
+      {partySplit(t)
+        ? groupRefs(t)
+            .map(
+              (g) =>
+                `${groupInfo(t, g).name}: ${partyEnvironment(groupPlace(t, g).position) || locationLabel(market, groupPlace(t, g).locationId)}`,
+            )
+            .join(" · ")
+        : partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)}{" "}
+      ·{" "}
+      {party || groupPins?.length
+        ? "Party position shown"
+        : "Choose a map position or link a location to show the party"}
+    </p>
+  );
+  const library = (
     <>
-      <SyncStatus compact />{" "}
-      <p className="text-muted">
-        {partySplit(t)
-          ? groupRefs(t)
-              .map(
-                (g) =>
-                  `${groupInfo(t, g).name}: ${partyEnvironment(groupPlace(t, g).position) || locationLabel(market, groupPlace(t, g).locationId)}`,
-              )
-              .join(" · ")
-          : partyEnvironment(w.partyPosition) ||
-            locationLabel(market, market.currentLocationId)}{" "}
-        ·{" "}
-        {party || groupPins?.length
-          ? "Party position shown"
-          : "Choose a map position or link a location to show the party"}
-      </p>
       <MapBrowser maps={maps} current={map?.id} select={(id) => selectMap(id)} />
       <div className="world-toolbar">
-        <AppLink className="settings-link" href="/features/npcs">
-          People & NPCs →
-        </AppLink>
-        <AppLink className="settings-link" href="/features/trading">
-          Trading & Barter →
-        </AppLink>
         <label>
           Map type
           <SearchSelect
@@ -728,11 +764,30 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           </>
         )}
       </div>
+    </>
+  );
+  const placeLinks = (
+    <>
+      <div className="world-toolbar">
+        <AppLink className="settings-link" href="/features/npcs">
+          People & NPCs →
+        </AppLink>
+        <AppLink className="settings-link" href="/features/trading">
+          Trading & Barter →
+        </AppLink>
+      </div>
       {dm && (
         <Fold title="Manage campaign locations">
           <MarketLocationsPanel />
         </Fold>
       )}
+    </>
+  );
+  const management = (
+    <>
+      <SyncStatus compact /> {partySummary}
+      {library}
+      {placeLinks}
     </>
   );
   // Location link and Marker forms: in Settings, or in their own panel from the setup rail.
@@ -936,11 +991,6 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     ) : undefined;
   const setup = map && (
     <>
-      {" "}
-      <p className="text-sm text-muted">
-        Drag to pan. Pinch or use the scroll wheel to zoom. Keyboard: arrows, +, − and Home. Markers
-        update through the shared campaign.
-      </p>
       {dm && (
         <PartyPlacement
           key={`party-placement-${map.id}`}
@@ -1123,12 +1173,17 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
             indexedRecords={allMaps.flatMap((m) =>
               recordsForMap(m).map((record) => ({ mapId: m.id, context: m.name, record })),
             )}
-            settings={
-              <>
-                {management}
-                {setup}
-              </>
-            }
+            settings={{
+              thisMap: library,
+              places: (
+                <>
+                  {partySummary}
+                  {setup}
+                  {placeLinks}
+                </>
+              ),
+              players: <SyncStatus compact />,
+            }}
             viewScope={viewScope}
             toggleGrid={() => {
               if (!combatPresentation) setTileMode(!tileMode);
@@ -1195,84 +1250,89 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               setPlacement("");
               setPoint(undefined);
             }}
-            controls={
-              <>
-                <MapSessionBar map={map} />
-                {dm && (
-                  <MapConnectedTools
-                    reveal={placement === "record"}
-                    key={`connected-${map.id}`}
-                    map={map}
-                    table={t}
-                    point={placement === "record" && !setupTool ? point : undefined}
-                    begin={() => {
-                      setSetupTool("");
-                      setPlacement("record");
-                      setPoint(undefined);
-                    }}
-                    done={() => {
-                      setPlacement("");
-                      setPoint(undefined);
-                    }}
-                  />
-                )}
-
-                {map.grid && (
-                  <Button
-                    aria-pressed={effectiveTileMode}
-                    disabled={!!combatPresentation}
-                    title={
-                      combatPresentation
-                        ? "Return to exploration to change the local grid view."
-                        : undefined
-                    }
-                    onClick={() => {
-                      setTileMode(!tileMode);
-                      setPlacement("");
-                      setPoint(undefined);
-                    }}
-                  >
-                    {combatPresentation
-                      ? effectiveTileMode
-                        ? "Encounter grid active"
-                        : "Encounter theatre view"
-                      : tileMode
-                        ? "Leave tile mode"
-                        : "Enter tile mode"}
-                  </Button>
-                )}
-                {effectiveTileMode &&
-                  map.grid &&
-                  (dm ? (
-                    <Fold title="Combat tiles" defaultOpen>
-                      <CombatControls
-                        key={`combat-${map.id}`}
-                        map={map}
-                        table={t}
-                        point={placement === "token" && setupTool !== "token" ? point : undefined}
-                        selected={selectedToken}
-                        select={(id) => {
-                          setSelectedToken(id);
-                          setPoint(undefined);
-                        }}
-                        begin={() => {
-                          setPlacement("token");
-                          setPoint(undefined);
-                        }}
-                        done={() => {
-                          setPoint(undefined);
-                          setPlacement("");
-                        }}
-                      />
-                    </Fold>
-                  ) : (
-                    <p>
-                      Combat grid · {map.grid.feetPerTile} ft per tile. Move assigned tokens when
-                      permitted by the DM; only authorized combatants are shown.
-                    </p>
-                  ))}
-              </>
-            }
+            controls={{
+              session: <MapSessionBar map={map} />,
+              connected: (
+                <>
+                  {dm && (
+                    <MapConnectedTools
+                      reveal={placement === "record"}
+                      key={`connected-${map.id}`}
+                      map={map}
+                      table={t}
+                      point={placement === "record" && !setupTool ? point : undefined}
+                      begin={() => {
+                        setSetupTool("");
+                        setPlacement("record");
+                        setPoint(undefined);
+                      }}
+                      done={() => {
+                        setPlacement("");
+                        setPoint(undefined);
+                      }}
+                    />
+                  )}
+                </>
+              ),
+              combat: (
+                <>
+                  {map.grid && (
+                    <Button
+                      aria-pressed={effectiveTileMode}
+                      disabled={!!combatPresentation}
+                      title={
+                        combatPresentation
+                          ? "Return to exploration to change the local grid view."
+                          : undefined
+                      }
+                      onClick={() => {
+                        setTileMode(!tileMode);
+                        setPlacement("");
+                        setPoint(undefined);
+                      }}
+                    >
+                      {combatPresentation
+                        ? effectiveTileMode
+                          ? "Encounter grid active"
+                          : "Encounter theatre view"
+                        : tileMode
+                          ? "Leave tile mode"
+                          : "Enter tile mode"}
+                    </Button>
+                  )}
+                  {effectiveTileMode &&
+                    map.grid &&
+                    (dm ? (
+                      <Fold title="Combat tiles" defaultOpen>
+                        <CombatControls
+                          key={`combat-${map.id}`}
+                          map={map}
+                          table={t}
+                          point={placement === "token" && setupTool !== "token" ? point : undefined}
+                          selected={selectedToken}
+                          select={(id) => {
+                            setSelectedToken(id);
+                            setPoint(undefined);
+                          }}
+                          begin={() => {
+                            setPlacement("token");
+                            setPoint(undefined);
+                          }}
+                          done={() => {
+                            setPoint(undefined);
+                            setPlacement("");
+                          }}
+                        />
+                      </Fold>
+                    ) : (
+                      <p>
+                        Combat grid · {map.grid.feetPerTile} ft per tile. Move assigned tokens when
+                        permitted by the DM; only authorized combatants are shown.
+                      </p>
+                    ))}
+                </>
+              ),
+            }}
             placing={!!placement}
             stopPlacing={() => {
               setPlacement("");
@@ -1701,7 +1761,8 @@ function MapViewport({
   planMapId?: string;
   maps: CampaignMap[];
   indexedRecords: { mapId: string; context: string; record: MapRecord }[];
-  settings: ReactNode;
+  /** All map settings, by group (the viewport adds This map's views, Exploration, View…). */
+  settings: { thisMap: ReactNode; places: ReactNode; players: ReactNode };
   viewScope: { key: string; ephemeral: boolean };
   toggleGrid: () => void;
   gridLocked: boolean;
@@ -1747,7 +1808,7 @@ function MapViewport({
   stopPlacing: () => void;
   tileMode: boolean;
   routes: { id: string; points: { x: number; y: number }[] }[];
-  controls: ReactNode;
+  controls: { session: ReactNode; connected: ReactNode; combat: ReactNode };
   onTokenSelect?: (id: string) => void;
   selectedToken: string;
 }) {
@@ -1766,7 +1827,8 @@ function MapViewport({
     [hotbarOpen, setHotbarOpen] = useState(true),
     [moreTools, setMoreTools] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
-    [settingsTab, setSettingsTab] = useState<"settings" | "places">("settings"),
+    [settingsQuery, setSettingsQuery] = useState(""),
+    [settingsMatches, setSettingsMatches] = useState(0),
     [highlight, setHighlight] = useState<MapRecordReference>(),
     [placeAnnouncement, setPlaceAnnouncement] = useState(""),
     [cardFocus, setCardFocus] = useState<string>(),
@@ -1805,7 +1867,10 @@ function MapViewport({
     // "Place on map" keeps its own bar; the settings drawer stays closed.
     if (placing && full && placementKind !== "place" && !setup?.tool) {
       setDrawerOpen(!!point);
-      if (point) setSettingsTab("settings");
+      if (point)
+        showSettingsGroup(
+          placementKind === "record" ? "this-map" : placementKind === "token" ? "combat" : "places",
+        );
     }
   }, [placing, point, full, placementKind, setup?.tool]);
   const signals = useMapPings(map.id),
@@ -2337,13 +2402,49 @@ function MapViewport({
     // Once per opened panel.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setupOpen]);
+  const settingsGroupsRef = useRef<HTMLDivElement>(null);
+  const settingsGroups: [string, string][] = [
+    ["this-map", "This map"],
+    ["places", "Places & party"],
+    ["players", "Players & display"],
+    ...(useDm ? ([["exploration", "Exploration"]] as [string, string][]) : []),
+    ["combat", "Combat"],
+    ["view", "View"],
+    ["shortcuts", "Shortcuts & help"],
+  ];
+  /** Opens All map settings at one group (also used by tools' "In Settings" links). */
+  function showSettingsGroup(id: string) {
+    setDrawerOpen(true);
+    requestAnimationFrame(() =>
+      document.getElementById(`map-settings-${id}`)?.scrollIntoView({ block: "start" }),
+    );
+  }
+  // Search: groups whose text does not match are hidden (DOM text, so every row counts).
+  useEffect(() => {
+    const root = settingsGroupsRef.current;
+    if (!root) return;
+    const query = settingsQuery.trim().toLocaleLowerCase();
+    let matches = 0;
+    for (const section of root.querySelectorAll<HTMLElement>("[data-settings-group]")) {
+      const hit = !query || (section.textContent ?? "").toLocaleLowerCase().includes(query);
+      section.hidden = !hit;
+      if (hit) matches++;
+    }
+    setSettingsMatches(matches);
+  }, [settingsQuery, drawerOpen]);
   // Reveal tools (DM) open their options beside the setup rail, with fog actions or their lists.
   const revealTool =
     useDm && REVEAL_TOOLS.some((t) => t.tool === tools.tool) && !sketches.active && !pinging
       ? tools.tool
       : undefined;
   /** Ctrl/⌘+Z and Ctrl/⌘+Shift+Z undo and redo fog while a fog tool is armed (DM). */
-  const fogHistoryKey = (e: { key: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; preventDefault: () => void }) => {
+  const fogHistoryKey = (e: {
+    key: string;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    shiftKey: boolean;
+    preventDefault: () => void;
+  }) => {
     if (!useDm || !tools.tool.startsWith("fog-") || !(e.ctrlKey || e.metaKey)) return false;
     if (e.key.toLowerCase() !== "z") return false;
     e.preventDefault();
@@ -2739,45 +2840,7 @@ function MapViewport({
         }}
       >
         <div className="map-panel-heading">
-          <div
-            role="tablist"
-            aria-label="Map settings tabs"
-            onKeyDown={(e) => {
-              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
-              e.preventDefault();
-              const next =
-                e.key === "Home"
-                  ? "settings"
-                  : e.key === "End"
-                    ? "places"
-                    : settingsTab === "settings"
-                      ? "places"
-                      : "settings";
-              setSettingsTab(next);
-              e.currentTarget.querySelector<HTMLButtonElement>(`#map-tab-${next}`)?.focus();
-            }}
-          >
-            <button
-              role="tab"
-              id="map-tab-settings"
-              aria-controls="map-panel-settings"
-              tabIndex={settingsTab === "settings" ? 0 : -1}
-              aria-selected={settingsTab === "settings"}
-              onClick={() => setSettingsTab("settings")}
-            >
-              Settings
-            </button>
-            <button
-              role="tab"
-              id="map-tab-places"
-              aria-controls="map-panel-places"
-              tabIndex={settingsTab === "places" ? 0 : -1}
-              aria-selected={settingsTab === "places"}
-              onClick={() => setSettingsTab("places")}
-            >
-              Places
-            </button>
-          </div>
+          <strong className="map-settings-title">All map settings</strong>
           <button
             className="map-icon-button"
             aria-label="Close settings"
@@ -2789,62 +2852,33 @@ function MapViewport({
             <X size={18} />
           </button>
         </div>
-        <div
-          role="tabpanel"
-          id="map-panel-places"
-          aria-labelledby="map-tab-places"
-          hidden={settingsTab !== "places"}
-        >
-          {records.map((record) => (
+        <input
+          type="search"
+          className="map-settings-search"
+          aria-label="Search settings"
+          placeholder="Search settings"
+          value={settingsQuery}
+          onChange={(e) => setSettingsQuery(e.target.value)}
+        />
+        <nav className="map-settings-index" aria-label="Settings groups">
+          {settingsGroups.map(([id, title]) => (
             <button
-              className="map-place-row"
-              key={`${record.kind}:${record.id}`}
-              onClick={() => focusRecord(record)}
+              key={id}
+              type="button"
+              onClick={() => {
+                setSettingsQuery("");
+                showSettingsGroup(id);
+              }}
             >
-              <strong>{record.label}</strong>
-              <span>{record.kind}</span>
+              {title}
             </button>
           ))}
-        </div>
-        <div
-          role="tabpanel"
-          id="map-panel-settings"
-          aria-labelledby="map-tab-settings"
-          hidden={settingsTab !== "settings"}
-        >
-          {setupSettings}
-          {tools.configurationControls}
-          <button className="settings-link" onClick={() => tools.openInspector()}>
-            Open inspector and object controls
-          </button>
-          <div className="world-toolbar map-controls">
-            <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
-              Filters
-            </Button>
-            <label>
-              Ping color
-              <select
-                aria-label="Ping color"
-                value={color}
-                onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
-              >
-                {pingColors.map((c) => (
-                  <option key={c} value={c}>
-                    {c[0].toUpperCase() + c.slice(1)} ({pingShapes[c]})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="map-check-row">
-              <input
-                type="checkbox"
-                checked={toolNames !== "hidden"}
-                onChange={(e) => setToolNames(e.target.checked ? "shown" : "hidden")}
-              />
-              Show tool names (desktop)
-            </label>
+        </nav>
+        <div ref={settingsGroupsRef} className="map-settings-groups">
+          <SettingsGroup id="this-map" title="This map">
+            {setupSettings.thisMap}
             {useDm && (
-              <>
+              <div className="world-toolbar map-controls">
                 <Button
                   disabled={tools.busy || !map.visible}
                   onClick={() => void tools.shareCamera(currentCamera())}
@@ -2857,38 +2891,125 @@ function MapViewport({
                 >
                   Save starting view
                 </Button>
-              </>
+              </div>
             )}
-          </div>
-          {filtersOpen && (
-            <fieldset className="map-filters">
-              <legend>Show on map</legend>
-              {mapRecordKinds.map((kind) => (
-                <label key={kind}>
-                  <input
-                    type="checkbox"
-                    checked={visible.includes(kind)}
-                    onChange={(e) =>
-                      setVisible((v) =>
-                        e.target.checked ? [...v, kind] : v.filter((k) => k !== kind),
-                      )
-                    }
-                  />
-                  {kind === "NPC" ? "Characters / NPCs" : kind}
-                </label>
-              ))}
-              <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
-              <Button onClick={() => setVisible([])}>Hide all</Button>
-            </fieldset>
+            {controls.connected}
+          </SettingsGroup>
+          <SettingsGroup id="places" title="Places & party">
+            {setupSettings.places}
+            {records.length > 0 && (
+              <section className="map-places-list" aria-label="Places on this map">
+                <h3>Places on this map</h3>
+                {records.map((record) => (
+                  <button
+                    className="map-place-row"
+                    key={`${record.kind}:${record.id}`}
+                    onClick={() => focusRecord(record)}
+                  >
+                    <strong>{record.label}</strong>
+                    <span>{record.kind}</span>
+                  </button>
+                ))}
+              </section>
+            )}
+          </SettingsGroup>
+          <SettingsGroup id="players" title="Players & display">
+            {setupSettings.players}
+            <div className="map-tile-control-area">{controls.session}</div>
+            {tools.sceneControls}
+            {useDm && tools.showPreview && <MapPlayerPreview map={map} />}
+          </SettingsGroup>
+          {useDm && (
+            <SettingsGroup id="exploration" title="Exploration">
+              {tools.explorationControls}
+              <button className="settings-link" onClick={() => tools.openInspector()}>
+                Open inspector and object controls
+              </button>
+            </SettingsGroup>
           )}
-          {useDm && tools.showPreview && <MapPlayerPreview map={map} />}
-          {pinging && (
+          <SettingsGroup id="combat" title="Combat">
+            <div className="map-tile-control-area">{controls.combat}</div>
+            {!map.grid && <p className="text-sm text-muted">This map has no combat grid.</p>}
+          </SettingsGroup>
+          <SettingsGroup id="view" title="View">
+            <div className="world-toolbar map-controls">
+              <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
+                Filters
+              </Button>
+              <label>
+                Ping color
+                <select
+                  aria-label="Ping color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
+                >
+                  {pingColors.map((c) => (
+                    <option key={c} value={c}>
+                      {c[0].toUpperCase() + c.slice(1)} ({pingShapes[c]})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="map-check-row">
+                <input
+                  type="checkbox"
+                  checked={toolNames !== "hidden"}
+                  onChange={(e) => setToolNames(e.target.checked ? "shown" : "hidden")}
+                />
+                Show tool names (desktop)
+              </label>
+            </div>
+            {filtersOpen && (
+              <fieldset className="map-filters">
+                <legend>Show on map</legend>
+                {mapRecordKinds.map((kind) => (
+                  <label key={kind}>
+                    <input
+                      type="checkbox"
+                      checked={visible.includes(kind)}
+                      onChange={(e) =>
+                        setVisible((v) =>
+                          e.target.checked ? [...v, kind] : v.filter((k) => k !== kind),
+                        )
+                      }
+                    />
+                    {kind === "NPC" ? "Characters / NPCs" : kind}
+                  </label>
+                ))}
+                <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
+                <Button onClick={() => setVisible([])}>Hide all</Button>
+              </fieldset>
+            )}
+            {pinging && (
+              <p className="text-sm text-muted">
+                Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape
+                turns ping mode off.
+              </p>
+            )}
+          </SettingsGroup>
+          <SettingsGroup id="shortcuts" title="Shortcuts & help">
             <p className="text-sm text-muted">
-              Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape turns
-              ping mode off.
+              Drag to pan. Pinch or use the scroll wheel to zoom. Keyboard: arrows, +, − and Home.
+              Markers update through the shared campaign.
+            </p>
+            <dl className="map-shortcut-list">
+              {MAP_SHORTCUTS.filter(([, , dmOnly]) => useDm || !dmOnly).map(([keys, action]) => (
+                <div key={keys}>
+                  <dt>
+                    <kbd>{keys}</kbd>
+                  </dt>
+                  <dd>{action}</dd>
+                </div>
+              ))}
+            </dl>
+          </SettingsGroup>
+          {settingsQuery && (
+            <p className="map-settings-empty text-sm text-muted" role="status">
+              {settingsMatches === 0
+                ? "No settings match. Try another word."
+                : `${settingsMatches} ${settingsMatches === 1 ? "group matches" : "groups match"}.`}
             </p>
           )}
-          <div className="map-tile-control-area">{controls}</div>
         </div>
       </div>
       {!interfaceHidden && (
@@ -3042,7 +3163,9 @@ function MapViewport({
                       />
                     ))}
                   </MapToolGroup>
-                  <MapToolGroup caption="Combat">{SETUP_TOOLS.slice(5).map(setupButton)}</MapToolGroup>
+                  <MapToolGroup caption="Combat">
+                    {SETUP_TOOLS.slice(5).map(setupButton)}
+                  </MapToolGroup>
                   <MapToolGroup caption="Objects">
                     <MapTool
                       icon={<List size={19} />}
@@ -3081,6 +3204,21 @@ function MapViewport({
                   <X size={16} />
                 </button>
               </div>
+              <button
+                type="button"
+                className="settings-link map-settings-jump"
+                onClick={() =>
+                  showSettingsGroup(
+                    setup.tool === "record" || setup.tool === "entrance" || setup.tool === "grid"
+                      ? "this-map"
+                      : setup.tool === "token"
+                        ? "combat"
+                        : "places",
+                  )
+                }
+              >
+                Related settings →
+              </button>
               <p className="map-setup-note">
                 Click the map again to move the pin. Saving keeps the tool ready for the next one;
                 Esc twice returns to Pan.
@@ -3147,6 +3285,16 @@ function MapViewport({
                 <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
                 <Button onClick={() => setVisible([])}>Hide all</Button>
               </fieldset>
+              <button
+                type="button"
+                className="settings-link map-settings-jump"
+                onClick={() => {
+                  setLayersOpen(false);
+                  showSettingsGroup("view");
+                }}
+              >
+                More in Settings › View →
+              </button>
               {map.grid && (
                 <button
                   className="map-layer-toggle"
@@ -3314,10 +3462,10 @@ function MapViewport({
                 ? setupName(setup.tool)
                 : `${setupName(setup.tool)}: ${point ? "fill in its panel, or click the map to move the pin" : "click the map to place it"}`
               : pinging
-              ? `Ping · ${color} ${pingShapes[color]}`
-              : sketches.active
-                ? "Personal annotations"
-                : tools.toolLabel}
+                ? `Ping · ${color} ${pingShapes[color]}`
+                : sketches.active
+                  ? "Personal annotations"
+                  : tools.toolLabel}
             {tools.measurement && ` · ${tools.measurement}`}
           </p>
         )}
