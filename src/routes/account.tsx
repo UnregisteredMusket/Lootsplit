@@ -18,7 +18,7 @@ import { CommunityControls } from "@/components/account/community-controls";
 import { CommunityReports } from "@/components/account/community-reports";
 import { Campaigns } from "@/components/campaigns";
 import { OwnerControls } from "@/components/account/owner-controls";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import {
   useEffect,
   useRef,
@@ -264,10 +264,13 @@ function Account() {
       : (typeof window !== "undefined" && accountTabForHash(window.location.hash, role)) ||
         "campaigns";
   const runsCampaigns = !!library && accountRunsCampaigns(library.members, role);
+  // In-app links (router navigation, the Android widget bridge) change the hash without a
+  // `hashchange` event, so the router's hash is watched too.
+  const routerHash = useRouterState({ select: (s) => s.location.hash });
   useEffect(() => {
-    if (!library) return;
+    if (!role) return;
     const open = () => {
-      const next = accountTabForHash(window.location.hash, library.user.role);
+      const next = accountTabForHash(window.location.hash, role);
       if (!next) return;
       setTab(next);
       // The target was hidden when the browser looked for it; scroll once its panel shows.
@@ -279,8 +282,12 @@ function Account() {
     };
     open();
     window.addEventListener("hashchange", open);
-    return () => window.removeEventListener("hashchange", open);
-  }, [library]);
+    window.addEventListener("lootsplit-monitor-destination", open);
+    return () => {
+      window.removeEventListener("hashchange", open);
+      window.removeEventListener("lootsplit-monitor-destination", open);
+    };
+  }, [role, routerHash]);
   function chooseTab(next: AccountTab, focus = false) {
     setTab(next);
     // Each section keeps a shareable address without a scroll jump or a history entry.
