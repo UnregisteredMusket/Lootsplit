@@ -110,3 +110,32 @@
   outline: 2px solid var(--help-link);
   outline-offset: 3px;
 }
+/* "Guide for: Players | Dungeon Masters" (W-3). */
+.help-guide-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--help-muted);
+}
+.help-guide-switch button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--help-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--help-text);
+  font: inherit;
+  font-weight: 600;
+}
+.help-guide-switch button[aria-pressed="true"] {
+  background: var(--help-link);
+  border-color: var(--help-link);
+  color: #14202c;
+}
+.help-guide-switch button:focus-visible {
+  outline: 2px solid var(--help-link);
+  outline-offset: 2px;
+}

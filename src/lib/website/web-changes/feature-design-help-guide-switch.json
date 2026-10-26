@@ -1,0 +1,9 @@
+{
+  "title": "Help for players and Dungeon Masters",
+  "summary": "Help now has a \"Guide for: Players | Dungeon Masters\" switch, so visitors can read the Dungeon Master guide before signing up.",
+  "items": [
+    "The website's Help page opens the Dungeon Master guide; switch to the player guide with one tap.",
+    "Links can open a guide directly, for example Help with ?guide=player.",
+    "Inside the app, Help still starts on the guide for your seat, and you can switch it."
+  ]
+}

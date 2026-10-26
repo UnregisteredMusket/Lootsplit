@@ -19,6 +19,30 @@ try {
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await openApplication(page, origin + "/help");
+    // W-3: the public Help page opens the DM guide, and visitors switch guides explicitly.
+    const switcher = page.getByRole("group", { name: "Guide for", exact: true });
+    const players = switcher.getByRole("button", { name: "Players", exact: true });
+    const dms = switcher.getByRole("button", { name: "Dungeon Masters", exact: true });
+    await page.getByRole("heading", { name: "Dungeon Master guide", exact: true }).waitFor();
+    assert.equal(await dms.getAttribute("aria-pressed"), "true");
+    await players.click();
+    await page.getByRole("heading", { name: "Player guide", exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get("guide"), "player");
+    assert.equal(await players.getAttribute("aria-pressed"), "true");
+    // The player guide keeps its rule: no DM setup links.
+    assert.equal(
+      await page.locator(".help-guide").getByRole("link", { name: /DM books|Encounter builder|Player reference controls|Saved DM shortcut/ }).count(),
+      0,
+    );
+    await page.goto(origin + "/help?guide=dm");
+    await page.getByRole("heading", { name: "Dungeon Master guide", exact: true }).waitFor();
+    await page.goto(origin + "/help?guide=player#references");
+    await page.locator("#references[open]").waitFor();
+    // An older link to a topic only the player guide has still opens it.
+    await page.goto(origin + "/help#multiple-windows");
+    await page.getByRole("heading", { name: "Player guide", exact: true }).waitFor();
+    await page.locator("#multiple-windows[open]").waitFor();
+    await page.goto(origin + "/help");
     const search = page.getByRole("searchbox");
     await search.fill("downtime");
     await page.locator("#downtime[open]").waitFor();

@@ -61,7 +61,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Player menus and Help",
         paragraphs: [
           "Home shows your assigned character with Open character sheet, followed by Your services and the same six shortcuts: Character Sheet, Bank, My Finances, Properties, Journal and Party chat. Inventory opens your permitted possessions and financial actions. Campaign contains the room, chat, rolls and alerts. Market opens nearby shops and trading. Library contains read-only reference indices and shared records. Maps shows shared cartography.",
-          "Open the gear for Settings & Management. Help is available there and from the Help button in the app. Keyboard users: the first Tab on any screen shows Skip to content, which jumps past the navigation. This player guide is searchable; its links open the current campaign with your existing permissions. Internal links do not restart the title screen.",
+          "Open the gear for Settings & Management. Help is available there and from the Help button in the app. Keyboard users: the first Tab on any screen shows Skip to content, which jumps past the navigation. This player guide is searchable; its links open the current campaign with your existing permissions. Internal links do not restart the title screen. Guide for switches between this guide (Players) and the Dungeon Master guide; reading the DM guide changes none of your permissions.",
         ],
         links: [
           ["Player Home", "/?view=home"],
