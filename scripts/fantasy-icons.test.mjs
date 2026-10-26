@@ -62,3 +62,13 @@ test("new/custom records and unsafe dictionary keys use generic icons without ch
     resolveFantasyIcon({ name: "Rat", kind: "creatures" }).icon,
   );
 });
+test("plural custom item names use their item family, not the shop category (design plan P6)", () => {
+  const arrows = resolveFantasyIcon({ name: "Arrows", category: "smith" });
+  assert.equal(arrows.icon, resolveFantasyIcon({ name: "Arrow" }).icon);
+  assert.notEqual(arrows.icon, resolveFantasyIcon({ category: "smith" }, { categoryOnly: true }).icon);
+  assert.equal(arrows.matchedBy, "family");
+  assert.equal(
+    resolveFantasyIcon({ name: "Torches" }).icon,
+    resolveFantasyIcon({ name: "Torch" }).icon,
+  );
+});

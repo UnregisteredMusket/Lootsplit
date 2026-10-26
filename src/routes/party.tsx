@@ -1,18 +1,18 @@
 import { CharacterPlacement } from "@/components/character-placement";
 import { inParty } from "@/lib/quire/character-position";
-import { holdingRecordId } from "@/lib/quire/finance-record-links";
 import { CharacterPermissions } from "@/components/character-permissions";
 import { toast } from "sonner";
 import { Open5eBrowser } from "@/components/open5e-browser";
 import { AppLink } from "@/components/app-link";
 import { useSheetReadouts, HpBar } from "@/components/control-panel/readouts";
 import { Shield, Backpack } from "lucide-react";
-import { LedgerArt, PortraitPicker, InventoryList } from "@/components/ledger-art";
+import { LedgerArt, PortraitPicker } from "@/components/ledger-art";
+import { PartyInventory } from "@/components/party-inventory";
+import { useGiveRecipients } from "@/lib/quire/use-give-recipients";
 import { getCloudTable } from "@/lib/quire/cloud-client";
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
-import { loadRoster, type RosterPerson } from "@/lib/quire/gift";
 import {
   carryUpTo,
   explainPurse,
@@ -21,6 +21,7 @@ import {
   parsePrice,
   toCopper,
 } from "@/lib/quire/money";
+import type { Coins, Holding } from "@/lib/quire/types";
 import { useDollarText } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { characterControl, type Purse } from "@/lib/quire/types";
@@ -88,6 +89,8 @@ function PartyPage() {
     else if (requestedSection === "fairness") setSection("fairness");
   }, [requestedSection, initialAction, hash]);
   const [action, setAction] = useState(initialAction ?? "");
+  // Give from an inventory row: that holder and item are chosen when the dialog opens.
+  const [giveFrom, setGiveFrom] = useState<Holding | null>(null);
   useEffect(() => setAction(initialAction ?? ""), [initialAction]);
   const seat = useSeat();
   const cloud = getCloudTable();
@@ -123,18 +126,22 @@ function PartyPage() {
             {seat.role === "dm" ? "Party" : "Inventory & purse"}
           </h1>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          {seat.role === "dm" && !readOnly && <SplitPartyButton />}
-          <Button
-            disabled={!economy.ready || visible.length === 0 || readOnly}
-            onClick={() => {
-              setSection("funds");
-              setAction("add");
-            }}
-          >
-            + Add loot
-          </Button>
-        </div>
+        {/* Add loot is the DM's; players never see a control they cannot use (P6). */}
+        {seat.role === "dm" ? (
+          <div className="flex flex-wrap justify-end gap-2">
+            {!readOnly && <SplitPartyButton />}
+            <Button
+              disabled={!economy.ready || visible.length === 0 || readOnly}
+              title={readOnly ? `Add loot when it is your turn.` : undefined}
+              onClick={() => {
+                setSection("funds");
+                setAction("add");
+              }}
+            >
+              + Add loot
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <div
@@ -396,8 +403,27 @@ function PartyPage() {
                 </span>
               </div>
             </section>
-            <InventoryList
-              holdings={economy.holdings.filter((h) => visible.some((p) => p.id === h.purseId))}
+            {seat.role !== "dm" && visible.length ? (
+              <PurseStrip
+                purses={visible}
+                canSplit={canSplit}
+                onGive={() => {
+                  setGiveFrom(null);
+                  setAction("give");
+                }}
+                onSplit={() => {
+                  setSplitSource("");
+                  setAction("split");
+                }}
+              />
+            ) : null}
+            <PartyInventory
+              purses={visible}
+              readOnly={readOnly}
+              onGive={(holding) => {
+                setGiveFrom(holding);
+                setAction("give");
+              }}
             />
             {!visible.length && seat.role === "player" && (
               <p className="inventory-empty">
@@ -505,64 +531,9 @@ function PartyPage() {
                 ))}
               </div>
 
-              <h2 className="mt-8 font-display text-2xl tracking-tight">
-                Manage holdings & property
-              </h2>
-              <ul className="mt-3 divide-y divide-border border-y border-border">
-                {economy.holdings
-                  .filter((holding) => visible.some((purse) => purse.id === holding.purseId))
-                  .map((holding) => {
-                    const owner = economy.purses.find((purse) => purse.id === holding.purseId);
-                    return (
-                      <li key={holding.id} id={holdingRecordId(holding.id)} className="py-3">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span>
-                            <span className="fantasy-reference-title">
-                              <LedgerArt kind={holding.kind} src={holding.image} entry={holding} />
-                              <span>{holding.name}</span>
-                            </span>
-                            <span className="text-sm text-muted">
-                              {owner?.name ?? "Unassigned"} · {holding.kind} · × {holding.quantity}
-                              {holding.pool ? " · in the treasure pool" : ""}
-                            </span>
-                          </span>
-                          <span className="text-right text-sm tabular-nums">
-                            {formatCopper(holding.unitCopper * holding.quantity)}
-                            <DollarLine copper={holding.unitCopper * holding.quantity} />
-                          </span>
-                        </div>
-                        {seat.role === "dm" ? (
-                          <div>
-                            <label className="mt-2 block text-sm text-muted">
-                              Inventory category
-                              <input
-                                className="ledger-search"
-                                aria-label={`Category for ${holding.name}`}
-                                defaultValue={holding.category || holding.kind}
-                                maxLength={80}
-                                onBlur={(e) => {
-                                  const category = e.target.value.trim();
-                                  if (category && category !== holding.category)
-                                    void economy.updateHolding({
-                                      ...holding,
-                                      category,
-                                    });
-                                }}
-                              />
-                            </label>
-                            <RemoveButton
-                              className="mt-1"
-                              label="Remove"
-                              title={`Remove ${holding.name}?`}
-                              body="This item is deleted. Money already in an account is not changed."
-                              onRemove={() => void economy.deleteHolding(holding.id)}
-                            />
-                          </div>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-              </ul>
+              {/* Players have Give and Split in the purse strip above; Add loot and Payment are
+                  the DM's direct edits. */}
+              {seat.role === "dm" ? (
               <div className="mt-5 flex flex-wrap gap-3">
                 <Button
                   onClick={() => setAction("add")}
@@ -572,7 +543,10 @@ function PartyPage() {
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={() => setAction("give")}
+                  onClick={() => {
+                    setGiveFrom(null);
+                    setAction("give");
+                  }}
                   disabled={visible.length === 0}
                 >
                   Give
@@ -597,11 +571,15 @@ function PartyPage() {
                   Payment
                 </Button>
               </div>
+              ) : null}
             </details>
             <Modal
               open={action !== ""}
               onOpenChange={(open) => {
-                if (!open) setAction("");
+                if (!open) {
+                  setAction("");
+                  setGiveFrom(null);
+                }
               }}
               title={
                 action === "add"
@@ -627,7 +605,12 @@ function PartyPage() {
               ) : action === "add" ? (
                 <AddHolding purses={visible} />
               ) : action === "give" ? (
-                <GiveToPlayer purses={visible} />
+                <GiveToPlayer
+                  key={giveFrom?.id ?? "give"}
+                  purses={visible}
+                  initialFromId={giveFrom?.purseId}
+                  initialHoldingId={giveFrom?.id}
+                />
               ) : (
                 <Payment purses={visible} />
               )}
@@ -636,6 +619,53 @@ function PartyPage() {
         ) : null}
       </div>
     </Shell>
+  );
+}
+
+/** Player purse strip (P6): coins by denomination with Give and Split, under Combined wealth. */
+function PurseStrip({
+  purses,
+  canSplit,
+  onGive,
+  onSplit,
+}: {
+  purses: Purse[];
+  canSplit: boolean;
+  onGive: () => void;
+  onSplit: () => void;
+}) {
+  const units: Array<[keyof Coins, string]> = [
+    ["pp", "platinum"],
+    ["gp", "gold"],
+    ["ep", "electrum"],
+    ["sp", "silver"],
+    ["cp", "copper"],
+  ];
+  const total = (unit: keyof Coins) => purses.reduce((sum, purse) => sum + purse.coins[unit], 0);
+  return (
+    <section className="purse-strip" aria-label="Coins">
+      {purses.length > 1 ? (
+        <span className="purse-strip-name">{purses.map((purse) => purse.name).join(" · ")}</span>
+      ) : null}
+      <ul className="purse-strip-coins">
+        {units.map(([unit, name]) => (
+          <li key={unit}>
+            <strong>{total(unit).toLocaleString()}</strong>
+            <abbr title={name}>{unit}</abbr>
+          </li>
+        ))}
+      </ul>
+      <span className="purse-strip-actions">
+        <Button variant="secondary" onClick={onGive}>
+          Give
+        </Button>
+        {canSplit ? (
+          <Button variant="secondary" onClick={onSplit} disabled={!purses.some((p) => toCopper(p.coins))}>
+            Split
+          </Button>
+        ) : null}
+      </span>
+    </section>
   );
 }
 
@@ -824,13 +854,6 @@ function itemValue(
     .reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
 }
 
-function DollarLine({ copper }: { copper: number }) {
-  const dollars = useDollarText();
-  const text = dollars(copper);
-  if (!text) return null;
-  return <span className="block text-muted">{text}</span>;
-}
-
 function AddHolding({ purses }: { purses: Purse[] }) {
   const { addHolding, journal } = useEconomy();
   const [pool, setPool] = useState(false);
@@ -1016,58 +1039,33 @@ function AddHolding({ purses }: { purses: Purse[] }) {
   );
 }
 
-function GiveToPlayer({ purses }: { purses: Purse[] }) {
-  const { give, holdings, purses: everyone } = useEconomy();
+function GiveToPlayer({
+  purses,
+  initialFromId,
+  initialHoldingId,
+}: {
+  purses: Purse[];
+  initialFromId?: string;
+  initialHoldingId?: string;
+}) {
+  const { give, holdings } = useEconomy();
   const seat = useSeat();
-  const [roster, setRoster] = useState<RosterPerson[]>([]);
-  const [rosterError, setRosterError] = useState("");
-  const [fromId, setFromId] = useState(purses[0]?.id ?? "");
+  const [fromId, setFromId] = useState(
+    initialFromId && purses.some((purse) => purse.id === initialFromId)
+      ? initialFromId
+      : (purses[0]?.id ?? ""),
+  );
   const [toId, setToId] = useState("");
   const [amount, setAmount] = useState("");
-  const [holdingId, setHoldingId] = useState("");
-  const [qty, setQty] = useState("1");
+  const [holdingId, setHoldingId] = useState(initialHoldingId ?? "");
+  const [qty, setQty] = useState(() => {
+    const chosen = holdings.find((holding) => holding.id === initialHoldingId);
+    return String(chosen?.quantity ?? 1);
+  });
   const [busy, setBusy] = useState(false);
   // One command ID per transfer, reused if the same transfer is retried.
   const action = useCommandId(`${fromId}|${toId}|${amount.trim()}|${holdingId}|${qty}`);
-
-  useEffect(() => {
-    if (seat.role !== "player") return;
-    let cancelled = false;
-    loadRoster().then(
-      (people) => {
-        if (cancelled) return;
-        setRoster(people);
-        setRosterError("");
-      },
-      (error: unknown) => {
-        if (cancelled) return;
-        setRosterError(
-          error instanceof Error && error.message
-            ? `The player list on this device could not be read: ${error.message}`
-            : "The player list on this device could not be read.",
-        );
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [seat.role, purses]);
-
-  const recipients =
-    seat.role === "dm"
-      ? everyone
-          .filter((purse) => purse.id !== fromId)
-          .map((purse) => ({ id: purse.id, name: purse.name }))
-      : getCloudTable().joined
-        ? everyone
-            .filter(
-              (purse) =>
-                purse.id !== fromId &&
-                purse.kind === "character" &&
-                characterControl(purse) === "player",
-            )
-            .map((purse) => ({ id: purse.id, name: purse.name }))
-        : roster.filter((person) => person.id !== fromId);
+  const { recipients, rosterError } = useGiveRecipients(fromId);
   // Pooled items wait for the DM's resolution (owner decision): Give doesn't offer them.
   const mine = holdings.filter(
     (holding) =>

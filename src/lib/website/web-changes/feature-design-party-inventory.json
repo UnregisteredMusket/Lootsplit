@@ -1,0 +1,11 @@
+{
+  "title": "Party inventory in one list",
+  "summary": "Funds & inventory now lists each item once, with an action menu on every row, and players see their coins and Give at the top.",
+  "items": [
+    "Each item has one row with its holder, quantity and value, and a ⋯ menu: Edit, Give, Move to pool, Sell to shop and Remove.",
+    "Group by holder or category, filter by holder, category or Equipped, and search.",
+    "Select several items to give, pool or remove them; each is its own action, and Resume finishes a run interrupted by a reload without repeating anything.",
+    "Editing an item uses a Save button instead of saving when you leave the field.",
+    "Players see their coins with Give right under Combined wealth, identical items as one row (Potion of healing ×3), and an Equipped chip."
+  ]
+}
