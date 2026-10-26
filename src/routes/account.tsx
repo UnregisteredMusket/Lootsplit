@@ -1185,19 +1185,23 @@ function Account() {
                   />
                 </section>
               </div>
+              {tabs.includes("field-monitor") && (
+                <div {...panel("field-monitor")}>
+                  <OwnerMonitor key={library.user.id} />
+                  {import.meta.env.VITE_MOBILE === "true" && (
+                    <MobileOwnerWidget
+                      key={library.user.id}
+                      name={library.user.name}
+                      email={library.user.email}
+                    />
+                  )}
+                </div>
+              )}
               {tabs.includes("administration") && (
                 <div {...panel("administration")}>
                   <div id="account-administration">
-                    {library?.user.role === "owner" && <OwnerMonitor key={library.user.id} />}
-                    {(library?.user.role === "owner" || library?.user.role === "admin") && (
+                    {(library.user.role === "owner" || library.user.role === "admin") && (
                       <ServerMonitor />
-                    )}
-                    {library?.user.role === "owner" && import.meta.env.VITE_MOBILE === "true" && (
-                      <MobileOwnerWidget
-                        key={library.user.id}
-                        name={library.user.name}
-                        email={library.user.email}
-                      />
                     )}
                     {library?.user.role === "owner" && <OwnerControls />}
                     {library && library.user.role !== "member" && (

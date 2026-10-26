@@ -1,0 +1,10 @@
+{
+  "title": "Field monitor on the web catches up with the widget",
+  "summary": "For the site owner, My account has a Field monitor section whose top shows the same summary as the home-screen widget.",
+  "items": [
+    "Field monitor is its own section of My account, with a direct link (/account#field-monitor), on the website and in the Android app.",
+    "The top shows the status word, the ✕ critical, ! warning and i info counts (tap one for Diagnostics filtered to it), Needs attention, Recently resolved, a 24-hour traffic chart and plan-usage gauges; the full history stays below.",
+    "Copy diagnostics on an expanded item copies a summary for a bug report, without email addresses, tokens or join codes.",
+    "A failed refresh says \"Last refresh failed\" with the reason and a Retry button."
+  ]
+}

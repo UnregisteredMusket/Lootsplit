@@ -20,16 +20,26 @@ test("older My account anchors open the section that holds them", () => {
   for (const [hash, tab] of cases) assert.equal(accountTabForHash(hash, "member"), tab, hash);
 });
 
-test("monitor and staff links open Administration for staff, Campaigns for members", () => {
+test("Field monitor links open Field monitor for the owner only", () => {
   for (const hash of [
-    "#account-administration",
-    "#account-member-management",
-    "#home-screen-widget",
     "#field-monitor",
     "#field-development",
+    "#home-screen-widget",
     "#monitor-diagnostics-critical",
     "#monitor-history",
   ]) {
+    assert.equal(accountTabForHash(hash, "owner"), "field-monitor", hash);
+    assert.equal(accountTabForHash(hash, "member"), "campaigns", hash);
+  }
+  // Other staff have the server monitor in Administration, never the owner's Field monitor.
+  assert.equal(accountTabForHash("#monitor-panel", "owner"), "administration");
+  assert.equal(accountTabForHash("#monitor-panel", "admin"), "administration");
+  assert.equal(accountTabForHash("#monitor-history", "admin"), "administration");
+  assert.equal(accountTabForHash("#field-monitor", "admin"), "campaigns");
+});
+
+test("staff links open Administration for staff, Campaigns for members", () => {
+  for (const hash of ["#account-administration", "#account-member-management", "#owner-title"]) {
     assert.equal(accountTabForHash(hash, "owner"), "administration", hash);
     assert.equal(accountTabForHash(hash, "member"), "campaigns", hash);
   }
@@ -44,7 +54,9 @@ test("an empty or unknown hash keeps the current section", () => {
   assert.equal(accountTabForHash("#%E0%A4%A", "member"), null);
 });
 
-test("only staff roles get the Administration section", () => {
+test("only staff roles get Administration, and only the owner gets Field monitor", () => {
+  assert.deepEqual(accountTabs("owner").slice(-2), ["field-monitor", "administration"]);
+  assert.equal(accountTabs("admin").includes("field-monitor"), false);
   assert.deepEqual(accountTabs("member"), [
     "campaigns",
     "characters",

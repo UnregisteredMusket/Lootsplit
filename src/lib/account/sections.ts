@@ -3,7 +3,13 @@
  * keeps working: the anchor picks the section that contains it, then scrolls to it.
  */
 export type AccountTab =
-  "campaigns" | "characters" | "profile" | "backups" | "support" | "administration";
+  | "campaigns"
+  | "characters"
+  | "profile"
+  | "backups"
+  | "support"
+  | "field-monitor"
+  | "administration";
 
 export type AccountSiteRole = "member" | "moderator" | "admin" | "owner" | string;
 
@@ -13,6 +19,7 @@ export const ACCOUNT_TAB_LABELS: Record<AccountTab, string> = {
   profile: "Profile",
   backups: "Backups",
   support: "Support",
+  "field-monitor": "Field monitor",
   administration: "Administration",
 };
 
@@ -23,12 +30,17 @@ export const ACCOUNT_TAB_ANCHORS: Record<AccountTab, string> = {
   profile: "account-profile",
   backups: "account-backups",
   support: "account-support",
+  "field-monitor": "field-monitor",
   administration: "account-administration",
 };
 
-/** Staff sections appear only for staff roles; the server still authorizes every staff request. */
+/**
+ * Staff sections appear only for staff roles, and Field monitor only for the site owner (design
+ * plan M9); the server still authorizes every staff and owner request.
+ */
 export function accountTabs(role: AccountSiteRole | undefined): AccountTab[] {
   const tabs: AccountTab[] = ["campaigns", "characters", "profile", "backups", "support"];
+  if (role === "owner") return [...tabs, "field-monitor", "administration"];
   return role && role !== "member" ? [...tabs, "administration"] : tabs;
 }
 
@@ -47,14 +59,19 @@ const ANCHOR_TABS: Record<string, AccountTab> = {
   "bug-reports": "support",
   "account-administration": "administration",
   "account-member-management": "administration",
-  "home-screen-widget": "administration",
-  "field-monitor": "administration",
+  // The server monitor (admins and the owner).
+  "monitor-panel": "administration",
+  "monitor-title": "administration",
+  "home-screen-widget": "field-monitor",
+  "field-monitor": "field-monitor",
 };
 
 /**
  * The section an `/account#…` link opens, or null when the hash names no section (the page then
- * keeps the current one). Field monitor (`#field-*`, `#owner-*`) and monitor history links
- * (`#monitor-*`, including widget count chips) live in Administration. A hash for a section this
+ * keeps the current one). Field monitor links (`#field-*`, `#owner-monitor-*`, the home-screen
+ * widget and monitor history links `#monitor-*`, including widget count chips) open Field monitor
+ * for the owner; for other staff a `#monitor-*` link opens Administration (server monitor). Owner
+ * and staff tools (`#owner-*`, `#staff-*`) live in Administration. A hash for a section this
  * account cannot see falls back to Campaigns.
  */
 export function accountTabForHash(
@@ -70,7 +87,15 @@ export function accountTabForHash(
   if (!id) return null;
   const tab: AccountTab | null =
     ANCHOR_TABS[id] ??
-    (/^(monitor|field|owner|staff|community-reports)-/.test(id) ? "administration" : null);
+    (/^(field|owner-monitor)-/.test(id)
+      ? "field-monitor"
+      : /^monitor-/.test(id)
+        ? role === "owner"
+          ? "field-monitor"
+          : "administration"
+        : /^(owner|staff|community-reports)-/.test(id)
+          ? "administration"
+          : null);
   if (!tab) return null;
   return accountTabs(role).includes(tab) ? tab : "campaigns";
 }

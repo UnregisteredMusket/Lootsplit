@@ -392,6 +392,13 @@ test("the widget payload stays under 64 kB at production size and carries the ne
     // The dashboard (full view) is unchanged: none of the widget-only parts.
     const full = await ownerMonitor({ DB, ACCOUNT_ORIGIN: "https://test" }, "owner", "s-owner", new Request("https://test/api/account/owner/monitor"));
     for (const key of ["series", "recentlyResolved", "rooms"]) assert.equal(full[key], undefined, key);
+    // The website Field monitor asks for the same parts on the full dashboard snapshot.
+    const web = await ownerMonitor({ DB, ACCOUNT_ORIGIN: "https://test" }, "owner", "s-owner", new Request("https://test/api/account/owner/monitor?include=widget-data"));
+    assert.equal(web.view, undefined, "the dashboard view keeps its full lists");
+    assert.equal(web.series.state, "ready");
+    assert.equal(web.recentlyResolved.items.length, RESOLVED_LIMIT);
+    assert.ok(web.diagnostics.every((d) => "severity" in d));
+    assert.equal(typeof web.account.email, "string");
   } finally {
     DB.close();
   }
