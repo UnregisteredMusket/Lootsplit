@@ -15,6 +15,8 @@ const browser = await chromium.launch({
   args: ["--no-sandbox", "--disable-dev-shm-usage"],
 });
 const failures = [];
+/** Product screenshots whose load was cancelled by navigation; each must still exist. */
+const abortedShots = new Set();
 const externalFailures = [];
 try {
   // Phones (320, 390), tablet (768) and desktop: no horizontal page scroll anywhere.
@@ -35,6 +37,11 @@ try {
     page.on("pageerror", (e) => failures.push(e.message));
     page.on("requestfailed", (r) => {
       const entry = { url: r.url(), error: r.failure()?.errorText };
+      // A lazy product screenshot still loading when the audit navigates away is cancelled by
+      // the browser (net::ERR_ABORTED), which is not a broken asset. Each one is fetched again
+      // at the end and must answer 200.
+      if (entry.error === "net::ERR_ABORTED" && r.resourceType() === "image" && new URL(r.url()).pathname.startsWith("/product/"))
+        return abortedShots.add(new URL(r.url()).pathname);
       (r.url().startsWith(origin) ? failures : externalFailures).push(entry);
     });
     for (const [path, heading] of [
@@ -449,6 +456,10 @@ try {
     await visitor.getByRole("link", { name: "Open the app", exact: true }).first().waitFor();
     assert.equal(await visitor.locator(".loot-opening").count(), 0);
     await first.close();
+  }
+  for (const path of abortedShots) {
+    const response = await fetch(origin + path);
+    assert.equal(response.status, 200, `${path} exists`);
   }
   assert.deepEqual(failures, []);
   // Local fixtures keep their existing route checks; remote live audits also hash the APK bytes.
