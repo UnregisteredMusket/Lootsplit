@@ -7,6 +7,8 @@ export async function openTabsAndWindows(page) {
   if (await header.isVisible()) return header.click();
   await page.getByRole("button", { name: "Settings & Management", exact: true }).click();
   const settings = page.getByRole("dialog", { name: "Settings & Management", exact: true });
-  await settings.getByRole("button", { name: /^Appearance/ }).click();
+  // The sheet remembers which group was open; only expand a closed one.
+  const group = settings.getByRole("button", { name: /^Appearance/ });
+  if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
   await settings.getByRole("button", { name: "Tabs & windows…", exact: true }).click();
 }

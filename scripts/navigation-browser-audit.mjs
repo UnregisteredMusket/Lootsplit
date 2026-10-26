@@ -190,13 +190,14 @@ async function menus(page, role) {
   for (const name of groups) {
     await page.locator(".settings-trigger").click();
     await expand(name);
-    const labels = await dialog.locator(".management-content .settings-link").allTextContents();
+    // Links only: Tabs & windows… and Keyboard shortcuts are buttons that open dialogs.
+    const labels = await dialog.locator(".management-content a.settings-link").allTextContents();
     await page.keyboard.press("Escape");
     for (const text of labels) {
       await page.locator(".settings-trigger").click();
       await expand(name);
       const link = dialog
-        .locator(".management-content .settings-link")
+        .locator(".management-content a.settings-link")
         .filter({ hasText: text.trim() });
       const href = await link.getAttribute("href");
       // Account administration remains role-gated; a member has no staff sections.
