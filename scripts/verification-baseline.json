@@ -27,6 +27,7 @@
   "node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-coin-split 240 node scripts/coin-split-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-party-split 240 node scripts/party-split-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-map-controls 240 node --experimental-strip-types scripts/map-controls-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot-claims 300 node scripts/loot-claims-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot-fairness 300 node scripts/loot-fairness-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-themed-confirm 180 node scripts/themed-confirm-browser-audit.mjs",

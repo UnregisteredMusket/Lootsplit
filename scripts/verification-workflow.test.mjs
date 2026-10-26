@@ -45,13 +45,15 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 51);
+  assert.equal(checks.length, 52);
   // Loot review: Desk card and count, three-tap transfer, bulk assign, pool, memory (1280/390/320).
   assert.ok(checks.some(([, name, group]) => name === "dev-loot-review" && group === "gameplay"));
   // Themed confirmations and prompts replace native dialogs (design audit D7), 1280/390.
   assert.ok(checks.some(([, name, group]) => name === "dev-themed-confirm" && group === "gameplay"));
   // Split the party: split, groups panel, players per group, buying per group, merge (1280/390/320).
   assert.ok(checks.some(([, name, group]) => name === "dev-party-split" && group === "world"));
+  // Map controls: Back to the parent map, X Close map, Android Back order, theme (5 sizes, both roles).
+  assert.ok(checks.some(([, name, group]) => name === "dev-map-controls" && group === "world"));
   // Community profiles and the Looking for Group directory (docs/COMMUNITY.md).
   assert.ok(checks.some(([, name, group]) => name === "dev-community" && group === "accounts"));
   // Human check stays on the sign-in form after a recovery-key reset and mode switches (2026-10-25).

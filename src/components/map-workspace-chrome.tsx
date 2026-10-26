@@ -4,13 +4,16 @@ import { useEffect, useRef, useState, useContext, type ReactNode } from "react";
 import {
   ArrowLeft,
   ChevronDown,
-  ChevronUp,
   Search,
   Menu,
   EyeOff,
+  SlidersHorizontal,
   X,
   Map as MapIcon,
 } from "lucide-react";
+import { useNavigate, useRouter } from "@tanstack/react-router";
+import { registerBackHandler } from "@/lib/mobile/back-handlers";
+import { mapBackStep, mapExitHref } from "@/lib/quire/map-navigation";
 import { AppLink } from "./app-link";
 import { MapFrame } from "./map-frame";
 import { allowContextChange } from "@/lib/quire/use-draft-guard";
@@ -35,8 +38,16 @@ export function MapWorkspaceChrome({
   toggleSettings,
   hidden,
   setHidden,
+  parent,
+  onBack,
+  closePanel,
 }: {
   map?: CampaignMap;
+  /** The parent map, only when this viewer can open it (otherwise no Back button). */
+  parent?: CampaignMap;
+  onBack?: () => void;
+  /** Closes an open map panel or sheet; returns false when none was open (Android Back). */
+  closePanel?: () => boolean;
   maps: CampaignMap[];
   navigation?: ReactNode;
   results: MapSearchResult[];
@@ -47,6 +58,9 @@ export function MapWorkspaceChrome({
   setHidden: (hidden: boolean) => void;
 }) {
   const app = useContext(ShellMapActions);
+  const navigate = useNavigate(),
+    router = useRouter();
+  const exitHref = mapExitHref();
   const [query, setQuery] = useState(""),
     [searching, setSearching] = useState(false),
     [index, setIndex] = useState(0),
@@ -76,6 +90,41 @@ export function MapWorkspaceChrome({
     setSearching(false);
     setQuery("");
   }, [map?.id]);
+  const parentRef = useRef(parent),
+    backRef = useRef(onBack),
+    stateRef = useRef({ menu, searching, closePanel, exitHref });
+  parentRef.current = parent;
+  backRef.current = onBack;
+  stateRef.current = { menu, searching, closePanel, exitHref };
+  // Android Back: menu/search → open panel → parent map → close the map (same as X).
+  useEffect(
+    () =>
+      registerBackHandler(() => {
+        const s = stateRef.current;
+        const step = mapBackStep({
+          menu: s.menu || s.searching,
+          panel: !!s.closePanel && s.closePanel(),
+          parent: !!parentRef.current && !!backRef.current,
+        });
+        if (step === "menu") {
+          setMenu(false);
+          setSearching(false);
+          input.current?.blur();
+        } else if (step === "parent") backRef.current!();
+        else if (step === "close") {
+          const url = new URL(s.exitHref, "https://app.invalid");
+          const leave = () =>
+            void navigate({
+              to: url.pathname as never,
+              search: router.options.parseSearch!(url.search) as never,
+              hash: url.hash.slice(1),
+            });
+          if (allowContextChange(leave)) leave();
+        }
+        return true;
+      }),
+    [navigate, router],
+  );
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -87,6 +136,16 @@ export function MapWorkspaceChrome({
         return;
       if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable="true"]'))
         return;
+      if (
+        (e.key === "Backspace" && !e.ctrlKey && !e.metaKey && !e.altKey) ||
+        // Alt+↑ from the top bar, rails or panels; on the map canvas Alt+arrows keep panning.
+        (e.key === "ArrowUp" && e.altKey)
+      ) {
+        if (!parentRef.current) return;
+        e.preventDefault();
+        backRef.current?.();
+        return;
+      }
       if (e.key === "/") {
         e.preventDefault();
         setHidden(false);
@@ -118,21 +177,44 @@ export function MapWorkspaceChrome({
         </button>
       ) : (
         <>
-          <div className="map-title-capsule">
-            <AppLink href="/?view=home" aria-label="Back to Lootsplitter" title="Back to Lootsplitter">
-              <ArrowLeft size={18} />
-            </AppLink>
+          <div className="map-title-capsule map-glass" data-has-back={parent ? "" : undefined}>
+            {parent && onBack && (
+              <button
+                className="map-back-button"
+                aria-label={`Back to ${parent.name}`}
+                title={`Back to ${parent.name} (Backspace)`}
+                aria-keyshortcuts="Backspace Alt+ArrowUp"
+                onClick={onBack}
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
             <button
+              className="map-title-button"
               aria-label="Map navigation menu"
               aria-expanded={menu}
               onClick={() => setMenu(!menu)}
             >
-              <span>{map?.name || "Maps"}</span>
+              <span>
+                {parent && <small className="map-title-parent">{parent.name} › </small>}
+                {map?.name || "Maps"}
+              </span>
               <ChevronDown size={16} />
             </button>
           </div>
           {menu && (
             <section className="map-app-menu map-glass" aria-label="Map and application navigation">
+              <button
+                className="map-menu-settings"
+                aria-expanded={settingsOpen}
+                onClick={() => {
+                  setMenu(false);
+                  toggleSettings();
+                }}
+              >
+                <SlidersHorizontal size={16} aria-hidden="true" />
+                Map settings
+              </button>
               {navigation}
               {map && (
                 <div className="map-connected-scene-list" aria-label="Connected scenes">
@@ -309,10 +391,12 @@ export function MapWorkspaceChrome({
                 </div>
               )}
             </div>
+          </div>
+          <div className="map-top-actions">
             <button
               className="map-settings-toggle map-glass map-icon-button"
               aria-label="Map settings"
-              title="Settings"
+              title="Map settings"
               aria-expanded={settingsOpen}
               onClick={() => {
                 setMenu(false);
@@ -320,7 +404,7 @@ export function MapWorkspaceChrome({
                 toggleSettings();
               }}
             >
-              <Menu size={21} />
+              <SlidersHorizontal size={20} />
             </button>
             <button
               className="map-glass map-icon-button map-hide-button"
@@ -330,45 +414,15 @@ export function MapWorkspaceChrome({
             >
               <EyeOff size={19} />
             </button>
+            <AppLink
+              className="map-glass map-icon-button map-close-button"
+              href={exitHref}
+              aria-label="Close map"
+              title="Close map"
+            >
+              <X size={20} />
+            </AppLink>
           </div>
-          {map && (
-            <div className="map-scene-stepper map-glass" aria-label="Scene navigation">
-              <button
-                className="map-icon-button"
-                aria-label="Parent map"
-                title="Parent map"
-                disabled={!maps.some((m) => m.id === map.connected?.parentMapId)}
-                onClick={() =>
-                  selectResult({
-                    key: "parent",
-                    label: "Parent",
-                    kind: "Map",
-                    context: "",
-                    mapId: map.connected!.parentMapId!,
-                  })
-                }
-              >
-                <ChevronUp size={18} />
-              </button>
-              <button
-                className="map-icon-button"
-                aria-label="Choose map"
-                title="Choose map"
-                aria-expanded={menu}
-                onClick={() => setMenu(!menu)}
-              >
-                <MapIcon size={19} />
-              </button>
-              <button
-                className="map-icon-button"
-                aria-label="Connected maps"
-                title="Connected maps"
-                onClick={() => setMenu(!menu)}
-              >
-                <ChevronDown size={18} />
-              </button>
-            </div>
-          )}
         </>
       )}
     </>

@@ -20,6 +20,7 @@ const featureAudits = {
   services: "scripts/services-browser-audit.mjs",
   "themed-confirm": "scripts/themed-confirm-browser-audit.mjs",
   a11y: "scripts/a11y-browser-audit.mjs",
+  "map-controls": "scripts/map-controls-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))

@@ -321,6 +321,9 @@ jobs:
       - name: dev-party-split
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-party-split 240 node scripts/party-split-browser-audit.mjs
+      - name: dev-map-controls
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-controls 240 node --experimental-strip-types scripts/map-controls-browser-audit.mjs
       - name: dev-journey-planner
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-journey-planner 240 node scripts/journey-planner-browser-audit.mjs

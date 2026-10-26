@@ -56,16 +56,15 @@ export async function checkMobileMapControls(page) {
     return {
       title: box(".map-title-capsule"),
       search: box(".map-search"),
-      settings: box(".map-settings-toggle"),
-      scenes: box(".map-scene-stepper"),
+      settings: box(".map-top-actions"),
       tools: box(".map-hotbar-anchor"),
       camera: box(".map-navigation"),
     };
   });
   if (height > 550) {
-    assert.ok(boxes.settings.left >= boxes.title.right + 6, "Title leaves room for Settings");
+    assert.ok(boxes.settings.left >= boxes.title.right + 6, "Title leaves room for Settings and X");
+    assert.ok(boxes.settings.height <= 50, "Settings and X Close map form one short row");
     assert.ok(boxes.search.top >= boxes.title.bottom + 6, "Search has its own clear row");
-    assert.ok(boxes.scenes.height <= 50, "Phone scene controls form one short row");
     assert.ok(boxes.camera.height <= 52, "Phone camera controls form one short row");
     assert.ok(boxes.tools.top >= boxes.camera.bottom + 6, "Camera and tool docks do not overlap");
     assert.ok(height - boxes.tools.bottom <= 20, "Tools hug the phone's bottom edge");
@@ -77,11 +76,11 @@ export async function checkMobileMapControls(page) {
     );
   }
   assert.ok(
-    boxes.scenes.right <= boxes.camera.left ||
-      boxes.scenes.left >= boxes.camera.right ||
-      boxes.scenes.bottom <= boxes.camera.top ||
-      boxes.scenes.top >= boxes.camera.bottom,
-    "Scene and camera controls do not overlap in narrow landscape",
+    boxes.settings.right <= boxes.camera.left ||
+      boxes.settings.left >= boxes.camera.right ||
+      boxes.settings.bottom <= boxes.camera.top ||
+      boxes.settings.top >= boxes.camera.bottom,
+    "Top actions and camera controls do not overlap in narrow landscape",
   );
   const toolbar = page.getByRole("toolbar", { name: "Map tools", exact: true });
   const unobstructed = (button) =>
