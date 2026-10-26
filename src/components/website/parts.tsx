@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
-import { productShots, productShotSize, type ProductShot } from "@/lib/website/product-shots";
+import {
+  PHONE_SHOT_MEDIA,
+  PHONE_SHOT_SIZE,
+  phoneShotFor,
+  productShots,
+  productShotSize,
+  type ProductShot,
+} from "@/lib/website/product-shots";
 
-/** A real product screenshot in an engraved mat (gold on parchment, dark on ink). */
+/** A real product screenshot in an engraved mat (gold on parchment, dark on ink). Below 700 px
+ * a screen with a phone capture shows that instead, so phone visitors can read it (W-4). */
 export function Shot({
   name,
   tone = "paper",
@@ -14,20 +22,31 @@ export function Shot({
   className?: string;
 }) {
   const { width, height } = productShotSize(name);
+  const phone = phoneShotFor(name);
   return (
     <figure
       className={`ls-frame ls-frame-${tone}${size === "inset" ? " ls-frame-inset" : ""}${
         name === "phone-home" ? " ls-frame-phone" : ""
-      } ${className}`.trim()}
+      }${phone ? " ls-frame-responsive" : ""} ${className}`.trim()}
     >
-      <img
-        src={`/product/${name}.webp`}
-        alt={productShots[name].alt}
-        width={width}
-        height={height}
-        loading="lazy"
-        decoding="async"
-      />
+      <picture>
+        {phone && (
+          <source
+            media={PHONE_SHOT_MEDIA}
+            srcSet={`/product/${phone}.webp`}
+            width={PHONE_SHOT_SIZE.width}
+            height={PHONE_SHOT_SIZE.height}
+          />
+        )}
+        <img
+          src={`/product/${name}.webp`}
+          alt={productShots[name].alt}
+          width={width}
+          height={height}
+          loading="lazy"
+          decoding="async"
+        />
+      </picture>
     </figure>
   );
 }

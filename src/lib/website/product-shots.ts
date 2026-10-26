@@ -53,6 +53,30 @@ export const productShots = {
 
 export type ProductShot = keyof typeof productShots;
 
+/** Screens that also have a 390-wide phone capture, public/product/<name>-phone.webp (W-4),
+ * taken from the same synthetic campaign by scripts/capture-product-screenshots.mjs. */
+const PHONE_CAPTURES = new Set<ProductShot>([
+  "ledger",
+  "character",
+  "market",
+  "maps",
+  "encounter",
+  "properties",
+  "downtime",
+  "room",
+  "journal",
+]);
+
+/** Phone captures replace the desktop ones below the website's 700 px phone layout. */
+export const PHONE_SHOT_MEDIA = "(max-width: 699px)";
+/** 390 x 560 CSS pixels at 2x. */
+export const PHONE_SHOT_SIZE = { width: 780, height: 1120 } as const;
+
+/** The phone capture's file name for a screen, or null when it has none. */
+export function phoneShotFor(name: ProductShot) {
+  return PHONE_CAPTURES.has(name) ? `${name}-phone` : null;
+}
+
 export function productShotSize(name: ProductShot) {
   return name === "phone-home" ? { width: 780, height: 1688 } : { width: 1280, height: 800 };
 }

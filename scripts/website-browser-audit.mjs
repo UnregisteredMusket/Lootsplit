@@ -83,23 +83,42 @@ try {
           await page.locator("main > section[aria-labelledby='loot'] + section").getAttribute("aria-labelledby"),
           "why",
         );
-        // "Everything around the ledger" drifts sideways, loops, and pauses on request.
+        // W-4: "Everything around the ledger" is a row the visitor moves: no auto motion, no loop
+        // copy, cards snap, and each card opens its Features section.
         const track = page.locator(".ls-carousel-track");
-        assert.equal(await page.locator(".ls-carousel ul:not([data-loop-copy]) a.ls-area").count(), 8);
-        assert.equal(await page.locator("[data-loop-copy]").getAttribute("aria-hidden"), "true");
-        for (const tab of await page.locator("[data-loop-copy] a").evaluateAll((a) => a.map((n) => n.tabIndex)))
-          assert.equal(tab, -1);
+        const cards = page.locator(".ls-carousel a.ls-area");
+        assert.equal(await cards.count(), 8);
+        for (const href of await cards.evaluateAll((a) => a.map((n) => n.getAttribute("href"))))
+          assert.match(href, /^\/features#[a-z]+$/);
+        assert.equal(await page.locator("[data-loop-copy]").count(), 0);
+        assert.equal(await page.getByRole("button", { name: /the scrolling$/ }).count(), 0);
+        assert.equal(await track.evaluate((e) => getComputedStyle(e).scrollSnapType), "x mandatory");
         assert.ok(await track.evaluate((e) => e.scrollWidth > e.clientWidth), "the row scrolls sideways");
         await track.scrollIntoViewIfNeeded();
         await page.mouse.move(1, 1);
-        const start = await track.evaluate((e) => e.scrollLeft);
-        await page.waitForFunction((s) => document.querySelector(".ls-carousel-track").scrollLeft > s + 20, start);
-        await page.getByRole("button", { name: "Pause the scrolling", exact: true }).click();
-        await page.mouse.move(1, 1);
-        const held = await track.evaluate((e) => e.scrollLeft);
-        await page.waitForTimeout(1200);
-        assert.equal(await track.evaluate((e) => e.scrollLeft), held, "paused row stays still");
-        await page.getByRole("button", { name: "Play the scrolling", exact: true }).click();
+        const still = await track.evaluate((e) => e.scrollLeft);
+        await page.waitForTimeout(1500);
+        assert.equal(await track.evaluate((e) => e.scrollLeft), still, "the row never moves by itself");
+        const previous = page.getByRole("button", { name: "Previous areas", exact: true });
+        const next = page.getByRole("button", { name: "Next areas", exact: true });
+        assert.equal(await previous.isDisabled(), true);
+        await next.click();
+        await page.waitForFunction((s) => document.querySelector(".ls-carousel-track").scrollLeft > s + 100, still);
+        await previous.click();
+        await page.waitForFunction(() => document.querySelector(".ls-carousel-track").scrollLeft <= 2);
+        // Phones get phone-sized captures through <picture media> (W-4).
+        const sources = await page.locator(".ls-carousel picture source").evaluateAll((els) =>
+          els.map((e) => ({ media: e.getAttribute("media"), src: e.getAttribute("srcset") })),
+        );
+        assert.equal(sources.length, 8);
+        for (const source of sources) {
+          assert.equal(source.media, "(max-width: 699px)");
+          assert.match(source.src, /^\/product\/[a-z]+-phone\.webp$/);
+        }
+        if (width <= 390) {
+          const shown = await page.locator(".ls-carousel img").first().evaluate((img) => img.currentSrc);
+          assert.match(shown, /-phone\.webp$/, "phones load the phone capture");
+        }
       }
       if (path === "privacy" && width === 1280) {
         // Owner decisions 2026-10-23: named as UnregisteredMusket, 30-day deletion, under-13 line.
@@ -129,7 +148,6 @@ try {
         await calm.waitForTimeout(1500);
         assert.equal(await calm.locator(".ls-promo-video").evaluate((v) => v.paused), true);
         await calm.getByRole("button", { name: "Play the video", exact: true }).waitFor();
-        assert.equal(await calm.locator("[data-loop-copy]").count(), 0, "no looping copy for reduced motion");
         assert.equal(await calm.locator(".ls-carousel-track").evaluate((e) => e.scrollLeft), 0);
         await calm.close();
       }

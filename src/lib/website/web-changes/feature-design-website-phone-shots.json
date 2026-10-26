@@ -1,0 +1,9 @@
+{
+  "title": "Readable screenshots on phones",
+  "summary": "Phone visitors now see phone-sized screenshots of Lootsplitter on the home page and the Features tour, and the home page's area cards no longer scroll by themselves.",
+  "items": [
+    "Features and the home page show phone screenshots below tablet width, so you can read them.",
+    "\"Everything around the ledger\" is a row you move yourself: swipe, scroll or use the arrow buttons. Cards snap into place.",
+    "Each card still opens its section of the Features tour."
+  ]
+}
