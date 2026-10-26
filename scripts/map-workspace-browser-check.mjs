@@ -94,7 +94,7 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await canvas.click({ position: { x: box.width * 0.2, y: box.height * 0.35 } });
   await expect(page.locator(".map-personal-sketches text")).toHaveText("My route");
   await canvas.press("Escape");
-  await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
+  await page.getByRole("button", { name: /map navigation menu$/i }).click();
   const nav = page.getByRole("region", { name: "Map and application navigation", exact: true });
   for (const label of ["Desk", "Encounters", "Party", "Market", "Library", "Maps"])
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
@@ -104,7 +104,7 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await navigateApplication(page, origin + "/maps");
   // Router transitions may retain the map's open menu. Open it deliberately
   // instead of toggling an already-open menu closed before Hide interface.
-  const menu = page.getByRole("button", { name: "Map navigation menu", exact: true });
+  const menu = page.getByRole("button", { name: /map navigation menu$/i });
   if ((await menu.getAttribute("aria-expanded")) !== "true") await menu.click();
   await expect(menu).toHaveAttribute("aria-expanded", "true");
   await nav.getByRole("button", { name: "Hide interface", exact: true }).click();
@@ -207,7 +207,7 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await expect(page.getByRole("option")).toHaveCount(0);
   await expect(page.getByText("No accessible maps or places found.")).toBeVisible();
   await search.press("Escape");
-  await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
+  await page.getByRole("button", { name: /map navigation menu$/i }).click();
   for (const label of ["Home", "Party & inventory", "Campaign", "Market", "Library", "Maps"])
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   return [

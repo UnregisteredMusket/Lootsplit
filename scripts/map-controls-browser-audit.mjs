@@ -282,7 +282,7 @@ async function checkChrome(page, { role, appearance, width, height }) {
   const url = page.url();
   if (width <= 340) {
     await expect(page.locator(".map-top-actions .map-settings-toggle")).toBeHidden();
-    await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
+    await page.getByRole("button", { name: /map navigation menu$/i }).click();
     await page.locator(".map-app-menu .map-menu-settings").click();
   } else await page.locator(".map-top-actions .map-settings-toggle").click();
   await expect(page.locator("#map-settings")).toBeVisible();
@@ -520,7 +520,7 @@ try {
 
     // Backspace and Alt+↑ go back up; never from a text field.
     const enterCove = async () => {
-      const menu = page.getByRole("button", { name: "Map navigation menu", exact: true });
+      const menu = page.getByRole("button", { name: /map navigation menu$/i });
       if ((await menu.getAttribute("aria-expanded")) !== "true") await menu.click();
       await page
         .locator(".map-connected-scene-list")
