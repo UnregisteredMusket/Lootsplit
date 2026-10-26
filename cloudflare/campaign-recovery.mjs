@@ -167,6 +167,7 @@ export function deletionRecoveryArgs(room, seat, name, userId) {
     turn: room.turn,
     closed: room.closed === true,
     viewOnly: room.viewOnly === true,
+    ...(typeof room.campaignName === "string" ? { campaignName: room.campaignName } : {}),
     seen: room.seen || { gifts: [], sales: [] },
     blockedUsers: room.blockedUsers || {},
     seats: [...room.seats, ...(room.departed || [])].map(({ token: _token, ...entry }) => entry),
@@ -289,6 +290,9 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
     table,
     seen: recovery.roomState?.seen || { gifts: [], sales: [] },
     blockedUsers: recovery.roomState?.blockedUsers || {},
+    ...(typeof recovery.roomState?.campaignName === "string"
+      ? { campaignName: recovery.roomState.campaignName.slice(0, 60) }
+      : {}),
     invitations: {},
     drafts: {},
   };

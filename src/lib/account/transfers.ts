@@ -1,3 +1,4 @@
+import { campaignDisplayName } from "../quire/campaign-name";
 import { reloadCampaignContext } from "../quire/navigation-launch.ts";
 import { getCampaigns, createCampaign } from "../quire/campaigns";
 import { getSeat } from "../quire/table";
@@ -49,10 +50,17 @@ export async function saveAccountBackup() {
 export async function linkCurrentCampaign() {
   const credentials = await prepareAccountMembership();
   const state = getCampaigns();
-  await accountRequest("link", {
-    ...credentials,
-    name: state.campaigns.find((c) => c.id === state.activeId)?.name || "Campaign",
+  const cloud = getCloudTable();
+  // A player's library entry takes the DM's campaign name (or "Shared campaign · CODE"),
+  // never this device's default name.
+  const name = campaignDisplayName({
+    deviceName: state.campaigns.find((c) => c.id === state.activeId)?.name,
+    joined: cloud.joined,
+    role: cloud.role,
+    code: cloud.code,
+    roomName: cloud.campaignName,
   });
+  await accountRequest("link", { ...credentials, name });
 }
 export async function restoreAccountBackup(id: string, name: string) {
   if (getCloudTable().joined || hasPendingChanges() || getSeat().role !== "dm")

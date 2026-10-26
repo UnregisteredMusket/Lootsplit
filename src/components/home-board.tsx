@@ -27,7 +27,7 @@ import { Guide } from "@/components/guide";
 import { Card, EmptyState, MoneyLine } from "@/components/terminal";
 import { TurnLine } from "@/components/turn-line";
 import { Button, Confirm, Fold, Switch } from "@/components/ui";
-import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
+import { useCampaignDisplayName } from "@/lib/quire/use-campaign-name";
 import { getChatSnapshot, refreshChat, serverChat, subscribeChat } from "@/lib/quire/chat";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useLibrary } from "@/lib/quire/library";
@@ -66,9 +66,7 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
   const { prefs, setPrefs } = usePrefs();
   const showDollars = useShowDollars();
   const notes = useSyncExternalStore(subscribeChat, getChatSnapshot, serverChat);
-  const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
-  const campaign =
-    campaigns.campaigns.find((item) => item.id === campaigns.activeId)?.name ?? "This campaign";
+  const campaign = useCampaignDisplayName();
 
   useEffect(() => {
     void refreshChat();

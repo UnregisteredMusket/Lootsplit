@@ -22,7 +22,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Join your party",
         paragraphs: [
           "Open the current invitation from your DM and choose your assigned available character. Guests do not need an account. Signing in lets you resume a saved membership on another device while its room and invitation remain valid. Repeated wrong passwords add a short wait before you can try again (up to 15 minutes). On the website, signing in and creating an account include a quick human check from Cloudflare that usually completes without a click.",
-          "If another room is open, choose whether to stay or switch before accepting the new invitation. A character or campaign name does not identify a room. Ask your DM for a fresh invitation when a session closes; old invitations remain expired after reopening.",
+          "If another room is open, choose whether to stay or switch before accepting the new invitation. The join card, the header and the browser tab show your DM’s campaign name, or Shared campaign and the room code when the DM has not named it. A character or campaign name does not identify a room. Ask your DM for a fresh invitation when a session closes; old invitations remain expired after reopening.",
         ],
         links: [
           ["Campaign connection", "/share"],

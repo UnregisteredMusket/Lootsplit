@@ -27,6 +27,7 @@ import {
 import { archiveSession, projectRecord } from "./session-records.ts";
 import { npcController } from "./world.ts";
 import { canReadNote } from "./chat-visibility.ts";
+import { roomCampaignName } from "./campaign-name.ts";
 import { characterControl, type Purse } from "./types.ts";
 import type { BillFile } from "./table.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
@@ -207,6 +208,7 @@ export async function openRoom(input: {
   name: string;
   table: CloudTable;
   userId?: string;
+  campaignName?: unknown;
 }, probe?: ProbeAccess): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
   const table = readCloudTableForImport(input.table);
   if (!table)
@@ -226,7 +228,9 @@ export async function openRoom(input: {
     purseIds: [],
   };
   const { hostedCampaignLimit } = await import("../../../cloudflare/hosted-campaigns.mjs");
+  const campaignName = roomCampaignName(input.campaignName);
   await createRoom({
+    ...(campaignName ? { campaignName } : {}),
     ownerId: input.userId,
     sessionId: input.userId ? crypto.randomUUID() : undefined,
     code,
@@ -245,11 +249,13 @@ export async function previewRoom(
   code: string,
   sessionId?: string,
   userId?: string,
-): Promise<{ characters: { id: string; name: string }[] }> {
+): Promise<{ characters: { id: string; name: string }[]; campaignName?: string }> {
   const room = await must(code);
   refuseProbeRoom(room);
   requireInvitationSession(room, sessionId);
   return {
+    // The campaign's name is not private: the join card reads "Joining <name>".
+    ...(room.campaignName ? { campaignName: room.campaignName } : {}),
     characters: room.table.purses
       .filter(
         (purse) =>
@@ -435,6 +441,28 @@ export async function choosePace(input: {
   return view(next, seat, room);
 }
 
+/**
+ * The DM names the shared campaign (players see it in the header, join card and tab title).
+ * Only the DM seat may set it; an unchanged name writes nothing.
+ */
+export async function nameRoom(input: {
+  code: string;
+  token: string;
+  campaignName: unknown;
+}): Promise<RoomView> {
+  const room = await must(input.code);
+  const seat = room.seats.find((item) => item.token === input.token);
+  if (!seat) throw new Error("This browser is not seated at that table.");
+  if (seat.role !== "dm") throw new Error("Only the DM can name the campaign.");
+  const campaignName = roomCampaignName(input.campaignName);
+  if ((room.campaignName ?? undefined) === campaignName) return view(room, seat);
+  const next: CloudRoom = { ...room, revision: room.revision + 1 };
+  if (campaignName) next.campaignName = campaignName;
+  else delete next.campaignName;
+  await updateRoom(next, room.revision);
+  return view(next, seat, room);
+}
+
 export async function closeRoom(input: {
   code: string;
   token: string;
@@ -509,6 +537,8 @@ export type RoomView = {
   acknowledged: string[];
   table: CloudTable;
   live: boolean;
+  /** The DM's campaign name; absent when the DM has not named it (shown as "Shared campaign · CODE"). */
+  campaignName?: string;
   departed?: Array<{ id: string; name: string; status: string; invitation?: string }>;
   testMode?: boolean;
 };
@@ -580,6 +610,7 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
     mine: room.viewOnly ? seat.role === "dm" : room.live || current?.id === seat.id,
     who: room.live ? "everyone" : (current?.name ?? "Someone"),
     live: room.live === true,
+    ...(room.campaignName ? { campaignName: room.campaignName } : {}),
     testMode: room.testMode === true,
     departed:
       seat.role === "dm"

@@ -3,6 +3,7 @@ import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
+import { roomCampaignName } from "../src/lib/quire/campaign-name.ts";
 import { hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 /** Tabletop protocol the account client declared: 0 (none) to 9 (current; 4 adds nothing here,
@@ -560,6 +561,8 @@ export async function handleAccounts(request, env, context = null) {
               closed: room?.closed === true,
               viewOnly: room?.viewOnly === true,
               ...(room ? { live: room.live === true } : {}),
+              // The DM's campaign name (not private), shown on the membership card.
+              ...(roomCampaignName(room?.campaignName) ? { campaignName: roomCampaignName(room.campaignName) } : {}),
             };
           }),
           backups: backups.results,

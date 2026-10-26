@@ -16,7 +16,7 @@ import { rememberScreen } from "@/lib/quire/map-navigation";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { useReviewCount } from "@/lib/quire/use-review-count";
 import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
-import { getCampaigns, subscribeCampaigns, serverCampaigns } from "@/lib/quire/campaigns";
+import { useCampaignDisplayName, useSyncRoomCampaignName } from "@/lib/quire/use-campaign-name";
 import { SyncStatus } from "./sync-status";
 import {
   SplitHeaderControls,
@@ -79,6 +79,7 @@ export function Shell(props: ShellProps) {
 }
 
 function WindowShell({ children, width = "wide" }: ShellProps) {
+  useSyncRoomCampaignName();
   const testRoom = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const { job } = useLibrary();
   const seat = useSeat();
@@ -99,9 +100,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
   const [leaving, setLeaving] = useState(false);
   const [management, setManagement] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
-  const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
-  const campaignName =
-    campaigns.campaigns.find((c) => c.id === campaigns.activeId)?.name || "Campaign";
+  const campaignName = useCampaignDisplayName();
   const overlayRef = useRef(false);
   overlayRef.current = management || campaignOpen;
   const [blocked, setBlocked] = useState<string | null>(null);
@@ -755,9 +754,7 @@ function PaneShell({ children, width = "wide" }: ShellProps) {
   const seatKnown = useSeatKnown();
   const dm = seat.role === "dm";
   const { count: unreadCount } = useChatUnread();
-  const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
-  const campaignName =
-    campaigns.campaigns.find((c) => c.id === campaigns.activeId)?.name || "Campaign";
+  const campaignName = useCampaignDisplayName();
   const { actions } = useSplitView();
   const inBooks =
     pathname === "/books" || pathname.startsWith("/book/") || pathname.startsWith("/read/");

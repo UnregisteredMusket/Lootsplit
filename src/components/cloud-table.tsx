@@ -37,6 +37,8 @@ import { Button, TextInput, Confirm, Field, Fold } from "@/components/ui";
 import { rememberSave } from "@/lib/quire/saves";
 import { loadSeatLock } from "@/lib/quire/lock";
 import { roomStatusLabels } from "@/lib/quire/room-state";
+import { roomCampaignName, sharedCampaignFallback } from "@/lib/quire/campaign-name";
+import { useCampaignDisplayName } from "@/lib/quire/use-campaign-name";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 import { requestConfirm, requestPrompt } from "@/lib/quire/confirm-store";
 
@@ -56,6 +58,8 @@ export function CloudTable() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [characters, setCharacters] = useState<{ id: string; name: string }[]>([]);
+  // The DM's campaign name from the lookup (not private): "Joining The Wayfarers".
+  const [joinCampaign, setJoinCampaign] = useState("");
   const [purseId, setPurseId] = useState("");
   const [busy, setBusy] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -73,6 +77,7 @@ export function CloudTable() {
   const [leaving, setLeaving] = useState(false);
   const [keepOnline, setKeepOnline] = useState(false);
   const host = cloud.joined && cloud.role === "dm";
+  const campaignName = useCampaignDisplayName();
   // Restored credentials arrive before the authoritative session mode/invitation.
   const unavailable = busy || !online || (cloud.joined && cloud.lastSync === 0);
   const savedRooms = hostAccount?.members.filter((m) => !m.archived && m.role) || [];
@@ -451,7 +456,9 @@ export function CloudTable() {
                 <ArrowLeft size={16} />
                 Back
               </Button>
-              <h2 className="mt-3 text-3xl">Join your party</h2>
+              <h2 className="mt-3 text-3xl">
+                {lookedUp && joinCampaign ? `Joining ${joinCampaign}` : "Join your party"}
+              </h2>
               <p className="mt-2 text-sm text-muted">Enter code → Choose character → Join</p>
               <form
                 className="mt-5 space-y-3"
@@ -467,6 +474,9 @@ export function CloudTable() {
                     if (preferred && !found.characters.some((c) => c.id === preferred))
                       throw new Error("The invited character is unavailable. Ask the DM to release it or send a new invitation.");
                     setCharacters(found.characters);
+                    setJoinCampaign(
+                      roomCampaignName(found.campaignName) ?? sharedCampaignFallback(code.split(".")[0]!.toUpperCase()),
+                    );
                     setPurseId(preferred || found.characters[0]?.id || "");
                     setLookedUp(true);
                   });
@@ -560,6 +570,9 @@ export function CloudTable() {
           <section className="ledger-card room-card">
             <p className="eyebrow">Your shared campaign</p>
             <h2>{host ? "Your party’s room" : "Adventure together"}</h2>
+            <p className="font-display text-xl" data-campaign-name>
+              {campaignName}
+            </p>
             <p className="text-muted">{host ? "You are the host" : "You joined as a player"}</p>
             <p className="mt-5 text-xs tracking-widest uppercase text-muted">Campaign ID</p>
             <p className="room-code" aria-label={`Campaign ID ${cloud.code}`}>
