@@ -646,9 +646,17 @@ try {
     await page.getByRole("button", { name: "Reveal black market", exact: true }).click();
     await expect(page.getByText("Black market is available.", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: /Moonlit broker/ }).click();
+    // Black-market rules live in the shop's Edit tab and save with its one Save changes bar.
+    await page
+      .getByRole("group", { name: "Shop mode", exact: true })
+      .getByRole("button", { name: "Edit", exact: true })
+      .click();
     await page.getByText("Black-market vendor rules", { exact: true }).click();
     await page.getByLabel("Price premium multiplier", { exact: true }).fill("2.5");
-    await page.getByRole("button", { name: "Save black-market vendor", exact: true }).click();
+    await page
+      .getByRole("group", { name: "Save shop changes", exact: true })
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
     await expect
       .poll(
         async () =>

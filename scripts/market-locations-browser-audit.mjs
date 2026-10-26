@@ -205,24 +205,26 @@ async function createLocation(page, kind, name, parentId) {
   await expect(form).toHaveCount(0);
   return (await market(page)).locations.find((location) => location.name === name).id;
 }
+const saveShopEdits = (page) =>
+  page
+    .getByRole("group", { name: "Save shop changes", exact: true })
+    .getByRole("button", { name: "Save changes", exact: true });
 async function newShop(page, name, locationId) {
   await page.getByRole("button", { name: "New shop", exact: true }).click();
   await page.getByRole("heading", { name: "New shop", exact: true }).waitFor();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const shopId = new URL(page.url()).pathname.split("/").at(-1);
   await page.getByLabel("Shop name", { exact: true }).fill(name);
-  await page.getByLabel("Shop name", { exact: true }).press("Tab");
-  await expect
-    .poll(async () => (await rows(page, "shops")).find((shop) => shop.id === shopId)?.name)
-    .toBe(name);
-  const form = page.getByRole("form", { name: "Shop location and image" });
+  // One Save changes bar saves the details and the location/image parts in sequence.
+  const form = page.getByRole("group", { name: "Shop location and image" });
   await chooseOption(form.getByLabel("Shop availability", { exact: true }), locationId);
   await form.getByLabel("Shop image", { exact: true }).setInputFiles(upload);
   await decode(form.getByAltText("Shop image preview"));
-  await form.getByRole("button", { name: "Save shop location and image", exact: true }).click();
-  await expect(
-    form.getByRole("button", { name: "Save shop location and image", exact: true }),
-  ).toBeDisabled();
+  await saveShopEdits(page).click();
+  await expect(saveShopEdits(page)).toBeDisabled();
+  await expect
+    .poll(async () => (await rows(page, "shops")).find((shop) => shop.id === shopId)?.name)
+    .toBe(name);
   await page.getByLabel("New item", { exact: true }).fill("Location audit good");
   await page.getByLabel("New price", { exact: true }).fill("13 cp");
   await page.getByLabel("New quantity", { exact: true }).fill("7");
@@ -350,7 +352,7 @@ try {
       .filter({ hasText: `Dock shop ${width}` })
       .click();
     await dm.getByRole("button", { name: "Edit", exact: true }).click();
-    const assignment = dm.getByRole("form", { name: "Shop location and image" });
+    const assignment = dm.getByRole("group", { name: "Shop location and image" });
     await chooseOption(assignment.getByLabel("Shop availability", { exact: true }), other);
     // Emulate an independent writer after the form captured its baseline.
     async function competingAssignment(locationId) {
@@ -383,9 +385,7 @@ try {
       );
     }
     await competingAssignment(region);
-    await assignment
-      .getByRole("button", { name: "Save shop location and image", exact: true })
-      .click();
+    await saveShopEdits(dm).click();
     await expect(assignment.getByRole("alert")).toContainText("changed elsewhere");
     assert.equal(
       await assignment.getByLabel("Shop availability", { exact: true }).getAttribute("data-value"),
@@ -399,19 +399,11 @@ try {
     );
     await decode(assignment.getByAltText("Shop image preview"));
     await competingAssignment(area);
-    await assignment
-      .getByRole("button", { name: "Save shop location and image", exact: true })
-      .click();
-    await expect(
-      assignment.getByRole("button", { name: "Save shop location and image", exact: true }),
-    ).toBeDisabled();
+    await saveShopEdits(dm).click();
+    await expect(saveShopEdits(dm)).toBeDisabled();
     await chooseOption(assignment.getByLabel("Shop availability", { exact: true }), area);
-    await assignment
-      .getByRole("button", { name: "Save shop location and image", exact: true })
-      .click();
-    await expect(
-      assignment.getByRole("button", { name: "Save shop location and image", exact: true }),
-    ).toBeDisabled();
+    await saveShopEdits(dm).click();
+    await expect(saveShopEdits(dm)).toBeDisabled();
     await dm.getByRole("link", { name: "Market", exact: true }).first().click();
     await dm.getByLabel("Available at the party's location", { exact: true }).check();
     await expect(

@@ -81,25 +81,19 @@ export function ShopStockList({
   ] as const;
   return (
     <section className="mt-6" aria-label="Shop inventory">
-      <dl
-        className="flex gap-2 overflow-x-auto pb-2"
-        aria-label="Shop inventory totals"
-        // Scrolls sideways on phones, so it must take keyboard focus (axe scrollable-region-focusable).
-        tabIndex={0}
-      >
+      {/* Compact wrapping tiles: never clipped or scrolled sideways at 390 or 320 px. */}
+      <dl className="shop-totals" aria-label="Shop inventory totals">
         {totals.map(([label, value]) => (
-          <div
-            key={label}
-            className="min-w-32 flex-1 rounded-sm border border-border bg-subtle p-3"
-          >
-            <dt className="text-sm text-muted">{label}</dt>
-            <dd className="mt-1 font-display text-2xl tabular-nums">{value.toLocaleString()}</dd>
+          <div key={label} className="shop-total">
+            <dt>{label}</dt>
+            <dd className="tabular-nums">{value.toLocaleString()}</dd>
           </div>
         ))}
       </dl>
       <h2 className="mt-3 font-display text-2xl">Shop inventory</h2>
-      <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
         <TextInput
+          className="col-span-2 sm:col-span-1"
           aria-label="Search shop inventory"
           placeholder="Search items, categories or notes"
           value={query}

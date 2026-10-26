@@ -32,7 +32,7 @@ import { getChatSnapshot, refreshChat, serverChat, subscribeChat } from "@/lib/q
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useLibrary } from "@/lib/quire/library";
 import { formatCoins, formatCopper, toCopper } from "@/lib/quire/money";
-import { usePrefs } from "@/lib/quire/prefs";
+import { usePrefs, useShowDollars } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 
 function OverviewSection({
@@ -64,6 +64,7 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const { prefs, setPrefs } = usePrefs();
+  const showDollars = useShowDollars();
   const notes = useSyncExternalStore(subscribeChat, getChatSnapshot, serverChat);
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
   const campaign =
@@ -415,10 +416,10 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
 
         <div className="mt-3">
           <Switch
-            checked={prefs.showDollars}
+            checked={showDollars}
             onChange={(on) => setPrefs({ showDollars: on })}
             label="Show dollars"
-            hint="A estimated dollar equivalent beside the coins."
+            hint="An estimated modern dollar equivalent (≈ $) beside the coins."
           />
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-sm">

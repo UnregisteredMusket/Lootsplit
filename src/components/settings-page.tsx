@@ -16,7 +16,7 @@ import { Button, ChoiceGrid, Confirm, Fold, Slider, Switch, ToggleButton } from 
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useLibrary } from "@/lib/quire/library";
 import { CATEGORIES, RARITIES, WEALTHS } from "@/lib/quire/labels";
-import { usePrefs, type AppPrefs } from "@/lib/quire/prefs";
+import { usePrefs, useShowDollars, type AppPrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { APP_VERSION } from "@/lib/quire/version";
 import { basketNote, DEFAULT_REALM, realmNote, scalePrice, SEASON_NAMES } from "@/lib/quire/scale";
@@ -46,6 +46,7 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
   const { ready, realm, setRealm, resetAll } = useEconomy();
   const { reload: reloadLibrary } = useLibrary();
   const { prefs, setPrefs, resetPrefs } = usePrefs();
+  const showDollars = useShowDollars();
   const seat = useSeat();
   const [draft, setDraft] = useState<RealmSettings>(realm);
   const draftRef = useRef(realm);
@@ -110,9 +111,9 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
           </>}
           {financial && <><Fold anchorId="economy" title="Price modifiers" hint="Season, shortages, war, and the value of a gold piece." defaultOpen>
             <p className="mt-2 text-sm text-muted">
-              {realmNote(draft, { dollars: prefs.showDollars })}
+              {realmNote(draft, { dollars: showDollars })}
             </p>
-            <p className="mt-2 text-sm text-muted">{basketNote(draft, { dollars: prefs.showDollars })}</p>
+            <p className="mt-2 text-sm text-muted">{basketNote(draft, { dollars: showDollars })}</p>
             <p className="mt-2 text-sm text-faint">{dirty ? "Release the slider to keep this." : "Saved."}</p>
 
             <div className="mt-5">
@@ -393,8 +394,8 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
           <Fold title="Display" hint="Dollars, type size, and how many recent entries to show.">
             <Switch
               label="Show a modern estimated dollar equivalent"
-              hint="Prices stay in copper, silver, and gold. Dollars are only a comparison for one gold piece."
-              checked={prefs.showDollars}
+              hint="Prices stay in copper, silver, and gold. Dollars (≈ $ modern) are only a comparison for one gold piece. Off for players until they turn it on."
+              checked={showDollars}
               onChange={(showDollars) => setPrefs({ showDollars })}
             />
             <Switch

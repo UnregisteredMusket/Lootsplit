@@ -125,7 +125,8 @@ function layout(input: ShopPdfInput): string[] {
 function priceLabel(ask: number, input: ShopPdfInput): string {
   const coin = formatCopper(ask).replace("\u2212", "-");
   if (!input.showDollars) return coin;
-  return `${coin}  (${formatDollars(ask, input.gpDollars).replace("\u2212", "-")})`;
+  // Standard PDF fonts have no "≈", so the sheet spells the approximation out.
+  return `${coin}  (about ${formatDollars(ask, input.gpDollars).replace("\u2212", "-")} modern)`;
 }
 
 function detailLabel(line: StockLine): string {

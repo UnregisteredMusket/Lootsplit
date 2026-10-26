@@ -14,9 +14,16 @@ import { AppLink } from "./app-link";
 /**
  * "Show on map" at the foot of a Shop, NPC, Property, Listing, Exchange or Post card
  * (docs/MAP-TILES.md "Place hub"). It reads only the table this viewer already has, so a DM-only
- * or hidden pin reads exactly like "Not on a map yet" to players.
+ * or hidden pin reads exactly like "No map location" to players.
  */
-export function MapRecordStrip({ reference }: { reference: MapRecordReference }) {
+export function MapRecordStrip({
+  reference,
+  hideUnplacedForPlayers = false,
+}: {
+  reference: MapRecordReference;
+  /** A shop page hides the strip from players when there is no map location to open. */
+  hideUnplacedForPlayers?: boolean;
+}) {
   const seat = useSeat(),
     dm = seat.role === "dm",
     table = useWorldTable();
@@ -32,7 +39,7 @@ export function MapRecordStrip({ reference }: { reference: MapRecordReference })
     status.kind === "none"
       ? dm
         ? ["Not placed", "Not on any map yet."]
-        : ["Not on a map yet", "The DM hasn't placed this one."]
+        : ["No map location", ""]
       : status.kind === "several"
         ? [
             `On ${status.spots.length} maps`,
@@ -45,11 +52,12 @@ export function MapRecordStrip({ reference }: { reference: MapRecordReference })
           : status.kind === "approximate"
             ? [dm ? "Approximate" : "On the map", `${first.map.name} · shown at its location`]
             : [dm ? "Placed" : "On the map", first.map.name];
+  if (!dm && status.kind === "none" && hideUnplacedForPlayers) return null;
   return (
     <div className="map-record-strip" role="group" aria-label="Map">
       <MapPin size={16} aria-hidden="true" />
       <p>
-        <strong>{state[0]}</strong> <span>{state[1]}</span>
+        <strong>{state[0]}</strong> {state[1] ? <span>{state[1]}</span> : null}
       </p>
       {first && (
         <AppLink className="map-record-strip-action" href={recordMapHref(first.map.id, reference)}>

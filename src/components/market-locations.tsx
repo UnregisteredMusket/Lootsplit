@@ -1,6 +1,6 @@
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { SearchSelect } from "@/components/search-select";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
@@ -349,86 +349,6 @@ function LocationEditor({
           Move assigned shops, child locations and the party before removing this location.
         </p>
       ) : null}
-    </form>
-  );
-}
-
-export function ShopLocationEditor({ shop }: { shop: Shop }) {
-  const { journal, commandOutcome } = useEconomy(),
-    market = readMarketLocations(journal.market);
-  const [baseline, setBaseline] = useState({
-    locationId: shop.locationId ?? null,
-    image: shop.image ?? null,
-  });
-  const [locationId, setLocationId] = useState(shop.locationId ?? ""),
-    [image, setImage] = useState(shop.image);
-  const [busy, setBusy] = useState(false),
-    [imageBusy, setImageBusy] = useState(false),
-    [error, setError] = useState("");
-  const dirty = locationId !== (baseline.locationId ?? "") || (image ?? null) !== baseline.image;
-  useEffect(() => {
-    if (dirty || busy || imageBusy) return;
-    setLocationId(shop.locationId ?? "");
-    setImage(shop.image);
-    setBaseline({ locationId: shop.locationId ?? null, image: shop.image ?? null });
-  }, [shop.locationId, shop.image, dirty, busy, imageBusy]);
-  useDraftGuard(!busy && (dirty || imageBusy), "shop location and image");
-  return (
-    <form
-      aria-label="Shop location and image"
-      className="space-y-3 rounded-sm border border-border p-3"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        setBusy(true);
-        setError("");
-        try {
-          const result = await commandOutcome({
-            kind: "shop-location",
-            shopId: shop.id,
-            before: baseline,
-            locationId: locationId || null,
-            image: image ?? null,
-          });
-          toast.success(mutationNotice(result, "Shop location and image saved."));
-          setBaseline({ locationId: locationId || null, image: image ?? null });
-        } catch (failure) {
-          setError(failure instanceof Error ? failure.message : "The shop could not be saved.");
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label className="block text-sm">
-        Shop availability
-        <SearchSelect
-          aria-label="Shop availability"
-          value={locationId}
-          disabled={busy}
-          onValueChange={(selectedValue) => setLocationId(selectedValue)}
-        >
-          <option value="">Campaignwide · available everywhere</option>
-          {LocationOptions({ market: market })}
-        </SearchSelect>
-      </label>
-      <p className="text-sm text-muted">
-        A shop assigned to a region, city or town is also available in its areas. Its address, stock
-        and trading rules stay configured below.
-      </p>
-      <MarketImageUpload
-        label="Shop image"
-        disabled={busy}
-        value={image}
-        onChange={setImage}
-        onBusyChange={setImageBusy}
-      />
-      {error ? (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-      <Button type="submit" disabled={busy || imageBusy || !dirty}>
-        Save shop location and image
-      </Button>
     </form>
   );
 }
