@@ -21,7 +21,8 @@ import { Shell } from "@/components/shell";
 import { PriceHarvest } from "@/components/price-harvest";
 import { ShopComposer } from "@/components/shop-composer";
 import { MarketBoard } from "@/components/market-board";
-import { GlobalCommodityMarket } from "@/components/commodity-board";
+import { TradeExchangeSection } from "@/components/market-exchange-section";
+import "@/components/shop-counter.css";
 import { EmptyState } from "@/components/terminal";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
@@ -138,34 +139,10 @@ function MarketPage() {
           </Button>
         ) : null}
       </div>
-      {ready && <GlobalCommodityMarket />}
-      {ready && <BlacksmithOrders/>}
-      {ready && <ServiceOrders />}
-      {ready ? <MarketLocationsPanel /> : null}
-      <BlackMarketToggle />
-      <AppLink className="settings-link" href="/features/economy?from=%2Fmarket">
-        Trade Exchanges · regional goods & seasonal market →
-      </AppLink>
-      {seat.role === "dm" && (
-        <AppLink className="settings-link" href="/features/time">
-          Session Time →
-        </AppLink>
-      )}
-      <div className="world-toolbar">
-        <AppLink className="settings-link" href="/features/npcs">
-          People & NPCs →
-        </AppLink>
-        <AppLink className="settings-link" href="/features/trading">
-          Trading & Barter →
-        </AppLink>
-        <AppLink className="settings-link" href="/maps">
-          Campaign maps →
-        </AppLink>
-      </div>
-      <AppLink className="settings-link mt-4" href="/features/properties?from=%2Fmarket">
-        Property listings · deeds & dwellings →
-      </AppLink>
-      <label className="relative mt-5 block">
+      <h2 className="market-section-title" id="shops-here">
+        Shops here
+      </h2>
+      <label className="relative mt-3 block">
         <Search className="absolute left-4 top-3.5 size-5 text-faint" aria-hidden="true" />
         <span className="sr-only">Search the market</span>
         <input
@@ -262,7 +239,7 @@ function MarketPage() {
           />
         </div>
       ) : null}
-      <ul className="market-grid mt-5 grid gap-3 md:grid-cols-2">
+      <ul className="market-grid mt-4 grid gap-3 md:grid-cols-2" aria-labelledby="shops-here">
         {filtered.map((shop) => {
           const lines = stock.filter((line) => line.shopId === shop.id);
           const tier =
@@ -336,11 +313,47 @@ function MarketPage() {
                     {shop.closed ? "Open" : "Close"}
                   </button>
                 </div>
-              ) : null}
+              ) : (
+                <div className="shop-actions">
+                  <Link
+                    className="quick-action"
+                    to="/shop/$shopId"
+                    params={{ shopId: shop.id }}
+                    aria-label={`Visit ${shop.name}`}
+                  >
+                    Visit
+                  </Link>
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
+      {ready ? <TradeExchangeSection /> : null}
+      <h2 className="market-section-title">More at the market</h2>
+      <div className="world-toolbar">
+        <AppLink className="settings-link" href="/features/npcs">
+          People & NPCs →
+        </AppLink>
+        <AppLink className="settings-link" href="/features/trading">
+          Trading & Barter →
+        </AppLink>
+        <AppLink className="settings-link" href="/maps">
+          Campaign maps →
+        </AppLink>
+      </div>
+      <AppLink className="settings-link mt-4" href="/features/properties?from=%2Fmarket">
+        Property listings · deeds & dwellings →
+      </AppLink>
+      {seat.role === "dm" && (
+        <AppLink className="settings-link" href="/features/time">
+          Session Time →
+        </AppLink>
+      )}
+      {ready && <BlacksmithOrders />}
+      {ready && <ServiceOrders />}
+      {ready ? <MarketLocationsPanel /> : null}
+      <BlackMarketToggle />
       {conditions.length > 0 ? (
         <section className="mt-5">
           <h2 className="text-sm font-medium text-muted">Market conditions</h2>

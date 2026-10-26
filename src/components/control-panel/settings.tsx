@@ -9,7 +9,7 @@ import { TestModeSettings } from "@/components/test-mode";
 import { ChevronDown, LogIn } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import { FANTASY_LOOKS } from "@/lib/quire/theme";
-import { usePrefs } from "@/lib/quire/prefs";
+import { usePrefs, useShowDollars } from "@/lib/quire/prefs";
 import { Campaigns } from "@/components/campaigns";
 type Group = {
   name: string;
@@ -31,6 +31,7 @@ export function ManagementPanel({
   onRoleChange: () => void;
 }) {
   const { prefs, setPrefs } = usePrefs(),
+    showDollars = useShowDollars(),
     [expanded, setExpanded] = useState("");
   const appearance = (
     <div className="setting-preferences">
@@ -65,7 +66,7 @@ export function ManagementPanel({
       <label className="flex gap-3 items-center">
         <input
           type="checkbox"
-          checked={prefs.showDollars}
+          checked={showDollars}
           onChange={(e) => setPrefs({ showDollars: e.target.checked })}
         />
         Show dollar estimates

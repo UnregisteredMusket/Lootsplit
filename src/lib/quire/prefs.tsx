@@ -2,6 +2,8 @@ import { configureSound, unlockSound, playSound } from "./sound.ts";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useEconomy } from "./economy-context.tsx";
 import { formatDollars } from "./money.ts";
+import { useSeat } from "./seat.tsx";
+import { dollarsChoiceFrom, dollarsShown, markDollarsChoice, modernDollarText } from "./dollar-prefs.ts";
 import { applyTheme, DEFAULT_ACCENT, DEFAULT_GROUND, type Appearance } from "./theme.ts";
 import type { Wealth } from "./types.ts";
 
@@ -15,6 +17,11 @@ export type AppPrefs = {
   ambienceVolume: number;
   rollMode: "manual" | "virtual";
   showDollars: boolean;
+  /**
+   * True once this device chose "Show dollars" itself. Until then the seat decides (design
+   * decision 2, 2026-10-25): DM seats show modern prices, player seats do not.
+   */
+  dollarsChosen: boolean;
   confirmRemoves: boolean;
   repriceOnRealm: boolean;
   nightReading: boolean;
@@ -45,6 +52,7 @@ export const DEFAULT_PREFS: AppPrefs = {
   ambienceVolume: 0.15,
   rollMode: "virtual",
   showDollars: true,
+  dollarsChosen: false,
   confirmRemoves: false,
   repriceOnRealm: false,
   nightReading: false,
@@ -94,6 +102,7 @@ export function normalizePrefs(input: Partial<AppPrefs> | null | undefined): App
     ambienceVolume: num(input?.ambienceVolume, 0, 1, 0.15),
     rollMode: input?.rollMode === "manual" ? "manual" : "virtual",
     showDollars: flag(input?.showDollars, DEFAULT_PREFS.showDollars),
+    dollarsChosen: dollarsChoiceFrom(input),
     confirmRemoves: flag(input?.confirmRemoves, DEFAULT_PREFS.confirmRemoves),
     repriceOnRealm: flag(input?.repriceOnRealm, DEFAULT_PREFS.repriceOnRealm),
     nightReading: flag(input?.nightReading, DEFAULT_PREFS.nightReading),
@@ -128,7 +137,15 @@ export function loadPrefs(): AppPrefs {
 
 function storePrefs(prefs: AppPrefs) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(prefs));
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(prefs));
+  } catch {
+    /* Blocked storage keeps the choice for this page only. */
+  }
+}
+
+function applyPrefsPatch(current: AppPrefs, patch: Partial<AppPrefs>): AppPrefs {
+  return normalizePrefs({ ...current, ...markDollarsChoice(patch) });
 }
 
 type PrefsApi = {
@@ -182,7 +199,7 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
       prefs,
       setPrefs: (patch) => {
         setPrefsState((current) => {
-          const next = normalizePrefs({ ...current, ...patch });
+          const next = applyPrefsPatch(current, patch);
           storePrefs(next);
           return next;
         });
@@ -204,8 +221,16 @@ export function usePrefs() {
   return value;
 }
 
-export function useDollarText() {
+/** "Show dollars" as it applies to the current seat (see `dollarsShown`). */
+export function useShowDollars(): boolean {
   const { prefs } = usePrefs();
+  return dollarsShown(prefs, useSeat().role);
+}
+
+/** "≈ $12,500 modern" for a copper amount, or null when modern prices are off for this seat. */
+export function useDollarText() {
+  const shown = useShowDollars();
   const { realm } = useEconomy();
-  return (copper: number) => (prefs.showDollars ? formatDollars(copper, realm.gpDollars) : null);
+  return (copper: number) =>
+    shown ? modernDollarText(formatDollars(copper, realm.gpDollars)) : null;
 }

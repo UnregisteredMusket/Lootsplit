@@ -19,6 +19,7 @@ const featureAudits = {
   "party-split": "scripts/party-split-browser-audit.mjs",
   services: "scripts/services-browser-audit.mjs",
   "themed-confirm": "scripts/themed-confirm-browser-audit.mjs",
+  "market-shops": "scripts/market-shops-browser-audit.mjs",
   a11y: "scripts/a11y-browser-audit.mjs",
   "map-controls": "scripts/map-controls-browser-audit.mjs",
 };

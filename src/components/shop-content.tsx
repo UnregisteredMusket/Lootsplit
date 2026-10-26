@@ -3,10 +3,10 @@ import { useSeatGroups } from "@/lib/quire/use-seat-groups";
 import { MapRecordStrip } from "./map-record-strip";
 import { BlacksmithServices } from "@/components/blacksmith-services";
 import { ShopServices } from "@/components/service-providers";
-import { BlackMarketVendor } from "@/components/black-market";
 import { shopVisible } from "@/lib/quire/world";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
-import { ShopLocationEditor } from "@/components/market-locations";
+import { ShopEditor } from "@/components/shop-editor";
+import "./shop-counter.css";
 import { readMarketLocations, locationLabel } from "@/lib/quire/shop-locations";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { FinanceReadiness } from "@/components/finance-input";
@@ -16,11 +16,10 @@ import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { toast } from "sonner";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
-import { SHOP_KINDS, WEALTHS } from "@/lib/quire/labels";
 import {
   charismaOffPercent,
   formatCopper,
@@ -29,14 +28,15 @@ import {
   toCopper,
 } from "@/lib/quire/money";
 import { charismaScore } from "@/lib/quire/sheet";
-import { useDollarText, usePrefs } from "@/lib/quire/prefs";
+import { useDollarText, useShowDollars } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
-import { realmNote, scarcityNote } from "@/lib/quire/scale";
 import { downloadShopPdf } from "@/lib/quire/shop-pdf";
-import type { Holding, Shop, StockLine, Wealth } from "@/lib/quire/types";
+import type { Holding, Shop, StockLine } from "@/lib/quire/types";
+import { activeCampaignId } from "@/lib/quire/campaign-context";
+import { initialPayer, rememberPayer, rememberedPayer } from "@/lib/quire/shop-counter-memory";
 import { RemoveButton } from "@/components/quire-ui";
 import { CatalogStockPicker, ShopStockList } from "@/components/shop-stock-manager";
-import { Button, Confirm, Field, Segmented, Slider, TextInput } from "@/components/ui";
+import { Button, Confirm, Field, Segmented, TextInput } from "@/components/ui";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export function ShopContent({
@@ -51,7 +51,7 @@ export function ShopContent({
 }) {
   const navigate = useNavigate();
   const economy = useEconomy();
-  const { prefs } = usePrefs();
+  const showDollars = useShowDollars();
   const seat = useSeat();
   const groups = useSeatGroups();
   const shop = economy.shops.find((item) => item.id === shopId);
@@ -61,15 +61,27 @@ export function ShopContent({
       ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id))
       : economy.purses;
   const [mode, setMode] = useState<"counter" | "edit">("counter");
-  const [purseId, setPurseId] = useState(
-    spendable.find((purse) => purse.kind === "party")?.id ?? spendable[0]?.id ?? "",
+  const [editDirty, setEditDirty] = useState(false);
+  // DM "Sell to <character>": the buyer is chosen once and each row becomes one tap.
+  const [sellTo, setSellTo] = useState(false);
+  const [purseId, setPurseId] = useState(() =>
+    initialPayer(spendable, rememberedPayer(activeCampaignId(), shopId)),
   );
+  // Only the row being edited shows its cost and afterward-balance sentence.
+  const [activeRow, setActiveRow] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const characters = spendable.filter((purse) => purse.kind === "character");
+  const choices = sellTo && characters.length ? characters : spendable;
 
   useEffect(() => {
-    if (!spendable.some((purse) => purse.id === purseId) && spendable[0])
-      setPurseId(spendable[0].id);
-  }, [spendable, purseId]);
+    if (!choices.some((purse) => purse.id === purseId) && choices[0])
+      setPurseId(initialPayer(choices, rememberedPayer(activeCampaignId(), shopId)));
+  }, [choices, purseId, shopId]);
+
+  function choosePayer(id: string) {
+    setPurseId(id);
+    rememberPayer(activeCampaignId(), shopId, id);
+  }
 
   if (!economy.ready) {
     return (
@@ -107,166 +119,148 @@ export function ShopContent({
     );
   }
 
-  const viewing = seat.role === "player" ? "counter" : mode;
+  const dm = seat.role === "dm";
+  const viewing = dm ? mode : "counter";
+  const payer = economy.purses.find((purse) => purse.id === purseId);
+  const region = shop.locationId
+    ? locationLabel(readMarketLocations(economy.journal.market), shop.locationId)
+    : "";
+  const pdf = (
+    <Button
+      variant="secondary"
+      onClick={() => {
+        void downloadShopPdf({
+          shop,
+          lines,
+          showDollars,
+          gpDollars: economy.realm.gpDollars,
+        })
+          .then((saved) => {
+            if (saved) toast.success("Shop sheet downloaded.");
+          })
+          .catch((error: unknown) =>
+            toast.error(error instanceof Error ? error.message : "Could not share the shop sheet."),
+          );
+      }}
+    >
+      Share as PDF
+    </Button>
+  );
 
   return (
     <>
-      {seat.role === "dm" && <BlackMarketVendor key={shop.id} shop={shop} />}
-      <Link to="/market" search={{ book: "" }} className="text-sm text-muted">
-        Market
-      </Link>
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className={shop.closed ? "text-muted" : "text-positive"}>
-          {shop.closed ? "Closed · browsing only" : "Open for trading"}
-        </p>
-        {seat.role === "dm" ? (
-          <Button
-            variant="secondary"
-            onClick={async () => {
-              if (
-                shop.schedule &&
-                !(await requestConfirm({
-                  title: shop.closed ? "Open this shop by hand?" : "Close this shop by hand?",
-                  body: "Manually changing availability disables this shop’s schedule.",
-                  confirmLabel: shop.closed ? "Open shop" : "Close shop",
-                }))
-              )
-                return;
-              void economy.updateShop({ ...shop, closed: !shop.closed });
-            }}
-          >
-            {shop.closed ? "Open shop" : "Close shop"}
-          </Button>
-        ) : null}
-      </div>
-      {shop.image ? (
-        <img
-          src={shop.image}
-          alt={shop.name}
-          className="mt-3 max-h-72 w-full rounded-lg object-contain"
-        />
-      ) : null}
-      <p className="mt-2 text-sm text-muted">
-        {locationLabel(readMarketLocations(economy.journal.market), shop.locationId)}
-      </p>
-      {mapStrip && <MapRecordStrip reference={{ kind: "shop", id: shop.id }} />}
-      {viewing === "edit" ? (
-        <div className="mt-3 flex flex-col gap-3">
-          {/* Visible labels: a filled field keeps its meaning (WCAG 3.3.2). */}
-          <Field label="Shop name">
-            <TextInput
-              aria-label="Shop name"
-              defaultValue={shop.name}
-              key={shop.name}
-              onBlur={(event) => {
-                const name = event.target.value.trim();
-                if (name && name !== shop.name) void economy.updateShop({ ...shop, name });
-              }}
-              className="font-display text-2xl"
-            />
-          </Field>
-          <Field label="Shopkeeper">
-            <TextInput
-              aria-label="Shopkeeper"
-              defaultValue={shop.keeper}
-              key={`keeper-${shop.keeper}`}
-              onBlur={(event) =>
-                void economy.updateShop({ ...shop, keeper: event.target.value.trim() })
-              }
-            />
-          </Field>
-          <Field label="Shop location">
-            <TextInput
-              aria-label="Shop location"
-              defaultValue={shop.place}
-              key={`place-${shop.place}`}
-              onBlur={(event) =>
-                void economy.updateShop({ ...shop, place: event.target.value.trim() })
-              }
-            />
-          </Field>
-          <ShelfTuning shop={shop} />
-          <ShopLocationEditor key={shop.id} shop={shop} />
-        </div>
-      ) : (
-        <div className="mt-2">
-          <h1 className="font-display text-4xl tracking-tight">{shop.name}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {[shop.keeper, shop.place].filter(Boolean).join(" · ") || "No owner or location"} ·
-            sells at {Math.round(shop.sellRate * 100)}%, buys at {Math.round(shop.buyRate * 100)}%
-          </p>
-        </div>
-      )}
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-        {seat.role === "dm" ? (
-          <div className="sm:flex-1">
-            <Segmented
-              label="Shop mode"
-              value={mode}
-              onChange={setMode}
-              options={[
-                { value: "counter", label: "Counter" },
-                { value: "edit", label: "Edit" },
-              ]}
-            />
+      <header className="shop-header">
+        <Link to="/market" search={{ book: "" }} className="shop-header-back">
+          <span aria-hidden="true">← </span>Market
+        </Link>
+        <div className="shop-header-title">
+          {shop.image ? <img src={shop.image} alt={shop.name} className="shop-header-image" /> : null}
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-3xl leading-tight tracking-tight sm:text-4xl">
+              {shop.name}
+            </h1>
+            <p className="mt-1 text-sm text-muted">
+              {[shop.keeper, shop.place].filter(Boolean).join(" · ") || "No owner or location"}
+              {region && region !== shop.place ? ` · ${region}` : ""}
+            </p>
+            <p className="text-sm text-muted">
+              Sells at {Math.round(shop.sellRate * 100)}%, buys at {Math.round(shop.buyRate * 100)}%
+              {shop.blackMarket ? " · black market" : ""}
+            </p>
           </div>
-        ) : (
-          <p className="text-sm text-muted sm:flex-1">
-            You can buy and sell. Only the dungeon master can change prices.
-          </p>
-        )}
-        <Button
-          variant="secondary"
-          onClick={() => {
-            void downloadShopPdf({
-              shop,
-              lines,
-              showDollars: prefs.showDollars,
-              gpDollars: economy.realm.gpDollars,
-            })
-              .then((saved) => {
-                if (saved) toast.success("Shop sheet downloaded.");
-              })
-              .catch((error: unknown) =>
-                toast.error(
-                  error instanceof Error ? error.message : "Could not share the shop sheet.",
-                ),
-              );
-          }}
-        >
-          Share as PDF
-        </Button>
-      </div>
-      <label className="mt-4 block text-sm text-muted">
-        Paying from
-        <SearchSelect
-          aria-label="Paying from"
-          value={purseId}
-          onValueChange={(selectedValue) => setPurseId(selectedValue)}
-          className="mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
-        >
-          {[...spendable]
-            .sort(
-              (a, b) =>
-                Number(b.kind === "party") - Number(a.kind === "party") ||
-                a.name.localeCompare(b.name),
-            )
-            .map((purse) => (
-              <option key={purse.id} value={purse.id}>
-                {purse.kind === "party" ? `Party · ${purse.name}` : purse.name} ·{" "}
-                {formatCopper(toCopper(purse.coins))}
-              </option>
-            ))}
-        </SearchSelect>
-        {spendable.some((purse) => purse.kind === "party") ? (
-          <span className="mt-1 block">
-            The party option spends the shared account. A character spends their own.
-          </span>
+          {dm ? (
+            <OpenSwitch shop={shop} />
+          ) : (
+            <span className={shop.closed ? "shop-status text-muted" : "shop-status text-positive"}>
+              {shop.closed ? "Closed · browsing only" : "Open"}
+            </span>
+          )}
+        </div>
+        {dm ? (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="sm:flex-1">
+              <Segmented
+                label="Shop mode"
+                value={mode}
+                onChange={async (next) => {
+                  if (
+                    next === "counter" &&
+                    editDirty &&
+                    !(await requestConfirm({
+                      title: "Discard unsaved shop edits?",
+                      tone: "discard",
+                    }))
+                  )
+                    return;
+                  setMode(next);
+                }}
+                options={[
+                  { value: "counter", label: "Counter" },
+                  { value: "edit", label: "Edit" },
+                ]}
+              />
+            </div>
+            {pdf}
+          </div>
         ) : null}
-        <CharismaNote purseId={purseId} />
-      </label>
-      <BlacksmithServices shop={shop} purseId={purseId} />
-      <ShopServices shop={shop} purseId={purseId} />
+      </header>
+      {mapStrip && (
+        <MapRecordStrip reference={{ kind: "shop", id: shop.id }} hideUnplacedForPlayers />
+      )}
+      {viewing === "edit" ? (
+        <ShopEditor key={shop.id} shop={shop} onDirtyChange={setEditDirty} />
+      ) : (
+        <>
+          <div
+            className="shop-paybar"
+            role="group"
+            aria-label="Counter purse"
+          >
+            <label className="shop-paybar-choice">
+              <span className="shop-paybar-label">{sellTo ? "Sell to" : "Paying from"}</span>
+              <SearchSelect
+                aria-label={sellTo ? "Sell to" : "Paying from"}
+                value={purseId}
+                onValueChange={choosePayer}
+                className="min-h-11 w-full min-w-0 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
+              >
+                {[...choices]
+                  .sort(
+                    (a, b) =>
+                      Number(b.kind === "party") - Number(a.kind === "party") ||
+                      a.name.localeCompare(b.name),
+                  )
+                  .map((purse) => (
+                    <option key={purse.id} value={purse.id}>
+                      {purse.kind === "party" ? `Party · ${purse.name}` : purse.name} ·{" "}
+                      {formatCopper(toCopper(purse.coins))}
+                    </option>
+                  ))}
+              </SearchSelect>
+            </label>
+            {dm ? (
+              <label className="shop-paybar-mode">
+                <input
+                  type="checkbox"
+                  className="size-5"
+                  checked={sellTo}
+                  onChange={(event) => {
+                    setSellTo(event.target.checked);
+                    setActiveRow("");
+                  }}
+                />
+                Sell to a character
+              </label>
+            ) : null}
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            <CharismaNote purseId={purseId} dm={dm} />
+            {sellTo && payer
+              ? ` Each Sell button charges ${payer.name} for one item through the usual purchase.`
+              : ""}
+          </p>
+        </>
+      )}
       <TurnLock />
       {viewing === "edit" ? <CatalogStockPicker key={`catalog-${shop.id}`} shop={shop} /> : null}
       <ShopStockList
@@ -278,13 +272,26 @@ export function ShopContent({
             line={line}
             mode={viewing}
             purseId={purseId}
+            sellToName={dm && sellTo ? (payer?.name ?? "") : ""}
+            active={activeRow === line.id}
+            onActivate={() => setActiveRow(line.id)}
             sellRate={shop.sellRate * (shop.blackMarket ? (shop.blackMarketPremium ?? 1.5) : 1)}
             charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))}
             locked={!!shop.closed || (viewing === "counter" && turnIsLocked())}
           />
         )}
       />
+      <BlacksmithServices shop={shop} purseId={purseId} />
+      <ShopServices shop={shop} purseId={purseId} />
       {viewing === "edit" ? <AddGood shopId={shop.id} /> : <SellBox shopId={shop.id} />}
+      {!dm ? (
+        <div className="mt-6 flex flex-col gap-2">
+          <p className="text-sm text-muted">
+            You can buy and sell. Only the dungeon master can change prices.
+          </p>
+          {pdf}
+        </div>
+      ) : null}
       {viewing === "edit" ? (
         <button
           type="button"
@@ -312,117 +319,35 @@ export function ShopContent({
   );
 }
 
-function ShelfTuning({ shop }: { shop: Shop }) {
-  const { applyShop, updateShop, realm } = useEconomy();
-  const { prefs } = usePrefs();
-  const [scale, setScale] = useState(shop.priceScale);
-  const [sell, setSell] = useState(shop.sellRate);
-  const [buy, setBuy] = useState(shop.buyRate);
-
-  useEffect(() => {
-    setScale(shop.priceScale);
-    setSell(shop.sellRate);
-    setBuy(shop.buyRate);
-  }, [shop.id, shop.priceScale, shop.sellRate, shop.buyRate]);
-
+/** The DM's Open/Closed switch in the shop header. */
+function OpenSwitch({ shop }: { shop: Shop }) {
+  const { updateShop } = useEconomy();
+  const open = !shop.closed;
   return (
-    <div className="flex flex-col gap-3">
-      <SearchSelect
-        aria-label="Type of shop"
-        value={shop.category}
-        onValueChange={(selectedValue) =>
-          void updateShop({ ...shop, category: selectedValue as Shop["category"] })
-        }
-      >
-        {SHOP_KINDS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </SearchSelect>
-      <label className="flex min-h-11 items-center gap-2">
-        <input
-          type="checkbox"
-          checked={shop.acceptAnyCategory === true}
-          onChange={(e) => void updateShop({ ...shop, acceptAnyCategory: e.target.checked })}
-        />
-        DM exception: buy all item categories
-      </label>
-      <fieldset>
-        <legend className="text-sm">Additional categories this merchant buys</legend>
-        {SHOP_KINDS.filter((o) => o.value !== "mixed").map((o) => (
-          <label key={o.value} className="mr-3 inline-flex min-h-11 items-center gap-2">
-            <input
-              type="checkbox"
-              checked={(shop.acceptedCategories || [shop.category]).includes(o.value)}
-              onChange={(e) => {
-                const categories = new Set(shop.acceptedCategories || [shop.category]);
-                if (e.target.checked) categories.add(o.value);
-                else categories.delete(o.value);
-                void updateShop({ ...shop, acceptedCategories: [...categories] });
-              }}
-            />
-            {o.label}
-          </label>
-        ))}
-      </fieldset>
-      <div className="grid grid-cols-2 gap-2">
-        {WEALTHS.map((option) => (
-          <Button
-            key={option.value}
-            variant={shop.wealth === option.value ? "primary" : "secondary"}
-            onClick={() =>
-              void applyShop({
-                ...shop,
-                wealth: option.value as Wealth,
-                priceScale: scale,
-                sellRate: sell,
-                buyRate: buy,
-              })
-            }
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
-      <Slider
-        label="Base price multiplier"
-        min={0.5}
-        max={2.5}
-        step={0.05}
-        value={scale}
-        onChange={setScale}
-        onCommit={(value) =>
-          void applyShop({ ...shop, priceScale: value, sellRate: sell, buyRate: buy })
-        }
-        display={`${Math.round(scale * 100)}%`}
-      />
-      <Slider
-        label="Sells at"
-        min={0.5}
-        max={2}
-        step={0.05}
-        value={sell}
-        onChange={setSell}
-        onCommit={(value) => void updateShop({ ...shop, sellRate: value })}
-        display={`${Math.round(sell * 100)}%`}
-      />
-      <Slider
-        label="Buys at"
-        min={0.1}
-        max={1}
-        step={0.05}
-        value={buy}
-        onChange={setBuy}
-        onCommit={(value) => void updateShop({ ...shop, buyRate: value })}
-        display={`${Math.round(buy * 100)}%`}
-      />
-      <p className="text-sm text-muted">
-        {realmNote(realm, { dollars: prefs.showDollars })} {scarcityNote(realm.scarcity)} Updating
-        prices uses the modifiers above. Dollars are a comparison for one gold piece, not a second
-        price.
-      </p>
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={open}
+      aria-label="Open for trading"
+      className="shop-open-switch"
+      onClick={async () => {
+        if (
+          shop.schedule &&
+          !(await requestConfirm({
+            title: shop.closed ? "Open this shop by hand?" : "Close this shop by hand?",
+            body: "Manually changing availability disables this shop’s schedule.",
+            confirmLabel: shop.closed ? "Open shop" : "Close shop",
+          }))
+        )
+          return;
+        void updateShop({ ...shop, closed: !shop.closed });
+      }}
+    >
+      <span className="shop-open-track" aria-hidden="true">
+        <span className="shop-open-thumb" />
+      </span>
+      <span aria-hidden="true">{open ? "Open" : "Closed"}</span>
+    </button>
   );
 }
 
@@ -443,25 +368,22 @@ function TurnLock() {
   return <p className="mt-3 text-sm text-muted">It is {table.who}'s turn. Buying waits.</p>;
 }
 
-function CharismaNote({ purseId }: { purseId: string }) {
+function CharismaNote({ purseId, dm }: { purseId: string; dm: boolean }) {
   const { sheets, purses } = useEconomy();
   const purse = purses.find((item) => item.id === purseId);
-  if (!purse || purse.kind !== "character")
-    return <span className="mt-1 block">The party fund pays the listed price.</span>;
+  if (!purse) return null;
+  if (purse.kind !== "character")
+    return <>The party fund pays the listed price from the shared account.</>;
   const score = charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
+  // Importing a sheet is the DM's setup step; players are not shown it.
   if (score === null)
-    return (
-      <span className="mt-1 block">
-        Import this character's 2014 sheet to take the Charisma discount.
-      </span>
-    );
+    return dm ? <>Import this character's 2014 sheet to take the Charisma discount.</> : null;
   const percent = charismaOffPercent(score);
-  if (percent <= 0)
-    return <span className="mt-1 block">Charisma {score} pays the listed price.</span>;
+  if (percent <= 0) return <>Charisma {score} pays the listed price.</>;
   return (
-    <span className="mt-1 block">
+    <>
       Charisma {score} takes {percent}% off every purchase.
-    </span>
+    </>
   );
 }
 
@@ -469,6 +391,9 @@ function StockRow({
   line,
   mode,
   purseId,
+  sellToName = "",
+  active = false,
+  onActivate,
   sellRate,
   charisma,
   locked = false,
@@ -476,6 +401,11 @@ function StockRow({
   line: StockLine;
   mode: "counter" | "edit";
   purseId: string;
+  /** DM "Sell to" mode: the buyer's name; the row becomes one tap for one item. */
+  sellToName?: string;
+  /** This row is being edited, so it shows the cost and afterward balance. */
+  active?: boolean;
+  onActivate?: () => void;
   sellRate: number;
   charisma: number | null;
   locked?: boolean;
@@ -483,9 +413,11 @@ function StockRow({
   const { buy, updateStock, deleteStock, purses } = useEconomy();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
+  const oneTap = !!sellToName;
+  const pending = useRef(false);
   // One command ID per purchase, reused if the same purchase is retried.
-  const action = useCommandId(`${purseId}|${qty}`);
-  const asked = Number(qty);
+  const action = useCommandId(`${purseId}|${oneTap ? "1" : qty}`);
+  const asked = oneTap ? 1 : Number(qty);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -498,10 +430,45 @@ function StockRow({
   const unit = priceAfterCharisma(asking, charisma);
   const price = unit * asked;
   const reduced = unit !== asking;
+  const modern = dollars(unit);
 
   if (mode === "counter") {
+    const disabled =
+      busy ||
+      readinessLocked ||
+      locked ||
+      !purseId ||
+      !Number.isSafeInteger(asked) ||
+      asked < 1 ||
+      price > available ||
+      (line.quantity !== null && asked > line.quantity);
+    async function purchase() {
+      // A second tap before React re-renders the disabled button must not start another buy.
+      if (pending.current) return;
+      pending.current = true;
+      setBusy(true);
+      setError("");
+      setNotice("");
+      let settle = 0;
+      try {
+        const outcome = await buy(line.id, purseId, asked, { commandId: action.commandId });
+        action.renew();
+        setNotice(
+          mutationNotice(outcome, oneTap ? `Sold 1 to ${sellToName}.` : "Purchase recorded."),
+        );
+        // One-tap selling: an accidental double tap is one sale, so the row rests briefly.
+        if (oneTap) settle = 700;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Purchase failed.");
+      } finally {
+        window.setTimeout(() => {
+          pending.current = false;
+          setBusy(false);
+        }, settle);
+      }
+    }
     return (
-      <li className="flex flex-wrap items-center gap-3 py-3">
+      <li className="shop-row flex flex-wrap items-center gap-x-3 gap-y-1 py-3" data-active={active || undefined}>
         <span className="min-w-0 flex-1">
           <span className="block">
             <FantasyIcon entry={line} className="fantasy-inline" />
@@ -510,50 +477,39 @@ function StockRow({
           <span className="text-sm text-muted">
             {formatCopper(unit)}
             {reduced ? ` · ${percent}% off · was ${formatCopper(asking)}` : ""}
-            {dollars(unit) ? ` · ${dollars(unit)}` : ""}
             {line.quantity === null ? "" : ` · ${line.quantity} left`}
+            {modern ? <span className="shop-row-modern"> · {modern}</span> : null}
           </span>
         </span>
-        <input
-          aria-label={`Quantity of ${line.name}`}
-          value={qty}
-          onChange={(event) => setQty(event.target.value)}
-          inputMode="numeric"
-          className="h-11 w-16 rounded-sm border border-border bg-subtle px-2 text-center text-base text-fg"
-        />
-        <Button
-          disabled={
-            busy ||
-            readinessLocked ||
-            locked ||
-            !purseId ||
-            !Number.isSafeInteger(asked) ||
-            asked < 1 ||
-            price > available ||
-            (line.quantity !== null && asked > line.quantity)
-          }
-          onClick={async () => {
-            setBusy(true);
-            setError("");
-            setNotice("");
-            try {
-              const outcome = await buy(line.id, purseId, asked, { commandId: action.commandId });
-              action.renew();
-              setNotice(mutationNotice(outcome, "Purchase recorded."));
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Purchase failed.");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Buy {formatCopper(price)}
-        </Button>
-        <p className="w-full text-sm">
-          {Number.isSafeInteger(asked) && asked > 0
-            ? `${asked} × ${formatCopper(unit)} = ${formatCopper(price)}. Available ${formatCopper(available)}; afterward ${formatCopper(available - price)}.`
-            : "Choose a whole quantity of at least one."}
-        </p>
+        {oneTap ? (
+          <Button disabled={disabled} onClick={() => void purchase()}>
+            Sell 1 · {formatCopper(price)}
+          </Button>
+        ) : (
+          <>
+            <input
+              aria-label={`Quantity of ${line.name}`}
+              value={qty}
+              onFocus={onActivate}
+              onChange={(event) => {
+                setQty(event.target.value);
+                onActivate?.();
+              }}
+              inputMode="numeric"
+              className="h-11 w-16 rounded-sm border border-border bg-subtle px-2 text-center text-base text-fg"
+            />
+            <Button disabled={disabled} onClick={() => void purchase()}>
+              Buy {formatCopper(price)}
+            </Button>
+          </>
+        )}
+        {active && !oneTap ? (
+          <p className="w-full text-sm" aria-live="polite">
+            {Number.isSafeInteger(asked) && asked > 0
+              ? `${asked} × ${formatCopper(unit)} = ${formatCopper(price)}. Available ${formatCopper(available)}; afterward ${formatCopper(available - price)}.`
+              : "Choose a whole quantity of at least one."}
+          </p>
+        ) : null}
         {error && <p role="alert">{error}</p>}
         {notice && (
           <p role="status">

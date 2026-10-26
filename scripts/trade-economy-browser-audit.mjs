@@ -16,6 +16,13 @@ import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { readFileSync } from "node:fs";
 
+/** Market folds the global board into "Trade exchange · N goods" (remembered per device). */
+async function openExchangeBoard(page) {
+  const board = page.getByRole("region", { name: "Trade exchange", exact: true }).locator("details");
+  await board.waitFor();
+  if (!(await board.evaluate((d) => d.open))) await board.locator("summary").click();
+  await expect(page.locator("#global-market")).toBeVisible();
+}
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(
   origin,
@@ -748,6 +755,7 @@ async function commodityBoardViews(page, width) {
   });
   const documentId = await page.evaluate(() => window.__commodityDocument);
   await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  await openExchangeBoard(page);
   await expect(page.getByRole("heading", { name: "Global market", exact: true })).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Global commodity quotes", exact: true }).getByRole("link"),
@@ -903,6 +911,7 @@ async function cityAccessAndCatalogue(page, width) {
   await page.evaluate(() => (window.__cityMarketDocument = crypto.randomUUID()));
   const documentId = await page.evaluate(() => window.__cityMarketDocument);
   await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  await openExchangeBoard(page);
   const location = page.getByRole("combobox", { name: "Party location", exact: true });
   for (const id of ["", "coast", "desert", "village", "village-square"]) {
     await chooseOption(location, id);
@@ -927,6 +936,7 @@ async function cityAccessAndCatalogue(page, width) {
   await expect(exchange.getByRole("button", { name: "Buy commodity", exact: true })).toBeDisabled();
   await expect(exchange).toContainText("Visit a city to trade");
   await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  await openExchangeBoard(page);
   for (const id of ["port", "dock"]) {
     await chooseOption(location, id);
     await expect(

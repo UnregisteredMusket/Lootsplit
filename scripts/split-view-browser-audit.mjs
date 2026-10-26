@@ -155,6 +155,9 @@ try {
   await chooseOption(shop.getByLabel("Paying from", { exact: true }), "mira");
   const row = shop.locator("li").filter({ has: page.getByLabel("Quantity of Bedroll", { exact: true }) });
   await expect(row.getByRole("button", { name: /^Buy / })).toBeEnabled();
+  // Only the row being edited explains its cost and the balance afterward.
+  await row.getByLabel("Quantity of Bedroll", { exact: true }).focus();
+  await expect(row).toContainText("afterward");
   const rowText = await row.innerText();
   const stockBefore = Number(/(\d+) left/.exec(rowText)[1]);
   const afterward = copper(/afterward ([^.]+)\./.exec(rowText)[1]);

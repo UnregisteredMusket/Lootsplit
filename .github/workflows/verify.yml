@@ -303,6 +303,9 @@ jobs:
       - name: dev-services
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-services 300 node --experimental-strip-types scripts/services-browser-audit.mjs
+      - name: dev-market-shops
+        if: matrix.group == 'desktop'
+        run: node scripts/recovery-step.mjs dev-market-shops 240 node scripts/market-shops-browser-audit.mjs
       - name: dev-desktop
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs

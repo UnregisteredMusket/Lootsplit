@@ -1,0 +1,12 @@
+{
+  "title": "Market and shop counter",
+  "summary": "The Market now opens with the shops you can visit, and a shop's counter keeps who is paying in view while you browse.",
+  "items": [
+    "Market starts with \"Shops here\". The trade exchange is a short summary you can open for the full board, and your device remembers whether you left it open.",
+    "A shop page starts with its name, keeper and place. DMs get an Open/Closed switch there, with Counter and Edit tabs below it.",
+    "A \"Paying from\" bar stays in view while you scroll and remembers who last paid at each shop. Only the row you are changing shows its cost and your balance afterward.",
+    "DMs can pick \"Sell to a character\" once and sell each item with one tap.",
+    "Shop editing has visible labels and one Save changes bar that reports each part.",
+    "Modern dollar estimates are labelled \"≈ $… modern\". They are off by default for players and stay on for DMs. Show dollars still changes this on any device."
+  ]
+}
