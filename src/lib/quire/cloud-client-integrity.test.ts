@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
-import { applyCommand, commandSchema, tablePatch, type Command } from "./commands.ts";
+import { applyCommand, commandSchema, compactPatch, tablePatch, type Command } from "./commands.ts";
 import { sameCommand } from "./command-identity.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { fromCopper, toCopper } from "./money.ts";
@@ -12,31 +12,85 @@ import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
 const source = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
 
 test("actual conditional refresh retains pending work and attention, updates encounter policy and leaves manual refresh complete", async () => {
-  const sessionValue = { code: "TEST", token: "token", seatId: "player", revision: 2, userId: "legacy-linked-account-cache", pending: [{ id: "unsent" }] };
-  const view = { error: "Retain recoverable attention", encounterActive: false, status: "attention" };
-  let polls = 0, pulls = 0, accepts = 0;
+  const sessionValue = {
+    code: "TEST",
+    token: "token",
+    seatId: "player",
+    revision: 2,
+    userId: "legacy-linked-account-cache",
+    pending: [{ id: "unsent" }],
+  };
+  const view = {
+    error: "Retain recoverable attention",
+    encounterActive: false,
+    status: "attention",
+  };
+  let polls = 0,
+    pulls = 0,
+    accepts = 0;
   let tableChangedSignal: boolean | undefined;
-  const body = source.slice(source.indexOf("async function refresh("), source.indexOf("export async function refreshShared()"));
-  const refresh = new Function("context", "readUnchangedRoom", stripTypeScriptTypes(`
+  const body = source.slice(
+    source.indexOf("async function refresh("),
+    source.indexOf("export async function refreshShared()"),
+  );
+  const refresh = new Function(
+    "context",
+    "readUnchangedRoom",
+    stripTypeScriptTypes(`
     const {sessionValue,view,pollCloudTable,pullCloudTable,accept,signal}=context;
     const session=()=>sessionValue,key=()=>"campaign";
     const acceptedPoll={campaignKey:key(),token:sessionValue.token,seatId:sessionValue.seatId,revision:sessionValue.revision};
     const publish=(patch,dataChanged)=>{signal(dataChanged);Object.assign(view,patch);};
     ${body}
-  `) + "; return refresh;")({ sessionValue, view,
-    signal: (changed: boolean) => { tableChangedSignal = changed; },
-    pollCloudTable: async () => { polls++;return { code: "TEST", seatId: "player", revision: 2, unchanged: true,
-      protocol: "lootsplit.room.unchanged.v1", encounterActive: true }; },
-    pullCloudTable: async () => { pulls++;return {}; },
-    accept: async () => { accepts++; },
-  }, readUnchangedRoom);
+  `) + "; return refresh;",
+  )(
+    {
+      sessionValue,
+      view,
+      signal: (changed: boolean) => {
+        tableChangedSignal = changed;
+      },
+      pollCloudTable: async () => {
+        polls++;
+        return {
+          code: "TEST",
+          seatId: "player",
+          revision: 2,
+          unchanged: true,
+          protocol: "lootsplit.room.unchanged.v1",
+          encounterActive: true,
+        };
+      },
+      pullCloudTable: async () => {
+        pulls++;
+        return {};
+      },
+      accept: async () => {
+        accepts++;
+      },
+    },
+    readUnchangedRoom,
+  );
   await refresh(true);
-  assert.equal(polls, 1);assert.equal(pulls, 0);assert.equal(accepts, 0);
-  assert.equal(view.encounterActive, true);assert.equal(view.error, "Retain recoverable attention");
-  assert.equal(tableChangedSignal, false, "A policy/status update must not announce a database change");
-  assert.equal(view.status, "attention");assert.deepEqual(sessionValue.pending, [{ id: "unsent" }]);
-  await refresh();assert.equal(pulls, 1);assert.equal(accepts, 1);
-  sessionValue.revision = 3;await refresh(true);assert.equal(pulls, 2);assert.equal(polls, 1);
+  assert.equal(polls, 1);
+  assert.equal(pulls, 0);
+  assert.equal(accepts, 0);
+  assert.equal(view.encounterActive, true);
+  assert.equal(view.error, "Retain recoverable attention");
+  assert.equal(
+    tableChangedSignal,
+    false,
+    "A policy/status update must not announce a database change",
+  );
+  assert.equal(view.status, "attention");
+  assert.deepEqual(sessionValue.pending, [{ id: "unsent" }]);
+  await refresh();
+  assert.equal(pulls, 1);
+  assert.equal(accepts, 1);
+  sessionValue.revision = 3;
+  await refresh(true);
+  assert.equal(pulls, 2);
+  assert.equal(polls, 1);
 });
 const give = (id: string, copper: number): Command => ({
   id,
@@ -112,7 +166,9 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     "applyCommand",
     "fail",
     "sameCommand",
-    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) + "; return accept;",
+    "compactPatch",
+    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) +
+      "; return accept;",
   )(
     () => session,
     readRoomResponse,
@@ -125,7 +181,10 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     () => ({}),
     () => {},
     // A preview conflict is published as attention directly (no data change).
-    (next: { error?: string }) => { Object.assign(view, next); if (next.error) error = next.error; },
+    (next: { error?: string }) => {
+      Object.assign(view, next);
+      if (next.error) error = next.error;
+    },
     () => {},
     applyCommand,
     (e: Error) => {
@@ -133,12 +192,21 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
       view.error = e.message;
     },
     sameCommand,
+    compactPatch,
   );
-  return { session, remote, accept, displayed: () => displayed, error: () => error, staged: () => view.staged };
+  return {
+    session,
+    remote,
+    accept,
+    displayed: () => displayed,
+    error: () => error,
+    staged: () => view.staged,
+  };
 }
 
 test("the saved-turn readout counts only exact accepted draft actions, excluding conflicts and receipts", async () => {
-  const a = give("saved-turn-action", 100), b = give("device-only-action", 200);
+  const a = give("saved-turn-action", 100),
+    b = give("device-only-action", 200);
   const partial = acceptance([a, b], [], [a]);
   await partial.accept(partial.remote);
   assert.equal(partial.staged(), 1);
@@ -164,11 +232,11 @@ test("actual acceptance drops acknowledged delayed drafts and hydrates the autho
   assert.equal(h.displayed()!.ledger.length, 2);
 });
 test("a persisted revision cannot skip full hydration in a fresh document", async () => {
-  const h = acceptance([],[],[]);
+  const h = acceptance([], [], []);
   h.session.revision = h.remote.revision;
   await h.accept(h.remote);
   assert.ok(h.displayed());
-  assert.deepEqual(h.displayed(),h.remote.table);
+  assert.deepEqual(h.displayed(), h.remote.table);
 });
 test("actual acceptance rejects incomplete room replies before changing pending work", async () => {
   const command = give("retain-after-incomplete-reply", 100);
@@ -755,6 +823,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     "start",
     "sameCommand",
     "readRoomResponse",
+    "compactPatch",
     stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) +
       "; return {queueCommand, runSharedMutation, captureMutationScope, retryPending};",
   )(
@@ -787,6 +856,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     () => {},
     sameCommand,
     readRoomResponse,
+    compactPatch,
   );
   return {
     ...functions,
@@ -941,7 +1011,10 @@ test("a retried user action with its command ID is queued and applied once (revi
   assert.equal(lost.session().pending.length, 1);
   assert.equal(toCopper(lost.authoritative().purses[1]!.coins), 100);
   // The same ID for different content is refused, leaving the queue as it was.
-  await assert.rejects(lost.queueCommand({ ...give, copper: 150 }), /already used for a different action/);
+  await assert.rejects(
+    lost.queueCommand({ ...give, copper: 150 }),
+    /already used for a different action/,
+  );
   assert.equal(lost.session().pending.length, 1);
   // Once committed, the room skips the seen ID if the action is retried.
   const live = outcomeHarness();
