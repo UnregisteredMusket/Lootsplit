@@ -41,6 +41,7 @@ test("an empty or unknown hash keeps the current section", () => {
   assert.equal(accountTabForHash("#", "member"), null);
   assert.equal(accountTabForHash("#account-sign-in", "member"), null);
   assert.equal(accountTabForHash("#purse-123", "member"), null);
+  assert.equal(accountTabForHash("#%E0%A4%A", "member"), null);
 });
 
 test("only staff roles get the Administration section", () => {

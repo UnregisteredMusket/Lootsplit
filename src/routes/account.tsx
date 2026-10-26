@@ -274,7 +274,12 @@ function Account() {
       if (!next) return;
       setTab(next);
       // The target was hidden when the browser looked for it; scroll once its panel shows.
-      const id = decodeURIComponent(window.location.hash.slice(1));
+      let id = "";
+      try {
+        id = decodeURIComponent(window.location.hash.slice(1));
+      } catch {
+        return;
+      }
       requestAnimationFrame(() => {
         const target = document.getElementById(id);
         if (target && !ACCOUNT_PANEL_IDS.has(id)) target.scrollIntoView({ block: "start" });

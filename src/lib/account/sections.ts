@@ -61,7 +61,12 @@ export function accountTabForHash(
   hash: string,
   role: AccountSiteRole | undefined,
 ): AccountTab | null {
-  const id = decodeURIComponent(hash.replace(/^#/, "")).trim();
+  let id = "";
+  try {
+    id = decodeURIComponent(hash.replace(/^#/, "")).trim();
+  } catch {
+    return null;
+  }
   if (!id) return null;
   const tab: AccountTab | null =
     ANCHOR_TABS[id] ??
