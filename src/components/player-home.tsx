@@ -8,6 +8,9 @@ import { characterSheet } from "@/lib/characters/campaign-sheet.mjs";
 import { Guide } from "./guide";
 import { LedgerArt } from "./ledger-art";
 import { PlayerQuestHome } from "./quests";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { dismissJoinTips, joinTipsOffered } from "@/lib/quire/join-memory";
 
 // Fixed player services share the existing destination labels and artwork.
 const playerServices = normalizeShortcuts(null, "player").map((item) =>
@@ -57,6 +60,7 @@ export function PlayerHome() {
             );
           })
         )}
+        {ready && mine.length > 0 && <JoinTips sheetHref={`/characters?id=${encodeURIComponent(`party:${mine[0]!.id}`)}`} />}
         {ready && mine.length > 0 && <PlayerQuestHome />}
         <AppLink className="settings-link" href="/share">
           Campaign, messages & session status →
@@ -83,5 +87,44 @@ export function PlayerHome() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** Three first steps after joining a room (plan P3, Q16), shown until dismissed. */
+function JoinTips({ sheetHref }: { sheetHref: string }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(joinTipsOffered()), []);
+  if (!open) return null;
+  return (
+    <section className="join-tips" aria-label="Getting started">
+      <div className="join-tips-heading">
+        <h2>Getting started</h2>
+        <button
+          type="button"
+          className="header-icon"
+          aria-label="Dismiss getting started tips"
+          onClick={() => {
+            dismissJoinTips();
+            setOpen(false);
+          }}
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <ol>
+        <li>
+          <AppLink href={sheetHref}>Sheet</AppLink>
+          <span>Your hit points, attacks, spells and dice.</span>
+        </li>
+        <li>
+          <AppLink href="/party">Inventory &amp; coins</AppLink>
+          <span>What you carry and your share of the purse.</span>
+        </li>
+        <li>
+          <AppLink href="/share?chat=1">Chat</AppLink>
+          <span>Talk with your party and your DM.</span>
+        </li>
+      </ol>
+    </section>
   );
 }

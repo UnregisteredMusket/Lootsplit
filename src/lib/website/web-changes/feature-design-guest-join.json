@@ -1,0 +1,12 @@
+{
+  "title": "Joining a room is quicker",
+  "summary": "A join link now goes straight to choosing your character, and you start on Home.",
+  "items": [
+    "Opening a join link finds the room's characters at once; there is no Find characters step.",
+    "The join card asks only for your character and your name, and remembers your name for next time.",
+    "A missing name or a mistyped room code is explained under the field.",
+    "Recovery, backup and file-sharing tools fold into one group until you have joined.",
+    "After joining you land on Home with \"You're playing …\" and a Getting started strip: Sheet, Inventory & coins, Chat.",
+    "On Campaign, players see which mode the DM runs the room in; the DM's mode switch and invite instructions stay on the DM's screen."
+  ]
+}
