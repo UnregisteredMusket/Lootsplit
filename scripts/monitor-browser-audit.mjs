@@ -183,6 +183,27 @@ try {
   await overview.screenshot({ path: output + "/daily-report-390.png" });
   await detailsNav.getByRole("link", { name: "Diagnostics", exact: true }).click();
   await overview.locator("#monitor-diagnostics").waitFor();
+  // A widget count chip opens #monitor-diagnostics-<severity>: Diagnostics showing only that severity.
+  const filters = overview.getByRole("group", { name: "Show diagnostics by severity" });
+  await filters.locator('button[aria-pressed="true"]', { hasText: "All" }).waitFor();
+  const allDiagnostics = await overview.locator("#monitor-diagnostics article").count();
+  for (const [hash, label] of [
+    ["monitor-diagnostics-warning", "Warning"],
+    ["monitor-diagnostics-critical", "Critical"],
+    ["monitor-diagnostics-info", "Info"],
+  ]) {
+    await page.evaluate((next) => {
+      window.location.hash = next;
+    }, hash);
+    const pressed = filters.locator('button[aria-pressed="true"]', { hasText: label });
+    await pressed.waitFor();
+    const shown = Number(/\((\d+)\)/.exec(await pressed.innerText())?.[1]);
+    assert.equal(await overview.locator("#monitor-diagnostics article").count(), shown, label);
+    if (shown === 0)
+      await overview.getByText(`No ${label.toLowerCase()} diagnostics in this reading.`).waitFor();
+  }
+  await filters.getByRole("button", { name: "All", exact: true }).click();
+  assert.equal(await overview.locator("#monitor-diagnostics article").count(), allDiagnostics);
   assert.equal(
     await page.locator(".quire-dawn").count(),
     0,

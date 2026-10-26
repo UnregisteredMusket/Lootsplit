@@ -845,8 +845,26 @@ public class OwnerWidgetTest {
             assertTrue(WidgetRowState.expanded(context,id).contains(WidgetTiles.RANGE_7D));
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-traffic-7d");}catch(Throwable error){captureFailure.set(error);}});
             if(captureFailure.get()!=null)throw new AssertionError("Traffic screenshot",captureFailure.get());
-            OwnerWidgetProvider.rowTap(context,new android.content.Intent(seven).putExtra(OwnerWidgetProvider.ROW_ID,WidgetTiles.RANGE_24H));
-            assertFalse(WidgetRowState.expanded(context,id).contains(WidgetTiles.RANGE_7D));
+            // The whole header of the expanded Traffic tile switches back to 24h (a real hosted tap), and
+            // the 24h/7d segments are 48 dp targets.
+            deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicReference<Boolean> header=new AtomicReference<>(false);
+            AtomicReference<Integer> segment=new AtomicReference<>(0);
+            while(!header.get()&&android.os.SystemClock.elapsedRealtime()<deadline){
+                InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+                    android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);
+                    for(int i=0;list!=null&&i<list.getChildCount()&&!header.get();i++){
+                        View child=list.getChildAt(i);View row=child.findViewById(R.id.tile_header_a),seg=child.findViewById(R.id.tile_seg_7d_a);
+                        if(row!=null&&seg!=null&&seg.getVisibility()==View.VISIBLE&&row.hasOnClickListeners()){segment.set(Math.min(seg.getHeight(),seg.getWidth()));header.set(row.performClick());}
+                    }
+                });
+                if(!header.get())android.os.SystemClock.sleep(100);
+            }
+            assertTrue("The expanded Traffic tile header is tappable",header.get());
+            assertTrue("The 24h/7d segments are 48 dp targets: "+segment.get(),segment.get()>=Math.round(48*context.getResources().getDisplayMetrics().density)-1);
+            deadline=android.os.SystemClock.elapsedRealtime()+8000;
+            while(WidgetRowState.expanded(context,id).contains(WidgetTiles.RANGE_7D)&&android.os.SystemClock.elapsedRealtime()<deadline)android.os.SystemClock.sleep(50);
+            assertFalse("A header tap on the 7d view switches to 24h",WidgetRowState.expanded(context,id).contains(WidgetTiles.RANGE_7D));
+            assertTrue("The tile stays expanded",WidgetRowState.expanded(context,id).contains(WidgetTiles.TRAFFIC));
             assertEquals("Expanding and toggling never fetch",0,fetches.get());
         }finally{
             if(activity!=null){WidgetAuditActivity screen=activity;InstrumentationRegistry.getInstrumentation().runOnMainSync(screen::finish);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
@@ -1413,7 +1431,18 @@ public class OwnerWidgetTest {
         View view=mainFace(snapshot);
         assertEquals("since "+WidgetRows.clock(started)+" · active 31m",text(view,R.id.monitor_since));
         assertTrue(view.findViewById(R.id.monitor_health).getContentDescription().toString().endsWith("1 critical, 1 warning, 1 info"));
-        assertEquals("1 critical",view.findViewById(R.id.monitor_count_crit).getContentDescription().toString());
+        assertEquals("1 critical. Opens diagnostics showing critical items",view.findViewById(R.id.monitor_count_crit).getContentDescription().toString());
+        // Each count opens Diagnostics showing its severity; the whole block (with its ›) opens Diagnostics.
+        for(int chip:new int[]{R.id.monitor_count_crit,R.id.monitor_count_warn,R.id.monitor_count_info}){
+            assertTrue("Count chips are tappable",view.findViewById(chip).hasOnClickListeners());
+            assertTrue("Count chips are tall enough to tap",view.findViewById(chip).getHeight()>=44*context.getResources().getDisplayMetrics().density-1);
+        }
+        assertTrue(view.findViewById(R.id.monitor_status).hasOnClickListeners());
+        assertEquals("›",text(view,R.id.monitor_status_more));
+        assertEquals("monitor-diagnostics-critical",WidgetActions.destination("diagnostics-critical"));
+        assertEquals("monitor-diagnostics-warning",WidgetActions.destination("diagnostics-warning"));
+        assertEquals("monitor-diagnostics-info",WidgetActions.destination("diagnostics-info"));
+        assertEquals("monitor-diagnostics",WidgetActions.destination("diagnostics"));
         assertEquals("31m",WidgetRows.duration(31*60000L));assertEquals("2h 5m",WidgetRows.duration(125*60000L));assertEquals("<1m",WidgetRows.duration(1000));assertEquals("3d 4h",WidgetRows.duration((3*24+4)*3600000L));
         // Rendered, the spoken item names its severity.
         AtomicReference<Throwable> failure=new AtomicReference<>();
@@ -1630,5 +1659,122 @@ public class OwnerWidgetTest {
         CompanionSettings.save(context,-1,CompanionSettings.preset("Development").put("theme","light"));
         render(state,true,368,392,"redesign-4x4-incident-light");
         CompanionSettings.remove(context,-1);
+    }
+
+    // ------------------------------------------------------------------ legibility (design plan M5)
+
+    /** A context at {@code scale}× the system font size (Android's "Largest" before Android 14 is 1.3). */
+    private Context fontScaled(float scale) {
+        android.content.res.Configuration config=new android.content.res.Configuration(context.getResources().getConfiguration());
+        config.fontScale=scale;
+        return context.createConfigurationContext(config);
+    }
+    /** Every visible text in {@code view} is at least {@code minSp} and tall enough for its own text (no fixed-height clipping). */
+    private void readable(View view,Context scaled,float minSp,String name) {
+        if(view.getVisibility()!=View.VISIBLE||view instanceof android.widget.ListView)return;
+        if(view instanceof TextView){
+            TextView text=(TextView)view;
+            float floor=android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,minSp,scaled.getResources().getDisplayMetrics());
+            assertTrue(name+": text below "+minSp+"sp in "+text.getId()+" \""+text.getText()+"\" ("+text.getTextSize()+" < "+floor+")",text.getTextSize()>=floor-0.5f);
+            android.text.Layout layout=text.getLayout();
+            if(layout!=null&&text.getText().length()>0){
+                int needed=layout.getLineBottom(Math.min(layout.getLineCount(),Math.max(1,text.getMaxLines()))-1)+text.getCompoundPaddingTop()+text.getCompoundPaddingBottom();
+                assertTrue(name+": clipped text in "+text.getId()+" \""+text.getText()+"\" ("+text.getHeight()+" < "+needed+")",text.getHeight()>=needed-1);
+            }
+        }
+        if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++)readable(((ViewGroup)view).getChildAt(i),scaled,minSp,name);
+    }
+    private View laidOut(Context scaled,android.widget.RemoteViews remote,int widthDp,int heightDp) {
+        float density=scaled.getResources().getDisplayMetrics().density;
+        FrameLayout parent=new FrameLayout(scaled);View view=remote.apply(scaled,parent);parent.addView(view);
+        int w=Math.round(widthDp*density);
+        parent.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),heightDp>0?View.MeasureSpec.makeMeasureSpec(Math.round(heightDp*density),View.MeasureSpec.EXACTLY):View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+        parent.layout(0,0,w,parent.getMeasuredHeight());
+        return view;
+    }
+    private void capture(View view,String name) throws Exception {
+        if(view.getWidth()<=0||view.getHeight()<=0)return;
+        Bitmap image=Bitmap.createBitmap(view.getWidth(),view.getHeight(),Bitmap.Config.ARGB_8888);view.draw(new Canvas(image));
+        File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();
+        try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();
+    }
+    /** True when {@code view} and every parent up to {@code root} are VISIBLE (isShown() needs an attached window). */
+    private static boolean visibleWithin(View view,View root) {
+        for(View v=view;v!=null;v=v.getParent() instanceof View?(View)v.getParent():null){if(v.getVisibility()!=View.VISIBLE)return false;if(v==root)return true;}
+        return false;
+    }
+    @Test public void widgetTextIsReadableAndNothingClipsAtLargeFontScale() throws Exception {
+        long now=System.currentTimeMillis();
+        JSONObject snapshot=WidgetData.project(redesignFixture(),now);
+        JSONObject state=new JSONObject().put("token","synthetic").put("snapshot",snapshot);
+        // Every row and tile expanded, plus every compact row: all collection layouts at their fullest.
+        java.util.Set<String> all=new java.util.HashSet<>();
+        org.json.JSONArray compact=WidgetRows.rows(snapshot,java.util.Collections.<String>emptySet());
+        for(int i=0;i<compact.length();i++){all.add(compact.getJSONObject(i).optString("id"));org.json.JSONArray ids=compact.getJSONObject(i).optJSONArray("ids");if(ids!=null)for(int j=0;j<ids.length();j++)all.add(ids.getString(j));}
+        java.util.Set<String> week=new java.util.HashSet<>(all);week.add(WidgetTiles.RANGE_7D);
+        for(float scale:new float[]{1f,1.3f}){
+            Context scaled=fontScaled(scale);
+            String tag=scale==1f?"1.0x":"1.3x";
+            AtomicReference<Throwable> failure=new AtomicReference<>();AtomicInteger checkedGauges=new AtomicInteger();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+                // The scale really reaches the inflated views (otherwise this test would prove nothing).
+                View probe=laidOut(scaled,OwnerWidgetProvider.views(scaled,state,true,-1),350,480);
+                float base=10*context.getResources().getDisplayMetrics().density;
+                assertEquals(tag+" font scale applied",base*scale,((TextView)probe.findViewById(R.id.monitor_identity)).getTextSize(),base*0.08f);
+                assertEquals(scale>1.05f,OwnerWidgetProvider.largeFont(scaled));
+                // 4×4 face, its smallest placement and wider ones.
+                for(int[] size:new int[][]{{250,260},{250,480},{368,392},{448,480}}){
+                    View face=laidOut(scaled,OwnerWidgetProvider.views(scaled,state,true,-1),size[0],size[1]);
+                    bounds(face);readable(face,scaled,10,"4x4 "+size[0]+"x"+size[1]+" "+tag);
+                    assertEquals(View.VISIBLE,face.findViewById(R.id.monitor_since).getVisibility());
+                    if(size[0]==368)capture(face,"legibility-4x4-"+tag);
+                }
+                // 4×2 face with and without tiles. At a large scale the "since" line and pace note give way.
+                for(boolean tiles:new boolean[]{true,false})for(int width:new int[]{250,368}){
+                    View face=laidOut(scaled,OwnerWidgetProvider.medium(scaled,state,-1,tiles),width,tiles?184:110);
+                    bounds(face);readable(face,scaled,10,"4x2 "+(tiles?"tiles ":"")+width+" "+tag);
+                    assertEquals(scale>1.05f?View.GONE:View.VISIBLE,face.findViewById(R.id.monitor_since).getVisibility());
+                    assertEquals("FAILURE",text(face,R.id.monitor_health));
+                    assertEquals("✕1",text(face,R.id.monitor_count_crit));
+                    if(tiles){
+                        assertEquals(scale>1.05f?View.GONE:View.VISIBLE,face.findViewById(R.id.medium_usage_note).getVisibility());
+                        assertTrue("The plan-usage value stays",text(face,R.id.medium_usage_value).startsWith("84%"));
+                    }
+                    if(width==250)capture(face,"legibility-4x2-"+(tiles?"tiles-":"short-")+tag);
+                }
+                // Every list row, compact and fully expanded (both traffic ranges), at the narrowest list width.
+                for(java.util.Set<String> expanded:java.util.Arrays.<java.util.Set<String>>asList(java.util.Collections.<String>emptySet(),all,week)){
+                    org.json.JSONArray rows=WidgetRows.rows(snapshot,expanded);
+                    for(int i=0;i<rows.length();i++){
+                        JSONObject row=rows.getJSONObject(i);
+                        View item=laidOut(scaled,OwnerWidgetService.rowView(scaled,row,-1,expanded),226,0);
+                        String name=row.optString("kind")+" "+row.optString("id")+" "+tag;
+                        bounds(item);readable(item,scaled,10,name);
+                        if(row.optString("kind").equals("item"))readable(item.findViewById(R.id.item_title),scaled,12,name);
+                        if(row.optString("kind").equals("tiles")&&row.optString("id").contains("usage")){
+                            // Gauge labels, tracks and values stay aligned row by row and none is pushed out.
+                            for(String slot:new String[]{"a","b"}){
+                                View label=item.findViewById(WidgetTiles.slotId(scaled,"usage_label0",slot));
+                                if(label==null||!visibleWithin(label,item))continue;
+                                checkedGauges.incrementAndGet();
+                                for(int g=0;g<4;g++){
+                                    View l=item.findViewById(WidgetTiles.slotId(scaled,"usage_label"+g,slot)),v=item.findViewById(WidgetTiles.slotId(scaled,"usage_value"+g,slot));
+                                    assertEquals(name+" gauge "+g+" aligned",l.getTop(),v.getTop());assertTrue(name+" gauge value "+g+" shown",v.getWidth()>0);
+                                }
+                            }
+                        }
+                        if(expanded==all&&row.optString("id").equals("tiles:traffic"))capture(item,"legibility-traffic-"+tag);
+                        if(expanded==all&&row.optString("id").contains("usage"))capture(item,"legibility-usage-"+tag);
+                    }
+                }
+                // The 4×1 companion, narrow and wide.
+                for(int width:new int[]{250,368}){
+                    View face=laidOut(scaled,CompanionWidgetProvider.views(scaled,state,CompanionSettings.preset("Status + charts"),-1,width),width,56);
+                    bounds(face);readable(face,scaled,10,"companion "+width+" "+tag);
+                }
+            }catch(Throwable error){failure.set(error);}});
+            if(failure.get()!=null)throw new AssertionError(tag,failure.get());
+            assertTrue(tag+": the plan-usage gauges were checked",checkedGauges.get()>0);
+        }
     }
 }

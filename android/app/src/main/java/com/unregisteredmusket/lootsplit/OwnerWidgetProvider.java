@@ -76,7 +76,15 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
      * Header and status shared by the 4×4 and 4×2 faces: reading time, glyph box, status word,
      * "since 10:41 · active 31m" (or "21 checks passed") and the ✕ ! i severity counts.
      */
-    private static void status(Context context, RemoteViews view, JSONObject state, JSONObject snapshot, int id, WidgetCharts.Palette p) {
+    /**
+     * True at a system font scale above the default (Android's "Large" is 1.15, "Largest" 1.3). The
+     * faces then drop their least important lines (the 4×2 "since" line and pace note) rather than
+     * shrink text or clip it (design plan M5); the spoken descriptions keep that text.
+     */
+    static boolean largeFont(Context context) { return context.getResources().getConfiguration().fontScale > 1.05f; }
+    /** Severity names for the count chips, in chip order; "diagnostics-<severity>" opens Diagnostics showing only that severity. */
+    static final String[] SEVERITIES = {"critical", "warning", "info"};
+    private static void status(Context context, RemoteViews view, JSONObject state, JSONObject snapshot, int id, WidgetCharts.Palette p, boolean showSince) {
         boolean light = p.light;
         boolean connected=!state.optString("token").isEmpty()||state.optBoolean(WidgetStore.UNAVAILABLE); String message=state.optString("message");
         boolean refreshing=connected&&"Refreshing…".equals(message);
@@ -92,7 +100,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         view.setTextColor(R.id.monitor_health,color(status,light));
         int[] counts=WidgetRows.counts(snapshot);
         String since=since(snapshot);
-        view.setViewVisibility(R.id.monitor_since,since.isEmpty()?View.GONE:View.VISIBLE);
+        view.setViewVisibility(R.id.monitor_since,since.isEmpty()||!showSince?View.GONE:View.VISIBLE);
         view.setTextViewText(R.id.monitor_since,since);
         view.setTextColor(R.id.monitor_since,p.muted);
         view.setContentDescription(R.id.monitor_health,word+(since.isEmpty()?"":", "+since)+(snapshot==null?"":". "+counts[0]+" critical, "+counts[1]+" warning, "+counts[2]+" info"));
@@ -103,8 +111,12 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
             view.setTextViewText(ids[i],glyphs[i]+counts[i]);
             // A zero count is dimmed (blended toward the background); the number still reads 0.
             view.setTextColor(ids[i],counts[i]>0?tones[i]:blend(tones[i],p.background,0.55f));
-            view.setContentDescription(ids[i],counts[i]+(i==0?" critical":i==1?" warning":" info"));
+            view.setContentDescription(ids[i],counts[i]+(i==0?" critical":i==1?" warning":" info")+". Opens diagnostics showing "+SEVERITIES[i]+" items");
+            // Each count opens Diagnostics filtered to its severity (the chips are hidden without a reading).
+            if(snapshot!=null) view.setOnClickPendingIntent(ids[i],WidgetActions.pending(context,id,"diagnostics-"+SEVERITIES[i],false));
         }
+        // The whole status block opens Diagnostics (My account when signed out); › shows that it is a link.
+        view.setTextColor(R.id.monitor_status_more,p.muted);
         view.setOnClickPendingIntent(R.id.monitor_status,WidgetActions.pending(context,id,snapshot==null?"account":"diagnostics",false));
         view.setOnClickPendingIntent(R.id.monitor_refresh,WidgetActions.pending(context,id,"refresh",false));
     }
@@ -138,7 +150,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         else view.setInt(R.id.monitor_root,"setBackgroundColor",p.background);
         for(int target: new int[]{R.id.monitor_open,R.id.monitor_refresh}) view.setTextColor(target,accent);
         view.setTextColor(R.id.monitor_identity,muted);
-        status(context,view,state,snapshot,id,p);
+        status(context,view,state,snapshot,id,p,true);
 
         // Reason line (the full list stays in its spoken description and in the items).
         String[] reason=WidgetRows.reason(snapshot);
@@ -186,7 +198,8 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         if(failure) view.setInt(R.id.monitor_root,"setBackgroundResource",light?R.drawable.monitor_background_alert_light:R.drawable.monitor_background_alert);
         else view.setInt(R.id.monitor_root,"setBackgroundColor",p.background);
         view.setTextColor(R.id.monitor_refresh,light?p.ink:p.ok);
-        status(context,view,state,snapshot,id,p);
+        boolean large=largeFont(context);
+        status(context,view,state,snapshot,id,p,!large);
         int tileBackground=light?R.drawable.item_tile_light:R.drawable.item_tile_dark;
         view.setInt(R.id.medium_item,"setBackgroundResource",tileBackground);
         // One line: the worst active item, the latest recovery, or the sign-in/refresh state.
@@ -245,7 +258,9 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         android.graphics.Bitmap pace=worst==null?null:WidgetCharts.paceStrip(elapsed);
         view.setViewVisibility(R.id.medium_usage_pace,pace==null?View.GONE:View.VISIBLE);
         if(pace!=null){view.setImageViewBitmap(R.id.medium_usage_pace,pace);view.setInt(R.id.medium_usage_pace,"setColorFilter",p.ink);}
-        view.setTextViewText(R.id.medium_usage_note,worst==null?(usage==null?"":"unavailable"):elapsed>=0?"pace "+WidgetData.percent(elapsed):"");
+        // At a large font scale the pace note gives way (the pace line and the description keep it); a gap note stays.
+        view.setTextViewText(R.id.medium_usage_note,worst==null?(usage==null?"":"unavailable"):elapsed>=0&&!large?"pace "+WidgetData.percent(elapsed):"");
+        view.setViewVisibility(R.id.medium_usage_note,worst!=null&&(elapsed<0||large)?View.GONE:View.VISIBLE);
         view.setContentDescription(R.id.medium_tile_usage,worst==null?"Cloudflare plan usage unavailable":"Highest plan usage this cycle: "+worst.optString("label")+" "+worst.optString("text")+(hot?", 80% or more":"")+(elapsed>=0?". Cycle elapsed "+WidgetData.percent(elapsed):""));
         view.setOnClickPendingIntent(R.id.medium_tile_usage,WidgetActions.pending(context,id,"logs",false));
         // Last five main runs.

@@ -1,0 +1,9 @@
+{
+  "title": "Field monitor diagnostics filters",
+  "summary": "For the site owner: Field monitor → Diagnostics in My account can now show only critical, warning or info items, and the Android widget's severity counts open that view.",
+  "items": [
+    "Diagnostics has All, Critical, Warning and Info buttons, each with its count.",
+    "Links ending in #monitor-diagnostics-critical, -warning or -info open Diagnostics already filtered; the Android widget's ✕ ! i counts use them from Android 1.14.0.",
+    "Older #monitor-diagnostics links still open the full list."
+  ]
+}

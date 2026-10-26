@@ -16,6 +16,10 @@ final class WidgetActions {
             case "report": return "monitor-reports";
             case "task": return "monitor-task";
             case "diagnostics": return "monitor-diagnostics";
+            // A severity count chip: Diagnostics showing only that severity (My account → Field monitor).
+            case "diagnostics-critical": return "monitor-diagnostics-critical";
+            case "diagnostics-warning": return "monitor-diagnostics-warning";
+            case "diagnostics-info": return "monitor-diagnostics-info";
             // Agent activity: My account → Field monitor → Development & deployments (GitHub events).
             case "activity": return "field-development";
             case "account": return "account-sign-in";

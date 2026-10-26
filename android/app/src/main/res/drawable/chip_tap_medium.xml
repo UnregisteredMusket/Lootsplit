@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The 4×2 face's tappable severity count: the same chip outline in its 32 dp status row. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:drawable="@drawable/chip_border"
+    android:insetLeft="2dp" android:insetRight="2dp" android:insetTop="5dp" android:insetBottom="5dp" />
