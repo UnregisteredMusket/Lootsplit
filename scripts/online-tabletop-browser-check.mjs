@@ -147,7 +147,8 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   const dmView = dm.getByRole("region", { name: "Interactive campaign map", exact: true });
   await dmView.scrollIntoViewIfNeeded();
   const rect = await dm.locator(".map-layer").boundingBox();
-  await dm.mouse.move(rect.x + rect.width * 0.05, rect.y + rect.height * 0.12);
+  // Start the rectangle clear of the DM's setup rail on the left (map controls).
+  await dm.mouse.move(rect.x + rect.width * 0.18, rect.y + rect.height * 0.15);
   await dm.mouse.down();
   await dm.mouse.move(rect.x + rect.width * 0.85, rect.y + rect.height * 0.7, { steps: 5 });
   await dm.mouse.up();
@@ -179,9 +180,9 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await openMoreMapTools(dm);
   await dm.getByRole("button", { name: "Fog rectangle", exact: true }).click();
   await dm.getByRole("button", { name: "Close tool options", exact: true }).click();
-  await dm.mouse.move(rect.x + rect.width * 0.15, rect.y + rect.height * 0.2);
+  await dm.mouse.move(rect.x + rect.width * 0.22, rect.y + rect.height * 0.22);
   await dm.mouse.down();
-  await dm.mouse.move(rect.x + rect.width * 0.3, rect.y + rect.height * 0.4, { steps: 5 });
+  await dm.mouse.move(rect.x + rect.width * 0.35, rect.y + rect.height * 0.42, { steps: 5 });
   await dm.mouse.up();
   await expect.poll(async () => (await scene()).tabletop.fog.shapes.length).toBe(2);
   await openMapSettings(dm);

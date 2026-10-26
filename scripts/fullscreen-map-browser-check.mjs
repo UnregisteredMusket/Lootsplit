@@ -50,26 +50,32 @@ export async function checkMobileMapControls(page) {
   if (width > 650) return;
   const boxes = await page.evaluate(() => {
     const box = (selector) => {
-      const r = document.querySelector(selector).getBoundingClientRect();
+      const el = document.querySelector(selector);
+      // Hidden (the DM's phone search is a row-1 icon until opened) or absent (players' setup bar).
+      if (!el || !el.getClientRects().length) return null;
+      const r = el.getBoundingClientRect();
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
     };
     return {
       title: box(".map-title-capsule"),
       search: box(".map-search"),
       settings: box(".map-top-actions"),
-      tools: box(".map-hotbar-anchor"),
+      tools: box(".map-hotbar-anchor:not(.map-setup-anchor)"),
+      setup: box(".map-setup-anchor"),
       camera: box(".map-navigation"),
     };
   });
   if (height > 550) {
     assert.ok(boxes.settings.left >= boxes.title.right + 6, "Title leaves room for Settings and X");
     assert.ok(boxes.settings.height <= 50, "Settings and X Close map form one short row");
-    assert.ok(boxes.search.top >= boxes.title.bottom + 6, "Search has its own clear row");
+    // Row 2 is the search field (players) or the DM's setup bar (search is then a row-1 icon).
+    const row2 = boxes.search ?? boxes.setup;
+    assert.ok(row2 && row2.top >= boxes.title.bottom + 6, "Row 2 (search or setup bar) is clear");
     assert.ok(boxes.camera.height <= 52, "Phone camera controls form one short row");
     assert.ok(boxes.tools.top >= boxes.camera.bottom + 6, "Camera and tool docks do not overlap");
     assert.ok(height - boxes.tools.bottom <= 20, "Tools hug the phone's bottom edge");
   }
-  for (const box of Object.values(boxes)) {
+  for (const box of Object.values(boxes).filter(Boolean)) {
     assert.ok(
       box.left >= 0 && box.right <= width + 1 && box.top >= 0 && box.bottom <= height + 1,
       "Mobile controls remain within the page in portrait and landscape",

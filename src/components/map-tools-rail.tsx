@@ -286,7 +286,8 @@ export function ToolNamesHint() {
     <section className="map-tool-names-hint map-glass" aria-label="Tool names are showing">
       <h2>Tool names are showing</h2>
       <p>
-        Play tools are on the right. Hover, focus or long-press any icon to see its name later.
+        Play tools are on the right (and, for the DM, setup tools on the left). Hover, focus or
+        long-press any icon to see its name later.
       </p>
       <div>
         <button type="button" className="map-hint-primary" onClick={() => setToolNames("hidden")}>

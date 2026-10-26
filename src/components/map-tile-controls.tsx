@@ -120,31 +120,35 @@ export function PartyPlacement({
   point,
   begin,
   done,
+  bare = false,
 }: {
   map: CampaignMap;
   table: CloudTable;
   point?: Point;
   begin: () => void;
   done: () => void;
+  /** In the Party position panel (map controls): no fold and no start button; the rail arms it. */
+  bare?: boolean;
 }) {
   const current = table.journal?.world?.partyPosition;
+
   const [environment, setEnvironment] = useState<(typeof travelEnvironments)[number]>(
       current?.environment ?? "Roads",
     ),
     [biome, setBiome] = useState<(typeof wildernessBiomes)[number]>(current?.biome ?? "Forest"),
     [description, setDescription] = useState(current?.description ?? "");
-  return (
-    <Fold title="Move party freely" defaultOpen>
+  const body = (
+    <>
       <p>
         {current
           ? `Travelling: ${partyEnvironment(current)}.`
           : "Place the party anywhere, without creating or choosing a listed location."}
       </p>
-      <Button onClick={begin}>Place party on map</Button>
+      {!bare && <Button onClick={begin}>Place party on map</Button>}
       {point && (
         <CommandForm
           label="Save party travel position"
-          dirty
+          dirty={!bare || description !== (current?.description ?? "")}
           submit={() => ({
             kind: "party-map-position",
             before: current ?? null,
@@ -216,6 +220,13 @@ export function PartyPlacement({
           Clear free party position
         </CommandButton>
       )}
+    </>
+  );
+  return bare ? (
+    body
+  ) : (
+    <Fold title="Move party freely" defaultOpen>
+      {body}
     </Fold>
   );
 }

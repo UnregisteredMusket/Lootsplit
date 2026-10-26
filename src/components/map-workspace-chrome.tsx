@@ -41,6 +41,7 @@ export function MapWorkspaceChrome({
   parent,
   onBack,
   closePanel,
+  compactSearch = false,
 }: {
   map?: CampaignMap;
   /** The parent map, only when this viewer can open it (otherwise no Back button). */
@@ -48,6 +49,8 @@ export function MapWorkspaceChrome({
   onBack?: () => void;
   /** Closes an open map panel or sheet; returns false when none was open (Android Back). */
   closePanel?: () => boolean;
+  /** Phones with the DM setup bar in row 2: search becomes a row-1 icon that opens the field. */
+  compactSearch?: boolean;
   maps: CampaignMap[];
   navigation?: ReactNode;
   results: MapSearchResult[];
@@ -64,7 +67,8 @@ export function MapWorkspaceChrome({
   const [query, setQuery] = useState(""),
     [searching, setSearching] = useState(false),
     [index, setIndex] = useState(0),
-    [menu, setMenu] = useState(false);
+    [menu, setMenu] = useState(false),
+    [searchOpen, setSearchOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null),
     searchRoot = useRef<HTMLDivElement>(null);
   const matches = results
@@ -88,6 +92,7 @@ export function MapWorkspaceChrome({
   useEffect(() => {
     setMenu(false);
     setSearching(false);
+    setSearchOpen(false);
     setQuery("");
   }, [map?.id]);
   const parentRef = useRef(parent),
@@ -149,7 +154,9 @@ export function MapWorkspaceChrome({
       if (e.key === "/") {
         e.preventDefault();
         setHidden(false);
+        setSearchOpen(true);
         input.current?.focus();
+        requestAnimationFrame(() => input.current?.focus());
       }
       if (e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
@@ -177,7 +184,11 @@ export function MapWorkspaceChrome({
         </button>
       ) : (
         <>
-          <div className="map-title-capsule map-glass" data-has-back={parent ? "" : undefined}>
+          <div
+            className="map-title-capsule map-glass"
+            data-has-back={parent ? "" : undefined}
+            data-compact={compactSearch || undefined}
+          >
             {parent && onBack && (
               <button
                 className="map-back-button"
@@ -305,12 +316,19 @@ export function MapWorkspaceChrome({
               </button>
             </section>
           )}
-          <div className="map-top-controls">
+          <div
+            className="map-top-controls"
+            data-compact={compactSearch || undefined}
+            data-open={searchOpen || undefined}
+          >
             <div
               className="map-search map-glass"
               ref={searchRoot}
               onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) setSearching(false);
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setSearching(false);
+                  if (!query) setSearchOpen(false);
+                }
               }}
             >
               <Search size={18} aria-hidden="true" />
@@ -349,6 +367,7 @@ export function MapWorkspaceChrome({
                   if (e.key === "Escape") {
                     e.stopPropagation();
                     setSearching(false);
+                    setSearchOpen(false);
                     input.current?.blur();
                   }
                 }}
@@ -393,6 +412,20 @@ export function MapWorkspaceChrome({
             </div>
           </div>
           <div className="map-top-actions">
+            {compactSearch && (
+              <button
+                className="map-search-toggle map-glass map-icon-button"
+                aria-label="Search maps and places"
+                title="Search (/)"
+                aria-expanded={searchOpen}
+                onClick={() => {
+                  setSearchOpen(true);
+                  requestAnimationFrame(() => input.current?.focus());
+                }}
+              >
+                <Search size={19} />
+              </button>
+            )}
             <button
               className="map-settings-toggle map-glass map-icon-button"
               aria-label="Map settings"

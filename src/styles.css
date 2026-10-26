@@ -3853,6 +3853,45 @@ input,select,textarea { max-width: 100%; }
 .map-workspace .map-rail-overflow { position:absolute; right:calc(100% + 8px); bottom:50px; max-height:calc(100% - 50px); display:flex; pointer-events:auto; }
 @media(prefers-reduced-motion:reduce) { .map-tool-tip { transition:none; } }
 
+/* Map controls: DM setup rail (left), its placement panels and the phone setup bar (row 2). */
+.map-workspace { --map-setup-w:0px; }
+.map-workspace .map-hotbar-anchor.map-setup-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) { left:max(14px,env(safe-area-inset-left)); right:auto; align-items:flex-start; }
+.map-workspace .map-hotbar-anchor.map-setup-anchor[data-layout="landscape"] { left:max(8px,env(safe-area-inset-left)); }
+.map-workspace .map-hotbar-anchor.map-setup-anchor[data-layout="phone"] { top:calc(62px + env(safe-area-inset-top)); bottom:auto; left:max(10px,env(safe-area-inset-left)); right:max(10px,env(safe-area-inset-right)); }
+.map-workspace .map-setup-panel { right:auto; left:calc(max(14px,env(safe-area-inset-left)) + var(--map-setup-w) + 8px); }
+.map-workspace .map-hotbar-anchor.map-setup-anchor[data-tool-names] .map-hotbar { width:196px; }
+.map-setup-note { font-size:12px; color:var(--color-muted); margin:0 0 8px; }
+.map-setup-panel .world-form label { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+.map-setup-panel .world-form input:not([type=checkbox]),.map-setup-panel .world-form textarea,.map-setup-panel .world-form select { width:100%; }
+.map-setup-panel .world-form label:has(> input[type=checkbox]) { flex-direction:row; align-items:center; }
+.map-workspace .map-entry-pick { position:absolute; z-index:48; top:calc(76px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(440px,calc(100% - 28px)); padding:12px 14px; }
+.map-entry-pick p { margin:0 0 8px; font-size:13px; }
+.map-entry-pick strong { display:block; font-size:15px; }
+.map-entry-pick div { display:flex; gap:8px; }
+/* Left-hand panels clear the setup rail. */
+@media(min-width:651px) {
+ .map-workspace .map-route-panel { left:calc(max(14px,env(safe-area-inset-left)) + var(--map-setup-w) + 8px); }
+ .map-workspace.map-view-frame .map-record-details:not(.map-service-open) { left:calc(14px + var(--map-setup-w) + 8px); }
+ .map-workspace.map-view-frame .map-feedback { left:calc(max(12px,env(safe-area-inset-left)) + var(--map-setup-w) + 8px); }
+ .map-workspace .map-media-controls { left:calc(max(14px,env(safe-area-inset-left)) + var(--map-setup-w) + 8px); }
+}
+@media(max-width:650px) {
+ /* Phones (DM): Search is a row-1 icon so the setup bar takes row 2; players keep their search row. */
+ .map-top-controls[data-compact] .map-search { display:none; }
+ .map-title-capsule[data-compact] { max-width:calc(100% - 176px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+ .map-top-controls[data-compact][data-open] .map-search { display:flex; z-index:48; }
+ .map-workspace .map-hotbar-anchor.map-setup-anchor .map-hotbar { overflow:hidden; }
+ .map-workspace .map-setup-panel { left:0; right:0; }
+}
+.map-search-toggle { display:none !important; }
+@media(max-width:650px) { .map-search-toggle { display:inline-flex !important; } }
+@media(max-height:550px) and (orientation:landscape) {
+ .map-workspace .map-route-panel { left:calc(10px + var(--map-setup-w) + 8px); }
+}
+@media(max-width:340px) {
+ .map-title-capsule[data-compact] { max-width:calc(100% - 126px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+}
+
 /* Split view: two screens in one window (desktop web and tablet landscape, >=1024px).
    Uses theme tokens only, so Adventurer's Ledger, Ironbound Dragon and custom colors apply. */
 .split-passthrough { display: contents; }

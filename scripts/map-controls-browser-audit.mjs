@@ -14,6 +14,7 @@ import {
 import { checkMobileMapControls } from "./fullscreen-map-browser-check.mjs";
 import { FANTASY_LOOKS, themeVars } from "../src/lib/quire/theme.ts";
 import { buildWayfarers } from "./product-screenshot-fixture.mjs";
+import { chooseOption } from "./search-select-browser.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080",
   output = "test-results/map-controls",
@@ -179,6 +180,10 @@ async function checkChrome(page, { role, appearance, width, height }) {
         ...document.querySelectorAll('[role="toolbar"][aria-label="Map tools"] [data-map-tool]'),
       ].filter((b) => b.tabIndex === 0).length,
       zoom: box(".map-navigation"),
+      setup: box('[role="toolbar"][aria-label="Map setup"]'),
+      setupOrientation: document
+        .querySelector('[role="toolbar"][aria-label="Map setup"]')
+        ?.getAttribute("aria-orientation"),
       pills: document.querySelectorAll(".map-here-button,.map-plan-journey-button").length,
       zoomButtons: [...document.querySelectorAll(".map-navigation button")].map((b) => {
         const style = getComputedStyle(b);
@@ -220,6 +225,20 @@ async function checkChrome(page, { role, appearance, width, height }) {
     assert.ok(facts.toolbar.height > facts.toolbar.width, `${tag}: rail is taller than wide`);
     assert.ok(facts.toolbar.right >= width - 24, `${tag}: rail hugs the right edge`);
     assert.ok(facts.toolbar.bottom <= facts.zoom.top + 1 || facts.toolbar.right <= facts.zoom.left + 1, `${tag}: rail clears the zoom pill`);
+  }
+  // Map setup (DM only): a left rail, or the phone's row-2 bar under the title row.
+  if (role === "player") assert.equal(facts.setup, null, `${tag}: players get no setup rail`);
+  else {
+    within(facts.setup, "Map setup toolbar");
+    if (width <= 650 && height > 550) {
+      assert.equal(facts.setupOrientation, "horizontal", `${tag}: phone setup bar is horizontal`);
+      assert.ok(facts.setup.top >= facts.title.bottom + 4, `${tag}: setup bar sits under row 1`);
+      assert.ok(facts.setup.bottom <= facts.toolbar.top, `${tag}: setup bar above the tools bar`);
+    } else {
+      assert.equal(facts.setupOrientation, "vertical", `${tag}: setup rail is vertical`);
+      assert.ok(facts.setup.left <= 24, `${tag}: setup rail hugs the left edge`);
+      assert.ok(facts.setup.right <= facts.toolbar.left, `${tag}: setup and tools rails apart`);
+    }
   }
   // Every tool is reachable at this size: in the bar or rail, or in More tools on short desktops.
   const more = page.getByRole("button", { name: "More tools", exact: true });
@@ -263,6 +282,128 @@ async function checkChrome(page, { role, appearance, width, height }) {
   if (width <= 650) await checkMobileMapControls(page);
   await page.screenshot({ path: `${output}/map-${tag}.png` });
   checks.push(`${tag}: layout, tokens, fonts, settings without navigation`);
+}
+
+async function journalMaps(page) {
+  return page.evaluate(async () => {
+    const active = localStorage.getItem("quire.campaign.v1"),
+      name =
+        JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]").find((c) => c.id === active)
+          ?.db || "quire",
+      db = await new Promise((res, rej) => {
+        const r = indexedDB.open(name);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    try {
+      return await new Promise((res, rej) => {
+        const r = db.transaction("meta").objectStore("meta").get("journal");
+        r.onsuccess = () => res(r.result.value.world.maps);
+        r.onerror = () => rej(r.error);
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
+/** DM setup rail: Marker and Entrance (with the entry view picked on the destination) open their
+ * own panels after placing, save through the same commands, stay armed, and never navigate away. */
+async function checkSetupRail(page) {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const setupBar = page.getByRole("toolbar", { name: "Map setup", exact: true });
+  const viewport = page.getByRole("region", { name: "Interactive campaign map", exact: true });
+  const clickMap = async (fx, fy) => {
+    const layer = await viewport.locator(".map-layer").boundingBox();
+    await page.mouse.click(layer.x + layer.width * fx, layer.y + layer.height * fy);
+  };
+  const markers = async () => (await journalMaps(page)).find((m) => m.id === "tide-cove").markers;
+  const before = (await markers()).length;
+  const url = page.url();
+  const marker = setupBar.getByRole("button", { name: "Place marker", exact: true });
+  await marker.click();
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".map-active-tool")).toContainText("Marker: click the map to place it");
+  await clickMap(0.42, 0.4);
+  const panel = page.getByRole("dialog", { name: "Marker", exact: true });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByLabel("Marker name", { exact: true })).toBeFocused();
+  await expect(page.locator("#map-settings")).toBeHidden();
+  await panel.getByLabel("Marker name", { exact: true }).fill("Smugglers' cache");
+  await panel.getByRole("button", { name: "Save live marker", exact: true }).click();
+  await expect(panel).toHaveCount(0);
+  await expect.poll(async () => (await markers()).length).toBe(before + 1);
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
+  // Armed again: a second click opens a fresh panel; Esc closes it, a second Esc disarms.
+  await clickMap(0.6, 0.6);
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
+  await viewport.focus();
+  await page.keyboard.press("Escape");
+  await expect(marker).toHaveAttribute("aria-pressed", "false");
+  assert.equal(page.url(), url, "Marker placement changes no route");
+  await sameDocument(page, "dm marker panel");
+
+  // Entrance (⇧E): place, name, choose the destination, pick its entry view there, come back.
+  await viewport.focus();
+  await page.keyboard.press("Shift+E");
+  await expect(setupBar.getByRole("button", { name: "Entrance", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await clickMap(0.3, 0.7);
+  const entrance = page.getByRole("dialog", { name: "Entrance", exact: true });
+  await expect(entrance).toBeVisible();
+  await entrance.getByLabel("Entrance name", { exact: true }).fill("Sea cave");
+  await chooseOption(entrance.getByLabel("Entrance destination", { exact: true }), "harbour");
+  await entrance
+    .getByRole("button", { name: "Pick the entry view on the destination", exact: true })
+    .click();
+  const pick = page.getByRole("region", { name: "Pick the entry view", exact: true });
+  await expect(pick).toBeVisible();
+  await expectMap(page, "Brackenport harbour");
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await pick.getByRole("button", { name: "Use this view", exact: true }).click();
+  await expectMap(page, "Smugglers' cove");
+  await expect(entrance).toBeVisible();
+  await expect(entrance.getByLabel("Entrance name", { exact: true })).toHaveValue("Sea cave");
+  await expect(entrance.getByRole("checkbox", { name: /destination entry camera/ })).toBeChecked();
+  await entrance.getByRole("button", { name: "Add map entrance", exact: true }).click();
+  await expect(entrance).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const link = (await journalMaps(page))
+        .find((m) => m.id === "tide-cove")
+        .connected.links.find((l) => l.label === "Sea cave");
+      return !!link && link.targetMapId === "harbour" && link.entry?.zoom > 1;
+    })
+    .toBe(true);
+  await page.keyboard.press("Escape");
+  await sameDocument(page, "dm entrance panel");
+
+  // Phone: row-2 setup bar, Search as a row-1 icon, the panel is a bottom sheet.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const search = page.getByRole("combobox", { name: "Search maps and places", exact: true });
+  await expect(search).toBeHidden();
+  await page.getByRole("button", { name: "Search maps and places", exact: true }).click();
+  await expect(search).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(search).toBeHidden();
+  await setupBar.getByRole("button", { name: "Place marker", exact: true }).click();
+  await clickMap(0.5, 0.5);
+  await expect(panel).toBeVisible();
+  const sheet = await panel.boundingBox();
+  assert.ok(sheet.y + sheet.height >= 840 && sheet.width >= 388, "Phone panel is a bottom sheet");
+  await page.getByRole("button", { name: "Close Marker panel", exact: true }).click();
+  await viewport.focus();
+  await page.keyboard.press("Escape");
+  await page.screenshot({ path: `${output}/setup-dm-390x844.png` });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  checks.push(
+    "dm: setup rail Marker and Entrance panels (pick on destination), armed after save, Esc twice, phone sheet and search icon, no navigation",
+  );
 }
 
 try {
@@ -407,6 +548,8 @@ try {
         await checkChrome(page, { role, appearance, width, height });
     }
     await page.setViewportSize({ width: 1280, height: 800 });
+
+    if (role === "dm") await checkSetupRail(page);
 
     // Android Back (the shell's interceptor chain): panel → parent map → close to Party.
     const androidBack = () =>
