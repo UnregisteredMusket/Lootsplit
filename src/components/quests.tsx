@@ -890,7 +890,7 @@ function RevealSheet({ t, quest, close }: { t: Table; quest: Quest; close: () =>
       {kind !== "none" && (
         <label className="quest-message">
           <input type="checkbox" checked={message} onChange={(e) => setMessage(e.target.checked)} />
-          {kind === "party" ? "Also post it in party chat" : "Also send them a private message"}: “New quest: {quest.title}”
+          Also send {kind === "party" ? "each of them" : "them"} a private message: “New quest: {quest.title}”
         </label>
       )}
       <div className="quest-sheet-footer">
