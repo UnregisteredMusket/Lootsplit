@@ -4817,3 +4817,28 @@ button.quest-chip { min-height: 44px; }
 .join-tips li span { font-size: .875rem; color: var(--color-muted); overflow-wrap: anywhere; }
 @media (max-width: theme(--bp-tablet)) { .join-tips li span { display: none; } .join-tips li a { line-height: 1.2; } }
 .room-mode-readout { font-weight: 600; }
+
+/* "Since you were away" on player Home (plan P4, Q21). */
+.since-away { border: 1px solid color-mix(in srgb, var(--color-lead) 45%, transparent); border-radius: .75rem; padding: .75rem 1rem; margin: .75rem 0; }
+.since-away h2 { font-size: 1.15rem; margin: 0 0 .25rem; }
+.since-away ul { margin: 0; padding: 0; list-style: none; display: grid; }
+.since-away li a { display: flex; align-items: center; min-height: 2.75rem; overflow-wrap: anywhere; }
+
+/* Healthy shared room: a header pill instead of the status card (plan P4, Q21). */
+.room-pill {
+  display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0;
+  min-height: 36px; padding: .25rem .55rem; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-lead) 35%, transparent);
+  font-size: .8rem; color: var(--color-fg); text-decoration: none; white-space: nowrap;
+}
+.room-pill:hover { background: color-mix(in srgb, var(--color-lead) 10%, transparent); }
+@media (max-width: 379px) {
+  /* Phones this narrow keep the campaign name readable: the pill is its dot (24 px target). */
+  .room-pill { border: 0; padding-inline: 0; min-width: 24px; justify-content: center; gap: 0; }
+  .room-pill > span[aria-hidden="true"]:not(.status-dot) { display: none; }
+}
+/* Phones: the decorative scene shows as a 48 px strip at most (plan P4). */
+@media (max-width: 479px) {
+  .submenu-workspace[data-submenu-scene] { padding-top: 3rem; min-height: 0; }
+  .submenu-scenery { height: 12rem; }
+}

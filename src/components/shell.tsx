@@ -19,7 +19,7 @@ import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { useReviewCount } from "@/lib/quire/use-review-count";
 import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
 import { useCampaignDisplayName, useSyncRoomCampaignName } from "@/lib/quire/use-campaign-name";
-import { SyncStatus } from "./sync-status";
+import { RoomPill, SyncStatus } from "./sync-status";
 import {
   SplitHeaderControls,
   SplitWorkspace,
@@ -357,6 +357,8 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
                 {seatKnown ? (dm ? "DM" : "Player") : "…"}
                 {testRoom.testMode && <span className="ml-2 text-negative">Test mode</span>}
               </button>
+              {/* A healthy room is one pill; Campaign and Maps show their own full status. */}
+              {pathname !== "/share" && pathname !== "/maps" ? <RoomPill /> : null}
               <div className="header-actions">
                 <SplitHeaderControls />
                 <WorkspaceWindows />
@@ -417,7 +419,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
                 width === "prose" ? "max-w-3xl" : "max-w-6xl",
               )}
             >
-              {pathname !== "/share" && pathname !== "/maps" ? <SyncStatus compact /> : null}
+              {pathname !== "/share" && pathname !== "/maps" ? <SyncStatus compact collapseHealthy /> : null}
               <ShellMapActions.Provider
                 value={{
                   campaignName,
@@ -853,7 +855,7 @@ function PaneShell({ children, width = "wide" }: ShellProps) {
             width === "prose" ? "max-w-3xl" : "max-w-6xl",
           )}
         >
-          {pathname !== "/share" && pathname !== "/maps" ? <SyncStatus compact /> : null}
+          {pathname !== "/share" && pathname !== "/maps" ? <SyncStatus compact collapseHealthy /> : null}
           <ShellMapActions.Provider value={{ campaignName, dm, seatKnown, unreadCount, ...actions }}>
             {children}
           </ShellMapActions.Provider>
