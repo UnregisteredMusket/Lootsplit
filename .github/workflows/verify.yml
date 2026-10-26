@@ -270,6 +270,9 @@ jobs:
       - name: dev-finance
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs
+      - name: dev-landscape
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-landscape 240 node scripts/landscape-browser-audit.mjs
       - name: dev-shop-stock
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-shop-stock 240 node scripts/shop-stock-browser-audit.mjs
