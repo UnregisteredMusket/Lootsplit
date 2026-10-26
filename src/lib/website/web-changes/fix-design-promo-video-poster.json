@@ -1,0 +1,9 @@
+{
+  "title": "Lighter home page on phones",
+  "summary": "On phones and with data saver, the home page's promo video now shows its poster and plays only when you tap it.",
+  "items": [
+    "Phones and data-saver connections no longer download the promo video until you press play.",
+    "On larger screens the video still plays muted on its own, but only once it is on screen.",
+    "Pause and play stay available at any time."
+  ]
+}

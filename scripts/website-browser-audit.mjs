@@ -150,6 +150,37 @@ try {
         await calm.getByRole("button", { name: "Play the video", exact: true }).waitFor();
         assert.equal(await calm.locator(".ls-carousel-track").evaluate((e) => e.scrollLeft), 0);
         await calm.close();
+        // W-5: the video waits until it is on screen (preload="none").
+        assert.equal(await video.getAttribute("preload"), "none");
+      }
+      if (path === "welcome" && width === 390) {
+        // W-5: phones see the poster only; the video downloads and plays only after a tap.
+        const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+        const media = [];
+        phone.on("request", (r) => {
+          if (/\/media\/lootsplitter-promo\.(webm|mp4)/.test(r.url())) media.push(r.url());
+        });
+        await openApplication(phone, `${origin}/welcome`, { waitUntil: "networkidle" });
+        const start = phone.getByRole("button", { name: "Play the video", exact: true });
+        await start.waitFor();
+        await phone.waitForTimeout(1500);
+        assert.equal(await phone.locator(".ls-promo-video").evaluate((v) => v.paused), true);
+        assert.deepEqual(media, [], "no promo video download before the tap");
+        assert.ok((await start.boundingBox()).height >= 44);
+        await start.click();
+        await phone.waitForFunction(() => document.querySelector(".ls-promo-video")?.currentTime > 0.3);
+        await phone.getByRole("button", { name: "Pause the video", exact: true }).click();
+        assert.equal(await phone.locator(".ls-promo-video").evaluate((v) => v.paused), true);
+        await phone.close();
+        // Data saver on a large screen also gets the poster first.
+        const saver = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+        await saver.addInitScript(() =>
+          Object.defineProperty(navigator, "connection", { configurable: true, value: { saveData: true } }),
+        );
+        await openApplication(saver, `${origin}/welcome`, { waitUntil: "networkidle" });
+        await saver.getByRole("button", { name: "Play the video", exact: true }).waitFor();
+        assert.equal(await saver.locator(".ls-promo-video").evaluate((v) => v.paused), true);
+        await saver.close();
       }
       // One header, one consistent app link label, and a footer route to release details.
       assert.equal(await page.locator(".ls-header").count(), 1);
