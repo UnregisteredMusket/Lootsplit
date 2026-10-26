@@ -623,15 +623,6 @@ public class OwnerWidgetTest {
             assertEquals("health",CompanionSettings.read(context,id).getString("first"));
             assertEquals("A fresh, unconfigured companion uses Agent activity","activity",CompanionSettings.read(context,second).getString("first"));
             assertFalse("The preset name is not stored; it is matched from the choices",CompanionSettings.read(context,id).has("preset"));
-            // Reopening the settings restores the saved preset instead of starting on the default.
-            instrumentation.runOnMainSync(()->host.startAppWidgetConfigureActivityForResult(screen,id,0,902,null));
-            CompanionWidgetConfigureActivity reopened=(CompanionWidgetConfigureActivity)monitor.waitForActivityWithTimeout(5000);
-            assertNotNull("Settings reopen",reopened);
-            instrumentation.waitForIdleSync();
-            AtomicReference<String> restored=new AtomicReference<>("");
-            instrumentation.runOnMainSync(()->{restored.set(reopened.value("preset"));reopened.finish();});
-            instrumentation.waitForIdleSync();
-            assertEquals("Server Health",restored.get());
             assertTrue("Adding/configuring must not create authorization",WidgetStore.read(context).optString("token").isEmpty());
             String preserved=WidgetStore.connect(context,"synthetic-registration-preservation");
             if(android.os.Build.VERSION.SDK_INT>=28) {
@@ -660,16 +651,19 @@ public class OwnerWidgetTest {
             AtomicReference<String> signedOutGlyph=new AtomicReference<>("");
             instrumentation.runOnMainSync(()->signedOutGlyph.set(((TextView)hosted.get().findViewById(R.id.companion_light)).getText().toString()));
             assertEquals("Signed-out glyph is a neutral dash, never ?","–",signedOutGlyph.get());
-            // The audit screen is resumed again after the reopened settings closed; wait for its layout pass.
-            AtomicReference<Boolean> laidOut=new AtomicReference<>(false);deadline=android.os.SystemClock.elapsedRealtime()+8000;
-            while(!laidOut.get()&&android.os.SystemClock.elapsedRealtime()<deadline){
-                instrumentation.runOnMainSync(()->laidOut.set(hosted.get().getWidth()>0&&hosted.get().getHeight()>0));
-                if(!laidOut.get())android.os.SystemClock.sleep(50);
-            }
             AtomicReference<Throwable> failure=new AtomicReference<>();
             instrumentation.runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-companion-signed-out");}catch(Throwable e){failure.set(e);}});
             if(failure.get()!=null)throw new AssertionError("Companion framework capture",failure.get());
             assertTrue("Adding/configuring must not create account authorization",WidgetStore.read(context).optString("token").isEmpty());
+            // Reopening the settings restores the saved preset instead of starting on the default.
+            instrumentation.runOnMainSync(()->host.startAppWidgetConfigureActivityForResult(screen,id,0,902,null));
+            CompanionWidgetConfigureActivity reopened=(CompanionWidgetConfigureActivity)monitor.waitForActivityWithTimeout(5000);
+            assertNotNull("Settings reopen",reopened);
+            instrumentation.waitForIdleSync();
+            AtomicReference<String> restored=new AtomicReference<>("");
+            instrumentation.runOnMainSync(()->{restored.set(reopened.value("preset"));reopened.finish();});
+            instrumentation.waitForIdleSync();
+            assertEquals("Server Health",restored.get());
         } finally {
             if(configuration!=null){CompanionWidgetConfigureActivity settings=configuration;instrumentation.runOnMainSync(settings::finish);}
             if(activity!=null){WidgetAuditActivity screen=activity;instrumentation.runOnMainSync(screen::finish);}
