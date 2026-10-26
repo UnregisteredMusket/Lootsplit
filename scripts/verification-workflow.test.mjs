@@ -45,7 +45,10 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 55);
+  // A floor, not an exact count: every PR that adds an audit used to conflict on this line.
+  // Removing a check is still caught by the per-check assertions below and the baseline gates.
+  assert.ok(checks.length >= 55, `expected at least 55 development checks, found ${checks.length}`);
+  assert.equal(new Set(checks.map(([, name]) => name)).size, checks.length, "No duplicate development check");
   // Market and shop counter: Shops here first, Paying from, Sell to, $ defaults, Edit save bar (1280/390/320).
   assert.ok(checks.some(([, name, group]) => name === "dev-market-shops" && group === "desktop"));
   // Loot review: Desk card and count, three-tap transfer, bulk assign, pool, memory (1280/390/320).
