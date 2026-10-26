@@ -36,7 +36,7 @@ import { downloadShopPdf } from "@/lib/quire/shop-pdf";
 import type { Holding, Shop, StockLine, Wealth } from "@/lib/quire/types";
 import { RemoveButton } from "@/components/quire-ui";
 import { CatalogStockPicker, ShopStockList } from "@/components/shop-stock-manager";
-import { Button, Confirm, Segmented, Slider, TextInput } from "@/components/ui";
+import { Button, Confirm, Field, Segmented, Slider, TextInput } from "@/components/ui";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 
 export function ShopContent({
@@ -152,34 +152,39 @@ export function ShopContent({
       {mapStrip && <MapRecordStrip reference={{ kind: "shop", id: shop.id }} />}
       {viewing === "edit" ? (
         <div className="mt-3 flex flex-col gap-3">
-          <TextInput
-            aria-label="Shop name"
-            defaultValue={shop.name}
-            key={shop.name}
-            onBlur={(event) => {
-              const name = event.target.value.trim();
-              if (name && name !== shop.name) void economy.updateShop({ ...shop, name });
-            }}
-            className="font-display text-2xl"
-          />
-          <TextInput
-            aria-label="Shopkeeper"
-            placeholder="Shopkeeper"
-            defaultValue={shop.keeper}
-            key={`keeper-${shop.keeper}`}
-            onBlur={(event) =>
-              void economy.updateShop({ ...shop, keeper: event.target.value.trim() })
-            }
-          />
-          <TextInput
-            aria-label="Shop location"
-            placeholder="Shop location"
-            defaultValue={shop.place}
-            key={`place-${shop.place}`}
-            onBlur={(event) =>
-              void economy.updateShop({ ...shop, place: event.target.value.trim() })
-            }
-          />
+          {/* Visible labels: a filled field keeps its meaning (WCAG 3.3.2). */}
+          <Field label="Shop name">
+            <TextInput
+              aria-label="Shop name"
+              defaultValue={shop.name}
+              key={shop.name}
+              onBlur={(event) => {
+                const name = event.target.value.trim();
+                if (name && name !== shop.name) void economy.updateShop({ ...shop, name });
+              }}
+              className="font-display text-2xl"
+            />
+          </Field>
+          <Field label="Shopkeeper">
+            <TextInput
+              aria-label="Shopkeeper"
+              defaultValue={shop.keeper}
+              key={`keeper-${shop.keeper}`}
+              onBlur={(event) =>
+                void economy.updateShop({ ...shop, keeper: event.target.value.trim() })
+              }
+            />
+          </Field>
+          <Field label="Shop location">
+            <TextInput
+              aria-label="Shop location"
+              defaultValue={shop.place}
+              key={`place-${shop.place}`}
+              onBlur={(event) =>
+                void economy.updateShop({ ...shop, place: event.target.value.trim() })
+              }
+            />
+          </Field>
           <ShelfTuning shop={shop} />
           <ShopLocationEditor key={shop.id} shop={shop} />
         </div>
@@ -571,25 +576,28 @@ function StockRow({
         }}
       />
       <div className="grid grid-cols-2 gap-2">
-        <TextInput
-          aria-label="Price"
-          defaultValue={formatCopper(line.copper)}
-          onBlur={(event) => {
-            const copper = parsePrice(event.target.value);
-            if (copper !== null && copper !== line.copper) void updateStock({ ...line, copper });
-          }}
-        />
-        <TextInput
-          aria-label="Quantity, blank if unlimited"
-          placeholder="Qty or blank"
-          defaultValue={line.quantity === null ? "" : String(line.quantity)}
-          onBlur={(event) => {
-            const raw = event.target.value.trim();
-            const quantity = raw === "" ? null : Math.max(0, Math.floor(Number(raw)));
-            if (raw !== "" && Number.isNaN(quantity)) return;
-            if (quantity !== line.quantity) void updateStock({ ...line, quantity });
-          }}
-        />
+        <Field label="Price">
+          <TextInput
+            aria-label="Price"
+            defaultValue={formatCopper(line.copper)}
+            onBlur={(event) => {
+              const copper = parsePrice(event.target.value);
+              if (copper !== null && copper !== line.copper) void updateStock({ ...line, copper });
+            }}
+          />
+        </Field>
+        <Field label="Quantity" hint="Blank if unlimited.">
+          <TextInput
+            aria-label="Quantity, blank if unlimited"
+            defaultValue={line.quantity === null ? "" : String(line.quantity)}
+            onBlur={(event) => {
+              const raw = event.target.value.trim();
+              const quantity = raw === "" ? null : Math.max(0, Math.floor(Number(raw)));
+              if (raw !== "" && Number.isNaN(quantity)) return;
+              if (quantity !== line.quantity) void updateStock({ ...line, quantity });
+            }}
+          />
+        </Field>
       </div>
       <RemoveButton
         className="self-start"
@@ -640,25 +648,29 @@ function AddGood({ shopId }: { shopId: string }) {
         }
       }}
     >
-      <TextInput
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        placeholder="Good"
-        aria-label="New item"
-      />
+      <Field label="New item">
+        <TextInput
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          aria-label="New item"
+        />
+      </Field>
       <div className="grid grid-cols-2 gap-2">
-        <TextInput
-          value={price}
-          onChange={(event) => setPrice(event.target.value)}
-          placeholder="2 gp"
-          aria-label="New price"
-        />
-        <TextInput
-          value={qty}
-          onChange={(event) => setQty(event.target.value)}
-          placeholder="Qty"
-          aria-label="New quantity"
-        />
+        <Field label="Price">
+          <TextInput
+            value={price}
+            onChange={(event) => setPrice(event.target.value)}
+            placeholder="2 gp"
+            aria-label="New price"
+          />
+        </Field>
+        <Field label="Quantity" hint="Blank if unlimited.">
+          <TextInput
+            value={qty}
+            onChange={(event) => setQty(event.target.value)}
+            aria-label="New quantity"
+          />
+        </Field>
       </div>
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}

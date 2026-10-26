@@ -25,7 +25,7 @@ try {
     await page.getByRole("dialog").waitFor();
     await page.getByRole("textbox", { name: "Holding name", exact: true }).fill("Audit ruby");
     await page.getByRole("textbox", { name: "Holding value", exact: true }).fill("12 gp");
-    await page.getByRole("button", { name: "Add holding", exact: true }).click();
+    await page.getByRole("button", { name: "Add loot", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
     await page.getByText("Audit ruby", { exact: true }).waitFor();
     await reloadApplication(page);

@@ -212,7 +212,7 @@ try {
     await dialog.getByRole("checkbox", { name: /Put in the treasure pool/ }).check();
     await noOverflow(page, `add loot ${width}`);
     await page.screenshot({ path: `test-results/loot-claims/add-loot-${width}.png` });
-    await dialog.getByRole("button", { name: "Add holding", exact: true }).click();
+    await dialog.getByRole("button", { name: "Add loot", exact: true }).click();
     await page.waitForFunction(async () => {
       const { economySnapshot } = await import("/src/lib/quire/economy.ts");
       return (await economySnapshot()).holdings.some((h) => h.name === "Silver holy symbol" && h.pool?.source === "add-loot");

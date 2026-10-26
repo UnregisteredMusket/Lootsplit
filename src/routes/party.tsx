@@ -26,7 +26,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { characterControl, type Purse } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
 import { CharacterSheetPanel } from "@/components/character-sheet";
-import { Button, Modal, Segmented, TextInput } from "@/components/ui";
+import { Button, Field, Modal, Segmented, TextInput } from "@/components/ui";
 import { RemoveButton } from "@/components/quire-ui";
 import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
@@ -927,37 +927,47 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               { value: "property", label: "Property" },
             ]}
           />
-          <TextInput
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Name"
-            aria-label="Holding name"
-          />
+          {/* Visible labels, so a filled field keeps its meaning (WCAG 3.3.2); the accessible
+              names stay "Holding …" and contain the visible label. */}
+          <Field label="Name">
+            <TextInput
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              aria-label="Holding name"
+            />
+          </Field>
           <div className="grid grid-cols-2 gap-2">
-            <TextInput
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-              placeholder="Value, 80 gp"
-              aria-label="Holding value"
-            />
-            <TextInput
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
-              aria-label="Holding quantity"
-            />
+            <Field label="Value" hint="Each, for example 80 gp.">
+              <TextInput
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                placeholder="80 gp"
+                aria-label="Holding value"
+              />
+            </Field>
+            <Field label="Quantity">
+              <TextInput
+                value={qty}
+                onChange={(event) => setQty(event.target.value)}
+                inputMode="numeric"
+                aria-label="Holding quantity"
+              />
+            </Field>
           </div>
-          <select
-            aria-label="Holding owner"
-            value={purseId}
-            onChange={(event) => setPurseId(event.target.value)}
-            className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
-          >
-            {purses.map((purse) => (
-              <option key={purse.id} value={purse.id}>
-                {purse.name}
-              </option>
-            ))}
-          </select>
+          <Field label="Owner">
+            <select
+              aria-label="Holding owner"
+              value={purseId}
+              onChange={(event) => setPurseId(event.target.value)}
+              className="min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
+            >
+              {purses.map((purse) => (
+                <option key={purse.id} value={purse.id}>
+                  {purse.name}
+                </option>
+              ))}
+            </select>
+          </Field>
           {poolable ? (
             <label className={`coin-split-rule${pool ? " is-selected" : ""}`}>
               <input type="checkbox" checked={pool} onChange={(e) => setPool(e.target.checked)} />
@@ -975,13 +985,14 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               treasure pool” is not offered.
             </p>
           ) : null}
-          <TextInput
-            aria-label="Holding category"
-            placeholder="Category (optional)"
-            value={category}
-            maxLength={80}
-            onChange={(event) => setCategory(event.target.value)}
-          />
+          <Field label="Category" hint="Optional.">
+            <TextInput
+              aria-label="Holding category"
+              value={category}
+              maxLength={80}
+              onChange={(event) => setCategory(event.target.value)}
+            />
+          </Field>
           <label className="text-sm">
             Notes & source
             <textarea
@@ -997,7 +1008,7 @@ function AddHolding({ purses }: { purses: Purse[] }) {
             </p>
           )}
           <Button type="submit" variant="secondary" disabled={saving || !purses.length}>
-            {saving ? "Adding…" : "Add holding"}
+            {saving ? "Adding…" : "Add loot"}
           </Button>
         </form>
       )}

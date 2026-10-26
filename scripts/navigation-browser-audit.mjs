@@ -248,6 +248,30 @@ try {
     await page.evaluate(() => {
       window.navigationAuditDocument = "same-document";
     });
+    // Keyboard bypass (WCAG 2.4.1): "Skip to content" is the first Tab stop on the page, shows
+    // when focused and moves focus to the screen without a route or hash change.
+    await page.locator(".settings-trigger").waitFor();
+    const firstStop = await page.evaluate(() => {
+      const focusable = [...document.querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]")]
+        .filter((el) => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length > 0);
+      const first = focusable[0];
+      return first ? first.textContent?.trim() || first.outerHTML.slice(0, 120) : `none of ${focusable.length}`;
+    });
+    assert.equal(firstStop, "Skip to content", `${width}: the skip link is the first Tab stop`);
+    const skip = page.getByRole("link", { name: "Skip to content", exact: true });
+    await skip.focus();
+    await expect(skip).toBeInViewport();
+    const before = page.url();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("main#main")).toBeFocused();
+    assert.equal(page.url(), before, `${width}: skipping keeps the address`);
+    assert.equal(await page.evaluate(() => window.navigationAuditDocument), "same-document");
+    // One Settings & Management stop: the header gear (the rail no longer repeats it).
+    assert.equal(
+      await page.getByRole("button", { name: "Settings & Management", exact: true }).count(),
+      1,
+      `${width}: one Settings & Management control`,
+    );
     await page
       .locator(".information-selectors")
       .getByRole("button", { name: "Market", exact: true })

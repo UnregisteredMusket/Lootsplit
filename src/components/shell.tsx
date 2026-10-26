@@ -173,6 +173,20 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
         splitOn ? "split-on" : [tradingWorkspace && "trading-shell", pathname === "/maps" && "maps-shell"],
       )}
     >
+      <a
+        className="app-skip"
+        href="#main"
+        onClick={(event) => {
+          // Move focus without changing the route's hash (some screens read it).
+          const main = document.getElementById("main");
+          if (!main) return;
+          event.preventDefault();
+          main.focus({ preventScroll: true });
+          main.scrollIntoView({ block: "start" });
+        }}
+      >
+        Skip to content
+      </a>
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         {splitOn ? (
           <aside
@@ -241,7 +255,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
             className="mt-8 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain"
             aria-label="Sections"
           >
-            {navLinks("rail")}
+            {navLinks("rail", { settings: false })}
           </nav>
           <div className="rounded-xl border border-lead/20 p-4 text-sm text-muted">
             <p className="text-xs tracking-widest text-lead uppercase">Campaign ledger</p>
@@ -327,6 +341,8 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
           >
           <SubmenuBackdrop pathname={pathname}>
             <main
+              id="main"
+              tabIndex={-1}
               className={cn(
                 "concept-main mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12",
                 width === "prose" ? "max-w-3xl" : "max-w-6xl",
@@ -427,7 +443,9 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
     return reason;
   }
 
-  function navLinks(layout: "tab" | "rail" | "compact") {
+  /** `settings: false` leaves out the rail's Settings button where the header gear (the same
+   * dialog) sits beside it, so keyboard users meet one Settings stop, not two. */
+  function navLinks(layout: "tab" | "rail" | "compact", { settings = true } = {}) {
     const primary = navItems(dm, pathname, search as unknown as Record<string, unknown>);
     const secondary = secondaryUrl
       ? navItems(dm, secondaryUrl.pathname, Object.fromEntries(secondaryUrl.searchParams))
@@ -452,7 +470,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
           );
         })}
         {layout === "rail" && <FeatureCards desktop />}
-        {layout === "rail" && (
+        {layout === "rail" && settings && (
           <button className="rail-settings" onClick={() => setManagement(true)}>
             <FantasyIcon ui="Settings" size={20} />
             Settings & Management

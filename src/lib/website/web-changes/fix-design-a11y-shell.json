@@ -1,0 +1,10 @@
+{
+  "title": "Faster keyboard navigation and clearer loot forms",
+  "summary": "Keyboard users can skip straight to each screen's content, and the Add loot and shop edit forms label every field.",
+  "items": [
+    "The first Tab on any app screen shows \"Skip to content\", which jumps past the navigation.",
+    "The desktop navigation has one Settings & Management stop instead of two; the gear in the header opens it.",
+    "Add loot now labels Name, Value, Quantity, Owner and Category above each field, and its button reads \"Add loot\".",
+    "Shop edit labels the shop name, shopkeeper, location, prices and quantities above each field."
+  ]
+}
