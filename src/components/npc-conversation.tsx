@@ -340,8 +340,11 @@ export function NpcConversation({
       p.control !== "npc" &&
       (dm || seat.purseIds.includes(p.id)),
   );
-  const [characterId, setCharacterId] = useState(characters[0]?.id ?? "");
-  const character = characters.find((p) => p.id === characterId);
+  // The seat is the default DM seat on the first render (a direct load or refresh), so the
+  // speaker follows the seat's characters instead of keeping that first choice.
+  const [chosenId, setCharacterId] = useState("");
+  const character = characters.find((p) => p.id === chosenId) ?? characters[0],
+    characterId = character?.id ?? "";
   const lines = npc.barter?.lines,
     say = (key: "greet" | "barter" | "bye") => lines?.[key] ?? STANCE_LINES.fair[key];
   const [step, setStep] = useState<"hub" | "barter" | "services" | "service" | "left">("hub");

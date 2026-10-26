@@ -465,9 +465,17 @@ function NpcInteraction({
         seat.purseIds.includes(p.id) ||
         world.conversations.some((c) => c.npcId === npc.id && c.purseId === p.id)),
   );
-  const [character, setCharacter] = useState(characters[0]?.id ?? ""),
+  // The seat is the default DM seat on the first render (a direct load or refresh), so
+  // choices seeded from it follow the seat instead of keeping that first value.
+  const [chosenCharacter, setCharacter] = useState(""),
+    character = characters.some((p) => p.id === chosenCharacter)
+      ? chosenCharacter
+      : (characters[0]?.id ?? ""),
     [text, setText] = useState(""),
-    [asNpc, setAsNpc] = useState(controller),
+    [speakAsNpc, setAsNpc] = useState<boolean | null>(null),
+    // Only the NPC's controller can speak as the NPC (the server refuses anyone else);
+    // a controller starts speaking as the NPC until they untick it.
+    asNpc = controller && (speakAsNpc ?? true),
     [itemName, setItemName] = useState(""),
     [qty, setQty] = useState("1"),
     [value, setValue] = useState("0"),

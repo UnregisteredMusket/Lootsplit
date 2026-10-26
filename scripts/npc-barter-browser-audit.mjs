@@ -6,7 +6,7 @@ import { expect } from "playwright/test";
 import { mkdir } from "node:fs/promises";
 import { barterFixture } from "../src/lib/quire/test-fixtures/npc-barter.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication, navigateApplication, continueIntoApp } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(origin, /^http:\/\/(127\.0\.0\.1|localhost):\d+$/, "NPC barter fixtures require a disposable server");
@@ -171,6 +171,49 @@ try {
     await expect(said(page, "Fair enough. We have a deal.")).toBeAttached();
     await fits(page, `${width} counter`);
     await page.screenshot({ path: `${output}/counter-${width}.png`, fullPage: true });
+
+    // A player seat opening the NPC page directly, then refreshing (design audit P1): the seat
+    // arrives after the first render, so the form must still speak as Bram, never as Odile.
+    await page.evaluate(async () => {
+      const seat = await import("/src/lib/quire/table.ts");
+      seat.setSeat({ ...seat.getSeat(), role: "player", purseIds: ["bram"] });
+    });
+    const interaction = page.locator(".world-card").filter({ has: page.getByRole("heading", { name: "Odile Marsh · interaction" }) });
+    const playerSays = async (text) => {
+      await expect(interaction.getByRole("combobox", { name: "Speaking character" })).toContainText("Bram Stoneward");
+      await expect(interaction.getByText("Speak as Odile Marsh")).toHaveCount(0);
+      await expect(interaction.getByRole("button", { name: "Send NPC response" })).toHaveCount(0);
+      await interaction.getByLabel("Message", { exact: true }).fill(text);
+      await interaction.getByRole("button", { name: "Speak to NPC", exact: true }).click();
+      await expect
+        .poll(async () =>
+          (await readJournal(page)).world.conversations
+            .find((c) => c.id === "odile:bram")
+            ?.messages.some((m) => m.text === text && m.author === "character"),
+        )
+        .toBe(true);
+      await expect(interaction).toContainText(`Bram Stoneward: ${text}`);
+      await expect(page.getByText("Only the configured NPC controller can respond.")).toHaveCount(0);
+    };
+    await page.goto(origin + "/features/npcs?npc=odile");
+    await continueIntoApp(page);
+    await playerSays("Good day, Odile.");
+    await reloadApplication(page);
+    await playerSays("Back again after a refresh.");
+    // The barter conversation speaks as Bram too: his goods, not the DM's first character's.
+    await reply(page, "I'd like to make you an offer.").click();
+    await expect(giveColumn(page).getByRole("button", { name: /^Wolf pelt/ })).toBeVisible();
+    await expect(giveColumn(page).getByRole("button", { name: /^Lucky bone dice/ })).toHaveCount(0);
+    await fits(page, `${width} player talk`);
+    await page.screenshot({ path: `${output}/player-talk-${width}.png`, fullPage: true });
+    // In-app route: Market → People & NPCs → Odile, without a reload.
+    await navigateApplication(page, origin + "/market");
+    await navigateApplication(page, origin + "/features/npcs?npc=odile");
+    await playerSays("And once more from the market.");
+    await page.evaluate(async () => {
+      const seat = await import("/src/lib/quire/table.ts");
+      seat.setSeat({ ...seat.getSeat(), role: "dm", purseIds: [] });
+    });
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");
