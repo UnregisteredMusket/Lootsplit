@@ -1,0 +1,10 @@
+{
+  "title": "Duplicate shops, encounters and NPCs; filters that stay put",
+  "summary": "DMs can copy a shop with its stock, an encounter with its loot, or an NPC's setup in one step, and list filters are remembered per campaign.",
+  "items": [
+    "Duplicate shop makes \"<name> (copy)\" with the same settings and stock; the original is untouched.",
+    "Duplicate on a saved encounter makes a fresh draft with the same combatants and loot, reset to round 1.",
+    "Duplicate NPC opens a new NPC form filled from the original; the copy starts with no coins or items.",
+    "Review Inbox's type filter and the inventory's Holder, Category and Equipped filters are remembered for each campaign on this device."
+  ]
+}

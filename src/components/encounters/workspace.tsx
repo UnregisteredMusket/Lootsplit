@@ -66,6 +66,7 @@ import {
   sortInitiative,
 } from "@/lib/encounters/model.mjs";
 import { requestConfirm } from "@/lib/quire/confirm-store";
+import { duplicateEncounter } from "@/lib/encounters/duplicate";
 import {
   assignLoot,
   gpInputText,
@@ -455,6 +456,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
                   dirty.current = v;
                 }}
                 onSaved={() => setRefresh((v) => v + 1)}
+                onDuplicate={(body) => void create(duplicateEncounter(body))}
               />
             ) : (
               <div className="encounter-panel encounter-empty">
@@ -484,11 +486,14 @@ function EncounterEditor({
   initialTab,
   onDirty,
   onSaved,
+  onDuplicate,
 }: {
   id: string;
   initialTab?: string;
   onDirty: (v: boolean) => void;
   onSaved: () => void;
+  /** Duplicate (design Q9): create a fresh draft from this saved encounter, with its loot. */
+  onDuplicate?: (body: Encounter) => void;
 }) {
   const seat = useSeat();
   const router = useRouter();
@@ -1020,6 +1025,15 @@ function EncounterEditor({
           >
             Export draft
           </button>
+          {onDuplicate && detail.readOnly !== true && (
+            <button
+              disabled={busy || dirty}
+              title={dirty ? "Save or reload first: the copy is made from the saved encounter." : undefined}
+              onClick={() => onDuplicate(detail.body as Encounter)}
+            >
+              Duplicate
+            </button>
+          )}
           {detail.status === "draft" && (
             <button disabled={locked || dirty} onClick={() => void action("start")}>
               Start encounter

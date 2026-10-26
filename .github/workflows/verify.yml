@@ -264,6 +264,9 @@ jobs:
       - name: dev-review-inbox
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-review-inbox 300 node scripts/review-inbox-browser-audit.mjs
+      - name: dev-duplicate-filters
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-duplicate-filters 240 node scripts/duplicate-filters-browser-audit.mjs
       - name: dev-command-palette
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-command-palette 240 node scripts/command-palette-browser-audit.mjs

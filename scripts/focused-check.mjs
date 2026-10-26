@@ -19,6 +19,7 @@ const featureAudits = {
   "journey-planner": "scripts/journey-planner-browser-audit.mjs",
   "party-split": "scripts/party-split-browser-audit.mjs",
   "quest-log": "scripts/quest-log-browser-audit.mjs",
+  "duplicate-filters": "scripts/duplicate-filters-browser-audit.mjs",
   services: "scripts/services-browser-audit.mjs",
   "themed-confirm": "scripts/themed-confirm-browser-audit.mjs",
   "market-shops": "scripts/market-shops-browser-audit.mjs",
