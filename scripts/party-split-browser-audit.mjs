@@ -196,7 +196,8 @@ try {
     await frame.getByRole("button", { name: "Fit map", exact: true }).click();
     await noOverflow(page, `map ${width}`);
     await page.screenshot({ path: `${out}/map-${width}.png` });
-    await frame.locator('button[title="What you can use at the party\'s location"]').click();
+    // Here (E) lives in the map tools since the map controls redesign.
+    await frame.getByRole("button", { name: /^Here/ }).click();
     const here = page.getByRole("region", { name: "Here", exact: true });
     await here.getByRole("group", { name: "Whose place" }).getByRole("button", { name: "Ironhold riders" }).click();
     await here.getByText("Ironhold riders is in Ironhold").waitFor();

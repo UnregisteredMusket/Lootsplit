@@ -326,6 +326,7 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(
         frame.getByRole("button", { name: "Encounter grid active", exact: true }),
       ).toBeDisabled();
+      await closeMapSettings(page);
       await frame.getByRole("button", { name: "Initiative", exact: true }).click();
       await combat.getByRole("button", { name: "Open encounter tracker", exact: true }).click();
       await combat.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
