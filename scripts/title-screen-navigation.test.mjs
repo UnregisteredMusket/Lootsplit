@@ -23,3 +23,19 @@ test("navigation discovery survives a replaced link list and clicks the visible 
   await navigateApplication(page,new URL(href,current).href);
   assert.equal(snapshots,1);assert.equal(clicked,1);
 });
+
+test("navigation discovery ignores in-page anchors such as the skip link", async () => {
+  let current = "http://127.0.0.1:8080/market", clicked = [];
+  const page = {
+    url: () => current,
+    locator(selector) {
+      if (selector === "a[href]") return { evaluateAll: async (read) => read([{ getAttribute: () => "#main" }, { getAttribute: () => "/market?book=" }]) };
+      if (selector === ".loot-opening") return { count: async () => 0 };
+      return { first: () => ({ isVisible: async () => true, click: async () => { clicked.push(selector); current = "http://127.0.0.1:8080/market?book="; } }) };
+    },
+    waitForURL: async (matches) => assert.equal(matches(new URL(current)), true),
+    goto: async () => { throw Error("A visible router link must preserve the running document"); },
+  };
+  await navigateApplication(page, "http://127.0.0.1:8080/market");
+  assert.deepEqual(clicked, [`a[href=${JSON.stringify("/market?book=")}]:visible`]);
+});
