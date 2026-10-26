@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A tappable severity count: the visible chip outline inside a larger touch target (44 dp tall on the 4×4 face).
+     Tapping it opens Diagnostics showing that severity (design plan M6). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:drawable="@drawable/chip_border"
+    android:insetLeft="2dp" android:insetRight="2dp" android:insetTop="11dp" android:insetBottom="11dp" />

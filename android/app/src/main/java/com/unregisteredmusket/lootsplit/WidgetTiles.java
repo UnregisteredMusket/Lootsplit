@@ -298,6 +298,9 @@ final class WidgetTiles {
         view.setTextViewText(v.apply("tile_detail"), tile.optString("detail"));
         view.setContentDescription(root, tile.optString("description") + (open ? ". Expanded; tap to collapse." : ". Tap to expand."));
         view.setOnClickFillInIntent(root, new Intent().putExtra(OwnerWidgetProvider.ROW_ID, tile.optString("id")));
+        // The header toggles the tile like the rest of it, except on the expanded Traffic tile, where the
+        // whole header switches 24h/7d (set below). Always set, so a recycled row never keeps an old target.
+        view.setOnClickFillInIntent(v.apply("tile_header"), new Intent().putExtra(OwnerWidgetProvider.ROW_ID, tile.optString("id")));
         view.setViewVisibility(v.apply("usage_gauges"), View.GONE);
         // Value line: "15.5k req · 12 err" with the error count in its status colour.
         SpannableStringBuilder value = new SpannableStringBuilder(tile.optString("value", "—"));
@@ -344,8 +347,11 @@ final class WidgetTiles {
         int day = v.apply("tile_seg_24h"), week = v.apply("tile_seg_7d");
         view.setViewVisibility(day, toggle ? View.VISIBLE : View.GONE);
         view.setViewVisibility(week, toggle ? View.VISIBLE : View.GONE);
+        if (!toggle) view.setContentDescription(v.apply("tile_header"), null);
         if (toggle) {
             boolean sevenDays = "7d".equals(tile.optString("range"));
+            view.setOnClickFillInIntent(v.apply("tile_header"), new Intent().putExtra(OwnerWidgetProvider.ROW_ID, sevenDays ? RANGE_24H : RANGE_7D));
+            view.setContentDescription(v.apply("tile_header"), (sevenDays ? "Showing seven days" : "Showing twenty-four hours") + ". Tap to show " + (sevenDays ? "twenty-four hours" : "seven days"));
             for (int seg : new int[]{day, week}) {
                 boolean on = (seg == week) == sevenDays;
                 view.setInt(seg, "setBackgroundColor", on ? p.line : p.tile);

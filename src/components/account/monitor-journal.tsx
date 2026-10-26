@@ -11,6 +11,12 @@ import {
   type MonitorReport,
   type MonitorSettings,
 } from "@/lib/monitor/types";
+import {
+  DIAGNOSTIC_SEVERITIES,
+  diagnosticSeverity,
+  monitorHash,
+  type DiagnosticSeverity,
+} from "@/lib/monitor/diagnostics-filter";
 
 const deniesAccess = (failure: unknown) => {
   const status = (failure as { status?: unknown } | null)?.status;
@@ -56,8 +62,15 @@ type Registry = {
 };
 const currentTab = (): Tab | null => {
   if (typeof window === "undefined") return null;
-  const id = window.location.hash.replace("#monitor-", "");
-  return tabs.includes(id as Tab) ? (id as Tab) : null;
+  return monitorHash(window.location.hash).tab;
+};
+/** A widget count chip opens `#monitor-diagnostics-<severity>`: Diagnostics showing only that severity. */
+const currentSeverity = (): DiagnosticSeverity | null =>
+  typeof window === "undefined" ? null : monitorHash(window.location.hash).severity;
+const severityNames: Record<DiagnosticSeverity, string> = {
+  critical: "✕ Critical",
+  warning: "! Warning",
+  info: "i Info",
 };
 function EvidenceLinks({ links = [] }: { links?: Evidence[] }) {
   return (
@@ -186,6 +199,7 @@ export function MonitorTaskSummary({ data, now }: { data: JournalSnapshot; now: 
 /** Shared website/bundled Android owner controls. Only current-session requests supply private data. */
 export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refresh: () => void }) {
   const [tab, setTab] = useState<Tab | null>(currentTab);
+  const [severity, setSeverity] = useState<DiagnosticSeverity | null>(currentSeverity);
   const [entries, setEntries] = useState<MonitorEntry[]>([]),
     [next, setNext] = useState<string | null>(null);
   const [query, setQuery] = useState(""),
@@ -201,7 +215,10 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
     () => localStorage.getItem("lootsplit.monitor.reduced-motion") === "true",
   );
   useEffect(() => {
-    const open = () => setTab(currentTab());
+    const open = () => {
+      setTab(currentTab());
+      setSeverity(currentSeverity());
+    };
     window.addEventListener("hashchange", open);
     window.addEventListener("lootsplit-monitor-destination", open);
     return () => {
@@ -209,6 +226,11 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
       window.removeEventListener("lootsplit-monitor-destination", open);
     };
   }, []);
+  useEffect(() => {
+    // A widget count chip's link (#monitor-diagnostics-critical) names no element; bring Diagnostics into view.
+    if (tab === "diagnostics" && currentSeverity())
+      document.getElementById("monitor-diagnostics")?.scrollIntoView({ block: "start" });
+  }, [tab, severity]);
   useEffect(() => {
     document.querySelector(".owner-monitor")?.setAttribute("data-reduced-motion", String(reduced));
   }, [reduced]);
@@ -844,41 +866,69 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
           <p>
             {data.overall?.label}: {data.overall?.reason}
           </p>
-          {data.diagnostics?.map((check) => (
-            <article key={check.component} className="monitor-entry">
-              <strong className="monitor-change" key={check.color}>
-                <span className="monitor-light" data-color={check.color} aria-hidden="true">
-                  ●
-                </span>{" "}
-                {check.component} · {diagnosticLabel(check)}
-              </strong>
-              <p>{check.symptom}</p>
-              {check.lastAt ? (
+          <div className="monitor-filters" role="group" aria-label="Show diagnostics by severity">
+            <button
+              type="button"
+              aria-pressed={severity === null}
+              onClick={() => setSeverity(null)}
+            >
+              All
+            </button>
+            {DIAGNOSTIC_SEVERITIES.map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={severity === value}
+                onClick={() => setSeverity(value)}
+              >
+                {severityNames[value]} (
+                {data.diagnostics?.filter((check) => diagnosticSeverity(check) === value).length ??
+                  0}
+                )
+              </button>
+            ))}
+          </div>
+          {severity &&
+            !data.diagnostics?.some((check) => diagnosticSeverity(check) === severity) && (
+              <p>No {severity} diagnostics in this reading.</p>
+            )}
+          {data.diagnostics
+            ?.filter((check) => !severity || diagnosticSeverity(check) === severity)
+            .map((check) => (
+              <article key={check.component} className="monitor-entry">
+                <strong className="monitor-change" key={check.color}>
+                  <span className="monitor-light" data-color={check.color} aria-hidden="true">
+                    ●
+                  </span>{" "}
+                  {check.component} · {diagnosticLabel(check)}
+                </strong>
+                <p>{check.symptom}</p>
+                {check.lastAt ? (
+                  <p>
+                    {check.brief ? `${check.brief} · ` : ""}last {dated(check.lastAt)}
+                  </p>
+                ) : null}
                 <p>
-                  {check.brief ? `${check.brief} · ` : ""}last {dated(check.lastAt)}
+                  {check.impact} {check.action}
                 </p>
-              ) : null}
-              <p>
-                {check.impact} {check.action}
-              </p>
-              <details>
-                <summary>Check times and technical details</summary>
-                <p>
-                  First occurrence: {dated(check.firstOccurredAt)} · latest check:{" "}
-                  {dated(check.latestCheckAt)} · last success: {dated(check.lastSuccessAt)} ·
-                  duration {duration(check.durationMs)}
-                </p>
-                <p>
-                  Error code: {check.errorCode || "Unavailable"} · confirmed cause:{" "}
-                  {check.confirmedCause || "Not established"} · suspected cause:{" "}
-                  {check.suspectedCause || "Not established"}
-                </p>
-                {check.retainedFailure && (
-                  <p>A later disconnection has not cleared the previous confirmed failure.</p>
-                )}
-              </details>
-            </article>
-          ))}
+                <details>
+                  <summary>Check times and technical details</summary>
+                  <p>
+                    First occurrence: {dated(check.firstOccurredAt)} · latest check:{" "}
+                    {dated(check.latestCheckAt)} · last success: {dated(check.lastSuccessAt)} ·
+                    duration {duration(check.durationMs)}
+                  </p>
+                  <p>
+                    Error code: {check.errorCode || "Unavailable"} · confirmed cause:{" "}
+                    {check.confirmedCause || "Not established"} · suspected cause:{" "}
+                    {check.suspectedCause || "Not established"}
+                  </p>
+                  {check.retainedFailure && (
+                    <p>A later disconnection has not cleared the previous confirmed failure.</p>
+                  )}
+                </details>
+              </article>
+            ))}
           <h4>Android device reports</h4>
           {data.devices?.length ? (
             data.devices.map((d) => (
