@@ -688,6 +688,8 @@ function Account() {
                                 setNotice(
                                   "Shared campaign deleted. Its saved state is in Cloud backups.",
                                 );
+                                // Its private backup (and Restore shared records) is in Backups.
+                                chooseTab("backups");
                               })}
                             >
                               Delete shared campaign
