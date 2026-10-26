@@ -320,6 +320,12 @@ try {
       0,
     );
     await page.screenshot({ path: `${output}/player-help-${width}.png`, fullPage: true });
+    // W-3: a player can explicitly switch the in-app guide to the DM guide and back.
+    const guideFor = guide.getByRole("group", { name: "Guide for", exact: true });
+    await guideFor.getByRole("button", { name: "Dungeon Masters", exact: true }).click();
+    await expect(guide.getByRole("heading", { name: "Dungeon Master guide", exact: true })).toBeVisible();
+    await guideFor.getByRole("button", { name: "Players", exact: true }).click();
+    await expect(guide.getByRole("heading", { name: "Player guide", exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
     await page.locator(".settings-trigger:visible").first().click();
     const settings = page.getByRole("dialog", { name: "Settings & Management", exact: true });

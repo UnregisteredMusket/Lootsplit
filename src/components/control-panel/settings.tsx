@@ -158,7 +158,7 @@ export function ManagementPanel({
           name: "Help & administration",
           icon: "Help",
           links: [
-            ["Guides & help", "/help"],
+            ["Guides & help", "/help?guide=dm"],
             ["Report a bug", "/account#bug-reports"],
             ["Authorized staff tools", "/account#account-administration"],
             ["Website, downloads & resources", "/welcome"],
@@ -212,7 +212,7 @@ export function ManagementPanel({
           name: "Help",
           icon: "Help",
           links: [
-            ["Guides & help", "/help"],
+            ["Guides & help", "/help?guide=player"],
             ["Report a bug", "/account#bug-reports"],
             ["Website & downloads", "/welcome"],
           ],
