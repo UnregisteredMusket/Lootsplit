@@ -73,11 +73,12 @@ function stamp(journal: Journal): { sessionId?: string; day?: number } {
   };
 }
 
+type ReceiptLine = { purseId: string; copper: number; summary: string };
 /** Where a reward receipt lives in this campaign (current records, then archived sessions). */
 function findReceipt(
   t: Pick<CloudTable, "ledger" | "journal">,
   link: Pick<QuestRewardLink, "kind" | "id">,
-): { purseIds: string[]; label: string } | null {
+): ReceiptLine[] | null {
   const tables: { ledger: CloudTable["ledger"]; events: Journal["events"] }[] = [
     { ledger: t.ledger, events: t.journal?.events ?? [] },
   ];
@@ -89,33 +90,37 @@ function findReceipt(
       // An unreadable archive cannot hold a linkable receipt; the others are still searched.
     }
   }
+  const line = (l: CloudTable["ledger"][number]): ReceiptLine => ({ purseId: l.purseId, copper: l.copper, summary: l.summary });
   for (const { ledger, events } of tables) {
     if (link.kind === "ledger") {
-      const line = ledger.find((l) => l.id === link.id);
-      if (line)
-        return {
-          purseIds: [line.purseId],
-          label: `${line.summary.slice(0, 120)}${line.copper ? ` · ${formatCopper(Math.abs(line.copper))}` : ""}`,
-        };
+      const found = ledger.find((l) => l.id === link.id);
+      if (found) return [line(found)];
     } else if (link.kind === "encounter-award") {
       const lines = ledger.filter((l) => l.award?.receiptId === link.id);
-      if (lines.length)
-        return {
-          purseIds: [...new Set(lines.map((l) => l.purseId))],
-          label: `${(lines[0]!.summary.replace(/:.*$/, "") || "Encounter award").slice(0, 120)}${
-            lines.some((l) => l.copper > 0) ? ` · ${formatCopper(lines.reduce((n, l) => n + Math.max(0, l.copper), 0))}` : ""
-          }`,
-        };
+      if (lines.length) return lines.map(line);
     } else {
       const event = events.find((e) => e.lootResolution?.id === link.id);
       if (event)
-        return {
-          purseIds: [...new Set(event.lootResolution!.lots.flatMap((l) => l.awards.map((a) => a.purseId)))],
-          label: "Treasure-pool resolution",
-        };
+        return event.lootResolution!.lots.flatMap((l) =>
+          l.awards.map((a) => ({ purseId: a.purseId, copper: 0, summary: "Treasure-pool resolution" })),
+        );
     }
   }
   return null;
+}
+/**
+ * A receipt's label from the given lines only: the DM's stored label uses every line; a player's
+ * is rebuilt at projection from the lines that seat can read, so no other purse's amount leaks.
+ */
+function receiptLabel(kind: QuestRewardLink["kind"], lines: ReceiptLine[]): string {
+  if (kind === "loot-resolution") return "Treasure-pool resolution";
+  const words =
+    kind === "ledger"
+      ? lines[0]!.summary.slice(0, 120)
+      : (lines[0]!.summary.replace(/:.*$/, "") || "Encounter award").slice(0, 120);
+  const copper =
+    kind === "ledger" ? Math.abs(lines[0]!.copper) : lines.reduce((n, l) => n + Math.max(0, l.copper), 0);
+  return copper ? `${words} · ${formatCopper(copper)}` : words;
 }
 
 /** Referenced records must exist when the DM saves; later deletions are skipped when shown. */
@@ -150,6 +155,11 @@ function assertDraft(t: CloudTable, draft: QuestDraft) {
   }
 }
 
+/**
+ * Existing chat notes for the players who can read the quest: one private DM message per
+ * character. A party quest is not posted to party chat, which every seat (including seats whose
+ * characters are hidden or not in the party) can read.
+ */
 function notify(
   t: CloudTable,
   quest: Quest,
@@ -158,11 +168,17 @@ function notify(
   text: string,
 ) {
   const line = `Quest · ${quest.title}: ${text}`.slice(0, 500);
-  if (quest.audience.kind === "party")
-    t.notes.push({ id: `${cmdId}-quest-note`, at, from: "dm", to: "party", purseId: "", text: line });
-  else if (quest.audience.kind === "characters")
-    for (const purseId of quest.audience.purseIds)
-      t.notes.push({ id: `${cmdId}-quest-note-${purseId}`, at, from: "dm", to: "dm", purseId, text: line });
+  const recipients =
+    quest.audience.kind === "party"
+      ? t.purses.filter((p) => partyMember(t, p)).map((p) => p.id)
+      : quest.audience.kind === "characters"
+        ? quest.audience.purseIds.filter((id) => {
+            const p = t.purses.find((x) => x.id === id);
+            return !!p && characterVisible(t, p);
+          })
+        : [];
+  for (const purseId of recipients)
+    t.notes.push({ id: `${cmdId}-quest-note-${purseId}`, at, from: "dm", to: "dm", purseId, text: line });
 }
 
 function audienceText(t: CloudTable, audience: QuestAudience) {
@@ -364,10 +380,13 @@ export function applyQuestCommand(t: CloudTable, seat: CloudSeat, cmd: QuestComm
     if (quest.rewardLinks.some(same)) return;
     if (quest.rewardLinks.length >= MAX_QUEST_REWARD_LINKS)
       throw Error(`A quest can link ${MAX_QUEST_REWARD_LINKS} receipts.`);
-    const receipt = findReceipt(t, cmd.link);
-    if (!receipt) throw Error("That receipt is not in this campaign.");
-    quest.rewardLinks.push({ ...cmd.link, label: receipt.label, at });
-    finish(`Quest reward linked: ${quest.title} · ${receipt.label}`, revealed(quest));
+    const lines = findReceipt(t, cmd.link);
+    if (!lines?.length) throw Error("That receipt is not in this campaign.");
+    // The stored label is the DM's (every line); players get one rebuilt from what they can read.
+    const label = receiptLabel(cmd.link.kind, lines);
+    quest.rewardLinks.push({ ...cmd.link, label, at });
+    // Not counted as a player-visible update: some seats cannot read the receipt at all.
+    finish(`Quest reward linked: ${quest.title} · ${label}`, false);
     return;
   }
   if (cmd.kind === "quest-archive") {
@@ -407,16 +426,29 @@ export function projectQuests(
   if (seat.role === "dm" || raw === undefined) return [];
   const own = new Set(seat.purseIds);
   const party = seatInParty(table, seat);
-  const receiptReadable = (link: QuestRewardLink) => {
-    const receipt = findReceipt(table, link);
-    if (!receipt) return false;
-    if (link.kind === "loot-resolution") return party || receipt.purseIds.some((id) => own.has(id));
-    return receipt.purseIds.some((id) => {
-      if (own.has(id)) return true;
-      const p = table.purses.find((x) => x.id === id);
-      // Party balances and their lines are shared only among the party (cloud.server.ts playerTable).
-      return !!p && party && !isNpc(table, p) && !p.nonParty && characterVisible(table, p) && inParty(table, p);
-    });
+  const treasuries = new Set((table.journal?.tradeEconomy?.exchanges ?? []).map((e) => e.purseId));
+  // The lines this seat could already read (cloud.server.ts playerTable): its own purses, and party
+  // balances (player characters and party funds travelling with the party) for seats with the party.
+  const lineReadable = (purseId: string) => {
+    if (own.has(purseId)) return true;
+    const p = table.purses.find((x) => x.id === purseId);
+    return (
+      !!p &&
+      party &&
+      !isNpc(table, p) &&
+      !p.nonParty &&
+      !treasuries.has(p.id) &&
+      characterVisible(table, p) &&
+      (p.kind === "party" || p.control !== "npc") &&
+      inParty(table, p)
+    );
+  };
+  const projectLink = (link: QuestRewardLink): QuestRewardLink[] => {
+    const lines = findReceipt(table, link);
+    if (!lines?.length) return [];
+    // A pool resolution is party-visible (projectLoot); its label carries no amounts.
+    const readable = link.kind === "loot-resolution" ? (party || lines.some((l) => own.has(l.purseId)) ? lines : []) : lines.filter((l) => lineReadable(l.purseId));
+    return readable.length ? [{ kind: link.kind, id: link.id, label: receiptLabel(link.kind, readable) }] : [];
   };
   const place = (id: string | undefined) => !!id && !context.hiddenPlaces.has(id);
   const quests = readQuests(raw)
@@ -449,7 +481,7 @@ export function projectQuests(
         log: q.log
           .filter((l) => l.shared && (!l.objectiveId || visibleObjectives.has(l.objectiveId)))
           .map((l) => ({ ...l })),
-        rewardLinks: q.rewardLinks.filter(receiptReadable).map((l) => ({ kind: l.kind, id: l.id, ...(l.label ? { label: l.label } : {}) })),
+        rewardLinks: q.rewardLinks.flatMap(projectLink),
         revision: 0,
       };
       // Permission chaining: a giver the seat cannot read is dropped, never named.

@@ -153,7 +153,11 @@ test("DM creates, reveals, updates and closes a quest; every step is stamped and
       ["objective", false, "s1"], // a hidden objective's progress stays DM-only
     ],
   );
-  assert.ok(t.notes.some((n) => n.to === "party" && n.from === "dm" && n.text.includes("Hollin's Missing Mare")));
+  // One private DM message per party character who can read it, never party chat.
+  assert.deepEqual(
+    t.notes.filter((n) => n.text.includes("Hollin's Missing Mare")).map((n) => [n.to, n.purseId]),
+    [["dm", "aria"], ["dm", "bram"], ["dm", "cass"], ["dm", "mirelle"]],
+  );
   t = run(t, { id: "c1", kind: "quest-close", questId: "q1", revision: rev(t), status: "completed", text: "The mare is home." });
   assert.equal(questsOf(t)[0]!.status, "completed");
   assert.ok(questsOf(t)[0]!.closedAt);
@@ -380,4 +384,48 @@ test("device: quest commands run through the shared engine with the same outcome
     executeLocalCommand({ id: "r2", kind: "quest-reveal", questId: "q1", revision: 0, audience: { kind: "party" } }),
     /Quest changed on another device/,
   );
+});
+
+// Privacy review of #290 (2026-10-26).
+test("review: a reward label shows a player only the amounts on lines they can read", () => {
+  const base = campaign();
+  base.ledger.push(
+    { id: "w-m", at: 2, purseId: "mirelle", shopId: null, summary: "Wolf den: share", copper: 100, award: { receiptId: "rc1", role: "coins" } },
+    { id: "w-h", at: 2, purseId: "hollin", shopId: null, summary: "Wolf den: share", copper: 90000, award: { receiptId: "rc1", role: "coins" } },
+    { id: "w-a", at: 2, purseId: "aria", shopId: null, summary: "Wolf den: share", copper: 2000, award: { receiptId: "rc1", role: "coins" } },
+  );
+  let t = run(base, { id: "q1", kind: "quest-save", questId: null, revision: null, quest: draft() });
+  t = run(t, { id: "r1", kind: "quest-reveal", questId: "q1", revision: rev(t), audience: { kind: "party" } });
+  t = run(t, { id: "w1", kind: "quest-link-reward", questId: "q1", revision: rev(t), link: { kind: "encounter-award", id: "rc1" } });
+  // The DM's stored label totals every line.
+  assert.equal(questsOf(t)[0]!.rewardLinks[0]!.label, "Wolf den · 921 gp");
+  // Mirelle (away from the party) reads only her own line; never the NPC's 900 gp.
+  const mirelle = projectRecord(t, player("mirelle"));
+  assert.deepEqual(questsOf(mirelle)[0]!.rewardLinks.map((l) => l.label), ["Wolf den · 1 gp"]);
+  assert.equal(JSON.stringify(mirelle.journal).includes("921"), false);
+  // Cass travels with the party: party members' lines (Aria's), not the NPC's or the away player's.
+  assert.deepEqual(questsOf(projectRecord(t, player("cass")))[0]!.rewardLinks.map((l) => l.label), ["Wolf den · 20 gp"]);
+});
+
+test("review: party quest messages reach only characters who can read the quest", () => {
+  const hid = campaign();
+  hid.journal!.world!.characterPositions.push({ purseId: "bram", inParty: true, locationId: "town", visible: false, sheetVisible: false });
+  let h = run(hid, { id: "q1", kind: "quest-save", questId: null, revision: null, quest: draft() });
+  h = run(h, { id: "r1", kind: "quest-reveal", questId: "q1", revision: rev(h), audience: { kind: "party" }, message: true });
+  const bram = projectRecord(h, player("bram"));
+  assert.equal(questsOf(bram).length, 0);
+  assert.equal(bram.notes.some((n) => n.text.includes("Hollin's Missing Mare")), false);
+  // NPC-controller seats and non-party characters get nothing either.
+  assert.equal(h.notes.some((n) => n.to === "party"), false);
+  assert.equal(h.notes.some((n) => ["hollin", "spy", "bram"].includes(n.purseId)), false);
+  const aria = projectRecord(h, player("aria"));
+  assert.equal(aria.notes.filter((n) => n.text.includes("Hollin's Missing Mare")).length, 1);
+});
+
+test("review: linking a receipt is not an Updated change for players", () => {
+  let t = revealedCampaign();
+  const before = questsOf(t)[0]!.updatedAt;
+  t = run(t, { id: "w1", kind: "quest-link-reward", questId: "q1", revision: rev(t), link: { kind: "ledger", id: "advance" } });
+  assert.equal(questsOf(t)[0]!.updatedAt, before);
+  assert.equal(questsOf(projectRecord(t, player("mirelle")))[0]!.updatedAt, before);
 });

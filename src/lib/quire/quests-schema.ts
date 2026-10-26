@@ -173,7 +173,7 @@ export const questDraftSchema = z
   .strict();
 export type QuestDraft = z.infer<typeof questDraftSchema>;
 
-/** Also post existing chat notes: party chat, or one private DM message per listed character. */
+/** Also post existing chat notes: one private DM message per character who can read the quest. */
 const message = z.boolean().optional();
 /** The quest revision the DM saw; null creates a new quest whose ID is the command ID. */
 const expected = { questId: id, revision };
