@@ -1,0 +1,11 @@
+{
+  "title": "Map tools: a tidy rail on the right",
+  "summary": "On computers and tablets the map tools now stand in one column on the right instead of a bar across the middle of the map. Phones keep the familiar bottom bar.",
+  "items": [
+    "Tools are grouped: Move, Play, Table and View, with Here and Plan journey now in the same place as everything else.",
+    "Tool names show beside the rail the first time; hide them whenever you like, and hover or long-press an icon to see its name and shortcut.",
+    "New Layers panel: choose what shows on the map and turn the grid display on or off.",
+    "New shortcuts: D draw, J plan a journey, E here, L layers, and I for the DM's encounter controls.",
+    "Zoom is now a small pill in the bottom-right corner."
+  ]
+}

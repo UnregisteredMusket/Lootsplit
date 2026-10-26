@@ -72,7 +72,7 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await page.keyboard.press("Escape");
   await expect(moreTools).toHaveAttribute("aria-expanded", "false");
   await page.getByRole("button", { name: "Fit map", exact: true }).click();
-  await page.getByRole("button", { name: "Drawing & annotations", exact: true }).click();
+  await page.getByRole("button", { name: "Draw & notes", exact: true }).click();
   const box = await canvas.boundingBox();
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.3);
   await page.mouse.down();
