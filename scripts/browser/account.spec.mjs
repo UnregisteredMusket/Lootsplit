@@ -970,7 +970,8 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
   await Promise.all([
     (async () => {
       await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
-      await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+      // The join link looks up its characters by itself (plan Q15); the expired session is
+      // reported once, without a Find characters tap.
       await expect(
         guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
       ).toBeVisible();
