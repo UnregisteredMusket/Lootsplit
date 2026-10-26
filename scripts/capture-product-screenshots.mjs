@@ -292,7 +292,17 @@ async function save(page, name) {
   await page.screenshot({ path: `${output}/${name}.png`, animations: "disabled" });
 }
 
+/** Desktop shots that also get a 390-wide phone capture, `<name>-phone` (W-4): the website
+ * serves it below 700 px so phone visitors can read the screen. Same synthetic campaign. */
+const PHONE_VARIANTS = new Set(["ledger", "character", "market", "maps", "encounter", "properties", "downtime", "room", "journal"]);
+const PHONE = { width: 390, height: 560, scale: 2 };
+
 async function shot(name, options, fn) {
+  await captureShot(name, options, fn);
+  if (PHONE_VARIANTS.has(name)) await captureShot(`${name}-phone`, PHONE, fn);
+}
+
+async function captureShot(name, options, fn) {
   if (only.size && !only.has(name)) return;
   const started = Date.now();
   let device;
