@@ -3,6 +3,7 @@ import { CharacterTabs } from "./workspace-tabs";
 import "./character-improvements.css";
 import { FeatureLink } from "../feature-navigation";
 import { ImportCharacterSheet } from "./import-sheet";
+import { CoinAmountInput } from "@/components/finance-input";
 import { canEditCharacterField, characterPermissions } from "@/lib/characters/permissions.mjs";
 import { usePrefs } from "@/lib/quire/prefs";
 import { FantasyIcon } from "@/components/fantasy-icon";
@@ -1308,7 +1309,10 @@ function CharacterEditor({
                     onChange={(v) => set("hitDice", v)}
                   />
                   {sheet.resources.map((r, i) => (
-                    <div className="resource-row" key={keysFor("resources", sheet.resources.length)[i]}>
+                    <div
+                      className="resource-row"
+                      key={keysFor("resources", sheet.resources.length)[i]}
+                    >
                       <Text
                         label={`Resource ${i + 1} name`}
                         value={r.name}
@@ -1826,6 +1830,21 @@ function CharacterEditor({
                         }
                       />
                     </div>
+                    {(canManageInventory || (item.unitCopper || 0) > 0) && (
+                      <CoinAmountInput
+                        label={`${item.name} value each (cp)`}
+                        value={item.unitCopper || 0}
+                        required={false}
+                        disabled={!canManageInventory}
+                        onChange={(raw) => {
+                          const v = Math.max(0, Math.floor(Number(raw) || 0));
+                          set(
+                            "equipment",
+                            sheet.equipment.map((x, j) => (j === i ? { ...x, unitCopper: v } : x)),
+                          );
+                        }}
+                      />
+                    )}
                     <Check
                       label={`Equip ${item.name}`}
                       value={item.equipped}
@@ -1885,6 +1904,32 @@ function CharacterEditor({
                     Add equipment
                   </button>
                 )}
+                {canManageInventory &&
+                  sheet.equipment.some((x) => !(x.unitCopper || 0) && x.kind !== "property") && (
+                    <button
+                      onClick={async () => {
+                        const { loadSrdIndex, valueEquipment } =
+                          await import("@/lib/quire/srd-item-values");
+                        const result = valueEquipment(
+                          await loadSrdIndex(),
+                          sheet.equipment,
+                          sheet.edition,
+                        );
+                        set("equipment", result.equipment);
+                        setNotice(
+                          result.valued.length
+                            ? `Filled ${result.valued.length} value${result.valued.length === 1 ? "" : "s"} from the SRD.${
+                                result.unmatched.length
+                                  ? ` No SRD match: ${result.unmatched.join(", ")}.`
+                                  : ""
+                              } Review, then Save character.`
+                            : "No unpriced items matched the SRD.",
+                        );
+                      }}
+                    >
+                      Fill missing values from the SRD
+                    </button>
+                  )}
               </section>
             )}
             {tab === "details" && (
@@ -2620,7 +2665,8 @@ function DmCampaigns({ campaigns }: { campaigns: Campaign[] }) {
   );
 }
 function ReferenceSearch({ onAdd }: { onAdd: (e: OpenEntry) => void }) {
-  const lookup = useReferenceAccess(), access = lookup.access("spells");
+  const lookup = useReferenceAccess(),
+    access = lookup.access("spells");
   const [query, setQuery] = useState(""),
     [edition, setEdition] = useState<"srd-2014" | "srd-2024">("srd-2014"),
     [entries, setEntries] = useState<OpenEntry[]>([]),
@@ -2628,9 +2674,17 @@ function ReferenceSearch({ onAdd }: { onAdd: (e: OpenEntry) => void }) {
     [busy, setBusy] = useState(false);
   const request = useRef(0);
   useEffect(() => {
-    request.current++; setEntries([]); setError(""); setBusy(false);
+    request.current++;
+    setEntries([]);
+    setError("");
+    setBusy(false);
   }, [access.allowed]);
-  useEffect(() => () => { request.current++; }, []);
+  useEffect(
+    () => () => {
+      request.current++;
+    },
+    [],
+  );
   if (!access.allowed) return <p role="status">{access.reason}</p>;
   return (
     <details>
