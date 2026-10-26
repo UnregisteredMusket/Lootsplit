@@ -19,6 +19,7 @@ import {
   refreshRecoveryVisibility,
 } from "@/lib/quire/cloud-client";
 import { Button } from "@/components/ui";
+import { useUnmatchedRoute } from "@/lib/website/not-found-route";
 import { DeviceRecovery } from "./device-recovery";
 import { roomLifecycleLabels } from "@/lib/quire/room-state";
 
@@ -38,6 +39,8 @@ const publicPaths = new Set([
 export function CampaignGate({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const search = useRouterState({ select: (s) => s.location.searchStr });
+  // The website's not-found page needs no campaign access (W-1).
+  const notFound = useUnmatchedRoute();
   useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const [identityEpoch, setIdentityEpoch] = useState(0);
   useEffect(() => {
@@ -119,6 +122,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
   if (
     publicPaths.has(path) ||
     path.startsWith("/community/") ||
+    notFound ||
     allowed ||
     !!sessionStorage.getItem("lootsplit.player.reconnect.v1") ||
     invitation ||
