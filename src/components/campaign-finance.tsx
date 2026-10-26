@@ -15,6 +15,7 @@ import { readFinance, type Terms, type Debt } from "@/lib/quire/finance";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import type { CommandInput } from "@/lib/quire/commands";
 import { Button } from "./ui";
+import { Disclosure } from "./disclosure";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 const defaults: Terms = {
   name: "",
@@ -166,8 +167,7 @@ export function CampaignFinance({
             />
             Remind me to set downtime before sessions
           </label>
-          <details open={pending ? true : undefined}>
-            <summary>Set downtime & review calculations</summary>
+          <Disclosure variant="section" open={pending ? true : undefined} summary="Set downtime & review calculations">
             <form
               className="mt-4 grid gap-3"
               onSubmit={(e) => {
@@ -296,12 +296,11 @@ export function CampaignFinance({
                   </div>
                 ))}
                 {pending.quote.market?.map((m) => (
-                  <details key={m.shopId}>
-                    <summary>
+                  <Disclosure variant="inline" key={m.shopId} summary={<>
                       {shops.find((s) => s.id === m.shopId)?.name || "Shop"}:{" "}
                       {m.closed ? "closed" : "open"} after downtime ·{" "}
                       {m.stock.filter((s) => s.after > s.before).length} stock lines topped up.
-                    </summary>
+                    </>}>
                     {m.stock.map((line) => (
                       <p key={line.id}>
                         {stock.find((s) => s.id === line.id)?.name || "Stock record"}: {line.before}{" "}
@@ -314,11 +313,10 @@ export function CampaignFinance({
                       .map((line) => (
                         <p key={line.id}>{line.name}: unlimited, unchanged.</p>
                       ))}
-                  </details>
+                  </Disclosure>
                 ))}
                 {pending.quote.propertyOperations && (
-                  <details open>
-                    <summary>Property work, deliveries & manager orders</summary>
+                  <Disclosure variant="inline" open summary="Property work, deliveries & manager orders">
                     {pending.quote.propertyOperations.state.jobs
                       .filter((j) => ["active", "blocked", "completed"].includes(j.status))
                       .map((j) => (
@@ -339,17 +337,16 @@ export function CampaignFinance({
                       These property results are applied together with the approved campaign days.
                       Review blocked results before starting the next session.
                     </p>
-                  </details>
+                  </Disclosure>
                 )}
                 {(pending.quote.blacksmith || pending.quote.services) && (
                   // One fold for the forge and workshops, so the screen doesn't grow per kind.
-                  <details className="mt-3" open>
-                    <summary>
+                  <Disclosure variant="inline" className="mt-3" open summary={<>
                       Commissions ·{" "}
                       {(pending.quote.blacksmith?.notices.length ?? 0) +
                         (pending.quote.services?.notices.length ?? 0)}{" "}
                       in progress
-                    </summary>
+                    </>}>
                     {pending.quote.blacksmith && (
                       <>
                         <h3>Blacksmith commissions</h3>
@@ -380,13 +377,12 @@ export function CampaignFinance({
                       work waits where it was ordered; a delivered letter lands in the sender's thread with its
                       recipient when you approve, and you answer there as the NPC.
                     </p>
-                  </details>
+                  </Disclosure>
                 )}
                 {journal.services?.providers.some((p) => p.kind === "inn") && (
-                  <details className="mt-3">
-                    <summary>Inn stays · nothing recurring</summary>
+                  <Disclosure variant="inline" className="mt-3" summary="Inn stays · nothing recurring">
                     <p className="text-sm">Stays are booked and paid up front, so downtime charges nothing here.</p>
-                  </details>
+                  </Disclosure>
                 )}
                 {pending.quote.tradeSeason && (
                   <TradeSeasonReview quote={pending.quote.tradeSeason} />
@@ -442,15 +438,14 @@ export function CampaignFinance({
                 )}
               </div>
             )}
-          </details>
+          </Disclosure>
         </>
       )}
       {(section === "all" || section === "bank") && (
-        <details open={section === "bank" ? true : undefined}>
-          <summary>
+        <Disclosure variant="section" open={section === "bank" ? true : undefined} summary={<>
             Loans & repayments · {f.loans.filter((l) => l.principal + l.interest > 0).length}{" "}
             outstanding
-          </summary>
+          </>}>
           {f.loans.map((l) => (
             <div className="journal-entry" key={l.id} id={loanRecordId(l.id)}>
               <strong>
@@ -728,11 +723,10 @@ export function CampaignFinance({
               </Button>
             )}
           </form>
-        </details>
+        </Disclosure>
       )}
       {(section === "all" || section === "settings") && (
-        <details open={section === "settings" ? true : undefined}>
-          <summary>Recurring revenue & expenses</summary>
+        <Disclosure variant="section" open={section === "settings" ? true : undefined} summary="Recurring revenue & expenses">
           {f.rules.map((r) => (
             <div
               className="journal-entry"
@@ -913,16 +907,14 @@ export function CampaignFinance({
               </Button>
             </fieldset>
           </form>
-        </details>
+        </Disclosure>
       )}
       {(section === "all" || section === "downtime") && (
-        <details>
-          <summary>Downtime history</summary>
+        <Disclosure variant="section" summary="Downtime history">
           {[...f.downtime].reverse().map((d) => (
-            <details key={d.id} className="journal-entry">
-              <summary>
+            <Disclosure variant="inline" key={d.id} className="journal-entry" summary={<>
                 {d.name} · {d.days} days · {d.status}
-              </summary>
+              </>}>
               <p className="text-sm">
                 Day {d.fromDay} → {d.fromDay + d.days}
                 {d.appliedAt
@@ -935,9 +927,9 @@ export function CampaignFinance({
                   · Interest {formatCopper(l.interest)} · Unpaid {formatCopper(l.unpaid)}
                 </p>
               ))}
-            </details>
+            </Disclosure>
           ))}
-        </details>
+        </Disclosure>
       )}
     </details>
   );

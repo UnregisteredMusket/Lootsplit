@@ -1,0 +1,9 @@
+{
+  "title": "One look for folds",
+  "summary": "Sections that open and close on Downtime, Party, Market and shop pages now share one look.",
+  "items": [
+    "Every fold has the same chevron on the right, the same 44 px row to tap and the same keyboard focus ring.",
+    "Small details inside a section use a compact row with the chevron first.",
+    "Folds still open and close as before, and the exchange board still remembers whether you left it open."
+  ]
+}

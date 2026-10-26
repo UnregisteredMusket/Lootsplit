@@ -15,6 +15,7 @@ import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { SearchSelect } from "./search-select";
 import { CommandForm, CommandButton } from "./world-tools";
 import { Fold } from "./ui";
+import { Disclosure } from "./disclosure";
 import { AppLink } from "./app-link";
 import { PaidLessons } from "./service-lessons";
 import { formatCopper } from "@/lib/quire/money";
@@ -74,8 +75,7 @@ export function DowntimeActivities({
           <p>
             Split approved hours across activities. Ship travel uses no personal downtime hours.
           </p>
-          <details className="downtime-rules">
-            <summary>Time rules & training eligibility</summary>
+          <Disclosure variant="inline" className="downtime-rules" summary="Time rules & training eligibility">
             <p>
               A calendar day is 24 elapsed hours. Each approved downtime day provides{" "}
               {state.settings.hoursPerDay} usable hours per character. One training day is{" "}
@@ -92,7 +92,7 @@ export function DowntimeActivities({
               specified. Trainer and NPC must be together. Training allocates the same hours to both
               participants. Missing sheets or unrecognized class levels require a DM review note.
             </p>
-          </details>
+          </Disclosure>
           {pending && (
             <p role="status">
               The DM must approve or cancel the campaign preview before allocating hours.

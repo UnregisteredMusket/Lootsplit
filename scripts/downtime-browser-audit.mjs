@@ -69,6 +69,37 @@ async function fits(page) {
     "Training controls fit viewport",
   );
 }
+// Design plan, dm-mobile #18: the Downtime screen's folds share one Disclosure look (native
+// details/summary), each with one chevron and a 44 px hit area, operable from the keyboard.
+async function disclosures(page) {
+  const rows = await page.locator("main details.disclosure").evaluateAll((all) =>
+    all.map((d) => {
+      const s = d.querySelector(":scope > summary");
+      return {
+        text: s?.textContent?.trim().slice(0, 60),
+        height: s?.getBoundingClientRect().height ?? 0,
+        chevrons: s?.querySelectorAll(":scope .disclosure-chevron").length ?? 0,
+        visible: !!s && s.getClientRects().length > 0,
+      };
+    }),
+  );
+  assert.ok(rows.length >= 3, "Downtime uses the shared Disclosure");
+  for (const row of rows.filter((r) => r.visible)) {
+    assert.ok(row.height >= 43.5, `${row.text}: disclosure hit area is at least 44 px`);
+    assert.equal(row.chevrons, 1, `${row.text}: one chevron`);
+  }
+  const rules = page
+    .locator("details.disclosure")
+    .filter({ has: page.locator(":scope > summary", { hasText: "Time rules & training eligibility" }) });
+  const summary = rules.locator(":scope > summary");
+  await summary.focus();
+  const before = await rules.evaluate((d) => d.open);
+  await page.keyboard.press("Enter");
+  await expect.poll(() => rules.evaluate((d) => d.open)).toBe(!before);
+  await page.keyboard.press("Enter");
+  await expect.poll(() => rules.evaluate((d) => d.open)).toBe(before);
+  await fits(page);
+}
 async function seed(page, table) {
   await page.evaluate(async (table) => {
     const active = localStorage.getItem("quire.campaign.v1"),
@@ -135,6 +166,12 @@ try {
         .filter({ hasText: /Room online.*Play active.*Saved to room/ })
         .first(),
     ).toBeVisible();
+    await disclosures(page);
+    if (width === 390) {
+      await page.setViewportSize({ width: 320, height: 950 });
+      await disclosures(page);
+      await page.setViewportSize({ width, height: 950 });
+    }
     await page.locator("summary").filter({ hasText: "Set downtime & review calculations" }).click();
     await page.getByLabel("In-game days", { exact: true }).fill("1");
     await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
