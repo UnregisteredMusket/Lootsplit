@@ -223,7 +223,15 @@ try {
   await page.screenshot({ path: "test-results/local-encounters/mobile.png", fullPage: true });
   await context.setOffline(false);
   await reloadApplication(page);
-  await page.getByRole("button", { name: /Imported account draft/ }).click();
+  // Encounters opens the only loot review directly (design D1); the saved list folds on phones.
+  const saved = page.locator(".encounter-library details"),
+    imported = page.getByRole("button", { name: /Imported account draft/ });
+  await page.locator(".encounter-editor").waitFor();
+  for (let i = 0; i < 40 && !(await imported.isVisible()); i++) {
+    if ((await saved.getAttribute("open")) === null) await saved.locator("summary").click();
+    await page.waitForTimeout(250);
+  }
+  await imported.click();
   await page.getByLabel("Name", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("Name", { exact: true }).inputValue(), "Offline enemy");
   assert.deepEqual(errors, []);

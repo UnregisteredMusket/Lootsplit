@@ -45,7 +45,9 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 50);
+  assert.equal(checks.length, 51);
+  // Loot review: Desk card and count, three-tap transfer, bulk assign, pool, memory (1280/390/320).
+  assert.ok(checks.some(([, name, group]) => name === "dev-loot-review" && group === "gameplay"));
   // Themed confirmations and prompts replace native dialogs (design audit D7), 1280/390.
   assert.ok(checks.some(([, name, group]) => name === "dev-themed-confirm" && group === "gameplay"));
   // Split the party: split, groups panel, players per group, buying per group, merge (1280/390/320).

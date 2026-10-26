@@ -1,0 +1,24 @@
+/* Desk: "Ready for loot review" cards (design plan D1). */
+.desk-loot-reviews {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 800px) {
+  .desk-loot-reviews {
+    max-width: 650px;
+  }
+}
+.desk-loot-review.readout {
+  border-color: var(--color-lead);
+}
+.desk-loot-review .readout-action {
+  color: var(--color-lead);
+}
+.desk-loot-review-more {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-lead);
+  text-decoration: underline;
+}

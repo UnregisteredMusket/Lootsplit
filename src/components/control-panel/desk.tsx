@@ -24,6 +24,8 @@ import { useSheetReadouts, HpBar } from "./readouts";
 import { InformationStrip } from "./information-strip";
 import { MarketReadout } from "./market-readout";
 import type { Purse } from "@/lib/quire/types";
+import { lootReviewEncounters, lootReviewHref } from "@/lib/encounters/loot-review";
+import { DeskLootReviews } from "./desk-loot-review";
 type Roll = NonNullable<Purse["rolls"]>[number];
 
 export function DmDesk() {
@@ -40,11 +42,14 @@ function DmDeskContents() {
   const search = useRouterState({ select: (s) => s.location.searchStr });
   const savedShortcuts = new URLSearchParams(search).get("customize") === "1";
   const [encounter, setEncounter] = useState<{
+      id?: string;
       name: string;
       status: string;
       round?: number;
     } | null>(null),
-    [encounterState, setEncounterState] = useState("");
+    [encounterState, setEncounterState] = useState(""),
+    // Concluded encounters waiting for their loot award (design D1); null until loaded.
+    [lootReviews, setLootReviews] = useState<{ id: string; name: string }[] | null>(null);
   const [imports, setImports] = useState<number | null>(null),
     [importError, setImportError] = useState(false),
     [sharedRolls, setSharedRolls] = useState<Roll[]>([]),
@@ -54,6 +59,7 @@ function DmDeskContents() {
   useEffect(() => {
     const c = new AbortController();
     setEncounter(null);
+    setLootReviews(null);
     setEncounterState("Loading encounter…");
     const load = room.joined ? accountRequest : localEncounterRequest;
     load<{ encounters: { id: string; code: string; name: string; status: string }[] }>(
@@ -66,6 +72,8 @@ function DmDeskContents() {
           (x) => x.code === (room.joined ? room.code : "device") && x.status !== "awarded",
         );
         const x = rows.find((x) => x.status === "active") || rows[0];
+        if (!c.signal.aborted)
+          setLootReviews(lootReviewEncounters(d.encounters, room.joined ? room.code : "device"));
         if (x) {
           const detail = await encounterRequest<{ body: { round: number } }>(
             "encounters/detail",
@@ -130,6 +138,7 @@ function DmDeskContents() {
     poolPending = pooledLots({ purses, holdings, journal }).filter((h) =>
       lotClaims({ purses, holdings, journal }, h.id).some((c) => c.choice !== "pass"),
     ).length,
+    lootPending = lootReviews?.length ?? 0,
     totals = session ? sessionSummary(ledger, session) : null,
     allCoins = purses
       .filter((p) => inParty({ purses, journal }, p))
@@ -168,7 +177,10 @@ function DmDeskContents() {
           </AppLink>
         </div>
         <div className="readout-grid desk-pinned-readouts">
-          <AppLink href="/encounters?resume=1" className="readout">
+          <AppLink
+            href={encounter?.status === "review" && encounter.id ? lootReviewHref(encounter.id) : "/encounters?resume=1"}
+            className="readout"
+          >
             <FantasyIcon ui="Encounters" size={30} />
             <span>
               <small>{encounter?.status === "active" ? "Active encounter" : "Encounter"}</small>
@@ -176,7 +188,9 @@ function DmDeskContents() {
                 {encounter
                   ? encounter.status === "active"
                     ? `Round ${encounter.round || 1}`
-                    : "Ready to play"
+                    : encounter.status === "review"
+                      ? "Loot review"
+                      : "Ready to play"
                   : encounterState || "Choose encounter"}
               </strong>
               {encounter && <small>{encounter.name}</small>}
@@ -189,12 +203,13 @@ function DmDeskContents() {
               <small>Pending reviews</small>
               <strong>
                 {imports === null
-                  ? `${pending} financial · ${propertyPending} property`
-                  : pending + imports + propertyPending + poolPending}
+                  ? `${pending} financial · ${propertyPending} property${lootPending ? ` · ${lootPending} loot` : ""}`
+                  : pending + imports + propertyPending + poolPending + lootPending}
               </strong>
               <small>
                 {pending} financial · {propertyPending} property
                 {poolPending ? ` · ${poolPending} treasure pool` : ""}
+                {lootPending ? ` · ${lootPending} loot ${lootPending === 1 ? "review" : "reviews"}` : ""}
                 {room.joined
                   ? imports !== null
                     ? ` · ${imports} imports`
@@ -207,6 +222,7 @@ function DmDeskContents() {
             </span>
           </AppLink>
         </div>
+        <DeskLootReviews rows={lootReviews} />
       </div>
       <InformationStrip
         resetKey={contextKey}

@@ -1,0 +1,12 @@
+{
+  "title": "Faster loot awards",
+  "summary": "Encounters waiting for their loot now show on the Desk, and the loot review fits on a phone with the transfer button always in reach.",
+  "items": [
+    "The Desk shows \"Ready for loot review\" for each finished encounter, counts it in Pending reviews, and opens straight to its loot.",
+    "Encounters opens your only active battle or loot review directly; otherwise loot reviews are listed first with a badge.",
+    "Each item is one short row: name, quantity, value in gold (type 250 or 2 gp 5 sp, with the amount shown below) and recipient. Notes and the exact copper value are under Details.",
+    "Tick several items to assign them to someone or send them to the treasure pool at once.",
+    "A bar at the bottom keeps the total, who gets what and Transfer loot once in view. Loot is still transferred only once.",
+    "The last coin recipient you chose is offered on the next award in that campaign."
+  ]
+}

@@ -39,11 +39,20 @@ The generator retrieves the SRD 5.1 creature index through Open5e, retaining sou
 - **One helper.** Both paths call `encounterCoinLine` / `encounterItemLine` (`src/lib/quire/award-tag.ts`) inside the existing exactly-once award. Line IDs are now `${receiptId}-coins` and `${receiptId}-item-${i}` (were random); summaries are unchanged. A differential test (`src/lib/encounters/local-award-tag.test.ts`) checks the shared and device paths write the same tagged lines, once.
 - **Fairness.** The Fairness ledger counts tagged items at their recorded value. Older lines without the tag still read: coins by their summary, items as 0 cp flagged "value not recorded" (see FEATURE-INVENTORY "Fairness ledger").
 
+### Loot review workflow (design plan D1, Q2, Q3, 2026-10-25)
+
+- **Finding it.** The Desk shows a "Ready for loot review · <encounter>" card for each encounter in `review` in the current campaign (up to three, then a link to Encounters) and adds them to the Pending reviews count; the card opens `/encounters?encounter=<id>&review=1` (Loot & rewards). Encounters opens the only active or reviewable encounter directly (a review on Loot & rewards); with none or several it keeps the list, loot reviews first with a "Loot review" badge (`src/lib/encounters/loot-review.ts`).
+- **Rows.** Each item is one compact row: select · name · quantity · value each in gold (`250`, `2.5`, `2 gp 5 sp`; at most two decimals so it is whole copper, up to the schema's 1,000,000 cp, with a live "= 250 gp" echo) · recipient. Details keeps the exact "Value each (cp)" field, notes and Remove item. `unitCopper` is still the stored unit.
+- **Bulk (Q2).** "Assign selected to…" and "Send selected to treasure pool" apply exactly the per-row semantics (a recipient clears `pool`; the pool sets `pool: true` and clears `purseId`) to the draft only. Nothing moves until the DM saves and transfers.
+- **Footer.** A bar fixed above the phone navigation (sticky on desktop and in the map panel) shows the total (coins plus item values), the recipient summary, the first readiness reason, Save review when there are unsaved changes, and the one **Transfer loot once** button: the same confirmation and the same `encounters/award` request, so the receipt still makes it exactly once.
+- **Remembered recipient (Q3).** The last One purse coin recipient is kept per campaign (room code, or `device:<campaign id>`) in `localStorage` under `lootsplit.award.coinRecipient.*`, read and written in try/catch. It is only offered ("Coins to <name>, as last time") when the award has coins and no recipient, and only if that purse still exists; it never decides anything by itself.
+- **No new data.** No new command, field, migration or projection; awards and old saves read exactly as before.
+
 ## Verification
 
 Service tests cover ownership/DM permissions, revoked memberships, revision conflicts, manual/automatic rolls, weighted results, review before transfer, recipient validation, pending turns, turn ownership, repeated transfers, concurrent room changes, and transactional rollback after an injected inventory-write failure.
 
-The browser audit uses disposable local DM/player accounts and campaign data, exercises actual account APIs, saves and reloads, generates Open5e enemies, checks phone/desktop layout, records a physical result, resolves a table, reviews loot and simulates a lost transfer response before retrying. It must never target a real user's campaign.
+The browser audit uses disposable local DM/player accounts and campaign data, exercises actual account APIs, saves and reloads, generates Open5e enemies, checks phone/desktop layout, records a physical result, resolves a table, reviews loot and simulates a lost transfer response before retrying. It must never target a real user's campaign. `scripts/loot-review-browser-audit.mjs` (CI `dev-loot-review`, `npm run verify:focus -- loot-review`) covers the Desk card and count (zero, one, two), Desk card → Transfer → confirm in three taps with the button in view at 390 × 844, 320 × 700 and 1280 × 900, compact rows and gold values, bulk assign and pool, the remembered coin recipient, Encounters opening its only review, and exactly-once transfer on a device campaign.
 
 ## Validation for this implementation
 
