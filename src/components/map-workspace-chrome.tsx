@@ -192,7 +192,7 @@ export function MapWorkspaceChrome({
               </nav>
               {app && (
                 <div className="map-app-actions">
-                  <button aria-label="Select campaign" onClick={app.openCampaign}>
+                  <button aria-label={`Select campaign: ${app.campaignName}`} onClick={app.openCampaign}>
                     {app.campaignName}
                   </button>
                   <button

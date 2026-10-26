@@ -170,7 +170,7 @@ export async function navigateAccountScenario(page, origin, path) {
       await page.locator(selector).first().click();
       await page.waitForURL((url) => url.href === target.href);
     } else if (["/account", "/share"].includes(target.pathname)) {
-      await page.getByRole("button", { name: "Select campaign", exact: true }).click();
+      await page.getByRole("button", { name: /^Select campaign: / }).click();
       const campaigns = page.getByRole("dialog", { name: "Campaigns", exact: true });
       await campaigns
         .getByRole("link", {
@@ -211,7 +211,7 @@ export async function waitForDmCampaign(page) {
     await page.getByRole("button", { name: "Not now", exact: true }).click();
   }
   await expect(
-    page.getByRole("button", { name: "Dungeon master. Change role.", exact: true }),
+    page.getByRole("button", { name: "DM, dungeon master. Change role.", exact: true }),
   ).toBeVisible();
 }
 

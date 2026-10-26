@@ -1391,7 +1391,7 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   await visitPage(page, origin, "/share");
   await expect(
     page.getByRole("button", {
-      name: "Dungeon master. Change role.",
+      name: "DM, dungeon master. Change role.",
       exact: true,
     }),
   ).toBeVisible();

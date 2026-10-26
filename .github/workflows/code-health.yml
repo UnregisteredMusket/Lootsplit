@@ -1,6 +1,7 @@
 name: Code health and security scans
-# Report-only scans that help agents and the owner find problems early. None of these jobs blocks a
-# merge or a release yet: findings go to the job summary or the repository's Security tab.
+# Scans that help agents and the owner find problems early. Findings go to the job summary or the
+# repository's Security tab. Only the accessibility job fails on findings (serious or critical axe
+# violations outside its documented allowlist); the others are report-only.
 # Tighten a job to blocking only after its first findings are triaged (see docs/AGENT-TOOLING.md).
 # Android Lint already runs as `:app:lintDebug` in android-widget.yml.
 on:
@@ -87,7 +88,7 @@ jobs:
   a11y:
     name: Accessibility (axe-core)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -109,10 +110,12 @@ jobs:
           done
           echo "Development server did not become ready" >&2
           exit 1
-      # Report-only: findings go to the job summary and artifact. Set A11Y_FAIL_IMPACT here to
-      # make a level blocking once existing findings are fixed.
-      - name: Check public and DM screens at 1280 and 390 px
-        run: node scripts/a11y-browser-audit.mjs
+      # Fails on serious or critical violations (and on screens that could not be checked) outside
+      # the allowlist in the script. Findings go to the job summary and artifact.
+      - name: Check public, DM and player screens at 1280 and 390 px, light and dark
+        env:
+          A11Y_FAIL_IMPACT: serious
+        run: node --experimental-strip-types scripts/a11y-browser-audit.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:

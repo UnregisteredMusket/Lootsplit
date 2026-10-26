@@ -369,7 +369,7 @@ try {
     await navigateApplication(page, origin + "/features/economy");
     const board = page.getByRole("region", { name: "Commodity quotes", exact: true });
     await board.waitFor();
-    const oil = page.getByRole("button", { name: "View Lamp oil at Brackenport Exchange", exact: true });
+    const oil = page.getByRole("button", { name: /^View Lamp oil\b.*Brackenport Exchange/ });
     if (await oil.count()) await oil.click();
     await scrollTo(page, board, 150);
   });

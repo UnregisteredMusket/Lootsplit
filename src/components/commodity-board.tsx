@@ -312,8 +312,11 @@ export function CommodityBoard({
     setSelectedKey(row.key);
   }
   function quote(row: CommodityQuoteRow) {
+    // The row's name is its visible content (good, exchange, prices, stock and change), so screen
+    // readers hear the quote and the name contains the visible text (WCAG 2.5.3).
     const content = (
       <>
+        <span className="sr-only">View </span>
         <div className="commodity-good">
           <FantasyIcon
             entry={{
@@ -356,7 +359,6 @@ export function CommodityBoard({
         key={row.key}
         className="commodity-row"
         href={`/features/economy?from=%2Fmarket&exchange=${encodeURIComponent(row.exchange.id)}&commodity=${encodeURIComponent(row.commodity.id)}`}
-        aria-label={`View ${row.commodity.name} at ${row.exchange.name}`}
       >
         {content}
       </AppLink>
@@ -366,7 +368,6 @@ export function CommodityBoard({
         key={row.key}
         className="commodity-row"
         aria-pressed={selected?.key === row.key}
-        aria-label={`View ${row.commodity.name} at ${row.exchange.name}`}
         onClick={() => select(row)}
       >
         {content}

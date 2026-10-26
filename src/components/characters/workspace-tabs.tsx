@@ -23,7 +23,6 @@ export function CharacterTabs({
           id={ids.tabId(key)}
           aria-controls={ids.panelId}
           aria-selected={key === value}
-          aria-pressed={key === value}
           tabIndex={key === value ? 0 : -1}
           ref={(node) => {
             if (node) buttons.current.set(key, node);

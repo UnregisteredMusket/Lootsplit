@@ -343,6 +343,10 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
       <div
         className="chat-history"
         ref={history}
+        role="log"
+        aria-label="Messages"
+        // Scrollable, so keyboard users can reach and scroll it (axe scrollable-region-focusable).
+        tabIndex={0}
         onScroll={() => {
           const el = history.current;
           if (!el) return;
