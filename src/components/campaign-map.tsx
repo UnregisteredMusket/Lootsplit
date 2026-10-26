@@ -83,6 +83,8 @@ import {
   Redo2,
   Crosshair,
   Maximize,
+  Plus,
+  Minus,
   X,
   MoreHorizontal,
   ChevronDown,
@@ -126,6 +128,7 @@ import {
   PLACE_UNAVAILABLE,
 } from "@/lib/quire/place-hub";
 import { mapReferenceRecord } from "@/lib/quire/connected-maps";
+import { accessibleParent, openingView } from "@/lib/quire/map-navigation";
 
 const MapCombatWorkspace = lazy(() =>
   import("./map-combat-workspace").then((m) => ({ default: m.MapCombatWorkspace })),
@@ -547,6 +550,8 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     ];
   }
   const pins = map ? recordsForMap(map) : [];
+  // ← Back: the parent map, only when this viewer can open it (docs/MAP-TILES.md).
+  const parentMap = accessibleParent(allMaps, map);
   const placedKeys = new Set(
     (map?.connected?.placedRecords ?? map?.connected?.placements.map((p) => p.record) ?? []).map(
       (r) => JSON.stringify([r.kind, r.id]),
@@ -955,6 +960,12 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
             dismissNotice={() => setPlaceNotice("")}
             onRecordMissing={() => setPlaceNotice(PLACE_UNAVAILABLE)}
             selectMap={selectMap}
+            parentMap={parentMap}
+            goParent={
+              parentMap
+                ? () => selectMap(parentMap.id, undefined, history.at(-1) === parentMap.id)
+                : undefined
+            }
             locationMaps={(id) => mapsForLocation(allMaps, id)}
             openLocation={(id) => {
               const target = defaultLocationMap(
@@ -1421,6 +1432,8 @@ function MapViewport({
   dismissNotice,
   onRecordMissing,
   selectMap,
+  parentMap,
+  goParent,
   locationMaps,
   openLocation,
   recordTable,
@@ -1463,6 +1476,9 @@ function MapViewport({
   dismissNotice?: () => void;
   onRecordMissing?: () => void;
   selectMap: (id: string, entry?: { x: number; y: number; zoom: number }) => void;
+  /** The accessible parent map, for ← Back, Backspace and Android Back. */
+  parentMap?: CampaignMap;
+  goParent?: () => void;
   locationMaps: (id: string) => CampaignMap[];
   openLocation: (id: string) => boolean;
   party?: { x: number; y: number };
@@ -1689,19 +1705,17 @@ function MapViewport({
         : !useDm && tools.session.camera?.mapId === map.id
           ? tools.session.camera.view
           : (cameras.get(map.id) ?? map.tabletop?.initialView);
-    const cover = Math.min(8, Math.max(size.w / w, size.h / h));
-    const restoredScale = camera
-      ? Math.min(8, Math.max(0.5, (camera.zoom * (camera.basis ?? w)) / w))
-      : cover;
-    setView(
-      camera
-        ? {
-            x: size.w / 2 - camera.x * w * restoredScale,
-            y: size.h / 2 - camera.y * h * restoredScale,
-            scale: restoredScale,
-          }
-        : { x: (size.w - w * cover) / 2, y: (size.h - h * cover) / 2, scale: cover },
-    );
+    if (!camera) {
+      // First visit: fit the whole map, centred on the party (or the first group) when it is here.
+      setView(openingView({ size, w, h, focus: party ?? groupPins?.[0]?.point }));
+      return;
+    }
+    const restoredScale = Math.min(8, Math.max(0.5, (camera.zoom * (camera.basis ?? w)) / w));
+    setView({
+      x: size.w / 2 - camera.x * w * restoredScale,
+      y: size.h / 2 - camera.y * h * restoredScale,
+      scale: restoredScale,
+    });
     // A DM camera action applies once. Ordinary room polling never drags a player's camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size.w, size.h, w, h, map.id, cameraNonce, artworkReady]);
@@ -2140,6 +2154,24 @@ function MapViewport({
         }}
         settingsOpen={drawerOpen}
         toggleSettings={openSettings}
+        parent={parentMap}
+        onBack={goParent && (() => afterContextChange(goParent))}
+        closePanel={() => {
+          if (drawerOpen) setDrawerOpen(false);
+          else if (moreTools) setMoreTools(false);
+          else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
+            const closeAll = () => {
+              setHereOpen(false);
+              setService(undefined);
+              setDetails([]);
+              setCombatOpen(false);
+              tools.hideInspector();
+            };
+            if (allowContextChange(closeAll)) closeAll();
+          } else if (planner.active) planner.close();
+          else return false;
+          return true;
+        }}
         hidden={interfaceHidden}
         setHidden={(hidden) => {
           afterContextChange(() => setInterfaceHidden(hidden));
@@ -2604,15 +2636,26 @@ function MapViewport({
             </aside>
           )}
           <div className="world-toolbar map-navigation map-glass" aria-label="Map navigation">
-            <Button onClick={() => zoom(1.4, size.w / 2, size.h / 2)} aria-label="Zoom in">
-              +
-            </Button>
-            <Button onClick={() => zoom(1 / 1.4, size.w / 2, size.h / 2)} aria-label="Zoom out">
-              −
-            </Button>
-            <Button onClick={fit} aria-label="Fit map" title="Fit map">
-              <Maximize size={18} />
-            </Button>
+            {/* Plain icon buttons on map tokens in every look (not filled primary buttons). */}
+            <button
+              className="map-icon-button"
+              onClick={() => zoom(1.4, size.w / 2, size.h / 2)}
+              aria-label="Zoom in"
+              title="Zoom in (+)"
+            >
+              <Plus size={18} aria-hidden="true" />
+            </button>
+            <button
+              className="map-icon-button"
+              onClick={() => zoom(1 / 1.4, size.w / 2, size.h / 2)}
+              aria-label="Zoom out"
+              title="Zoom out (−)"
+            >
+              <Minus size={18} aria-hidden="true" />
+            </button>
+            <button className="map-icon-button" onClick={fit} aria-label="Fit map" title="Fit map (Home)">
+              <Maximize size={18} aria-hidden="true" />
+            </button>
             <button
               className="map-icon-button"
               aria-label="Center on party or selection"

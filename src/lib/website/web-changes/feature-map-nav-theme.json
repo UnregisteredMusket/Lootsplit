@@ -1,0 +1,11 @@
+{
+  "title": "Map controls: Back to the parent map and X to close",
+  "summary": "Maps gets a one-button way back to the parent map, a clear X to leave map mode, and controls that follow your theme.",
+  "items": [
+    "← Back, in the upper left, opens the map this one belongs to (also Backspace). It only appears when there is a parent map you can see.",
+    "X Close map, in the upper right, returns to the screen you opened Maps from.",
+    "On Android, Back closes an open panel first, then goes up to the parent map, then closes the map.",
+    "A map you open for the first time shows the whole map; phones zoom in only part way, centred on the party.",
+    "The map title, buttons and zoom controls now use your theme's colours and the app's fonts in light and dark looks."
+  ]
+}

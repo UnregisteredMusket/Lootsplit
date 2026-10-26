@@ -10,6 +10,8 @@ import {
   confirmContextChange,
 } from "@/lib/quire/use-draft-guard";
 import { dismissDialog } from "@/lib/quire/confirm-store";
+import { runBackHandlers } from "@/lib/mobile/back-handlers";
+import { rememberScreen } from "@/lib/quire/map-navigation";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
 import { getCampaigns, subscribeCampaigns, serverCampaigns } from "@/lib/quire/campaigns";
@@ -83,6 +85,8 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
     select: (state) => state.location.pathname,
   });
   const search = useRouterState({ select: (state) => state.location.search });
+  const href = useRouterState({ select: (state) => state.location.href });
+  useEffect(() => rememberScreen(pathname, href), [pathname, href]);
   const split = useSplitView();
   const splitOn = split.open;
   const [railOpen, setRailOpen] = useState(false);
@@ -121,6 +125,8 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
           close.click();
           return;
         }
+        // A screen's own interceptor (the map: panel, then parent map, then close the map).
+        if (runBackHandlers()) return;
         const back = () => {
           if (canGoBack) window.history.back();
           else void App.exitApp();

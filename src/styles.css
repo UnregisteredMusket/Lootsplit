@@ -3592,7 +3592,7 @@ input,select,textarea { max-width: 100%; }
 .maps-shell > div { display:block; }
 .maps-shell .concept-main { max-width:none; min-height:100dvh; padding:0; }
 .map-workspace-loading { position:fixed; inset:0; display:grid; place-items:center; background:var(--color-bg); z-index:45; }
-.map-workspace.map-view-frame { position:fixed; inset:0; z-index:45; width:100%; height:100dvh; padding:0; margin:0; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:14px; --map-panel:color-mix(in srgb,var(--color-bg) 89%,transparent); --map-edge:color-mix(in srgb,var(--color-fg) 10%,transparent); --map-shadow:0 3px 15px #0002; }
+.map-workspace.map-view-frame { position:fixed; inset:0; z-index:45; width:100%; height:100dvh; padding:0; margin:0; overflow:hidden; font-family:var(--font-sans); font-size:14px; --map-panel:color-mix(in srgb,var(--color-elevated) 92%,transparent); --map-edge:color-mix(in srgb,var(--color-fg) 16%,transparent); --map-shadow:0 3px 15px #0003; }
 .map-glass { background:var(--map-panel); color:var(--color-fg); border:1px solid var(--map-edge); border-radius:18px; box-shadow:var(--map-shadow); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
 .map-workspace button { font-family:inherit; }
 .map-workspace .map-icon-button { display:inline-flex; align-items:center; justify-content:center; width:46px; min-width:46px; height:46px; min-height:46px; padding:0; border-radius:13px; border:0; flex-shrink:0; color:inherit; }
@@ -3600,10 +3600,16 @@ input,select,textarea { max-width: 100%; }
 .map-workspace .map-icon-button:hover:not(:disabled) { background:color-mix(in srgb,var(--color-fg) 9%,transparent); }
 .map-workspace .map-icon-button[aria-pressed="true"] { background:var(--color-accent); color:var(--color-bg); }
 .map-workspace .map-icon-button.map-glass { border-radius:50%; background:var(--map-panel); box-shadow:var(--map-shadow); border:1px solid var(--map-edge); }
-.map-title-capsule { position:absolute; top:max(14px,env(safe-area-inset-top)); left:max(14px,env(safe-area-inset-left)); z-index:45; display:flex; align-items:center; gap:0; border-radius:18px; background:rgba(22,26,31,.82); color:#f5f7fa; box-shadow:var(--map-shadow); backdrop-filter:blur(12px); height:46px; max-width: min(280px,calc(50vw - 280px)); }
-.map-title-capsule > a { width:42px; min-width:42px; height:46px; display:grid; place-items:center; }
-.map-title-capsule > button { display:flex; align-items:center; gap:9px; min-height:46px; padding:0 14px 0 0; min-width:0; font-weight:600; }
+/* Map chrome reads app tokens (theme looks follow through themeVars); the title uses the display face. */
+.map-title-capsule { position:absolute; top:max(14px,env(safe-area-inset-top)); left:max(14px,env(safe-area-inset-left)); z-index:45; display:flex; align-items:center; gap:0; border-radius:18px; height:46px; max-width: min(340px,calc(50vw - 270px)); }
+.map-title-capsule > .map-back-button { width:44px; min-width:44px; height:44px; display:grid; place-items:center; border-radius:16px 0 0 16px; border-right:1px solid var(--map-edge); color:inherit; }
+.map-title-capsule > .map-back-button:hover { background:color-mix(in srgb,var(--color-fg) 9%,transparent); }
+.map-title-capsule > .map-title-button { display:flex; align-items:center; gap:9px; min-height:44px; padding:0 14px; min-width:0; font-family:var(--font-display); font-size:18px; font-weight:700; line-height:1.1; color:inherit; }
 .map-title-capsule span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.map-title-capsule .map-title-parent { font-family:var(--font-sans); font-size:12px; font-weight:500; color:var(--color-muted); }
+.map-top-actions { position:absolute; z-index:46; top:max(14px,env(safe-area-inset-top)); right:max(14px,env(safe-area-inset-right)); display:flex; gap:8px; }
+.map-workspace .map-close-button { display:inline-flex; }
+.map-app-menu .map-menu-settings { display:none; }
 .map-top-controls { position:absolute; z-index:46; top:max(14px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; gap:8px; width:min(508px,45vw); align-items:flex-start; pointer-events:none; }
 .map-top-controls > * { pointer-events:auto; }
 .map-search { flex:1; min-width:0; display:flex; gap:10px; align-items:center; height:46px; padding:0 14px; border-radius:999px; position:relative; }
@@ -3614,8 +3620,6 @@ input,select,textarea { max-width: 100%; }
 .map-search-results button[aria-selected="true"],.map-search-results button:hover { background:color-mix(in srgb,var(--color-fg) 8%,transparent); }
 .map-search-results span { font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--color-muted); }
 .map-search-results p { padding:14px; }
-.map-workspace .map-scene-stepper { position:absolute; top:35%; right:max(14px,env(safe-area-inset-right)); z-index:39; display:flex; flex-direction:column; padding:4px; border-radius:22px; }
-.map-workspace .map-scene-stepper .map-icon-button { width:40px; height:40px; min-width:40px; min-height:40px; }
 .map-hotbar-anchor { position:absolute; z-index:40; top:calc(50% - 2px); right:max(14px,env(safe-area-inset-right)); display:flex; gap:8px; align-items:center; max-width:calc(100% - 28px); }
 .map-hotbar { display:flex; gap:2px; padding:5px; overflow:auto; overscroll-behavior:contain; max-width:calc(100vw - 90px); scrollbar-width:thin; }
 .map-hotbar-tools { display:contents; }
@@ -3668,18 +3672,22 @@ input,select,textarea { max-width: 100%; }
 .map-editor-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; }
 @media(max-width:1000px) {
  .map-title-capsule { max-width:230px; }
- .map-top-controls { left:auto; right:14px; transform:none; width:calc(100% - 272px); max-width:508px; }
+ /* Narrow title: the map's own name wins; the parent stays named on ← Back and in the menu. */
+ .map-title-capsule .map-title-parent { display:none; }
+ .map-top-controls { left:auto; right:178px; transform:none; width:calc(100% - 440px); max-width:508px; }
 }
 @media(max-width:650px) {
- .map-title-capsule { top:max(10px,env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); max-width:calc(100% - 76px - env(safe-area-inset-left) - env(safe-area-inset-right)); height:44px; border-radius:14px; }
- .map-title-capsule > a,.map-title-capsule > button { height:44px; min-height:44px; }
+ .map-title-capsule { top:max(10px,env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); max-width:calc(100% - 126px - env(safe-area-inset-left) - env(safe-area-inset-right)); height:44px; border-radius:14px; }
+ .map-title-capsule > .map-back-button,.map-title-capsule > .map-title-button { height:42px; min-height:42px; }
+ .map-title-capsule > .map-back-button { border-radius:13px 0 0 13px; }
+ .map-title-capsule > .map-title-button { font-size:17px; padding:0 12px; }
+ .map-title-capsule .map-title-parent { display:none; }
+ .map-top-actions { top:max(10px,env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); gap:6px; }
  .map-top-controls { display:contents; }
  .map-top-controls .map-search { position:absolute; z-index:46; top:calc(62px + env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); right:max(10px,env(safe-area-inset-right)); height:44px; padding:0 12px; }
- .map-top-controls .map-settings-toggle { position:absolute; z-index:46; top:max(10px,env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); }
- .map-top-controls .map-hide-button { display:none; }
+ .map-top-actions .map-hide-button { display:none; }
  .map-app-menu { top:calc(114px + env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); max-height:calc(100dvh - 128px); }
  .map-workspace.map-view-frame .map-settings-drawer { top:calc(114px + env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); bottom:max(10px,env(safe-area-inset-bottom)); width:calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)); max-width:none; }
- .map-workspace .map-scene-stepper { top:calc(114px + env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); flex-direction:row; padding:2px; border-radius:15px; }
  /* Both docks hug the bottom edge; controls keep 44px touch targets. */
  .map-hotbar-anchor { z-index:41; top:auto; bottom:max(10px,env(safe-area-inset-bottom)); left:max(10px,env(safe-area-inset-left)); right:max(10px,env(safe-area-inset-right)); max-width:none; gap:6px; justify-content:flex-end; }
  .map-hotbar { flex:1; min-width:0; max-width:none; padding:4px; gap:0; border-radius:15px; overflow:hidden; }
@@ -3700,9 +3708,10 @@ input,select,textarea { max-width: 100%; }
 }
 @media(max-height:550px) and (orientation:landscape) {
  .map-title-capsule { max-width:180px; }
- .map-top-controls { display:flex; top:10px; left:200px; right:72px; width:auto; }
- .map-top-controls .map-search,.map-top-controls .map-settings-toggle { position:relative; top:auto; left:auto; right:auto; }
- .map-workspace .map-scene-stepper { top:74px; right:84px; flex-direction:row; }
+ .map-title-capsule .map-title-parent { display:none; }
+ .map-top-controls { display:flex; top:10px; left:200px; right:170px; width:auto; }
+ .map-top-controls .map-search { position:relative; top:auto; left:auto; right:auto; }
+ .map-top-actions { top:10px; right:10px; }
  .map-hotbar-anchor { top:auto; bottom:14px; left:auto; right:72px; max-width:calc(100% - 90px); }
  .map-hotbar-more { top:auto; bottom:62px; right:0; }
  .map-tool-context { top:70px; bottom:78px; right:72px; max-height:none; }
@@ -3755,8 +3764,13 @@ input,select,textarea { max-width: 100%; }
  .map-workspace .map-record-icon[aria-pressed="true"]::before { background:#1e5e96; border-color:#9bd7ff; box-shadow:0 0 0 2px #60baff,0 2px 6px #0008; }
  .map-workspace .map-record-icon .map-count { top:0; right:0; }
  .map-workspace .map-icon-group { max-width:144px; }
- .map-workspace .map-scene-stepper .map-icon-button { width:44px; min-width:44px; height:44px; min-height:44px; }
  .map-workspace.map-view-frame .map-navigation button { width:44px; min-width:44px; height:44px; min-height:44px; }
+}
+/* ≤340 px phones: Map settings moves into the title menu (its first item). */
+@media(max-width:340px) {
+ .map-top-actions .map-settings-toggle { display:none; }
+ .map-app-menu .map-menu-settings { display:flex; align-items:center; gap:8px; width:100%; min-height:44px; padding:8px; margin-bottom:6px; border-bottom:1px solid var(--map-edge); }
+ .map-title-capsule { max-width:calc(100% - 76px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
 }
 @media(max-width:650px) and (forced-colors:active) {
  .map-workspace .map-record-icon[aria-pressed="true"]::before { background:Highlight; border-color:HighlightText; }
@@ -3837,7 +3851,8 @@ input,select,textarea { max-width: 100%; }
 .split-on .app-column > header > div:first-child { max-width: none; padding-inline: 18px; }
 /* A map in a pane uses the existing narrow-window arrangement of its floating controls. */
 .split-on .map-title-capsule { max-width: 230px; }
-.split-on .map-top-controls { left: auto; right: 14px; transform: none; width: calc(100% - 272px); max-width: 508px; }
+.split-on .map-title-capsule .map-title-parent { display: none; }
+.split-on .map-top-controls { left: auto; right: 178px; transform: none; width: calc(100% - 440px); max-width: 508px; }
 /* Desktop multi-column layouts follow the pane's width, not the window's. */
 @container split-pane (max-width: 800px) {
   .split-pane-body .encounter-layout { grid-template-columns: minmax(0, 1fr); }

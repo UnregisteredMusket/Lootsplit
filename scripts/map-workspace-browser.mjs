@@ -1,6 +1,8 @@
 import { chooseOption } from "./search-select-browser.mjs";
 import { expect } from "playwright/test";
 export async function openMapSettings(page) {
+  // At 340 px or less, Map settings is the first item of the title menu.
+  if (page.viewportSize().width <= 340) await openMapNavigation(page);
   const button = page.getByRole("button", { name: "Map settings", exact: true });
   if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
   await expect(page.locator("#map-settings")).toBeVisible();
