@@ -40,3 +40,231 @@
 .encounter-award-receipt .character-toolbar a {
   text-decoration: underline;
 }
+
+/* Loot review (design plan D1, Q2, Q3): compact rows, bulk bar and the sticky transfer footer. */
+.encounter-library-row.is-loot-review {
+  border-color: var(--color-lead);
+}
+.encounter-library-row.is-loot-review span {
+  text-transform: none;
+}
+.loot-review-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-lead);
+  color: var(--color-bg);
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.loot-last-recipient {
+  margin-top: 0.5rem;
+}
+.loot-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem 0.75rem;
+  margin-block: 1rem 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+}
+.loot-bulk-bar > label:not(.loot-bulk-all) {
+  display: grid;
+  gap: 0.2rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.loot-bulk-all {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+}
+.loot-bulk-count {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.loot-bulk-bar input[type="checkbox"],
+.loot-review-row .loot-row-pick {
+  width: 1.4rem;
+  height: 1.4rem;
+  min-height: 0;
+  accent-color: var(--color-lead);
+}
+.loot-review-row {
+  display: grid;
+  grid-template-columns: 1.6rem 1.75rem minmax(0, 1fr) minmax(0, 1fr) 4.5rem;
+  grid-template-areas:
+    "pick icon name name qty"
+    "value value value recipient recipient"
+    "details details details details details";
+  gap: 0.35rem 0.5rem;
+  align-items: end;
+  margin-block: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--sheet-line, var(--color-border));
+  border-radius: 0.6rem;
+  min-width: 0;
+}
+.loot-review-row.is-picked {
+  border-color: var(--color-lead);
+  background: color-mix(in srgb, var(--color-lead) 8%, transparent);
+}
+.loot-review-row > .loot-row-pick {
+  grid-area: pick;
+  align-self: center;
+}
+.loot-review-row > .loot-row-icon {
+  grid-area: icon;
+  align-self: center;
+}
+.loot-review-row > .loot-row-name {
+  grid-area: name;
+}
+.loot-review-row > .loot-row-qty {
+  grid-area: qty;
+}
+.loot-review-row > .loot-row-value {
+  grid-area: value;
+  min-width: 0;
+}
+.loot-review-row > .loot-row-recipient {
+  grid-area: recipient;
+  min-width: 0;
+}
+.loot-review-row > .loot-row-details {
+  grid-area: details;
+}
+.loot-review-row label {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+.loot-review-row label input,
+.loot-review-row label textarea {
+  width: 100%;
+  min-width: 0;
+  color: var(--color-fg);
+  font-size: 1rem;
+}
+.loot-row-echo {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.loot-row-value input[aria-invalid="true"] {
+  border-color: var(--color-danger, #c0392b);
+}
+.loot-row-details > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.loot-row-details[open] {
+  display: grid;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+@media (min-width: 900px) {
+  .loot-review-row {
+    grid-template-columns: 1.6rem 1.75rem minmax(10rem, 1fr) 5rem 11rem minmax(12rem, 16rem);
+    grid-template-areas:
+      "pick icon name qty value recipient"
+      "details details details details details details";
+  }
+}
+.loot-review-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 15;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-lead);
+  border-radius: 0.75rem;
+  background: var(--color-elevated, var(--color-bg));
+  box-shadow: 0 -6px 20px #0003;
+}
+/*
+ * Phones and tablets: pinned just above the bottom navigation (67px) for the whole review, since
+ * the editor starts too far down for a sticky bar to reach the bottom edge. The editor reserves
+ * the space. The map panel's copy stays sticky at its own bottom edge.
+ */
+@media (max-width: 1023px) {
+  .encounter-workspace .loot-review-footer {
+    position: fixed;
+    left: max(0.5rem, env(safe-area-inset-left));
+    right: max(0.5rem, env(safe-area-inset-right));
+    bottom: calc(4.4rem + env(safe-area-inset-bottom));
+    z-index: 19;
+    margin: 0;
+    padding: 0.45rem 0.6rem;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+  .encounter-workspace .encounter-editor.has-loot-footer {
+    padding-bottom: 8rem;
+  }
+  .encounter-workspace .loot-review-footer-summary {
+    flex: 1 1 auto;
+  }
+  .encounter-workspace .loot-review-footer-summary small {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .encounter-workspace .loot-review-footer-summary .loot-review-footer-coins {
+    display: none;
+  }
+  .encounter-workspace .loot-review-footer-actions {
+    flex-direction: column;
+    flex: 0 0 auto;
+    gap: 0.35rem;
+  }
+}
+.loot-review-footer-summary {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+.loot-review-footer-summary small {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.loot-review-footer-summary .loot-review-footer-reason {
+  color: var(--color-fg);
+}
+.loot-review-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex: 0 1 auto;
+}
+.loot-review-footer-actions button {
+  min-height: 44px;
+}
+.loot-review-transfer:not(:disabled) {
+  background: var(--color-lead);
+  color: var(--color-bg);
+  font-weight: 700;
+}

@@ -22,7 +22,7 @@ import {
   getServerCloudTable,
   subscribeCloudTable,
 } from "@/lib/quire/cloud-client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { AppLink } from "@/components/app-link";
 import { journalEntryHref } from "@/lib/quire/journal-navigation";
@@ -66,6 +66,18 @@ import {
   sortInitiative,
 } from "@/lib/encounters/model.mjs";
 import { requestConfirm } from "@/lib/quire/confirm-store";
+import {
+  assignLoot,
+  gpInputText,
+  lootValueCopper,
+  parseGpValue,
+  readLastCoinRecipient,
+  recipientSummary,
+  rememberCoinRecipient,
+  soleOpenEncounter,
+  sortForReview,
+  valueEcho,
+} from "@/lib/encounters/loot-review";
 type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
@@ -123,6 +135,9 @@ const defaults: Filters = {
   environment: "",
 };
 const n = (value: string) => Number(value) || 0;
+/** Q3 remembered choices are per campaign: the room code, or this device campaign. */
+const awardMemoryKey = (code: string, campaignId: string) =>
+  code === "device" ? `device:${campaignId}` : code;
 export function EncounterWorkspace() {
   const seat = useSeat();
   const campaign = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
@@ -153,6 +168,8 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
         : "",
     ),
     [selected, setSelected] = useState(""),
+    // The Loot & rewards tab when Encounters opened a loot review on its own (D1).
+    [openTab, setOpenTab] = useState<{ id: string; tab: string } | null>(null),
     [refresh, setRefresh] = useState(0),
     [error, setError] = useState(""),
     [onlineNotice, setOnlineNotice] = useState(""),
@@ -160,7 +177,8 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
   const selectedCode = useRef(code);
   selectedCode.current = code;
   const dirty = useRef(false),
-    createKey = useRef("");
+    createKey = useRef(""),
+    autoOpened = useRef(false);
   useEffect(
     () =>
       subscribeWorkspaceChanges((change) => {
@@ -241,7 +259,18 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
             eligible.find((x) => x.status === (params.has("review") ? "review" : "active")) ||
             eligible[0];
           if (match) setSelected((v) => v || match.id);
+        } else if (!autoOpened.current) {
+          // Design D1: with exactly one active battle or loot review, open it instead of the list.
+          const sole = soleOpenEncounter(
+            data.encounters,
+            selectedCode.current || (getCloudTable().joined ? current : "device"),
+          );
+          if (sole) {
+            if (sole.status === "review") setOpenTab((open) => open ?? { id: sole.id, tab: "loot" });
+            setSelected((v) => v || sole.id);
+          }
         }
+        autoOpened.current = true;
         setError("");
       })
       .catch((e) => {
@@ -391,27 +420,29 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
                 <p className="text-sm text-muted">
                   Private drafts, active battles and award receipts.
                 </p>
-                {library.encounters
-                  .filter((r) => r.code === code)
-                  .map((r) => (
-                    <button
-                      key={r.id}
-                      className="encounter-library-row"
-                      aria-pressed={selected === r.id}
-                      onClick={async () => {
-                        if (await canLeave()) {
-                          dirty.current = false;
-                          setSelected(r.id);
-                        }
-                      }}
-                    >
-                      <strong>{r.name}</strong>
-                      <span>
-                        {r.status === "review" ? "Loot review" : r.status} ·{" "}
-                        {new Date(r.updated_at).toLocaleDateString()}
-                      </span>
-                    </button>
-                  ))}
+                {sortForReview(library.encounters.filter((r) => r.code === code)).map((r) => (
+                  <button
+                    key={r.id}
+                    className={`encounter-library-row${r.status === "review" ? " is-loot-review" : ""}`}
+                    aria-pressed={selected === r.id}
+                    onClick={async () => {
+                      if (await canLeave()) {
+                        dirty.current = false;
+                        setOpenTab(r.status === "review" ? { id: r.id, tab: "loot" } : null);
+                        setSelected(r.id);
+                      }
+                    }}
+                  >
+                    <strong>
+                      {r.name}
+                      {r.status === "review" && <span className="loot-review-badge">Loot review</span>}
+                    </strong>
+                    <span>
+                      {r.status === "review" ? "Ready for loot review" : r.status} ·{" "}
+                      {new Date(r.updated_at).toLocaleDateString()}
+                    </span>
+                  </button>
+                ))}
                 {!library.encounters.some((r) => r.code === code) && <p>No encounters yet.</p>}
               </details>
             </aside>
@@ -419,6 +450,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
               <EncounterEditor
                 key={selected}
                 id={selected}
+                initialTab={openTab?.id === selected ? openTab.tab : undefined}
                 onDirty={(v) => {
                   dirty.current = v;
                 }}
@@ -449,10 +481,12 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
 }
 function EncounterEditor({
   id,
+  initialTab,
   onDirty,
   onSaved,
 }: {
   id: string;
+  initialTab?: string;
   onDirty: (v: boolean) => void;
   onSaved: () => void;
 }) {
@@ -467,7 +501,9 @@ function EncounterEditor({
   const [detail, setDetail] = useState<Detail | null>(null),
     [draft, setDraft] = useState<Encounter | null>(null),
     [tab, setTab] = useState(
-      new URLSearchParams(router.state.location.searchStr).has("review") ? "loot" : "battle",
+      () =>
+        initialTab ??
+        (new URLSearchParams(router.state.location.searchStr).has("review") ? "loot" : "battle"),
     ),
     [expanded, setExpanded] = useState(""),
     [hpAmount, setHpAmount] = useState(1),
@@ -490,7 +526,10 @@ function EncounterEditor({
     [showPartyReview, setShowPartyReview] = useState(false),
     [selectedMembers, setSelectedMembers] = useState<string[]>([]),
     [planningLevel, setPlanningLevel] = useState(1),
-    [summarySessionId, setSummarySessionId] = useState("");
+    [summarySessionId, setSummarySessionId] = useState(""),
+    // Loot review multi-select (Q2): which loot rows "Assign selected to…" applies to. Draft only.
+    [picked, setPicked] = useState<string[]>([]),
+    [lastCoinRecipient, setLastCoinRecipient] = useState("");
   const editing = useRef(false);
   editing.current = dirty || busy;
   useEffect(
@@ -541,6 +580,8 @@ function EncounterEditor({
         setShowPartyReview(false);
         setSelectedMembers([]);
         setSummarySessionId("");
+        setPicked([]);
+        setLastCoinRecipient(readLastCoinRecipient(awardMemoryKey(d.code, loadedCampaignId.current)));
         onDirty(false);
         setError("");
       })
@@ -809,6 +850,9 @@ function EncounterEditor({
   const readOnly = detail.status === "awarded" || detail.readOnly === true,
     review = detail.status === "review",
     locked = readOnly || busy || querying;
+  const pickedIds = new Set(picked.filter((x) => draft.loot.some((l) => l.id === x)));
+  const memoryKey = awardMemoryKey(detail.code, loadedCampaignId.current);
+  const rememberedRecipient = detail.purses.find((p) => p.id === lastCoinRecipient) ?? null;
   const stats = estimate(draft);
   const currentContext =
     getCampaigns().activeId === loadedCampaignId.current &&
@@ -894,15 +938,17 @@ function EncounterEditor({
     onChange: (v: string) => void,
     label = "Recipient",
     pool = false,
+    caption = label,
+    placeholder = "Choose recipient",
   ) => (
     <label>
-      {label}
+      {caption}
       <SearchSelect
         aria-label={label}
         value={value}
         onValueChange={(selectedValue) => onChange(selectedValue)}
       >
-        <option value="">Choose recipient</option>
+        <option value="">{placeholder}</option>
         {pool && (
           <option value={POOL_VALUE} disabled={!poolFund}>
             {poolFund ? `Treasure pool · ${poolFund.name}` : "Treasure pool (add a party fund first)"}
@@ -918,7 +964,7 @@ function EncounterEditor({
     </label>
   );
   return (
-    <div className="encounter-editor">
+    <div className={`encounter-editor${tab === "loot" && review ? " has-loot-footer" : ""}`}>
       <div className="encounter-panel">
         <div className="encounter-heading">
           <div>
@@ -1813,7 +1859,12 @@ function EncounterEditor({
                   {!draft.coinSplit &&
                     recipients(
                       draft.coinPurseId,
-                      (v) => change({ ...draft, coinPurseId: v }),
+                      (v) => {
+                        // Q3: remember this choice for the next award in this campaign (this browser only).
+                        rememberCoinRecipient(memoryKey, v);
+                        if (v) setLastCoinRecipient(v);
+                        change({ ...draft, coinPurseId: v });
+                      },
                       "Coin recipient",
                     )}
                 </label>
@@ -1845,6 +1896,19 @@ function EncounterEditor({
                 </div>
               </div>
             </fieldset>
+            {!draft.coinSplit &&
+              !draft.coinPurseId &&
+              awardCopper > 0 &&
+              rememberedRecipient &&
+              !readOnly && (
+                <button
+                  type="button"
+                  className="loot-last-recipient"
+                  onClick={() => change({ ...draft, coinPurseId: rememberedRecipient.id })}
+                >
+                  Coins to {rememberedRecipient.name}, as last time
+                </button>
+              )}
             {draft.coinSplit && (
               <>
                 <SplitRecipientPicker
@@ -2007,98 +2071,162 @@ function EncounterEditor({
                   </button>
                 ))}
             </details>
-            {draft.loot.map((l, i) => (
-              <article className="encounter-combatant" key={l.id}>
-                <FantasyIcon entry={l} size={32} />
-                <div className="encounter-grid">
-                  <label>
+            {draft.loot.length > 0 && (
+              <div className="loot-bulk-bar" role="group" aria-label="Selected loot">
+                <label className="loot-bulk-all">
+                  <input
+                    type="checkbox"
+                    checked={pickedIds.size === draft.loot.length}
+                    ref={(el) => {
+                      if (el) el.indeterminate = pickedIds.size > 0 && pickedIds.size < draft.loot.length;
+                    }}
+                    onChange={(e) => setPicked(e.target.checked ? draft.loot.map((l) => l.id) : [])}
+                  />
+                  Select all
+                </label>
+                <span className="loot-bulk-count" aria-live="polite">
+                  {pickedIds.size} of {draft.loot.length} selected
+                </span>
+                <label>
+                  Assign selected to…
+                  <SearchSelect
+                    aria-label="Assign selected to…"
+                    value=""
+                    disabled={!pickedIds.size}
+                    onValueChange={(purseId) => {
+                      if (!purseId) return;
+                      change({ ...draft, loot: assignLoot(draft.loot, pickedIds, { purseId }) });
+                      const name = detail.purses.find((p) => p.id === purseId)?.name ?? "the recipient";
+                      setPicked([]);
+                      setNotice(
+                        `Assigned ${pickedIds.size} ${pickedIds.size === 1 ? "item" : "items"} to ${name}. Save the review, then transfer once.`,
+                      );
+                    }}
+                  >
+                    <option value="">Choose recipient</option>
+                    {detail.purses.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                        {p.kind === "party" ? " · party inventory" : ""}
+                      </option>
+                    ))}
+                  </SearchSelect>
+                </label>
+                <button
+                  className="loot-pool-send-selected"
+                  disabled={!poolFund || !pickedIds.size}
+                  title={poolFund ? undefined : "Add a party fund before sending items to the treasure pool."}
+                  onClick={() => {
+                    change({ ...draft, loot: assignLoot(draft.loot, pickedIds, { pool: true }) });
+                    setPicked([]);
+                    setNotice(
+                      `Sent ${pickedIds.size} ${pickedIds.size === 1 ? "item" : "items"} to the treasure pool. Save the review, then transfer once.`,
+                    );
+                  }}
+                >
+                  Send selected to treasure pool
+                </button>
+              </div>
+            )}
+            {draft.loot.map((l, i) => {
+              const update = (patch: Partial<Encounter["loot"][number]>) =>
+                change({
+                  ...draft,
+                  loot: draft.loot.map((r, j) => (i === j ? { ...r, ...patch } : r)),
+                });
+              return (
+                <article
+                  className={`loot-review-row${pickedIds.has(l.id) ? " is-picked" : ""}`}
+                  key={l.id}
+                >
+                  <input
+                    type="checkbox"
+                    className="loot-row-pick"
+                    aria-label={`Select ${l.name.trim() || `item ${i + 1}`}`}
+                    checked={pickedIds.has(l.id)}
+                    onChange={(e) =>
+                      setPicked(
+                        e.target.checked
+                          ? [...picked.filter((x) => x !== l.id), l.id]
+                          : picked.filter((x) => x !== l.id),
+                      )
+                    }
+                  />
+                  <FantasyIcon entry={l} size={28} className="loot-row-icon" />
+                  <label className="loot-row-name">
                     Item name
-                    <input
-                      value={l.name}
-                      onChange={(e) =>
-                        change({
-                          ...draft,
-                          loot: draft.loot.map((r, j) =>
-                            i === j ? { ...r, name: e.target.value } : r,
-                          ),
-                        })
-                      }
-                    />
+                    <input value={l.name} onChange={(e) => update({ name: e.target.value })} />
                   </label>
-                  <label>
+                  <label className="loot-row-qty">
                     Quantity
                     <input
                       type="number"
                       min="1"
                       value={l.quantity}
-                      onChange={(e) =>
-                        change({
-                          ...draft,
-                          loot: draft.loot.map((r, j) =>
-                            i === j ? { ...r, quantity: n(e.target.value) } : r,
-                          ),
-                        })
-                      }
+                      onChange={(e) => update({ quantity: n(e.target.value) })}
                     />
                   </label>
-                  <label>
-                    Value each (cp)
-                    <input
-                      type="number"
-                      min="0"
-                      value={l.unitCopper}
-                      onChange={(e) =>
-                        change({
-                          ...draft,
-                          loot: draft.loot.map((r, j) =>
-                            i === j ? { ...r, unitCopper: n(e.target.value) } : r,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-                {recipients(
-                  l.pool ? POOL_VALUE : l.purseId,
-                  (v) =>
-                    change({
-                      ...draft,
-                      loot: draft.loot.map((r, j) => {
-                        if (i !== j) return r;
-                        const { pool: _pool, ...rest } = r;
-                        return v === POOL_VALUE ? { ...rest, purseId: "", pool: true } : { ...rest, purseId: v };
-                      }),
-                    }),
-                  `Recipient for item ${i + 1}`,
-                  true,
-                )}
-                <details>
-                  <summary>Item notes</summary>
-                  <textarea
-                    aria-label={`Notes for item ${i + 1}`}
-                    value={l.notes}
-                    onChange={(e) =>
-                      change({
-                        ...draft,
-                        loot: draft.loot.map((r, j) =>
-                          i === j ? { ...r, notes: e.target.value } : r,
-                        ),
-                      })
-                    }
+                  <GpValueInput
+                    label="Value each (gp)"
+                    copper={l.unitCopper}
+                    quantity={l.quantity}
+                    onCopper={(unitCopper) => update({ unitCopper })}
                   />
-                </details>
-                <button
-                  onClick={() =>
-                    change({
-                      ...draft,
-                      loot: draft.loot.filter((r) => r.id !== l.id),
-                    })
-                  }
-                >
-                  Remove item
-                </button>
-              </article>
-            ))}
+                  <div className="loot-row-recipient">
+                    {recipients(
+                      l.pool ? POOL_VALUE : l.purseId,
+                      (v) =>
+                        change({
+                          ...draft,
+                          loot: draft.loot.map((r, j) => {
+                            if (i !== j) return r;
+                            const { pool: _pool, ...rest } = r;
+                            return v === POOL_VALUE ? { ...rest, purseId: "", pool: true } : { ...rest, purseId: v };
+                          }),
+                        }),
+                      `Recipient for item ${i + 1}`,
+                      true,
+                      "Recipient",
+                    )}
+                  </div>
+                  <details className="loot-row-details">
+                    <summary>
+                      Details{l.notes.trim() ? " · has notes" : ""}
+                      <span className="sr-only"> for item {i + 1}</span>
+                    </summary>
+                    <label>
+                      Value each (cp)
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={l.unitCopper}
+                        onChange={(e) => update({ unitCopper: n(e.target.value) })}
+                      />
+                    </label>
+                    <label>
+                      Item notes
+                      <textarea
+                        aria-label={`Notes for item ${i + 1}`}
+                        value={l.notes}
+                        onChange={(e) => update({ notes: e.target.value })}
+                      />
+                    </label>
+                    <button
+                      onClick={() => {
+                        setPicked(picked.filter((x) => x !== l.id));
+                        change({
+                          ...draft,
+                          loot: draft.loot.filter((r) => r.id !== l.id),
+                        });
+                      }}
+                    >
+                      Remove item
+                    </button>
+                  </details>
+                </article>
+              );
+            })}
             {!review && !readOnly && (
               <>
                 <h3>Loot tables</h3>
@@ -2409,21 +2537,10 @@ function EncounterEditor({
                     </p>
                   )}
                 </div>
-                <button
-                  disabled={readiness.transfer.length > 0}
-                  onClick={async () => {
-                    if (
-                      await requestConfirm({
-                        title: "Transfer the reviewed loot?",
-                        body: `The reviewed loot from “${draft.name}” goes to the selected campaign inventories.`,
-                        confirmLabel: "Transfer loot",
-                      })
-                    )
-                      void action("award");
-                  }}
-                >
-                  Transfer loot once
-                </button>
+                <p className="text-sm text-muted">
+                  Transfer from the bar at the bottom of the screen. It stays in view while you
+                  review.
+                </p>
               </div>
             )}
           </div>
@@ -2519,11 +2636,99 @@ function EncounterEditor({
           )}
         </div>
       )}
+      {tab === "loot" && review && (
+        // Design D1: the total, who gets what and the one transfer stay in view while reviewing.
+        <section className="loot-review-footer" aria-label="Loot transfer">
+          <div className="loot-review-footer-summary">
+            <strong>
+              Total {formatCopper(awardCopper + lootValueCopper(draft.loot))}
+            </strong>
+            <small className="loot-review-footer-coins">
+              {formatCopper(awardCopper)} coins · {draft.loot.length}{" "}
+              {draft.loot.length === 1 ? "item" : "items"} worth{" "}
+              {formatCopper(lootValueCopper(draft.loot))}
+            </small>
+            <small className="loot-review-footer-recipients">{recipientSummary(awardPreview)}</small>
+            {readiness.transfer.length > 0 && (
+              <small className="loot-review-footer-reason">{readiness.transfer[0]}</small>
+            )}
+          </div>
+          <div className="loot-review-footer-actions">
+            {dirty && (
+              <button
+                disabled={locked}
+                onClick={() => void action("save", { encounter: draft })}
+              >
+                Save review
+              </button>
+            )}
+            <button
+              className="loot-review-transfer"
+              disabled={readiness.transfer.length > 0}
+              onClick={async () => {
+                if (
+                  await requestConfirm({
+                    title: "Transfer the reviewed loot?",
+                    body: `The reviewed loot from “${draft.name}” goes to the selected campaign inventories.`,
+                    confirmLabel: "Transfer loot",
+                  })
+                )
+                  void action("award");
+              }}
+            >
+              Transfer loot once
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
 /** Same canonical editor/loot review, hosted inside the map's persistent panel. */
+/** Item value in gold with a live echo (design D8/#11). Copper stays the stored unit. */
+function GpValueInput({
+  label,
+  copper,
+  quantity,
+  onCopper,
+}: {
+  label: string;
+  copper: number;
+  quantity: number;
+  onCopper: (copper: number) => void;
+}) {
+  // What the DM is typing, until they leave the field; otherwise the stored copper in gold.
+  const [raw, setRaw] = useState<string | null>(null);
+  const echoId = useId();
+  const parsed = raw === null ? copper : parseGpValue(raw);
+  return (
+    <div className="loot-row-value">
+      <label>
+        {label}
+        <input
+          inputMode="decimal"
+          autoComplete="off"
+          aria-describedby={echoId}
+          aria-invalid={parsed === null}
+          value={raw ?? gpInputText(copper)}
+          onChange={(e) => {
+            setRaw(e.target.value);
+            const next = parseGpValue(e.target.value);
+            if (next !== null && next !== copper) onCopper(next);
+          }}
+          onBlur={() => setRaw(null)}
+        />
+      </label>
+      <small id={echoId} className="loot-row-echo" aria-live="polite">
+        {parsed === null
+          ? "Enter gold (250 or 2.5) or coins (2 gp 5 sp), up to 10,000 gp."
+          : valueEcho(parsed, quantity)}
+      </small>
+    </div>
+  );
+}
+
 export function EncounterMapEditor({id}:{id:string}) {
   const seat=useSeat();
   if(seat.role!=='dm')return <p>Only the DM can manage this encounter.</p>;
