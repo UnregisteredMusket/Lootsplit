@@ -224,7 +224,7 @@ try {
     await guest.evaluate((value) => {
       window.trainingDocument = value;
     }, marker);
-    await guest.getByRole("link", { name: "Downtime & NPC training →", exact: true }).click();
+    await guest.locator("main").getByRole("link", { name: "Time & downtime →", exact: true }).click();
     assert.equal(await guest.evaluate(() => window.trainingDocument), marker);
     await expect(guest.locator(".loot-opening")).toHaveCount(0);
     await expect(

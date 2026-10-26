@@ -175,7 +175,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         ],
         links: [
           ["Session Time", "/features/time"],
-          ["Downtime", "/features/downtime"],
+          ["Time & downtime", "/features/downtime"],
         ],
       },
       {
@@ -247,11 +247,12 @@ export const HELP_GROUPS: HelpGroup[] = [
           "Search (the magnifying glass in the header, Ctrl+K or ⌘K, or / outside a text field) finds screens, records and actions in one list: characters, NPCs (hidden ones too, since you are the DM), shops, places, maps and pins, and items in any inventory. Actions open the screen or form for the job and never act by themselves: Award loot (loot review in Encounters), Add loot, End session or Start session (Desk session controls), Advance 8 h (Session Time with 8 hours entered; you still approve it), New quest, Review Inbox, Split the party and Invite players. Arrow keys move through the results, Enter opens one, Esc closes. Keyboard shortcuts (? or Settings & Management → Help & administration → Keyboard shortcuts): g then d Desk, g p Party, g m Maps, g k Market, g l Library. Letter shortcuts never fire while you type in a field, and on Maps the map keeps its own keys (Ctrl+K still searches).",
           "Desk → Market information shows the campaign season and economy mode, inflation, exchange and active-quote counts, and up to three commodity quotes. Ask/bid prices use the listed unit; stock and wanted quantities come from current offers. Percentage changes compare a matching recorded prior season; missing history is labeled. The DM can read campaign-wide prices while travelling, but trading still requires an eligible location and open exchange. Open a quote for its exact exchange/commodity or use Open global market. These website controls require a separately signed update to appear in the Android app.",
           "Player navigation: Home offers fixed buttons for Character Sheet, Bank, My Finances, Properties, Journal and Party chat; Inventory opens your possessions and permitted financial actions; Campaign contains Room, Chat, Rolls and Alerts; Market opens trading; Library opens available references; Maps opens shared cartography and location records. The full campaign overview holds sessions, reviews and activity.",
+          "Names (design glossary, October 2026): the Desk is the DM's home screen (its title used to read Campaign control); Shop schedules is the screen of shop opening days and restocks (it used to be called Shop Management; shops themselves are run from Market); Time & downtime is the downtime screen (it used to be called Downtime); Review Inbox holds every request waiting for you; Add loot adds items or coins. Players see Party & inventory where you see Party. Old links and bookmarks open the same screens.",
           "The gear opens Settings & Management. Its categories depend on your role. Use the campaign name to switch campaigns and the message icon for chat. On desktop the same destinations appear in the navigation rail. Keyboard users: the first Tab on any screen shows Skip to content, which jumps past the navigation to the screen itself. The DM Desk uses swipeable summaries and phone selectors arranged in two rows. Encounter and review readouts show their destination. Shared connection status stays in the global strip; Multiplayer settings remains beside the desk heading. Previously saved DM shortcuts can still be managed from Dashboard → Saved shortcut settings. Help has a Guide for switch: Dungeon Masters shows this guide and Players shows the player guide. In the app it starts on your seat’s guide; the website’s Help page starts on this one. To send players straight to theirs, share the Help link ending in ?guide=player.",
         ],
         links: [
           ["Settings & Management", "/?view=home#management"],
-          ["Campaign control / overview", "/?view=overview"],
+          ["Desk (campaign overview)", "/?view=overview"],
           ["Saved DM shortcut settings", "/?view=home&customize=1#saved-shortcuts"],
           ["Open Library", "/library"],
         ],
@@ -372,7 +373,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         links: [
           ["Market", "/market"],
           ["People & NPCs", "/features/npcs"],
-          ["Downtime", "/features/downtime"],
+          ["Time & downtime", "/features/downtime"],
         ],
       },
       {
@@ -415,17 +416,17 @@ export const HELP_GROUPS: HelpGroup[] = [
       },
       {
         id: "dm-feature-screens",
-        title: "Financial Settings, Shop Management and Review Reports",
+        title: "Financial Settings, Shop schedules and Review Reports",
         audience: "DM",
         paragraphs: [
           "Financial Settings (Settings & Management → Economy → Currency, price modifiers & shop defaults) holds Price modifiers (season, shortages, war and the value of a gold piece), the Price preview for an average shop, Open shops repricing, Defaults for the next shop and Reset price modifiers. Below them, Recurring financial agreements lists every recurring revenue and expense schedule; add or edit a schedule there, or follow View all financial schedules from a property. Changing defaults affects new shops only; repricing affects open shops only when you choose it.",
-          "Shop Management (Settings & Management → Economy → Shop schedules) sets each shop's opening days and scheduled restocking. Opening days repeat from campaign day 0, and a scheduled top-up fills finite stock without reducing a surplus or changing unlimited stock. The schedule only advances when you approve campaign time. Create and stock shops in Market first; Open Market & stock returns there.",
+          "Shop schedules (Settings & Management → Economy → Shop schedules; it used to be called Shop Management) sets each shop's opening days and scheduled restocking. Opening days repeat from campaign day 0, and a scheduled top-up fills finite stock without reducing a surplus or changing unlimited stock. The schedule only advances when you approve campaign time. Create and stock shops in Market first; Open Market & stock returns there.",
           "Review Reports gathers the campaign financial overview, session financial summaries, bank decision history, character edit reports, full activity search and the price-change history, with a link to the full ledger. It reads records only; it changes no money or inventory. Party's Ledger link, the Desk's report links and an encounter's Open campaign reports open it.",
           "Session Time (see Advance session hours, rest and downtime) and these screens are DM-only. A player who opens one of their links sees that it is available to the campaign DM.",
         ],
         links: [
           ["Financial Settings", "/features/financial"],
-          ["Shop Management", "/features/shops"],
+          ["Shop schedules", "/features/shops"],
           ["Review Reports", "/features/reports"],
           ["Session Time", "/features/time"],
         ],
@@ -490,7 +491,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         links: [
           ["Property Management", "/features/properties"],
           ["Review Inbox", "/features/review"],
-          ["Downtime", "/features/downtime"],
+          ["Time & downtime", "/features/downtime"],
         ],
       },
       {

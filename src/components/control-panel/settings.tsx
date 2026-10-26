@@ -114,7 +114,7 @@ export function ManagementPanel({
           name: "Campaign",
           icon: "Campaign",
           links: [
-            ["Campaign control & sessions", "/?view=home#sessions"],
+            ["Desk & sessions", "/?view=home#sessions"],
             ["Manage saved campaigns", "/account"],
             ["Local, live & turn-based play", "/share"],
           ],

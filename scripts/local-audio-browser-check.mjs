@@ -8,7 +8,7 @@ export async function checkLocalAudio(page, context, width) {
     .locator('nav[aria-label="Sections"]:visible')
     .getByRole("link", { name: "Desk", exact: true })
     .click();
-  await expect(page.getByRole("heading", { name: "Campaign control", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toBeVisible();
   await page.evaluate(() => {
     if (!window.__loops) {
       window.__loops = new Set();

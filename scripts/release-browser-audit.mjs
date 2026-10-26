@@ -44,9 +44,9 @@ async function open(width = 390) {
   await skip.waitFor();
   await skip.click();
   await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
-  await page.getByRole("heading", { name: "Campaign control", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   await page.waitForTimeout(2000); // Initial Vite dependency optimization can reload once.
-  await page.getByRole("heading", { name: "Campaign control", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   if (await skip.isVisible()) await skip.click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   return page;

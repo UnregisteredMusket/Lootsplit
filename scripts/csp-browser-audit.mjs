@@ -112,7 +112,7 @@ try {
 
   // Title screen, hydration and the signed-in app (openApplication provisions a disposable DM).
   await openApplication(page, origin + "/");
-  await page.getByText("Campaign control", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   await violations("app");
 
   // /account is not a public page: a cold document load shows the title screen first, and the
