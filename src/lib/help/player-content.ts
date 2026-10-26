@@ -60,7 +60,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "menus",
         title: "Player menus and Help",
         paragraphs: [
-          "Home shows your assigned character with Open character sheet, followed by Your services and the same six shortcuts: Character Sheet, Bank, My Finances, Properties, Journal and Party chat. Inventory opens your permitted possessions and financial actions. Campaign contains the room, chat, rolls and alerts. Market opens nearby shops and trading. Library contains read-only reference indices and shared records. Maps shows shared cartography.",
+          "Home shows your assigned character with Open character sheet, followed by Your services and the same six shortcuts: Character Sheet, Bank, My Finances, Properties, Journal and Party chat, with the quest you follow and a Quest log link above them. Inventory opens your permitted possessions and financial actions. Campaign contains the room, chat, rolls and alerts. Market opens nearby shops and trading. Library contains read-only reference indices and shared records. Maps shows shared cartography.",
           "Open the gear for Settings & Management. Help is available there and from the Help button in the app. Keyboard users: the first Tab on any screen shows Skip to content, which jumps past the navigation. This player guide is searchable; its links open the current campaign with your existing permissions. Internal links do not restart the title screen. Guide for switches between this guide (Players) and the Dungeon Master guide; reading the DM guide changes none of your permissions.",
         ],
         links: [
@@ -328,6 +328,16 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
           ["Journal", "/features/journal"],
           ["Alerts", "/share?tab=notifications"],
         ],
+      },
+      {
+        id: "quest-log",
+        title: "Your quest log",
+        paragraphs: [
+          "Home → Quest log lists the quests your DM has shared with you: Active, Done and Failed. Open one to read what you were asked, who asked, the objectives (done ones are crossed out; New marks one added since you last looked), the promised reward and the chronicle of what happened, stamped with the session and campaign day. Only you know this, or You and other names, means only those characters were told; the DM decides who knows.",
+          "Follow this quest pins it to the top of your quest log and your Home, with Show on map and Open quest. Following and the Updated marks are kept on this device only. When the DM updates a quest you can see, a Quest updated notice says what changed. Talk opens the person who gave it, if they are nearby.",
+          "My notes are private journal entries only you can read; the DM cannot see them. Rewards are paid by the DM when the quest is done; a linked receipt shows what was paid.",
+        ],
+        links: [["Quest log", "/features/quests"]],
       },
       {
         id: "find-a-group",

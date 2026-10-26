@@ -1,0 +1,12 @@
+{
+  "title": "Quest log",
+  "summary": "DMs can write quests and choose who knows about them; players follow them in their own quest log.",
+  "items": [
+    "DMs: Quests lets you write quests with a giver, a place, objectives, a promised reward and private DM notes, then reveal them to the whole party or chosen characters.",
+    "Hidden objectives, DM notes and DM-only chronicle lines never reach players' devices.",
+    "Mark objectives done or failed, add chronicle entries stamped with the session and campaign day, and close quests as completed or failed.",
+    "Rewards are words plus links to receipts you already paid; writing or closing a quest never moves coins or items.",
+    "Players: Home → Quest log shows Active, Done and Failed quests, a Follow pin with Show on map, private notes and a Quest updated notice.",
+    "Quests also appear on the DM's Desk, on NPC cards and in the map's Here sheet as Quests here."
+  ]
+}

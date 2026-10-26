@@ -33,3 +33,10 @@ The DM writes quests; players read the ones revealed to them. Quests never move 
 - Character audience: the listed characters, stored at reveal time (a group reveal stores its members). Co-recipients' names are shown (owner decision D3).
 - Never sent to players: drafts, DM notes, `editedAt`, revision, hidden objectives (and their chronicle lines, pins and areas), DM-only chronicle lines, a giver NPC the seat cannot read, places of hidden groups the seat is not in, map pins and areas on maps or pins the seat cannot see, and reward links to receipts the seat could not already read (own lines; party lines for seats travelling with the party; pool resolutions for party seats).
 - Linked places are added to the player's market projection so their names resolve.
+
+## Screens (`src/components/quests.tsx`, `quest-view.ts`, `quest-toasts.tsx`)
+
+- `/features/quests` (`?quest=<id>` opens one): DM list with In play / Drafts / Done / Failed / Archived and search, editor, Reveal sheet ("Who knows about it?"), Close sheet, Add entry, Link a receipt, View as player. Players: Active / Done / Failed, detail, Follow, My notes.
+- Desk → Current session: Quests in play (`DeskQuestsGlance`). Player Home: the followed quest and a Quest log link (the six fixed shortcuts are unchanged, owner decision D9). Journal links to Quests. NPC cards: Quests from <NPC> (the DM also gets New quest from <NPC>). Map Here sheet: Quests here when an open visible objective's place, the quest's place or its giver's place is on the path of the viewer's group place.
+- Follow and the Updated/New marks are per device (`localStorage` key per campaign and seat, wrapped in try/catch; an in-memory copy keeps working when storage is blocked). Guests get the same.
+- "Quest updated": a toast when a synced table brings a newer `updatedAt` for a quest the seat can read; primed on first load, never on the DM's device. Background push uses the existing chat notes when the DM ticks "Also send them a message".

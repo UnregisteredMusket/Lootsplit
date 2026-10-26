@@ -18,6 +18,7 @@ import { OpeningDawn } from "@/components/opening-dawn";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { LibraryProvider } from "@/lib/quire/library";
 import { EconomyProvider } from "@/lib/quire/economy-context";
+import { QuestUpdateToasts } from "@/components/quest-toasts";
 import { PrefsProvider } from "@/lib/quire/prefs";
 import { MenuAudioBridge } from "@/components/menu-audio-bridge";
 import { installMobileApi } from "@/lib/mobile/boot";
@@ -121,6 +122,7 @@ function RootDocument() {
                     <EconomyProvider>
                       <PlayerDisplayProvider>
                         <AppNotifications />
+                        <QuestUpdateToasts />
                         <SplitViewProvider>
                           <Outlet />
                         </SplitViewProvider>

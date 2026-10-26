@@ -11,10 +11,17 @@ export const featureScreens = {
   reports: { title: "Review Reports", dm: true },
   review: { title: "Review Inbox", dm: true },
   journal: { title: "Journal", dm: false },
+  /** Owner decision D1: "Quests" for the DM, "Quest log" for players. */
+  quests: { title: "Quests", playerTitle: "Quest log", dm: false },
   shops: { title: "Shop Management", dm: true },
   music: { title: "Music & Ambience", dm: true },
 };
 export type Feature = keyof typeof featureScreens;
+/** The title this seat sees (players read "Quest log"). */
+export function featureTitle(feature: Feature, dm: boolean): string {
+  const screen: { title: string; playerTitle?: string } = featureScreens[feature];
+  return !dm && screen.playerTitle ? screen.playerTitle : screen.title;
+}
 export function safeReturn(value: unknown): string {
   if (
     typeof value !== "string" ||
@@ -27,7 +34,7 @@ export function safeReturn(value: unknown): string {
   const url = new URL(value, "https://lootsplit.invalid");
   if (url.origin !== "https://lootsplit.invalid") return "/?view=home";
   if (
-    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|features|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|shops|music|npcs|trading|time))?$/.test(
+    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|features|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|quests|shops|music|npcs|trading|time))?$/.test(
       url.pathname,
     )
   )
@@ -56,7 +63,7 @@ export function screenName(href: string, dm: boolean) {
   const url = new URL(href, "https://lootsplit.invalid");
   const feature = url.pathname.split("/")[2] as Feature;
   if (url.pathname.startsWith("/features/") && featureScreens[feature])
-    return featureScreens[feature].title;
+    return featureTitle(feature, dm);
   if (url.pathname === "/")
     return dm
       ? "Desk"

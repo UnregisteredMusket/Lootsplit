@@ -9,6 +9,7 @@ import { Shell } from "@/components/shell";
 import { AppLink } from "@/components/app-link";
 import {
   featureScreens,
+  featureTitle,
   safeReturn,
   screenName,
   type Feature,
@@ -30,6 +31,7 @@ import { LocalAudioPanel } from "@/components/local-audio-panel";
 import { DowntimeActivities } from "@/components/downtime-activities";
 import { DowntimeJourneys } from "@/components/map-journeys";
 import { LootClaimsReview } from "@/components/treasure-pool";
+import { QuestsScreen } from "@/components/quests";
 // Load exchange editors only for this screen. Downtime shares the small review
 // without pulling every market editor into startup.
 const TradeEconomyPanel = lazy(() =>
@@ -46,6 +48,7 @@ export const Route = createFileRoute("/features/$feature")({
     commodity?: string;
     bank?: string;
     lesson?: string;
+    quest?: string;
   } => ({
     from: safeReturn(s.from),
     code: typeof s.code === "string" ? s.code.slice(0, 24) : undefined,
@@ -54,12 +57,13 @@ export const Route = createFileRoute("/features/$feature")({
     commodity: typeof s.commodity === "string" ? s.commodity.slice(0, 150) : undefined,
     bank: typeof s.bank === "string" ? s.bank.slice(0, 150) : undefined,
     lesson: typeof s.lesson === "string" ? s.lesson.slice(0, 150) : undefined,
+    quest: typeof s.quest === "string" ? s.quest.slice(0, 150) : undefined,
   }),
   component: FeaturePage,
 });
 function FeaturePage() {
   const { feature } = Route.useParams(),
-    { from, code, bank, lesson } = Route.useSearch(),
+    { from, code, bank, lesson, quest } = Route.useSearch(),
     seat = useSeat(),
     dm = seat.role === "dm";
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
@@ -73,7 +77,7 @@ function FeaturePage() {
         className="feature-screen"
         key={`${campaigns.activeId}:${room.code}:${room.sessionId}:${seat.role}:${seat.purseIds.join(",")}:${feature}`}
       >
-        <h1>{screen?.title || "Feature unavailable"}</h1>
+        <h1>{screen ? featureTitle(feature as Feature, dm) : "Feature unavailable"}</h1>
         {!screen || (screen.dm && !dm) ? (
           <p>This screen is available to the campaign DM.</p>
         ) : (
@@ -147,7 +151,15 @@ function FeaturePage() {
                 <CampaignOperations section="shops" />
               </>
             )}
-            {feature === "journal" && <JournalNotes />}
+            {feature === "journal" && (
+              <>
+                <AppLink className="settings-link" href="/features/quests">
+                  {dm ? "Quests" : "Quest log"} →
+                </AppLink>
+                <JournalNotes />
+              </>
+            )}
+            {feature === "quests" && <QuestsScreen key={quest ?? ""} initialQuest={quest} />}
             {feature === "reports" && (
               <>
                 <CampaignReports />

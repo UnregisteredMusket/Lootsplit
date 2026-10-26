@@ -19,6 +19,7 @@ import { Guide } from "@/components/guide";
 import { Fold } from "@/components/ui";
 import { Shortcuts } from "./shortcuts";
 import { DeskGroupsGlance } from "@/components/party-groups";
+import { DeskQuestsGlance } from "@/components/quests";
 import { HomeBoard } from "../home-board";
 import { useSheetReadouts, HpBar } from "./readouts";
 import { InformationStrip } from "./information-strip";
@@ -247,6 +248,7 @@ function DmDeskContents() {
                 <AppLink className="information-action" href="/?view=home#sessions">
                   Open session controls →
                 </AppLink>
+                <DeskQuestsGlance />
               </>
             ),
           },

@@ -17,6 +17,7 @@ import { MarketImageUpload } from "./market-image-upload";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm, CommandButton } from "./world-tools";
 import { Button, Fold } from "./ui";
+import { NpcQuestStrip } from "@/components/quests";
 import { AppLink } from "./app-link";
 import type { CloudTable } from "@/lib/quire/cloud";
 import { NpcConversation } from "./npc-conversation";
@@ -219,6 +220,7 @@ export function LocationNpcs() {
               </span>
             </div>
             <MapRecordStrip reference={{ kind: "npc", id: n.id }} />
+            <NpcQuestStrip npcId={n.id} name={n.name} />
             <details className="npc-record-details">
               <summary aria-label={`Details & actions for ${n.name}`}>Details & actions</summary>
               <div className="world-toolbar">
