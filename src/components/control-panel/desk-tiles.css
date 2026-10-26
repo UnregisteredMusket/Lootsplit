@@ -1,0 +1,224 @@
+/* Desk Information (design D4): content-sized cards, dots on phones, a 3×2 tile grid on desktop. */
+.desk-information {
+  container: desk-information / inline-size;
+}
+/* Each card is as tall as its own content; the strip no longer stretches every card to the tallest. */
+.information-strip {
+  align-items: start;
+}
+.information-selectors {
+  display: flex;
+  justify-content: center;
+  gap: 0.15rem;
+  margin: 0.1rem 0 1rem;
+}
+.information-selectors button {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+.information-selectors button > span {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-muted);
+  background: transparent;
+  transition: width 0.15s ease;
+}
+.information-selectors button[aria-pressed="true"] > span {
+  width: 22px;
+  border-color: var(--color-lead);
+  background: var(--color-lead);
+}
+.information-selectors button:focus-visible {
+  outline: 2px solid var(--color-lead);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .information-selectors button > span {
+    transition: none;
+  }
+}
+
+/* Session tile: "Session N · End & start next" first. */
+.information-session-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+.information-session-line > span {
+  display: grid;
+  min-width: 0;
+}
+.information-session-line small {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+.information-session-line strong {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.information-session-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--color-lead);
+  border-radius: 7px;
+  color: var(--color-lead);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Desktop: all six panels at once as compact tiles (owner decision 8). A narrow split-view pane
+   keeps the strip, so the grid also needs room inside the Desk itself. */
+@media (min-width: 1024px) {
+  @container desk-information (min-width: 720px) {
+    .information-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: start;
+      gap: 0.75rem;
+      overflow: visible;
+      scroll-snap-type: none;
+      padding: 0.35rem 0 0.5rem;
+    }
+    .information-strip::after {
+      display: none;
+    }
+    .information-panel {
+      gap: 0.45rem;
+      padding: 0.85rem 0.95rem;
+    }
+    .information-panel h2 {
+      font-size: 1.15rem;
+    }
+    .information-panel .information-value {
+      font-size: 1.4rem;
+    }
+    .information-panel .information-action {
+      min-height: 36px;
+    }
+    .information-panel .information-action + .information-action {
+      margin-top: 0;
+    }
+    .information-market-quotes {
+      gap: 0.4rem;
+    }
+    .information-market-quotes li {
+      gap: 0.1rem;
+      padding-bottom: 0.4rem;
+    }
+    .information-market-quotes a {
+      min-height: 0;
+      gap: 0;
+    }
+    .information-market-quotes li > small {
+      font-size: 0.68rem;
+    }
+    .information-selectors {
+      display: none;
+    }
+  }
+}
+
+/* "Set up your campaign" checklist for a new campaign (dm #16). */
+.desk-setup {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-lead);
+  border-radius: 8px;
+  background: var(--panel);
+}
+@media (min-width: 800px) {
+  .desk-setup {
+    max-width: 650px;
+  }
+}
+.desk-setup-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.desk-setup-heading h2 {
+  font-size: 1.2rem;
+}
+.desk-setup-heading small {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+.desk-setup-dismiss {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: auto;
+  border-radius: 7px;
+  color: var(--color-muted);
+}
+.desk-setup ol {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+.desk-setup li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+}
+.desk-setup-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--color-muted);
+  border-radius: 50%;
+}
+.desk-setup li.done .desk-setup-mark {
+  border-color: var(--color-positive);
+  background: var(--color-positive);
+  color: var(--color-bg);
+}
+.desk-setup li.done strong {
+  color: var(--color-muted);
+  font-weight: 500;
+  text-decoration: line-through;
+}
+.desk-setup-text {
+  display: grid;
+  min-width: 0;
+}
+.desk-setup-text strong {
+  font-size: 0.9rem;
+}
+.desk-setup-text small {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+.desk-setup-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-lead);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .desk-setup li {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+  .desk-setup-link {
+    grid-column: 2;
+    min-height: 32px;
+  }
+}

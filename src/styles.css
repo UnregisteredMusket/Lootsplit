@@ -2304,9 +2304,6 @@ input,select,textarea { max-width: 100%; }
 .multiplayer-settings { display:inline-flex; align-items:center; gap:.4rem; min-height:44px; padding:.45rem .7rem; border:1px solid var(--edge); border-radius:7px; color:var(--color-lead); font-size:.85rem; background:var(--panel); }
 .desk-pinned-readouts { margin-bottom:1rem; }
 .desk-information { min-width:0; }
-.information-controls { display:flex; align-items:center; gap:.4rem; color:var(--color-muted); font-size:.8rem; }
-.information-controls button { display:grid; place-items:center; width:44px; min-height:44px; border:1px solid var(--edge); border-radius:7px; background:var(--panel); }
-.information-controls button:disabled { opacity:.45; }
 .information-strip { display:flex; gap:.7rem; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; padding:.35rem 0 .65rem; scrollbar-width:thin; scrollbar-color:var(--edge) var(--color-bg); }
 .information-panel { flex:0 0 91%; min-width:0; display:flex; flex-direction:column; gap:.6rem; padding:1rem; border:1px solid var(--edge); border-radius:8px; background:linear-gradient(120deg,var(--panel),var(--color-bg)); scroll-snap-align:start; overflow-wrap:anywhere; }
 .information-panel h2 { font-size:1.45rem; }
@@ -2318,9 +2315,6 @@ input,select,textarea { max-width: 100%; }
 .information-panel > .panel-heading { margin:0; }
 .information-panel > .panel-heading button { min-height:44px; padding:.35rem .5rem; border:1px solid var(--edge); border-radius:6px; font-size:.8rem; }
 .information-action { display:flex; align-items:center; min-height:44px; margin-top:auto; color:var(--color-lead); font-size:.85rem; }
-.information-selectors { display:flex; gap:.35rem; flex-wrap:wrap; margin:.2rem 0 1.3rem; }
-.information-selectors button { flex:1; min-width:0; min-height:44px; padding:.4rem .25rem; border:1px solid var(--edge); border-radius:7px; font-size:.78rem; background:var(--panel); }
-.information-selectors button[aria-pressed="true"] { background:var(--color-lead); color:var(--color-bg); }
 .information-party { display:grid; gap:.5rem; }
 .information-party > a { display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:.55rem; align-items:center; min-height:50px; }
 .information-party .ledger-art { width:38px; height:38px; border-radius:50%; }
@@ -2352,7 +2346,7 @@ input,select,textarea { max-width: 100%; }
 .dm-tool-links .settings-link { display:flex; align-items:center; min-height:48px; margin:0; padding:.65rem; border:1px solid var(--edge); border-radius:7px; background:var(--panel); overflow-wrap:anywhere; }
 .swipe-dm-desk .dm-campaign-details { margin-top:.5rem; }
 @media(min-width:800px) { .swipe-dm-desk .desk-pinned-readouts { max-width:650px; } .information-panel { flex-basis:calc((100% - 1.4rem) / 3); } .swipe-dm-desk .dm-tool-groups { max-width:900px; } }
-@media(max-width:350px) { .information-panel { padding:.75rem; } .information-selectors button { font-size:.72rem; } .multiplayer-settings { font-size:.8rem; } }
+@media(max-width:350px) { .information-panel { padding:.75rem; } .multiplayer-settings { font-size:.8rem; } }
 .feature-cards.dm-tool-groups { display:block; }
 @media(min-width:800px) { .information-strip::after { content:""; flex:0 0 calc((200% - .7rem) / 3); } }
 .swipe-dm-desk .desk-pinned-readouts { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -3375,7 +3369,6 @@ input,select,textarea { max-width: 100%; }
 .sync-recovery-actions a, .sync-status a { display: inline-flex; align-items: center; min-height: 44px; }
 #pending-changes { scroll-margin-top: 8rem; }
 .desk-pinned-readouts .readout-action { color: var(--color-lead); margin-top: .35rem; }
-.information-controls button { min-width: 44px; min-height: 44px; }
 .downtime-rules { margin: .5rem 0 .75rem; font-size: .85rem; }
 .downtime-rules summary { min-height: 44px; cursor: pointer; align-content: center; }
 .downtime-rules p { margin: .5rem 0; }
@@ -3403,7 +3396,6 @@ input,select,textarea { max-width: 100%; }
   .desk-pinned-readouts .readout small:first-child { align-self: center; }
   .desk-pinned-readouts .readout strong,
   .desk-pinned-readouts .readout small:not(:first-child) { grid-column: 1 / -1; overflow-wrap: break-word; }
-  .information-selectors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .hourly-downtime .world-form .training-step { grid-template-columns: minmax(0, 1fr); padding: .6rem; }
 }
 /* Reviewed commodity definitions use the existing trading palette. */

@@ -66,6 +66,16 @@ try {
   ).toHaveCount(0);
   const information = page.getByRole("region", { name: "Campaign information", exact: true });
   await expect(information).toBeVisible();
+  // A new campaign gets "Set up your campaign": steps computed from its data, each with a link.
+  const setup = page.getByRole("region", { name: "Set up your campaign", exact: true });
+  await expect(setup).toBeVisible();
+  // The starter campaign already has characters and a sample shop; those steps show as done.
+  for (const link of ["Add a place →", "Import a map →", "Host a room →"])
+    await expect(setup.getByRole("link", { name: link, exact: true })).toBeVisible();
+  await expect(setup.locator("li")).toHaveCount(5);
+  await expect(setup.locator("li.done")).toHaveCount(2);
+  await expect(setup).toContainText("2 of 5 done");
+  await capture("dm-setup-checklist");
   assert.equal(await page.locator(".information-panel").count(), 6);
   await page
     .locator(".information-selectors")
@@ -74,12 +84,26 @@ try {
   await expect(
     page.locator(".information-selectors").getByRole("button", { name: "Funds", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Next information panel", exact: true }).click();
+  // Phones page the strip with dots only (design D4): no arrow pager or "1 / 6" counter.
+  await expect(page.getByRole("button", { name: "Next information panel", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Previous information panel", exact: true })).toHaveCount(0);
+  assert.equal(await page.locator(".information-selectors button").count(), 6, "one dot per panel");
+  for (const dot of await page.locator(".information-selectors button").all()) {
+    const box = await dot.boundingBox();
+    assert.ok(box.width >= 24 && box.height >= 24, "each dot is at least a 24 px target");
+  }
+  await page
+    .locator(".information-selectors")
+    .getByRole("button", { name: "Market", exact: true })
+    .click();
   await expect(
     page.locator(".information-selectors").getByRole("button", { name: "Market", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("region", { name: "Market information", exact: true })).toContainText("Global market");
-  await page.getByRole("button", { name: "Next information panel", exact: true }).click();
+  await page
+    .locator(".information-selectors")
+    .getByRole("button", { name: "Activity", exact: true })
+    .click();
   await expect(
     page.locator(".information-selectors").getByRole("button", { name: "Activity", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -425,23 +449,18 @@ try {
   await expect(paymentRequest.locator(".review-stub")).toContainText("Denied");
   await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
-  await page
-    .locator(".information-selectors")
-    .getByRole("button", { name: "Rolls", exact: true })
-    .click();
+  // Desktop: the six panels are a 3×2 grid of tiles, all visible, with no pager (design D4).
+  await expect(page.locator(".information-selectors")).toBeHidden();
+  const tiles = await page
+    .locator(".information-panel")
+    .evaluateAll((panels) => panels.map((p) => p.getBoundingClientRect()).map((r) => [Math.round(r.left), Math.round(r.top), r.height]));
+  assert.equal(new Set(tiles.map(([left]) => left)).size, 3, "three tile columns");
+  assert.equal(new Set(tiles.map(([, top]) => top)).size, 2, "two tile rows");
+  for (const name of ["Session", "Party", "Funds", "Market", "Activity", "Rolls"])
+    await expect(page.getByRole("region", { name: `${name} information`, exact: true })).toBeVisible();
   await expect(
-    page.locator(".information-selectors").getByRole("button", { name: "Rolls", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    page.getByRole("button", { name: "Next information panel", exact: true }),
-  ).toBeDisabled();
-  await page
-    .locator(".information-selectors")
-    .getByRole("button", { name: "Session", exact: true })
-    .click();
-  await expect(
-    page.locator(".information-selectors").getByRole("button", { name: "Session", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+    page.getByRole("region", { name: "Session information", exact: true }).locator(".session-readout"),
+  ).toBeVisible();
   await capture("dm-desktop");
   const historyCount = await page.evaluate(async () => {
     const economy = await import("/src/lib/quire/economy.ts");
@@ -503,9 +522,18 @@ try {
   await page.setViewportSize({ width: 320, height: 740 });
   await visit("/");
   await capture("dm-small");
+  // Hiding the checklist lasts on this device.
+  const checklist = page.getByRole("region", { name: "Set up your campaign", exact: true });
+  if (await checklist.isVisible()) {
+    await checklist.getByRole("button", { name: "Hide the setup checklist", exact: true }).click();
+    await expect(checklist).toHaveCount(0);
+    await visit("/");
+    await expect(page.getByRole("region", { name: "Campaign information", exact: true })).toBeVisible();
+    await expect(checklist).toHaveCount(0);
+  }
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: swipeable summaries, native horizontal input, jump/arrows, multiplayer Room entry, grouped tools, saved-shortcut persistence, role/settings preservation, 320/390/768/1440 layouts.",
+    "PASS: swipeable summaries, native horizontal input, dots on phones and a 3×2 tile grid on desktop, the setup checklist, multiplayer Room entry, grouped tools, saved-shortcut persistence, role/settings preservation, 320/390/768/1440 layouts.",
   );
 } finally {
   await browser.close();
