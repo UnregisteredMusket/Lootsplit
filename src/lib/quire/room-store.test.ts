@@ -1346,6 +1346,20 @@ test("initiative panel (map controls): a player reads only revealed order, round
   for (const secret of ["dragon", "Ancient", "300", "Invisible", "Blessed", "Black Gull", "Flees", "Private", "Secret", "40", "44"])
     assert.ok(!text.includes(secret), `a player never reads "${secret}"`);
   assert.equal(await mapCombatOrder({ ...auth, mapId: "other-map" }), null);
+  // Fog: a party-visible creature outside the seat's vision is never listed (nor its turn).
+  const { mapTabletopSchema } = await import("./tabletop-schema.ts");
+  const fogged = (await readRoom(host.code))!;
+  const foggedMap = fogged.table.journal!.world!.maps.find((m) => m.id === battle.id)!;
+  foggedMap.tabletop = mapTabletopSchema.parse({ fog: { enabled: true, base: "concealed", shapes: [] } });
+  await updateRoom({ ...fogged, revision: fogged.revision + 1 }, fogged.revision);
+  const foggedOrder = await mapCombatOrder(auth);
+  assert.ok(foggedOrder, "still shown to players under fog");
+  assert.ok(
+    !foggedOrder!.entries.some((e) => e.tokenId === "scout-token"),
+    "the fogged scout is not listed",
+  );
+  assert.ok(!JSON.stringify(foggedOrder).includes("scout"), "nothing names the fogged scout");
+  assert.ok(foggedOrder!.entries.every((e) => !e.active), "the fogged scout's turn is not revealed");
   sql.prepare("UPDATE dm_encounters SET code=? WHERE id=?").run("FOREIGN", "order-encounter");
   assert.equal(await mapCombatOrder(auth), null);
   sql.prepare("UPDATE dm_encounters SET code=? WHERE id=?").run(host.code, "order-encounter");
