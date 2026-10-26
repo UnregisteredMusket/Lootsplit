@@ -153,7 +153,7 @@ export function ShopContent({
   return (
     <>
       <header className="shop-header">
-        <Link to="/market" search={{ book: "" }} className="shop-header-back">
+        <Link to="/market" search={{ book: "" }} className="shop-header-back tap-link">
           <span aria-hidden="true">← </span>Market
         </Link>
         <div className="shop-header-title">
@@ -245,7 +245,7 @@ export function ShopContent({
               <label className="shop-paybar-mode">
                 <input
                   type="checkbox"
-                  className="size-5"
+                  className="size-6"
                   checked={sellTo}
                   onChange={(event) => {
                     setSellTo(event.target.checked);
@@ -516,7 +516,10 @@ function StockRow({
         {error && <p role="alert">{error}</p>}
         {notice && (
           <p role="status">
-            {notice} <AppLink href="/party?section=funds">Open inventory & ledger</AppLink>
+            {notice}{" "}
+            <AppLink className="tap-link" href="/party?section=funds">
+              Open inventory & ledger
+            </AppLink>
           </p>
         )}
       </li>

@@ -28,7 +28,7 @@ export function RemoveButton({
     <>
       <button
         type="button"
-        className={cn("text-sm text-muted", className)}
+        className={cn("tap-link text-sm text-muted", className)}
         onClick={() => {
           if (prefs.confirmRemoves) setOpen(true);
           else onRemove();

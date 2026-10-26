@@ -386,7 +386,10 @@ export function PropertyFinancialPlan({ holding }: { holding: Holding }) {
         {formatCopper(upkeepRule?.arrears || 0)}. Pausing preserves unpaid upkeep and partial
         periods.
       </p>
-      <AppLink href={`/features/financial#property-${encodeURIComponent(holding.id)}`}>
+      <AppLink
+        className="tap-link"
+        href={`/features/financial#property-${encodeURIComponent(holding.id)}`}
+      >
         Review all linked recurring rules
       </AppLink>
       {existing.some((r) => r.purseId !== holding.purseId) && (

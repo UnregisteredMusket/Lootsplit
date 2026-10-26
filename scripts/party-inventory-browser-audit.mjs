@@ -234,6 +234,41 @@ try {
       await page.locator(".party-inventory").waitFor();
     }
 
+    // --- Touch targets (design plan M1, A7): character cards have no 13 px checkboxes, and the
+    // per-field permissions live in a sheet behind "Permissions…" with 44 px rows.
+    await page.goto(origin + "/party?section=characters");
+    await continueIntoApp(page);
+    const card = page.locator(".party-profile").first();
+    await card.waitFor();
+    const boxes = (scope) =>
+      scope.locator("input[type=checkbox]").evaluateAll((all) =>
+        all
+          .filter((e) => e.getClientRects().length)
+          .map((e) => {
+            const box = e.getBoundingClientRect(),
+              row = e.closest("label")?.getBoundingClientRect();
+            return { name: e.getAttribute("aria-label") || e.closest("label")?.textContent?.trim(), w: box.width, h: box.height, row: row?.height ?? 0 };
+          }),
+      );
+    for (const box of await boxes(page.locator(".party-profile"))) {
+      assert.ok(box.w >= 24 && box.h >= 24, `${label}: ${box.name} checkbox is ${box.w}×${box.h}`);
+      assert.ok(box.row >= 44, `${label}: ${box.name} row is ${box.row} px`);
+    }
+    assert.equal(await page.locator(".party-profile details.character-permissions").count(), 0, "permissions moved to a sheet");
+    await card.getByLabel("Allow character editing", { exact: true }).waitFor();
+    await card.getByRole("button", { name: "Permissions…", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: /· Individual permissions$/ });
+    await sheet.waitFor();
+    const fields = await boxes(sheet);
+    assert.ok(fields.length >= 5, `${label}: the sheet lists the per-field permissions`);
+    for (const box of fields) {
+      assert.ok(box.w >= 24 && box.h >= 24, `${label}: ${box.name} checkbox is ${box.w}×${box.h}`);
+      assert.ok(box.row >= 44, `${label}: ${box.name} row is ${box.row} px`);
+    }
+    await noOverflow(page, `permissions sheet ${label}`);
+    await sheet.getByRole("button", { name: "Done", exact: true }).click();
+    await sheet.waitFor({ state: "hidden" });
+
     // --- Mira's player seat.
     await page.evaluate(async () => {
       const { setSeat } = await import("/src/lib/quire/table.ts");
