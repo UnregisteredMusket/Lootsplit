@@ -4,7 +4,8 @@
   gap: 0.65rem;
   margin: 1.25rem 0;
 }
-.ls-account .account-section-index a {
+.ls-account .account-section-index a,
+.ls-account .account-section-index [role="tab"] {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -13,8 +14,36 @@
   border-radius: 0.75rem;
   text-decoration: none;
 }
-.ls-account .account-section-index a:hover {
+.ls-account .account-section-index a:hover,
+.ls-account .account-section-index [role="tab"]:hover {
   background: #203349;
+}
+.ls-account .account-section-index [role="tab"] {
+  background: transparent;
+  color: var(--portal-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.ls-account .account-section-index [role="tab"][aria-selected="true"] {
+  border-color: var(--portal-gold);
+  color: var(--portal-gold);
+  box-shadow: inset 0 -3px 0 var(--portal-gold);
+}
+.ls-account .account-panel[hidden] {
+  display: none;
+}
+.ls-account .account-panel > :first-child {
+  margin-top: 0.5rem;
+}
+.ls-account .account-panel > .portal-card + .portal-card,
+.ls-account .account-panel > * + .portal-card {
+  margin-top: 1.5rem;
+}
+.ls-account .account-auth-error {
+  margin: 1rem 0 0;
+}
+.ls-account .portal-auth-layout + #account-support {
+  margin-top: 3rem;
 }
 .ls-account [id^="account-"] {
   scroll-margin-top: 1.25rem;

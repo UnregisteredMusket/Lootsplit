@@ -313,7 +313,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Live and Turn-based play",
         paragraphs: [
           "Live play shares permitted changes after the server accepts them. Turn-based play keeps transaction changes pending until Submit changes and end turn commits them. When changes need attention, the status strip offers Retry and Pending changes, which opens Connection & recovery. A confirmed Turn saved to room is a server draft, not committed money or inventory; submit your turn to commit. Offline or unconfirmed work is labeled separately. Chat is independent of transaction turns. Both use an open shared room and a connection.",
-          "Offline campaign play belongs to the DM's owned device save. Guests keep campaign data and unsent actions in memory; a reload can lose unsent work. An account membership is a way to resume an authorized seat, not a private offline player campaign.",
+          "Offline campaign play belongs to the DM's owned device save. Guests keep campaign data and unsent actions in memory; a reload can lose unsent work. An account membership is a way to resume an authorized seat, not a private offline player campaign. My account opens on Campaigns, where each saved membership has Resume; Characters, Profile, Backups and Support are separate sections, and links to an older My account section open the right one.",
         ],
         links: [["Room & sync", "/share"]],
       },
@@ -345,8 +345,8 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Find players or a group",
         paragraphs: [
           "Find a group (lootsplitter.com/community) lists community profiles of Dungeon Masters looking for players and players looking for a table. Filter by role, what people are looking for, game, time zone or name. Signed-in members also see members-only profiles.",
-          "To appear there, open My account → Community profile, choose a handle (your profile address is lootsplitter.com/community/your-handle), then choose who can see it: nobody (the default), signed-in Lootsplitter members, or everyone including search engines. Add whether you DM, play or both, your games, time zone, usual play times, a looking-for-group note and, if you want people to message you, your Discord username. The profile also shows your display name, picture and introduction from your member profile; your email addresses are never shown.",
-          "Signed-in members can report a profile from its page. Site staff review reports in My account and can hide a profile; its owner sees a notice and can contact support. Lootsplitter has no private messages between members: arrange games on Discord or wherever you both chat.",
+          "To appear there, open My account → Profile → Community profile, choose a handle (your profile address is lootsplitter.com/community/your-handle), then choose who can see it: nobody (the default), signed-in Lootsplitter members, or everyone including search engines. Add whether you DM, play or both, your games, time zone, usual play times, a looking-for-group note and, if you want people to message you, your Discord username. The profile also shows your display name, picture and introduction from your member profile; your email addresses are never shown.",
+          "Signed-in members can report a profile from its page. Site staff review reports in My account → Administration and can hide a profile; its owner sees a notice and can contact support. Lootsplitter has no private messages between members: arrange games on Discord or wherever you both chat.",
         ],
         links: [
           ["Find a group", "/community"],
@@ -396,7 +396,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "bugs",
         title: "Report a bug",
         paragraphs: [
-          "Sign in to My account → Report a bug. Describe your action, expected result, actual result, role and play mode. Preview any optional diagnostics before attaching them. Campaign content and files are not automatically included.",
+          "Sign in to My account → Support → Report a bug (before signing in, Bug reports is below the sign-in form). Describe your action, expected result, actual result, role and play mode. Preview any optional diagnostics before attaching them. Campaign content and files are not automatically included.",
           "Reports and replies are private to you and authorized site staff. Preserve pending work and a recovery copy before an action that replaces or clears device data.",
         ],
         links: [["Report a bug", "/account#bug-reports"]],

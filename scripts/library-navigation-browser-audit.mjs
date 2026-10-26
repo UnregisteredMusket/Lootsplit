@@ -165,10 +165,10 @@ try {
       .getByRole("link", { name: "My account", exact: true })
       .click();
     await page.waitForURL("**/account");
-    await page
-      .getByRole("heading", { name: "Disposable audit DM’s library", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "My account", level: 1 }).waitFor();
     await stillOpen();
+    // My account shows one section at a time; the profile form is under Profile.
+    await page.getByRole("tab", { name: "Profile", exact: true }).click();
     await page.screenshot({ path: `test-results/library-navigation/account-${width}.png` });
     const introduction = page.getByLabel("Introduction", { exact: true });
     await introduction.fill("An unsaved account introduction");

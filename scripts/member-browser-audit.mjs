@@ -41,7 +41,7 @@ try {
   const owner = await account("Staff Audit"),
     member = await account("Member Audit");
   await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(owner.id, Date.now()).run();
-  await openApplication(member.page, origin + "/account");
+  await openApplication(member.page, origin + "/account#account-profile");
   await member.page.getByRole("heading", { name: "Profile & preferences" }).waitFor();
   await member.page.getByLabel("Introduction", { exact: true }).fill("A tabletop adventurer.");
   await member.page.getByLabel("Messaging email", { exact: true }).fill("messages@example.com");
@@ -60,7 +60,7 @@ try {
     await member.page.getByRole("heading", { name: "Member management", exact: true }).count(),
     0,
   );
-  await openApplication(owner.page, origin + "/account");
+  await openApplication(owner.page, origin + "/account#account-member-management");
   await owner.page.getByRole("heading", { name: "Member management", exact: true }).waitFor();
   await owner.page.getByLabel("Search members", { exact: true }).fill(member.email);
   await owner.page.getByRole("button", { name: "Search / refresh members" }).click();
@@ -140,6 +140,7 @@ try {
   });
   assert.equal(linked.status(), 200);
   await reloadApplication(owner.page);
+  await owner.page.getByRole("tab", { name: "Campaigns", exact: true }).click();
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).waitFor();
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();
   await answerThemedDialog(owner.page, { value: code });
@@ -150,7 +151,9 @@ try {
     await DB.prepare("SELECT code FROM campaign_rooms WHERE code=?").bind(code).first(),
     null,
   );
+  await owner.page.getByRole("tab", { name: "Backups", exact: true }).click();
   await owner.page.getByRole("button", { name: "Restore as new", exact: true }).waitFor();
+  await owner.page.getByRole("tab", { name: "Administration", exact: true }).click();
   await owner.page.setViewportSize({ width: 390, height: 844 });
   await owner.page
     .getByRole("heading", { name: "Member management", exact: true })

@@ -118,7 +118,7 @@ export function BugReports({ userId, role }: { userId?: string; role?: string })
         <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
       </p>
       {!userId ? (
-        <p>Sign in below to report a bug and track its progress.</p>
+        <p>Sign in above to report a bug and track its progress.</p>
       ) : (
         <>
           <details>

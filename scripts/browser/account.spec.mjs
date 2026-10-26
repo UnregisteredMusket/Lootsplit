@@ -557,28 +557,63 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   const visit = (p, path) => visitPage(p, origin, path);
   await page.setViewportSize({ width: 390, height: 900 });
   await visit(page, "/account");
+  // Sign-in page: the form comes before Bug reports, and an auth error sits under the form.
+  const signIn = page.locator("#account-sign-in");
+  const bugCard = page.locator("#bug-reports");
+  await bugCard.waitFor();
+  assert.ok(
+    (await signIn.boundingBox()).y < (await bugCard.boundingBox()).y,
+    "the sign-in form precedes Bug reports",
+  );
   console.log("Account audit: sign up");
   const email = credentials().email,
     password = "browser testing password 2026";
+  // An unknown account fails inline, under the form, and the error clears on a tab switch.
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).last().click();
+  const authError = signIn.getByRole("alert");
+  await expect(authError).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(1);
   await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await page.getByLabel("Display name").fill("Test adventurer");
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Create account", exact: true }).last().click();
-  await page.getByRole("heading", { name: "Test adventurer’s library" }).waitFor();
+  await page.getByRole("heading", { name: "My account", level: 1 }).waitFor();
+  await expect(page.getByTestId("account-name")).toHaveText("Test adventurer");
   await page.getByRole("heading", { name: "Keep this recovery key somewhere safe" }).waitFor();
   const key = await page.locator(".portal-key code").innerText();
   assert.equal(key.length, 64);
   await page.getByRole("button", { name: "I have saved it" }).click();
   await prepareDmFixture(page, origin, { useAccountLink: true });
   await navigateAccountScenario(page, origin, "/account");
-  console.log("Account audit: character and backup");
+  console.log("Account audit: sections, character and backup");
+  // One section at a time; Campaigns opens first, and each tab keeps a shareable address.
+  const sections = page.getByRole("tablist", { name: "Account sections" });
+  await expect(sections.getByRole("tab", { name: "Campaigns", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByRole("tabpanel")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "My campaigns", exact: true })).toBeVisible();
+  // A new account with no memberships may be about to host, so it still sees DM encounters.
+  await expect(page.getByRole("heading", { name: "DM encounters", exact: true })).toBeVisible();
+  await expect(sections.getByRole("tab", { name: "Administration" })).toHaveCount(0);
+  await sections.getByRole("tab", { name: "Campaigns", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(sections.getByRole("tab", { name: "Characters", exact: true })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "My campaigns", exact: true })).toBeHidden();
+  expect(new URL(page.url()).hash).toBe("#account-characters");
   await page.getByLabel("Character name", { exact: true }).fill("Browser test hero");
   await page.getByLabel("Notes", { exact: true }).fill("A reusable hero.");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await page.getByRole("heading", { name: "Browser test hero", exact: true }).waitFor();
   await page.getByRole("button", { name: "Add to campaign", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "was added" }).waitFor();
+  await sections.getByRole("tab", { name: "Backups", exact: true }).click();
+  expect(new URL(page.url()).hash).toBe("#account-backups");
   await page.getByRole("button", { name: "Save current campaign", exact: true }).click();
   await page.getByRole("button", { name: "Restore as new", exact: true }).waitFor();
   await page.screenshot({
@@ -586,12 +621,26 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
     fullPage: true,
   });
   // A second browser/device sees the same private library, with an independent local campaign.
+  // An older deep link (#account-reusable-profiles) still opens the section that holds it.
   const { page: other } = await devices.newDevice();
   await visit(other, "/account");
+  await other.evaluate(() => history.replaceState(null, "", "#account-reusable-profiles"));
   await other.getByLabel("Email", { exact: true }).fill(email);
   await other.getByLabel("Password", { exact: true }).fill(password);
   await other.getByRole("button", { name: "Sign in", exact: true }).last().click();
   await other.getByRole("heading", { name: "Browser test hero", exact: true }).waitFor();
+  await expect(other.getByRole("tab", { name: "Characters", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  // An in-page link to another section switches to it.
+  await other.evaluate(() => (location.hash = "#bug-reports"));
+  await expect(other.getByRole("tab", { name: "Support", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(other.locator("#bug-reports")).toBeVisible();
+  await other.getByRole("tab", { name: "Backups", exact: true }).click();
   await other.getByRole("button", { name: "Restore as new", exact: true }).waitFor();
   await other.screenshot({
     path: testInfo.outputPath("account-library-desktop.png"),
@@ -600,6 +649,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   await prepareDmFixture(other, origin, { useAccountLink: true });
   await navigateAccountScenario(other, origin, "/account");
   console.log("Account audit: restore into new campaign");
+  await other.getByRole("tab", { name: "Backups", exact: true }).click();
   other.on("dialog", (d) => d.accept());
   await other.getByRole("button", { name: "Restore as new", exact: true }).click();
   await answerThemedDialog(other);
@@ -950,6 +1000,15 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
   await expect(guest.locator(".room-code")).toHaveText(code);
   phase("returning joined");
   await visitPage(secondPlayer, origin, "/account");
+  // A player-only account: no hosting allowance or DM encounters card, while personal
+  // encounter drafts stay one link away; Resume leads each membership's actions.
+  const playerCard = secondPlayer.locator("article.portal-card").filter({ hasText: code });
+  await expect(playerCard.locator(".portal-actions button").first()).toHaveText(/^Resume/);
+  await expect(secondPlayer.getByTestId("hosting-allowance")).toHaveCount(0);
+  await expect(secondPlayer.getByRole("heading", { name: "DM encounters" })).toHaveCount(0);
+  await expect(
+    secondPlayer.getByRole("link", { name: "Open DM encounters", exact: true }),
+  ).toBeVisible();
   await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
   await secondPlayer.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(secondPlayer);

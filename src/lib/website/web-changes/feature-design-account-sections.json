@@ -1,0 +1,11 @@
+{
+  "title": "My account in sections",
+  "summary": "My account now shows one section at a time, starting with your campaigns, and the sign-in form comes first.",
+  "items": [
+    "Campaigns, Characters, Profile, Backups and Support are tabs; Campaigns opens first, and Resume leads each saved campaign's buttons.",
+    "Older links to a part of My account still open the right section.",
+    "Accounts that only play (no DM campaigns) no longer see the online-campaign hosting count or the DM encounters card; Open DM encounters stays as a short link.",
+    "The heading reads \"My account\" with your name below it.",
+    "On the sign-in page, Bug reports moved below the form, and a sign-in error appears right under the form and clears when you switch between Sign in and Create account."
+  ]
+}
