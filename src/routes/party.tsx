@@ -28,6 +28,7 @@ import { characterControl, type Purse } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
 import { CharacterSheetPanel } from "@/components/character-sheet";
 import { Button, Field, Modal, Segmented, TextInput } from "@/components/ui";
+import { Disclosure } from "@/components/disclosure";
 import { RemoveButton } from "@/components/quire-ui";
 import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
@@ -435,8 +436,7 @@ function PartyPage() {
                 <AppLink href="/share">Open your campaign to choose a character →</AppLink>
               </p>
             )}
-            <details className="inventory-management" open={seat.role === "dm" || undefined}>
-              <summary>Wallets, transfers & property</summary>
+            <Disclosure variant="section" className="inventory-management" open={seat.role === "dm" || undefined} summary="Wallets, transfers & property">
               <h2 className="mt-5 text-sm font-medium text-muted">Members · {visible.length}</h2>
               <ul className="mt-1 divide-y divide-border border-y border-border">
                 {visible.map((purse) => {
@@ -576,7 +576,7 @@ function PartyPage() {
                 </Button>
               </div>
               ) : null}
-            </details>
+            </Disclosure>
             <Modal
               open={action !== ""}
               onOpenChange={(open) => {
