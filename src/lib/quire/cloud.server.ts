@@ -777,6 +777,9 @@ export async function submitCommands(input: {
   // directly, never staged with a turn.
   if (input.stage && commands.some((c) => c.kind === "loot-claim" || c.kind === "loot-resolve"))
     throw Error("Treasure-pool claims and resolutions are sent to the room directly. Send it again.");
+  // Quest commands move nothing and are the DM's alone: sent directly, never staged with a turn.
+  if (input.stage && commands.some((c) => c.kind.startsWith("quest-")))
+    throw Error("Quest changes are sent to the room directly. Send it again.");
   // Pen & Paper totals follow the campaign's manual-roll policy (play_policies), read on the server.
   const manualRolls = commands.some((c) => c.kind === "loot-resolve" && c.rolls === "manual")
     ? await manualCharacterRolls(input.code)
@@ -843,10 +846,12 @@ export async function submitCommands(input: {
         );
       return view(room, seat);
     }
-    // Chat and treasure-pool claims (which move nothing) may be sent outside the seat's turn
+    // Chat, treasure-pool claims and quest changes (which move nothing) may be sent outside the seat's turn
     // (owner decision, 2026-10-23).
+    // Quest changes (DM only, nothing moves) are not bound to the turn either.
     const messagesOnly =
-      commands.length > 0 && commands.every((c) => c.kind === "message" || c.kind === "loot-claim");
+      commands.length > 0 &&
+      commands.every((c) => c.kind === "message" || c.kind === "loot-claim" || c.kind.startsWith("quest-"));
     if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
     const seen = new Set(room.commands ?? []);

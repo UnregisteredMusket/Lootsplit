@@ -101,6 +101,15 @@ export function pendingCommandDescription(value: unknown): string {
       return `Character ${c.kind === "portrait" ? "portrait" : "sheet"} change · ${c.purseId}`;
     case "message":
       return `Message to ${c.to} · text kept in recovery export`;
+    case "quest-save":
+    case "quest-reveal":
+    case "quest-objective":
+    case "quest-log":
+    case "quest-close":
+    case "quest-link-reward":
+    case "quest-archive":
+    case "quest-delete":
+      return `Quest change (${c.kind.slice(6).replaceAll("-", " ")}) · text kept in recovery export`;
     case "journal-note":
       return `Journal entry · ${c.visibility} visibility · text kept in recovery export`;
     case "patch":
