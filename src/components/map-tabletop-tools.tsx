@@ -764,12 +764,12 @@ export function useMapTabletopTools(
           </Button>
     </>
   );
+  const sceneControls = dm && <SceneConfiguration map={map} />;
+  const explorationControls = dm && <Fold title="Exploration & lighting">{fogActions}</Fold>;
   const configurationControls = (
     <>
-      {dm && <SceneConfiguration map={map} />}
-      {dm && (
-        <Fold title="Exploration & lighting">{fogActions}</Fold>
-      )}
+      {sceneControls}
+      {explorationControls}
     </>
   );
   const activateTool = (next: MapTool): boolean => {
@@ -1112,6 +1112,8 @@ export function useMapTabletopTools(
     activateTool,
     contextControls,
     configurationControls,
+    sceneControls,
+    explorationControls,
     fogActions,
     wallsList,
     lightsList,

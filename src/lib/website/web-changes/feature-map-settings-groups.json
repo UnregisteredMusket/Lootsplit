@@ -1,0 +1,10 @@
+{
+  "title": "Map settings, grouped and searchable",
+  "summary": "All map settings is now organised into clear groups with a search box, instead of one long list.",
+  "items": [
+    "Groups: This map, Places & party, Players & display, Exploration, Combat, View, and Shortcuts & help.",
+    "Type in the search box to show only the groups that mention it, or jump straight to a group from the row of buttons at the top.",
+    "The places on the map, once their own tab, are now in Places & party.",
+    "Shortcuts & help lists every map keyboard shortcut."
+  ]
+}
