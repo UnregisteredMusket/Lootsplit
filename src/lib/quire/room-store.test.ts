@@ -1343,3 +1343,64 @@ test("connected combat presentation rechecks seats, campaign, fog and scene perm
   assert.deepEqual(saved.ledger, []);
   assert.deepEqual(saved.holdings, []);
 });
+
+test("market location and other journal artwork is stored beside the room row; shared portraits stay inline", async () => {
+  const { readJournal } = await import("./journal.ts");
+  const { encodeRoomImages } = await import("../../../cloudflare/room-images.mjs");
+  const art = (letter: string) => "data:image/webp;base64," + letter.repeat(90000);
+  const portrait = art("P");
+  const locations = Array.from({ length: 24 }, (_, i) => ({
+    id: `loc-${i}`,
+    name: `Place ${i}`,
+    kind: "region",
+    parentId: null,
+    description: "",
+    image: art(String.fromCharCode(97 + i)),
+  }));
+  const table = {
+    ...emptyCloudTable(),
+    purses: [
+      { id: "art-hero", name: "Hero", kind: "character" as const, coins: emptyCoins(), portrait },
+    ],
+    journal: readJournal({ market: { locations, currentLocationId: null } }),
+  };
+  // An NPC record that mirrors the purse portrait keeps the inline copy SQL reads rely on.
+  (table.journal as any).market.locations[0].image = portrait;
+  const before = JSON.stringify(table);
+  assert.ok(before.length > 1_800_000, "the old inline form is over the room budget");
+  const encoded = await encodeRoomImages({
+    table,
+    drafts: {
+      dm: [
+        {
+          kind: "patch",
+          changes: [
+            { store: "journal", id: 'journal:["market"]', before: null, after: { locations } },
+          ],
+        },
+      ],
+    },
+  });
+  assert.ok(encoded.body.length < 300_000, `encoded body is ${encoded.body.length} characters`);
+  assert.equal(encoded.assets.length, 24); // 23 table images plus the draft-only original of loc-0
+  const raw = JSON.parse(encoded.body);
+  assert.equal(raw.table.purses[0].portrait, portrait);
+  assert.equal(raw.table.journal.market.locations[0].image, portrait);
+  assert.match(
+    raw.table.journal.market.locations[1].image,
+    /^\/art\/room-image-[a-f0-9]{64}\.webp$/,
+  );
+  assert.match(raw.drafts.dm[0].changes[0].after.locations[2].image, /^\/art\/room-image-/);
+  let restored = encoded.body;
+  for (const asset of encoded.assets) restored = restored.split(asset.reference).join(asset.image);
+  assert.deepEqual(JSON.parse(restored).table, JSON.parse(before));
+  // Through D1: the room opens under the budget and every image hydrates exactly.
+  const host = await openRoom({ name: "Artwork DM", table });
+  assert.ok(
+    (sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as { body: string })
+      .body.length < 300_000,
+  );
+  const read = await readRoom(host.code);
+  assert.deepEqual(read!.table.journal!.market!.locations, table.journal.market!.locations);
+  await deleteRoom(host.code, read!.revision);
+});

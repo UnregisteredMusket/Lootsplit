@@ -1,0 +1,9 @@
+{
+  "title": "Large campaigns save online again",
+  "summary": "DM edits in campaigns with lots of artwork no longer fail with storage-quota, batch-size or campaign-size errors.",
+  "items": [
+    "A DM edit now sends only the part of the campaign it changed, instead of the whole campaign journal twice; pending edits saved on a device shrink the same way the next time the campaign opens.",
+    "Location, shop and other campaign artwork is stored beside the campaign online, like map images already were, so it no longer counts toward the online campaign size limit.",
+    "Edits to unrelated parts of the campaign made on two devices no longer conflict with each other."
+  ]
+}

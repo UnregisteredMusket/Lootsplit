@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
-import { applyCommand, commandSchema, tablePatch, type Command } from "./commands.ts";
+import { applyCommand, commandSchema, compactPatch, tablePatch, type Command } from "./commands.ts";
 import { sameCommand } from "./command-identity.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { fromCopper, toCopper } from "./money.ts";
@@ -112,6 +112,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     "applyCommand",
     "fail",
     "sameCommand",
+    "compactPatch",
     stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) + "; return accept;",
   )(
     () => session,
@@ -133,6 +134,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
       view.error = e.message;
     },
     sameCommand,
+    compactPatch,
   );
   return { session, remote, accept, displayed: () => displayed, error: () => error, staged: () => view.staged };
 }
@@ -755,6 +757,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     "start",
     "sameCommand",
     "readRoomResponse",
+    "compactPatch",
     stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) +
       "; return {queueCommand, runSharedMutation, captureMutationScope, retryPending};",
   )(
@@ -787,6 +790,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     () => {},
     sameCommand,
     readRoomResponse,
+    compactPatch,
   );
   return {
     ...functions,

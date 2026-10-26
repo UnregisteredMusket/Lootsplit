@@ -749,7 +749,7 @@ export async function submitCommands(input: {
   endTurn?: boolean;
   stage?: boolean;
 }): Promise<RoomView> {
-  const { commandSchema, applyCommandBatch } = await import("./commands.ts");
+  const { commandSchema, applyCommandBatch, compactPatch } = await import("./commands.ts");
   const { commandIdentity, canonicalJson, sameCommand } = await import("./command-identity.ts");
   if (JSON.stringify(input).length > 2_000_000)
     throw new Error("The pending batch is too large. Submit smaller changes.");
@@ -828,7 +828,8 @@ export async function submitCommands(input: {
           "An action ID contains conflicting changes. Export your pending actions before retrying.",
         );
       const staged = room.drafts?.[seat.id]?.find((c) => c.id === command.id);
-      if (staged && !sameCommand(staged, command))
+      // A draft staged with the whole journal equals its split form (journal-patch.ts).
+      if (staged && !sameCommand(compactPatch(staged), compactPatch(command)))
         throw Error(
           "Another device saved different changes for this action. Export your pending actions before retrying.",
         );
@@ -869,7 +870,8 @@ export async function submitCommands(input: {
     if (!allowance) throw Object.assign(Error(SUBMIT_LIMIT_MESSAGE), { status: 429 });
     const drafts = { ...(room.drafts ?? {}) };
     if (input.stage) {
-      const pending = [...(drafts[seat.id] ?? [])];
+      // Drafts staged before journal changes were split keep their action IDs in the split form.
+      const pending = (drafts[seat.id] ?? []).map((c) => compactPatch(c));
       const known = new Set(pending.map((c) => c.id));
       for (const command of commands)
         if (!seen.has(seat.id + ":" + command.id) && !known.has(command.id)) {

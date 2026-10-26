@@ -24,6 +24,7 @@ import { getSeat, setSeat, downloadJson, resumedPlayerSeat } from "./table.ts";
 import {
   applyCommand,
   commandSchema,
+  compactPatch,
   tablePatch,
   type Command,
   type CommandRequest,
@@ -34,7 +35,10 @@ import { rememberIncoming } from "./chat.ts";
 import { isEphemeralCampaign, setEphemeralCampaign } from "./guest-storage.ts";
 import { closeQuireDb } from "./db.ts";
 import { reconcileAccountResume } from "./account-resume.ts";
-import { sameCommand } from "./command-identity.ts";
+import { sameCommand as sameIdentity } from "./command-identity.ts";
+// A whole-journal patch from an older draft and its split form (journal-patch.ts) are the same action.
+const sameCommand = (a: unknown, b: unknown) =>
+  sameIdentity(compactPatch(a as Command), compactPatch(b as Command));
 import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
 import { forgetRoomImages, restoreRoomImages, roomImageReferences } from "./room-image-cache.ts";
 import {
@@ -169,6 +173,17 @@ function session(): Session | null {
       !Array.isArray(saved.pending)
     )
       return null;
+    // Older drafts carried the whole journal (with inline map artwork) in each DM edit, which
+    // could exceed the batch limit and this device's storage. Split them into the parts that
+    // changed; the room treats both forms as the same action.
+    if (saved.pending.some((c: Command) => compactPatch(c) !== c)) {
+      saved.pending = saved.pending.map((c: Command) => compactPatch(c));
+      try {
+        localStorage.setItem(key(), JSON.stringify(saved));
+      } catch {
+        // Kept in memory for this read; the next successful save stores the smaller form.
+      }
+    }
     // Legacy owned DM caches inherit the saved campaign owner, never whichever
     // account happens to sign in when a request is later rejected.
     if (saved.role === "dm" && !saved.userId)
@@ -452,7 +467,7 @@ async function accept(value: RoomView, committed = false) {
   }
   // Unite immutable same-seat drafts from every device. Acknowledged commands
   // never return as pending, including legacy/delayed server responses.
-  const draft = incomingDraft.filter((c) => !acknowledged.has(c.id));
+  const draft = incomingDraft.filter((c) => !acknowledged.has(c.id)).map((c) => compactPatch(c));
   const known = new Map(s.pending.map((c) => [c.id, c]));
   for (const command of draft) {
     const local = known.get(command.id);

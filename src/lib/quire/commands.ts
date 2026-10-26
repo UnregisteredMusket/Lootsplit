@@ -79,6 +79,7 @@ import { applyServiceCommand } from "./services-command.ts";
 // After services-command: finance must load after journal here (see services-lessons.ts).
 import { chargeLesson } from "./services-lessons.ts";
 import { validateServices } from "./services-validation.ts";
+import { diffJournal, journalChangeId, journalChangePath, LEGACY_JOURNAL_CHANGE_ID, writeJournalPath } from "./journal-patch.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
   qty = amount.min(1).max(100000);
@@ -1297,11 +1298,21 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         assertFinanceAccountRemovable(t.journal?.finance, change.id);
       if (change.store === "journal") {
         const currentJournal = readJournal(t.journal);
-        if (!currentJournal.tradeEconomy && readJournal(change.after).tradeEconomy)
+        // A part of the journal (journal-patch.ts) is checked and applied exactly like the whole
+        // journal: the rest of `before`/`after` is the current journal itself.
+        let before = change.before,
+          after = change.after;
+        if (change.id !== LEGACY_JOURNAL_CHANGE_ID) {
+          const path = journalChangePath(change.id);
+          if (!path) throw new Error("Invalid journal change.");
+          before = writeJournalPath(currentJournal, path, change.before);
+          after = writeJournalPath(currentJournal, path, change.after);
+        }
+        if (!currentJournal.tradeEconomy && readJournal(after).tradeEconomy)
           throw Error("Configure a new trade economy with reviewed economy commands; seasonal rolls require DM authority.");
-        if (!same(currentJournal, preserveJournalMetadata(change.before, currentJournal)))
+        if (!same(currentJournal, preserveJournalMetadata(before, currentJournal)))
           throw new Error("Activity changed elsewhere. Refresh and retry.");
-        t.journal = preserveJournalMetadata(change.after, currentJournal);
+        t.journal = preserveJournalMetadata(after, currentJournal);
         continue;
       }
       if (change.store === "realm") {
@@ -1444,12 +1455,32 @@ export function tablePatch(before: CloudTable, after: CloudTable): CommandInput 
       before: before.realm ?? null,
       after: after.realm ?? null,
     });
-  if (!same(before.journal ?? readJournal(null), after.journal ?? readJournal(null)))
-    changes.push({
-      store: "journal",
-      id: "journal",
-      before: before.journal ?? readJournal(null),
-      after: after.journal ?? readJournal(null),
-    });
+  // Only the parts of the journal that changed (journal-patch.ts): a whole journal with its
+  // inline map artwork can exceed the batch limit and the device's storage for pending actions.
+  for (const part of diffJournal(before.journal ?? readJournal(null), after.journal ?? readJournal(null)))
+    changes.push({ store: "journal", id: journalChangeId(part.path), before: part.before, after: part.after });
   return { kind: "patch", changes };
+}
+
+/**
+ * The same patch with any whole-journal change (older drafts and clients) split into the parts
+ * that changed. Applying either form gives the same table.
+ */
+export function compactPatch<C extends { kind: string }>(command: C): C {
+  if (command.kind !== "patch") return command;
+  const patch = command as unknown as Extract<Command, { kind: "patch" }>;
+  if (!patch.changes.some((c) => c.store === "journal" && c.id === LEGACY_JOURNAL_CHANGE_ID)) return command;
+  return {
+    ...command,
+    changes: patch.changes.flatMap((c) =>
+      c.store === "journal" && c.id === LEGACY_JOURNAL_CHANGE_ID
+        ? diffJournal(c.before ?? readJournal(null), c.after ?? readJournal(null)).map((part) => ({
+            store: "journal" as const,
+            id: journalChangeId(part.path),
+            before: part.before,
+            after: part.after,
+          }))
+        : [c],
+    ),
+  } as C;
 }

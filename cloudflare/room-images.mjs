@@ -26,38 +26,60 @@ const reference = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
 export async function encodeRoomImages(value) {
   const resources = await encodeRoomResources(value);
   let body = JSON.stringify(resources.value);
-  // Existing sheet/profile and recovery SQL reads raw room portraits directly.
-  // Extract map images only; keep every image also used outside maps inline.
+  // Existing sheet/profile and recovery SQL reads raw room portraits directly, so an image that
+  // also appears outside the campaign journal (a purse or sheet portrait, an NPC mirrored from
+  // it) stays inline. Journal images move to campaign_room_images: map artwork, and since
+  // 2026-10-26 the other journal artwork too (market location, shop and record images), which
+  // could otherwise push a campaign over the room budget.
   const maps = new Set(),
+    journal = new Set(),
     inline = new Set();
-  /** @param {unknown} node */
-  function scan(node, map = false, world = false) {
+  /** @param {string} value */
+  const whole = (value) => value.match(raster)?.some((image) => image === value);
+  /** @param {unknown} node @param {boolean} [map] @param {boolean} [world] @param {boolean} [inJournal] */
+  function scan(node, map = false, world = false, inJournal = false) {
     if (typeof node === "string") {
-      for (const image of node.match(raster) || []) inline.add(image);
+      if (inJournal && whole(node)) journal.add(node);
+      else for (const image of node.match(raster) || []) inline.add(image);
     } else if (Array.isArray(node)) {
-      node.forEach((value) => scan(value));
+      node.forEach((value) => scan(value, false, false, inJournal));
     } else if (node && typeof node === "object") {
       for (const [key, value] of Object.entries(node)) {
         if (map && key === "image" && typeof value === "string") {
-          if (value.match(raster)?.some((image) => image === value)) maps.add(value);
+          if (whole(value)) maps.add(value);
         } else if (world && key === "maps" && Array.isArray(value)) {
-          value.forEach((value) => scan(value, true));
+          value.forEach((value) => scan(value, true, false, true));
         } else if (key === "world") {
-          scan(value, false, true);
+          scan(value, false, true, inJournal);
         } else if ("kind" in node && node.kind === "map-save" && ["map", "before"].includes(key)) {
           scan(value, true);
+        } else if (
+          "store" in node &&
+          node.store === "journal" &&
+          ["before", "after"].includes(key)
+        ) {
+          // A DM patch draft carries journal parts (journal-patch.ts) or a whole journal.
+          scan(value, false, false, true);
         } else if (key === "snapshot" && typeof value === "string") {
           try {
             scan(JSON.parse(value));
           } catch {
             scan(value);
           }
-        } else scan(value);
+        } else if (key === "journal" && value && typeof value === "object") {
+          scan(value, false, false, true);
+        } else scan(value, false, false, inJournal);
       }
     }
   }
   scan(value);
-  const images = [...maps].filter((image) => !inline.has(image));
+  const images = [
+    ...[...maps].filter((image) => !inline.has(image)),
+    // Larger non-map images stay inline, as before (map artwork keeps its size error below).
+    ...[...journal].filter(
+      (image) => !inline.has(image) && !maps.has(image) && image.length <= 500000,
+    ),
+  ];
   const assets = await Promise.all(
     images.map(async (image) => {
       if (image.length > 500000)
@@ -108,7 +130,8 @@ export async function hydrateRoomImages(db, code, value, options = {}) {
   if (options.keepMapImageReferences && liveMaps(value)) {
     value = structuredClone(value);
     kept = /** @type {any[]} */ (liveMaps(value)).map((map) => {
-      if (!map || typeof map.image !== "string" || !ROOM_IMAGE_REFERENCE.test(map.image)) return undefined;
+      if (!map || typeof map.image !== "string" || !ROOM_IMAGE_REFERENCE.test(map.image))
+        return undefined;
       const image = map.image;
       delete map.image;
       return image;
