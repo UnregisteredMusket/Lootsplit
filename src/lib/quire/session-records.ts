@@ -32,6 +32,7 @@ import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
 import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
 import { projectJourneys } from "./journey-engine.ts";
+import { projectQuestMapLinks, projectQuests, questNamedPurses } from "./quests.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
@@ -236,6 +237,34 @@ export function projectRecord(
         );
       t.journal.propertyOperations = estate;
     }
+    // Quest log: only quests revealed to this seat, without DM-only parts (quests.ts).
+    const hiddenGroups = new Set(
+      (table.journal?.world?.groups ?? []).filter((g) => g.status === "active" && g.hidden && !groups.includes(g.id)).map((g) => g.id),
+    );
+    const questPlaces = projectQuests(table, t.journal, seat, {
+      readableNpcs,
+      // A hidden group's place, unless the seat's own group or the party is there too.
+      hiddenPlaces: new Set(
+        (table.journal?.world?.groups ?? [])
+          .filter((g) => hiddenGroups.has(g.id) && g.locationId)
+          .map((g) => g.locationId!)
+          .filter(
+            (id) =>
+              id !== table.journal?.market?.currentLocationId &&
+              !(table.journal?.world?.groups ?? []).some(
+                (g) => groups.includes(g.id) && g.status === "active" && g.locationId === id,
+              ),
+          ),
+      ),
+    });
+    // Entries keep a quest link only when the quest is in this seat's log.
+    const readableQuests = new Set(((t.journal as { quests?: { quests: { id: string }[] } }).quests?.quests ?? []).map((q) => q.id));
+    t.journal.entries = t.journal.entries?.map((e) => {
+      if (!e.questId || readableQuests.has(e.questId)) return e;
+      const plain = { ...e };
+      delete plain.questId;
+      return plain;
+    });
     const market = readMarketLocations(t.journal.market);
     if (t.journal.tradeEconomy) {
       const economy = t.journal.tradeEconomy;
@@ -354,6 +383,7 @@ export function projectRecord(
             t.journal.tradeEconomy?.exchanges.flatMap((e) =>
               e.locationId ? [e.locationId] : [],
             ) ?? [],
+            questPlaces,
           ),
         !!world.partyPosition,
       );
@@ -452,6 +482,8 @@ export function projectRecord(
       ...world.npcs.map((n) => n.id),
       ...world.trades.flatMap((o) => [o.left.purseId, o.right.purseId]),
       ...sharedOwners,
+      // Quest co-recipients are named (owner decision D3).
+      ...questNamedPurses(t.journal),
       ...t.holdings.map((h) => h.purseId),
       ...estate.jobs.flatMap((j) => [j.purseId, ...j.assignments.map((a) => a.purseId)]),
       ...estate.letters.map((l) => l.senderId),
@@ -533,6 +565,7 @@ export function projectRecord(
     );
   }
   if (!dm) projectConnectedMaps(t, seat);
+  if (!dm && t.journal) projectQuestMapLinks(t.journal);
   for (const p of t.purses) delete p.editBaseline;
   return t;
 }

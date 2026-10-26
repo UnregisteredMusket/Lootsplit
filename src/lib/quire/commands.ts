@@ -30,6 +30,8 @@ import { canonicalJson } from "./canonical-json.ts";
 import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
 import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
 import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
+import { questCommands, questKinds, type QuestCommand } from "./quests-schema.ts";
+import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
@@ -163,6 +165,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
     purseId: z.string(),
     reportIds: z.array(id).default([]),
     provenance: encounterLootProvenanceSchema.optional(),
+    /** A note about one quest the writer can read (players' private "My notes"). */
+    questId: id.optional(),
   }),
   z.object({ ...base, kind: z.literal("character-editing"), purseId: id, allowed: z.boolean() }),
   z.object({
@@ -283,6 +287,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
       .max(10000),
   }),
   ...lootCommands,
+  ...questCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export type CommandInput = Command extends infer C
@@ -418,6 +423,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
   } else if (lootKinds.has(cmd.kind)) {
     applyLootCommand(t, seat, cmd as LootCommand, at, execution, event);
+  } else if (questKinds.has(cmd.kind)) {
+    applyQuestCommand(t, seat, cmd as QuestCommand, at);
   } else if (journeyKinds.has(cmd.kind)) {
     journal.world = readWorld(journal.world);
     applyJourneyCommand(t, seat, cmd as JourneyCommand, at, (summary, purseId) =>
@@ -830,6 +837,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     }
     if (cmd.reportIds.some((id) => !journal.reports?.some((r) => r.id === id)))
       throw Error("Session report not found.");
+    if (cmd.questId) {
+      const quest = questsOf(t).find((q) => q.id === cmd.questId);
+      if (!quest || !questReadable(t, quest, seat)) throw Error("This quest is not in your quest log.");
+      if (cmd.provenance) throw Error("A loot summary cannot be a quest note.");
+    }
     if (cmd.provenance) {
       dm();
       if (cmd.visibility !== "party" || cmd.purseId || cmd.reportIds.length)

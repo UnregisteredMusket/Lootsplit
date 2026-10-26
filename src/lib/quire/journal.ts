@@ -10,6 +10,7 @@ import { validateFleet } from "./ships.ts";
 import { referencePolicySchema } from "./reference-access.ts";
 import { resourceLibrarySchema } from "./resource-packs.ts";
 import { worldSchema } from "./world-schema.ts";
+import { questsSchema } from "./quests-schema.ts";
 import { validateWorld } from "./world.ts";
 import { estateSchema } from "./estate-schema.ts";
 import { validateEstate } from "./estate.ts";
@@ -69,6 +70,8 @@ export const coinSplitEventSchema = z
 const journalFields = z.object({
   coinSplit: coinSplitSettingsSchema.optional(),
   lootClaims: lootClaimsSchema.optional(),
+  /** Quest log (docs/QUESTS.md); changes only through quest commands. */
+  quests: questsSchema.optional(),
   downtimeActivities: downtimeActivitiesSchema.optional(),
   blacksmith: blacksmithSchema.optional(),
   services: servicesSchema.optional(),
@@ -107,6 +110,8 @@ const journalFields = z.object({
         text: z.string().max(12000),
         reportIds: z.array(id).default([]),
         provenance: encounterLootProvenanceSchema.optional(),
+        /** A note about one quest (players' private "My notes"). */
+        questId: id.optional(),
       }),
     )
     .optional(),
@@ -306,6 +311,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   delete next.referenceAccess;
   delete next.lootClaims;
   delete next.services;
+  delete next.quests;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -331,10 +337,18 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   const privateEvents = new Set(current.events.filter((e) => e.dmOnly).map((e) => e.id));
   const entries = new Map((current.entries || []).map((entry) => [entry.id, entry]));
   for (const entry of next.entries || []) {
-    const provenance = entries.get(entry.id)?.provenance ?? entry.provenance;
-    // Older clients do not know this optional field. Keep a confirmed record's
+    const old = entries.get(entry.id);
+    const provenance = old?.provenance ?? entry.provenance;
+    const questId = old ? old.questId : entry.questId;
+    // Older clients do not know these optional fields. Keep a confirmed record's
     // stable association when they write the same entry back without it.
-    entries.set(entry.id, provenance ? { ...entry, provenance } : entry);
+    const kept = { ...entry };
+    delete kept.questId;
+    entries.set(entry.id, {
+      ...kept,
+      ...(provenance ? { provenance } : {}),
+      ...(questId ? { questId } : {}),
+    });
   }
   return readJournal({
     ...next,
@@ -447,6 +461,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     ...(next.coinSplit ?? current.coinSplit ? { coinSplit: next.coinSplit ?? current.coinSplit } : {}),
     // Claims change only through loot commands; a journal patch never rewrites them.
     ...(current.lootClaims ? { lootClaims: current.lootClaims } : {}),
+    // Quests change only through quest commands; a journal patch never rewrites them.
+    ...(current.quests ? { quests: current.quests } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);

@@ -882,8 +882,8 @@ export async function queueCommand(
     const s = requireSession();
     if (view.viewOnly && s.role === "player")
       throw Error("The session has ended. This room is view-only until the DM resumes play.");
-    // Chat and treasure-pool claims (which move nothing) are not bound to the turn.
-    if (input.kind !== "message" && input.kind !== "loot-claim" && !view.mine)
+    // Chat, treasure-pool claims and quest changes (which move nothing) are not bound to the turn.
+    if (input.kind !== "message" && input.kind !== "loot-claim" && !input.kind.startsWith("quest-") && !view.mine)
       throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
     // A caller-supplied ID identifies one user action across retries: an action
@@ -911,7 +911,11 @@ export async function queueCommand(
     const loot = input.kind === "loot-claim" || input.kind === "loot-resolve";
     if (input.kind === "loot-resolve" && s.pending.length)
       throw Error("Submit or discard your pending actions before resolving the treasure pool.");
-    if (input.kind === "message" || seasonalPlan || npcBarter || loot) {
+    // Quest changes (DM only, nothing moves) go to the room directly too, never with a turn.
+    const quest = input.kind.startsWith("quest-");
+    if (quest && s.pending.length)
+      throw Error("Submit or discard your pending actions before changing quests.");
+    if (input.kind === "message" || seasonalPlan || npcBarter || loot || quest) {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
         data: {
