@@ -78,6 +78,7 @@ import {
   sortForReview,
   valueEcho,
 } from "@/lib/encounters/loot-review";
+import { FeatureHeader } from "../feature-header";
 type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
@@ -311,16 +312,16 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
   }
   return (
     <section className="character-play encounter-workspace" aria-label="DM encounters">
-      <header className="character-heading">
-        <div>
-          <p className="eyebrow">THE DUNGEON MASTER’S DESK</p>
-          <h1>Encounters</h1>
-          <p>Prepare the opposition. Run the battle. Review the spoils.</p>
-        </div>
-        <span className="encounter-badge">
-          <Shield size={16} /> DM only
-        </span>
-      </header>
+      <FeatureHeader
+        eyebrow="Combat"
+        title="Encounters"
+        subtitle="Prepare the opposition. Run the battle. Review the spoils."
+        primary={
+          <span className="encounter-badge">
+            <Shield size={16} /> DM only
+          </span>
+        }
+      />
       {error && (
         <p role="alert" className="character-error">
           {error}
