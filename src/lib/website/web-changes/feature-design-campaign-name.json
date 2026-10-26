@@ -1,0 +1,10 @@
+{
+  "title": "Players see their campaign's name",
+  "summary": "In a shared room, players now see the DM's campaign name instead of \"Party overview\".",
+  "items": [
+    "The join card reads \"Joining The Wayfarers\" once your characters are found.",
+    "The header's campaign button, the Campaign screen and the browser tab (\"Mira · The Wayfarers\") show the campaign's name.",
+    "My account names each saved membership after its campaign.",
+    "A campaign the DM has not named shows as \"Shared campaign\" and its room code."
+  ]
+}

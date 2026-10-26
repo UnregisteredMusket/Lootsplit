@@ -26,6 +26,7 @@ const featureAudits = {
   "map-controls": "scripts/map-controls-browser-audit.mjs",
   "review-inbox": "scripts/review-inbox-browser-audit.mjs",
   "command-palette": "scripts/command-palette-browser-audit.mjs",
+  "player-onboarding": "scripts/player-onboarding-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))

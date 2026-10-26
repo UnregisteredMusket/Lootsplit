@@ -1,5 +1,5 @@
 import { PlayerDisplayButton } from "./player-display-controller";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { PanelsTopLeft } from "lucide-react";
 import { Button, Field, Modal, Select } from "./ui";
@@ -8,26 +8,43 @@ import { featureScreens, screenName } from "@/lib/quire/feature-navigation";
 import { openWorkspaceWindow } from "@/lib/quire/workspace-windows";
 import { paneTitle, screenKey } from "@/lib/quire/split-view";
 import { OPEN_WORKSPACE_WINDOWS, useSplitView } from "./split-view";
+import { useEconomy } from "@/lib/quire/economy-context";
+import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
+import { useCampaignDisplayName } from "@/lib/quire/use-campaign-name";
+import { campaignTabTitle } from "@/lib/quire/campaign-name";
 
 export function WorkspaceWindows() {
   const [open, setOpen] = useState(false),
     [destination, setDestination] = useState("current"),
     [error, setError] = useState("");
   const href = useRouterState({ select: (s) => s.location.href });
-  const dm = useSeat().role === "dm";
+  const seat = useSeat();
+  const dm = seat.role === "dm";
+  const { purses } = useEconomy();
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const campaign = useCampaignDisplayName();
+  // A player in a shared room: "Mira · The Wayfarers" (plan Q17), after the screen name off Home.
+  const character =
+    cloud.joined && !dm
+      ? purses.find((p) => p.kind === "character" && seat.purseIds.includes(p.id))?.name
+      : undefined;
   const native = import.meta.env.VITE_MOBILE === "true";
   const split = useSplitView();
   // In split view the tab title names the focused pane's screen.
   const titleHref =
     split.open && split.focused === "secondary" && split.secondaryHref ? split.secondaryHref : href;
   const title = split.open ? paneTitle(titleHref, dm) : screenName(href, dm);
+  const playerTitle =
+    cloud.joined && !dm
+      ? `${title === "Home" ? "" : `${title} · `}${campaignTabTitle(campaign, character)}`
+      : null;
   useEffect(() => {
     const previous = document.title;
-    document.title = `${title} · Lootsplitter`;
+    document.title = playerTitle ?? `${title} · Lootsplitter`;
     return () => {
       document.title = previous;
     };
-  }, [title]);
+  }, [title, playerTitle]);
   // "Open in a separate window…" from the split-view menus opens this dialog for that screen.
   useEffect(() => {
     const open = (event: Event) => {

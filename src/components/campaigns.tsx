@@ -65,6 +65,10 @@ export function Campaigns({ heading = true }: { heading?: boolean }) {
             setDraft(null);
           }}
         />
+        <span className="mt-1 block text-xs">
+          Players in shared rooms see this name. Rename it in Local play; a room you host takes
+          the new name the next time you open it.
+        </span>
       </label>
       {campaigns.length > 1 ? (
         <ul className="mt-3 divide-y divide-border border-y border-border">

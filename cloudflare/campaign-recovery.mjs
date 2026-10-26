@@ -1,3 +1,4 @@
+import { restoredCampaignName } from "./library-member-room.mjs";
 import { readCloudTableForImport } from "../src/lib/quire/cloud.ts";
 import { encounterSchema } from "../src/lib/encounters/model.mjs";
 import { sheetSchema } from "../src/lib/characters/model.mjs";
@@ -167,6 +168,7 @@ export function deletionRecoveryArgs(room, seat, name, userId) {
     turn: room.turn,
     closed: room.closed === true,
     viewOnly: room.viewOnly === true,
+    ...(typeof room.campaignName === "string" ? { campaignName: room.campaignName } : {}),
     seen: room.seen || { gifts: [], sales: [] },
     blockedUsers: room.blockedUsers || {},
     seats: [...room.seats, ...(room.departed || [])].map(({ token: _token, ...entry }) => entry),
@@ -289,6 +291,9 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
     table,
     seen: recovery.roomState?.seen || { gifts: [], sales: [] },
     blockedUsers: recovery.roomState?.blockedUsers || {},
+    ...(restoredCampaignName(recovery.roomState)
+      ? { campaignName: restoredCampaignName(recovery.roomState) }
+      : {}),
     invitations: {},
     drafts: {},
   };

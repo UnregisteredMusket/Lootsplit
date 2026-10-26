@@ -62,6 +62,8 @@ export type CloudRoom = {
   batches?: string[];
   closed?: boolean;
   viewOnly?: boolean;
+  /** The DM's campaign name, shown to players (not private). Set by the DM seat only. */
+  campaignName?: string;
   testMode?: boolean;
   testTemplate?: CloudTable;
   /** Owner monitor synthetic round trip (cloudflare/probe-namespace.mjs); never a player campaign. */

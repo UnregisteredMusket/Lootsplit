@@ -22,7 +22,7 @@ export const rollCampaignCharacter = createServerFn({ method: "POST" })
   });
 
 export const openCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { name: string; table: CloudTable }) => input)
+  .validator((input: { name: string; table: CloudTable; campaignName?: string }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
@@ -156,6 +156,18 @@ export const submitCloudCommands = createServerFn({ method: "POST" })
     await guardMemberSeat(data);
     const { submitCommands } = await import("./cloud.server.ts");
     return tabletopResponse(await submitCommands(data), data.tabletopProtocol);
+  });
+/** The DM names the shared campaign; players see that name (campaign-name.ts). */
+export const nameCloudRoom = createServerFn({ method: "POST" })
+  .validator(
+    (input: { tabletopProtocol?: number; code: string; token: string; campaignName: string }) =>
+      input,
+  )
+  .handler(async ({ data }) => {
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { nameRoom } = await import("./cloud.server.ts");
+    return tabletopResponse(await nameRoom(data), data.tabletopProtocol);
   });
 export const manageCloudRoom = createServerFn({ method: "POST" })
   .validator(

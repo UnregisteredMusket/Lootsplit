@@ -77,6 +77,7 @@ export function readRoomResponse(value: unknown): { remote: RoomView; draft: Com
       !value.seats.every(seat) ||
       !optionalText(value.userId) ||
       !optionalText(value.sessionId) ||
+      !optionalText(value.campaignName) ||
       !optionalBoolean(value.viewOnly) ||
       !optionalBoolean(value.testMode) ||
       !optionalBoolean(value.encounterActive) ||

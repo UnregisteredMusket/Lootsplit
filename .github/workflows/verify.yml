@@ -342,6 +342,9 @@ jobs:
       - name: dev-journey-planner
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-journey-planner 240 node scripts/journey-planner-browser-audit.mjs
+      - name: dev-player-onboarding
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-player-onboarding 240 node scripts/player-onboarding-browser-audit.mjs
       - name: Summarize measured verification stages
         if: always()
         run: node scripts/verification-timing.mjs
