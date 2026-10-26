@@ -17,6 +17,8 @@ import { type Journal } from "./journal.ts";
 import { type CommandRequest } from "./commands.ts";
 import { newCommandId, type CommandOptions } from "./command-id.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { purchaseUndoable, showActionReceipt } from "./action-receipt.ts";
+import { resultToast } from "./result-toast.ts";
 import {
   economyView,
   executeLocalCommand,
@@ -148,7 +150,8 @@ type EconomyApi = {
   updateShop: (shop: Shop) => Promise<void>;
   applyShop: (shop: Shop) => Promise<void>;
   deleteShop: (id: string) => Promise<void>;
-  updateStock: (line: StockLine) => Promise<void>;
+  /** Resolves `true` when saved; `false` after a shown error. */
+  updateStock: (line: StockLine) => Promise<boolean>;
   addStock: (
     shopId: string,
     name: string,
@@ -179,7 +182,8 @@ type EconomyApi = {
     input: Parameters<EconomyApi["openShelf"]>[0],
   ) => Promise<{ id: string } & EconomyMutationOutcome>;
   createPurse: (kind: Purse["kind"]) => Promise<void>;
-  updatePurse: (purse: Purse) => Promise<void>;
+  /** Resolves `true` when saved; `false` after a shown error. */
+  updatePurse: (purse: Purse) => Promise<boolean>;
   deletePurse: (id: string) => Promise<void>;
   /** Resolves `true` when saved; `false` after a shown error. */
   updateHolding: (holding: Holding) => Promise<boolean>;
@@ -272,12 +276,19 @@ type EconomyApi = {
   importSheet: (purseId: string, file: File) => Promise<boolean>;
   updateSheet: (sheet: CharacterSheet, before?: CharacterSheet) => Promise<boolean>;
   voidLine: (id: string) => Promise<void>;
+  /**
+   * Undo a DM's shop purchase from its result toast (design D9): the existing ledger void on the
+   * purchase line, with a command ID derived from the purchase's, so a repeated Undo applies once.
+   * Resolves `true` when reversed; `false` after a shown refusal.
+   */
+  undoPurchase: (commandId: string) => Promise<boolean>;
   setRealm: (settings: RealmSettings, options?: { reprice?: boolean }) => Promise<void>;
   addGoods: (
     rows: CatalogItem[],
     expected?: import("./cloud-client.ts").ExpectedMutationScope,
   ) => Promise<number>;
-  saveGood: (item: CatalogItem) => Promise<void>;
+  /** Resolves `true` when saved; `false` after a shown error. */
+  saveGood: (item: CatalogItem) => Promise<boolean>;
   deleteGood: (id: string) => Promise<void>;
   invent: (category: ItemCategory, flags: RarityFlags, count: number) => Promise<number>;
   restoreGoods: () => Promise<void>;
@@ -339,6 +350,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
   const [loans, setLoans] = useState<LoanAsk[]>([]);
   const [sheets, setSheets] = useState<CharacterSheet[]>([]);
 
+  const ledgerRef = useRef(ledger);
+  ledgerRef.current = ledger;
   const reloadSequence = useRef(0);
   const reload = useCallback(async () => {
     const sequence = ++reloadSequence.current;
@@ -587,6 +600,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     const accept = async (
       work: (assertScope: () => void) => Promise<unknown>,
       ok?: string,
+      // The caller shows its own result toast (Buy and Sell, with View receipt / Undo).
+      quiet = false,
     ): Promise<EconomyMutationOutcome> => {
       const invoked = captureMutationScope();
       const guard = () => assertMutationScope(invoked);
@@ -607,7 +622,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         ["Purchase recorded.", "Sale recorded."].includes(ok)
       )
         void playSound("coins");
-      if (ok) toast.success(mutationNotice(outcome, ok));
+      if (ok && !quiet) toast.success(mutationNotice(outcome, ok));
       return outcome;
     };
     const acceptCommand = async (
@@ -762,7 +777,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await removeShop(id);
         }, "Shop removed."),
       updateStock: (line) =>
-        run(async () => {
+        attempt(async () => {
           dmOnly();
           await saveStock(line);
         }),
@@ -820,7 +835,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await savePurse(blankPurse(kind));
         }, "Account created."),
       updatePurse: (purse) =>
-        run(async () => {
+        attempt(async () => {
           dmOnly();
           await updatePurseMetadata(purse);
         }),
@@ -834,12 +849,13 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await saveHolding(holding);
         }),
-      addHolding: (purseId, name, kind, quantity, unitCopper, metadata) =>
-        run(
+      addHolding: (purseId, name, kind, quantity, unitCopper, metadata) => {
+        const id = crypto.randomUUID();
+        return attempt(
           async () => {
             dmOnly();
             await saveHolding({
-              id: crypto.randomUUID(),
+              id,
               purseId,
               name,
               kind,
@@ -850,9 +866,18 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               ...(metadata?.pool ? { pool: { at: Date.now(), source: "add-loot" as const } } : {}),
             });
           },
-          "Holding added.",
+          undefined,
           true,
-        ),
+        ).then((ok) => {
+          if (ok)
+            resultToast(
+              getCloudWatch().joined && hasPendingChanges()
+                ? "Action saved as pending. Check sync status."
+                : "Holding added.",
+              { receipt: () => showActionReceipt({ title: "Loot added", holdingId: id }) },
+            );
+        });
+      },
       lootClaim: (input, options = {}) =>
         lootCommand({ kind: "loot-claim", ...input, ...idOf(options) }),
       lootPoolSet: (holdingId, pooled, options = {}) =>
@@ -879,7 +904,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               const line = stock.find((item) => item.id === stockId);
               if (line) ownShop(line.shopId);
               await buyFromShop({ stockId, purseId, quantity }, options);
-            }, "Purchase recorded."),
+            }, "Purchase recorded.", true),
       sell: (holdingId, shopId, quantity, options = {}) =>
         getCloudWatch().joined ||
         holdings.some(
@@ -895,7 +920,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               const holding = holdings.find((item) => item.id === holdingId);
               if (holding) ownPurse(holding.purseId);
               await sellToShop({ holdingId, shopId, quantity }, options);
-            }, "Sale recorded."),
+            }, "Sale recorded.", true),
       // A shared room records these as a reviewed table patch; the device
       // receipt only guards offline retries, so the ID is used offline only.
       setPurseCoins: (purseId, coins, options = {}) =>
@@ -908,9 +933,27 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await postCopper(purseId, copper, summary, getCloudWatch().joined ? {} : options);
         }, "Ledger updated."),
-      give: (input, options = {}) =>
-        getCloudWatch().joined
-          ? shared({ kind: "give", ...input, ...idOf(options) })
+      give: (input, options = {}) => {
+        // One ID per transfer (the caller's, reused on retry), so its receipt can be shown.
+        const commandId = options.commandId ?? newCommandId();
+        const done = "Transfer recorded and added to party messages.";
+        // A player link's gift waits for the DM's activity report: there is no receipt yet.
+        const receipt =
+          getCloudWatch().joined || getSeat().role === "dm"
+            ? () =>
+                showActionReceipt({
+                  title: "Transfer receipt",
+                  commandId,
+                  ...(input.holdingId ? { holdingId: commandId + "-item" } : {}),
+                })
+            : undefined;
+        const shown = (outcome?: EconomyMutationOutcome) =>
+          resultToast(outcome ? mutationNotice(outcome, done) : done, { receipt });
+        return getCloudWatch().joined
+          ? shared({ kind: "give", ...input, id: commandId }).then((ok) => {
+              if (ok) resultToast(hasPendingChanges() ? "Action saved as pending. Check sync status." : done, { receipt });
+              return ok;
+            })
           : holdings.some(
                 (h) =>
                   h.id === input.holdingId &&
@@ -918,11 +961,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
                     h.reservedFor ||
                     journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
               )
-            ? acceptCommand({ kind: "give", ...input, ...idOf(options) }).then(
+            ? acceptCommand({ kind: "give", ...input, id: commandId }).then(
                 (outcome) => {
-                  toast.success(
-                    mutationNotice(outcome, "Transfer recorded and added to party messages."),
-                  );
+                  shown(outcome);
                   return true;
                 },
                 (error: unknown) => {
@@ -932,8 +973,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               )
             : attempt(async () => {
                 ownPurse(input.fromId);
-                await giveToPlayer(input, options);
-              }, "Transfer recorded and added to party messages."),
+                await giveToPlayer(input, { ...options, commandId });
+              }).then((ok) => {
+                if (ok) {
+                  void playSound("coins");
+                  shown();
+                }
+                return ok;
+              });
+      },
       split: async (input, options = {}) => {
         const command = { kind: "coin-split" as const, ...input, ...idOf(options) };
         try {
@@ -1041,6 +1089,34 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           fault(error, "That line could not be reversed.");
         }
       },
+      undoPurchase: async (commandId) => {
+        try {
+          // The latest ledger: the toast outlives the render that created it.
+          const line = purchaseUndoable(
+            ledgerRef.current,
+            commandId,
+            getSeat().role === "dm" ? "dm" : "player",
+          );
+          if (!line)
+            throw Error(
+              "This purchase can no longer be undone here. Correct it from its receipt in Activity.",
+            );
+          const outcome = await acceptCommand({
+            id: commandId + "-undo",
+            kind: "ledger-void",
+            target: { kind: "ledger", id: line.id },
+            before: canonicalJson(line),
+            reason: "Purchase undone from its result.",
+          });
+          toast.success(
+            mutationNotice(outcome, "Purchase undone. The coins and the shop stock are back."),
+          );
+          return true;
+        } catch (error) {
+          fault(error, "That purchase could not be undone.");
+          return false;
+        }
+      },
       setRealm: (settings, options) =>
         run(async () => {
           dmOnly();
@@ -1065,7 +1141,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         return added;
       },
       saveGood: (item) =>
-        run(async () => {
+        attempt(async () => {
           dmOnly();
           await saveCatalog(item);
         }),
