@@ -57,6 +57,57 @@ function DiscordJoin() {
   );
 }
 
+/** Below this many listed profiles the directory invites visitors to list theirs first (W-6). */
+const FEW_LISTED_PROFILES = 3;
+
+/** No search filters set (a first load, or a search with every field empty). */
+function isUnfiltered(filters: CommunityFilters) {
+  return (
+    !filters.offset &&
+    !filters.role &&
+    !filters.lfg &&
+    !filters.game?.trim() &&
+    !filters.tz &&
+    !filters.q?.trim()
+  );
+}
+
+/** "Be the first table listed": what a profile shows and where to make one (W-6). */
+function DirectoryInvite({ none, signedIn }: { none: boolean; signedIn: boolean }) {
+  return (
+    <section className="ls-community-invite ls-card" aria-labelledby="community-invite">
+      <Kicker>{none ? "Nobody listed yet" : "A few tables so far"}</Kicker>
+      <h2 id="community-invite">
+        {none ? "Be the first table listed" : "Be one of the first tables listed"}
+      </h2>
+      <p>
+        {none
+          ? "No one has listed a profile you can see yet. Make yours and it is the first one Dungeon Masters and players find here."
+          : "The directory is just getting started. Add your profile so the next Dungeon Master or player finds you."}
+        {!signedIn && " Members-only profiles appear after you sign in."}
+      </p>
+      <h3 className="ls-sc">A profile shows</h3>
+      <ul className="ls-plain-list">
+        <li>your name and portrait;</li>
+        <li>
+          whether you run games, play or both, and whether you are looking for players or a group;
+        </li>
+        <li>the games you play, your time zone with its local time, and when you play;</li>
+        <li>
+          a short note such as “Two seats open, Fridays”, and a Discord username if you add one.
+        </li>
+      </ul>
+      <p className="ls-fine">
+        It stays hidden until you choose who can see it: everyone, or signed-in members only. Your
+        email address is never shown.
+      </p>
+      <Link className="ls-btn ls-btn-ink ls-self-start" to="/account" hash="account-community">
+        Set up my profile
+      </Link>
+    </section>
+  );
+}
+
 /** /community — the Looking for Group directory. */
 export function CommunityPage() {
   const [filters, setFilters] = useState<CommunityFilters>({});
@@ -65,6 +116,8 @@ export function CommunityPage() {
   const [more, setMore] = useState<CommunityProfile[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  // Profiles listed with no filters: the filters show only once there are some (W-6).
+  const [listed, setListed] = useState<number | null>(null);
   const zones = useMemo(() => timeZones(), []);
 
   useEffect(() => {
@@ -76,6 +129,7 @@ export function CommunityPage() {
       .then((next) => {
         if (!alive) return;
         setData(next);
+        if (isUnfiltered(filters)) setListed(next.total);
         setMore((prev) => (filters.offset ? [...prev, ...next.profiles] : next.profiles));
       })
       .catch((e) => {
@@ -105,51 +159,56 @@ export function CommunityPage() {
       </PageHero>
       <section className="ls-paper ls-section ls-section-tight" aria-labelledby="community-results">
         <div className="ls-wrap ls-stack ls-gap-lg">
-          <form className="ls-community-filters" onSubmit={search} aria-label="Filter profiles">
-            <label>
-              Role
-              <select value={form.role ?? ""} onChange={(e) => setForm({ ...form, role: e.target.value as CommunityFilters["role"] })}>
-                <option value="">Anyone</option>
-                <option value="dm">Dungeon Masters</option>
-                <option value="player">Players</option>
-              </select>
-            </label>
-            <label>
-              Looking for
-              <select value={form.lfg ?? ""} onChange={(e) => setForm({ ...form, lfg: e.target.value as CommunityFilters["lfg"] })}>
-                <option value="">Any</option>
-                <option value="players">Looking for players</option>
-                <option value="group">Looking for a group</option>
-              </select>
-            </label>
-            <label>
-              Game
-              <input list="community-filter-games" value={form.game ?? ""} maxLength={30} onChange={(e) => setForm({ ...form, game: e.target.value })} />
-              <datalist id="community-filter-games">
-                {GAME_SUGGESTIONS.map((g) => (
-                  <option key={g} value={g} />
-                ))}
-              </datalist>
-            </label>
-            <label>
-              Time zone
-              <select value={form.tz ?? ""} onChange={(e) => setForm({ ...form, tz: e.target.value })}>
-                <option value="">Any</option>
-                {zones.map((z) => (
-                  <option key={z} value={z}>
-                    {z.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Name
-              <input value={form.q ?? ""} maxLength={60} onChange={(e) => setForm({ ...form, q: e.target.value })} />
-            </label>
-            <button className="ls-btn ls-btn-ink" type="submit">
-              Search
-            </button>
-          </form>
+          {listed !== null && listed < FEW_LISTED_PROFILES && (
+            <DirectoryInvite none={listed === 0} signedIn={!!data?.signedIn} />
+          )}
+          {!!listed && (
+            <form className="ls-community-filters" onSubmit={search} aria-label="Filter profiles">
+              <label>
+                Role
+                <select value={form.role ?? ""} onChange={(e) => setForm({ ...form, role: e.target.value as CommunityFilters["role"] })}>
+                  <option value="">Anyone</option>
+                  <option value="dm">Dungeon Masters</option>
+                  <option value="player">Players</option>
+                </select>
+              </label>
+              <label>
+                Looking for
+                <select value={form.lfg ?? ""} onChange={(e) => setForm({ ...form, lfg: e.target.value as CommunityFilters["lfg"] })}>
+                  <option value="">Any</option>
+                  <option value="players">Looking for players</option>
+                  <option value="group">Looking for a group</option>
+                </select>
+              </label>
+              <label>
+                Game
+                <input list="community-filter-games" value={form.game ?? ""} maxLength={30} onChange={(e) => setForm({ ...form, game: e.target.value })} />
+                <datalist id="community-filter-games">
+                  {GAME_SUGGESTIONS.map((g) => (
+                    <option key={g} value={g} />
+                  ))}
+                </datalist>
+              </label>
+              <label>
+                Time zone
+                <select value={form.tz ?? ""} onChange={(e) => setForm({ ...form, tz: e.target.value })}>
+                  <option value="">Any</option>
+                  {zones.map((z) => (
+                    <option key={z} value={z}>
+                      {z.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Name
+                <input value={form.q ?? ""} maxLength={60} onChange={(e) => setForm({ ...form, q: e.target.value })} />
+              </label>
+              <button className="ls-btn ls-btn-ink" type="submit">
+                Search
+              </button>
+            </form>
+          )}
           <h2 id="community-results" className="ls-visually-hidden">
             Profiles
           </h2>
@@ -161,7 +220,7 @@ export function CommunityPage() {
               </button>
             </p>
           )}
-          {data && (
+          {data && listed !== 0 && (
             <p role="status" className="ls-fine">
               {data.total === 0
                 ? "No profiles match yet."
@@ -200,18 +259,20 @@ export function CommunityPage() {
             </button>
           )}
           {loading && !data && <p role="status">Loading profiles…</p>}
-          <div className="ls-band ls-band-paper">
-            <div>
-              <Kicker>Your profile</Kicker>
-              <p>
-                Add your games, time zone and what you are looking for. Profiles are hidden until
-                you choose who can see them.
-              </p>
+          {listed !== 0 && (
+            <div className="ls-band ls-band-paper">
+              <div>
+                <Kicker>Your profile</Kicker>
+                <p>
+                  Add your games, time zone and what you are looking for. Profiles are hidden until
+                  you choose who can see them.
+                </p>
+              </div>
+              <Link className="ls-btn ls-btn-ink" to="/account" hash="account-community">
+                Set up my profile
+              </Link>
             </div>
-            <Link className="ls-btn ls-btn-ink" to="/account" hash="account-community">
-              Set up my profile
-            </Link>
-          </div>
+          )}
         </div>
       </section>
     </Website>

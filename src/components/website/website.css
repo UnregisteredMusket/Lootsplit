@@ -2299,3 +2299,16 @@
 .ls-frame picture {
   display: block;
 }
+
+/* ---------- Find a group: empty directory (W-6) ---------- */
+.ls-community-invite {
+  max-width: 760px;
+  gap: 14px;
+}
+.ls-community-invite h2 {
+  font-size: clamp(28px, 1.6vw + 22px, 36px);
+}
+.ls-community-invite h3 {
+  font: 700 16px/1.3 var(--sc);
+  letter-spacing: 0.12em;
+}

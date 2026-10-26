@@ -46,6 +46,29 @@ try {
   const anonPage = await anon.newPage();
   anonPage.on("pageerror", (e) => errors.push(e.message));
 
+  // 0. W-6: with no public profiles a visitor sees "Be the first table listed" and no filters;
+  // with a few, the invitation sits above them; with more, only the filters and results.
+  {
+    const listed = (await (await anon.request.get(origin + "/api/account/community/directory")).json()).total;
+    await openApplication(anonPage, origin + "/community");
+    const invite = anonPage.getByRole("heading", { name: /^Be (the|one of the) first tables? listed$/, level: 2 });
+    const filters = anonPage.getByRole("form", { name: "Filter profiles" });
+    if (listed === 0) {
+      await anonPage.getByRole("heading", { name: "Be the first table listed", level: 2 }).waitFor();
+      assert.equal(await filters.count(), 0, "no filters without profiles");
+      await anonPage.getByText("A profile shows", { exact: true }).waitFor();
+      assert.equal(
+        await anonPage.getByRole("link", { name: "Set up my profile", exact: true }).getAttribute("href"),
+        "/account#account-community",
+      );
+      assert.equal(await anonPage.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await anonPage.screenshot({ path: output + "/directory-empty-mobile.png", fullPage: true });
+    } else {
+      await filters.waitFor();
+      assert.equal(await invite.count(), listed < 3 ? 1 : 0);
+    }
+  }
+
   // 1. The DM sets up a members-only profile from My account.
   await openApplication(dm.page, origin + "/account#account-community");
   const card = dm.page.locator("#account-community");
@@ -106,7 +129,15 @@ try {
   await reports.getByRole("button", { name: "Hide profile" }).first().click();
   await reports.getByText("No open reports.").waitFor();
   await anonPage.reload();
-  await anonPage.getByText("No profiles match yet.").waitFor();
+  // Hidden from the directory: either other public profiles remain, or the empty state invites
+  // the visitor to be the first table listed (W-6).
+  await anonPage
+    .getByText("No profiles match yet.")
+    .or(anonPage.getByText(/^\d+ profiles?$/))
+    .or(anonPage.getByRole("heading", { name: "Be the first table listed", level: 2 }))
+    .first()
+    .waitFor();
+  assert.equal(await anonPage.getByRole("link", { name: /Community DM/ }).count(), 0);
   await reloadApplication(dm.page);
   await dm.page.getByText(/Site staff have hidden your community profile/).waitFor();
   assert.deepEqual(errors, []);
