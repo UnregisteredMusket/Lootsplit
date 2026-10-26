@@ -70,6 +70,8 @@ test("each development check belongs to exactly one declared isolated group", ()
   assert.ok(checks.some(([, name, group]) => name === "dev-loot-claims" && group === "gameplay"));
   // Fairness ledger: DM, party member and away views, breakdown and favour (1280/390/320).
   assert.ok(checks.some(([, name, group]) => name === "dev-loot-fairness" && group === "gameplay"));
+  // Party inventory list: one list, row menu, edit sheet, bulk exactly once, player coin row (D3/P6).
+  assert.ok(checks.some(([, name, group]) => name === "dev-party-inventory" && group === "gameplay"));
   assert.ok(checks.some(([, name, group]) => name === "dev-downtime" && group === "accounts"));
   assert.match(
     workflow,

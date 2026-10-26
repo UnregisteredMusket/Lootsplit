@@ -43,8 +43,11 @@ export function ShopContent({
   shopId,
   onRemoved,
   mapStrip = true,
+  sellHoldingId,
 }: {
   shopId: string;
+  /** Preselects this holding in "Sell to this shop" and scrolls to it. */
+  sellHoldingId?: string;
   onRemoved?: () => void;
   /** False inside the map's place card, which is already on the map. */
   mapStrip?: boolean;
@@ -283,7 +286,7 @@ export function ShopContent({
       />
       <BlacksmithServices shop={shop} purseId={purseId} />
       <ShopServices shop={shop} purseId={purseId} />
-      {viewing === "edit" ? <AddGood shopId={shop.id} /> : <SellBox shopId={shop.id} />}
+      {viewing === "edit" ? <AddGood shopId={shop.id} /> : <SellBox shopId={shop.id} initialHoldingId={sellHoldingId} />}
       {!dm ? (
         <div className="mt-6 flex flex-col gap-2">
           <p className="text-sm text-muted">
@@ -637,7 +640,7 @@ function AddGood({ shopId }: { shopId: string }) {
   );
 }
 
-function SellBox({ shopId }: { shopId: string }) {
+function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingId?: string }) {
   const { holdings, sell, shops } = useEconomy();
   const closed = shops.find((s) => s.id === shopId)?.closed;
   const turnLocked = turnIsLocked();
@@ -646,8 +649,20 @@ function SellBox({ shopId }: { shopId: string }) {
     seat.role === "player"
       ? holdings.filter((holding) => seat.purseIds.includes(holding.purseId))
       : holdings;
-  const [holdingId, setHoldingId] = useState(mine[0]?.id ?? "");
+  const [holdingId, setHoldingId] = useState(
+    initialHoldingId && mine.some((item) => item.id === initialHoldingId)
+      ? initialHoldingId
+      : (mine[0]?.id ?? ""),
+  );
   const [qty, setQty] = useState("1");
+  useEffect(() => {
+    if (!initialHoldingId) return;
+    const timer = setTimeout(
+      () => document.getElementById("sell")?.scrollIntoView({ block: "center" }),
+      80,
+    );
+    return () => clearTimeout(timer);
+  }, [initialHoldingId]);
   // One command ID per sale, reused if the same sale is retried.
   const action = useCommandId(`${holdingId}|${qty}`);
   const holding = mine.find((item) => item.id === holdingId),

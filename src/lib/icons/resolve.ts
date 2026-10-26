@@ -157,8 +157,23 @@ export function resolveFantasyIcon(
       get(catalog.names[kind], n) ||
       (kind === "items" ? get(catalog.names.magicitems, n) : undefined);
     if (spec) return result(spec.icon, spec.category, "name");
+    // Plural custom names ("Arrows", "Torches") match their singular family ("arrow", "torch").
+    const singular = n
+      .split(" ")
+      .map((word) =>
+        word.length > 4 && word.endsWith("es") && /(ch|sh|x)es$/.test(word)
+          ? word.slice(0, -2)
+          : word.length > 3 && word.endsWith("s") && !word.endsWith("ss")
+            ? word.slice(0, -1)
+            : word,
+      )
+      .join(" ");
     const rules = get(catalog.rules, kind === "magicitems" ? "items" : kind) || [];
-    const match = rules.find(([term]) => ` ${n} `.includes(` ${normalize(term)} `));
+    const match =
+      rules.find(([term]) => ` ${n} `.includes(` ${normalize(term)} `)) ||
+      (singular !== n
+        ? rules.find(([term]) => ` ${singular} `.includes(` ${normalize(term)} `))
+        : undefined);
     if (match) return result(match[1], category, "family");
   }
   category ||= spec?.category || "";

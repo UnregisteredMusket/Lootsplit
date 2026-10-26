@@ -181,7 +181,8 @@ type EconomyApi = {
   createPurse: (kind: Purse["kind"]) => Promise<void>;
   updatePurse: (purse: Purse) => Promise<void>;
   deletePurse: (id: string) => Promise<void>;
-  updateHolding: (holding: Holding) => Promise<void>;
+  /** Resolves `true` when saved; `false` after a shown error. */
+  updateHolding: (holding: Holding) => Promise<boolean>;
   addHolding: (
     purseId: string,
     name: string,
@@ -190,7 +191,8 @@ type EconomyApi = {
     unitCopper: number,
     metadata?: Pick<Holding, "notes" | "category"> & { pool?: boolean },
   ) => Promise<void>;
-  deleteHolding: (id: string) => Promise<void>;
+  /** Resolves `true` when removed; `false` after a shown error. */
+  deleteHolding: (id: string) => Promise<boolean>;
   /**
    * Treasure pool (one `loot-*` command, shared room or this device's engine). Each resolves to
    * null once accepted, or to the refusal text so the form keeps its choices for another try.
@@ -828,7 +830,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await removePurse(id);
         }, "Account removed."),
       updateHolding: (holding) =>
-        run(async () => {
+        attempt(async () => {
           dmOnly();
           await saveHolding(holding);
         }),
@@ -865,7 +867,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           true,
         ),
       deleteHolding: (id) =>
-        run(async () => {
+        attempt(async () => {
           dmOnly();
           await removeHolding(id);
         }),

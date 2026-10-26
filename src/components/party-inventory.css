@@ -1,0 +1,34 @@
+/* Party → Funds & inventory list (design plan D3 / P6). */
+.party-inventory > .section-heading { margin-bottom: .5rem; }
+.inventory-toolbar { display: flex; flex-direction: column; gap: .5rem; }
+.inventory-toolbar .ledger-search { margin: 0; }
+.inventory-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.inventory-filters > [role=radiogroup], .inventory-filters > div { margin: 0; }
+.inventory-select { min-height: 2.75rem; max-width: 100%; border: 1px solid var(--color-border); border-radius: .4rem; background: var(--color-subtle); color: var(--color-fg); padding: 0 .6rem; font-size: .9rem; text-transform: capitalize; }
+.inventory-chip { min-height: 2.75rem; padding: .4rem .9rem; border: 1px solid var(--color-border); border-radius: 2rem; white-space: nowrap; font-size: .9rem; }
+.inventory-chip[aria-pressed=true] { background: var(--color-lead); color: var(--color-bg); border-color: var(--color-lead); }
+.inventory-bulk { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .6rem; padding: .4rem .6rem; border: 1px solid color-mix(in srgb, var(--color-lead) 40%, var(--color-border)); border-radius: .6rem; background: var(--color-elevated); }
+.inventory-bulk-all { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; font-size: .9rem; cursor: pointer; }
+.inventory-bulk-all input { width: 1.25rem; height: 1.25rem; accent-color: var(--color-lead); }
+.inventory-bulk-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.inventory-group { margin-top: 1rem; }
+.inventory-group-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem .75rem; padding-bottom: .25rem; border-bottom: 1px solid color-mix(in srgb, var(--color-lead) 35%, var(--color-border)); font-family: var(--font-display); font-size: 1.15rem; text-transform: capitalize; }
+.inventory-group-title small { font-family: var(--font-sans); font-size: .75rem; color: var(--color-muted); text-transform: none; }
+.party-inventory .inventory-group > ul { display: block; padding: 0; margin: 0; }
+.inventory-resume { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin: .5rem 0; padding: .6rem .8rem; border: 1px solid var(--color-lead); border-radius: .6rem; font-size: .9rem; }
+.inventory-summary { margin: 0; padding-left: 1.1rem; list-style: disc; }
+.inventory-shop-list { display: flex; flex-direction: column; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.inventory-shop-list a { display: flex; flex-direction: column; min-height: 2.75rem; justify-content: center; padding: .5rem .75rem; border: 1px solid var(--color-border); border-radius: .5rem; }
+.inventory-shop-list small { color: var(--color-muted); font-size: .8rem; }
+/* Player purse strip (P6): the coins and Give / Split right under Combined wealth. */
+.purse-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem .75rem; margin-top: .75rem; padding: .55rem .75rem; border: 1px solid color-mix(in srgb, var(--color-lead) 30%, var(--color-border)); border-radius: .8rem; background: var(--color-elevated); }
+.purse-strip-coins { display: flex; flex-wrap: wrap; gap: .25rem .8rem; margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.purse-strip-coins li { display: inline-flex; align-items: baseline; gap: .2rem; }
+.purse-strip-coins abbr { color: var(--color-muted); font-size: .75rem; text-decoration: none; }
+.purse-strip-actions { display: flex; gap: .4rem; }
+.purse-strip-actions button { min-height: 2.75rem; }
+.purse-strip-name { width: 100%; color: var(--color-muted); font-size: .75rem; }
+/* Wide screens: two columns of rows inside each group, so the list is half as long. */
+@media (min-width: 1100px) {
+  .party-inventory .inventory-group > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.5rem; align-items: start; }
+}
