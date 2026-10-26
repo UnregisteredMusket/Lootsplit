@@ -189,9 +189,11 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
      * latest recovery) and three mini tiles: requests with errors on their own baseline, the
      * fullest plan-usage gauge with its pace line, and the last five main runs.
      */
-    static RemoteViews medium(Context context, JSONObject state, int id, boolean tiles) {
+    static RemoteViews medium(Context context, JSONObject state, int id, boolean tiles) { return medium(context,state,id,tiles,WidgetAppearance.light(context,id)); }
+    /** The 4×2 face in a given theme (the settings screen previews an unsaved appearance choice). */
+    static RemoteViews medium(Context context, JSONObject state, int id, boolean tiles, boolean lightTheme) {
         RemoteViews view=new RemoteViews(context.getPackageName(),R.layout.owner_widget_medium);
-        WidgetCharts.Palette p=palette(context,id); boolean light=p.light;
+        WidgetCharts.Palette p=WidgetCharts.Palette.of(lightTheme); boolean light=p.light;
         JSONObject snapshot=current(state);
         boolean connected=!state.optString("token").isEmpty()||state.optBoolean(WidgetStore.UNAVAILABLE); String message=state.optString("message");
         boolean failure=snapshot!=null&&"red".equals(statusColor(snapshot));
