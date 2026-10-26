@@ -61,7 +61,7 @@ export function CampaignOperations({
       {notice && <p role="status">{notice}</p>}
       {section !== "properties" && (
         <>
-          <h3>Shop schedules</h3>
+          <h3>Opening days & restocks</h3>
           {shops.map((s) => (
             <ShopPlan key={s.id} shop={s} day={finance.day} disabled={locked} save={save} />
           ))}
