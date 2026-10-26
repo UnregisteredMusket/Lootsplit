@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { carryToStandard, charismaOffPercent, explainPurse, formatCopper, formatDollars, parsePrice, priceAfterCharisma, pricesInText, spendCoins, toCopper } from "./money.ts";
+import { carryToStandard, groupThousands, charismaOffPercent, explainPurse, formatCopper, formatDollars, parsePrice, priceAfterCharisma, pricesInText, spendCoins, toCopper } from "./money.ts";
 
 test("parses mixed coin prices and spends smaller coins first", () => {
   assert.equal(parsePrice("1 gp 5 sp"), 150);
@@ -43,4 +43,14 @@ test("pulls item names that sit in front of a printed price", () => {
   assert.equal(hits[0]?.copper, 10);
   assert.equal(hits[1]?.name, "Hempen rope, 50 ft");
   assert.equal(hits[1]?.copper, 100);
+});
+
+test("formatCopper groups thousands of gold and the parser reads it back", () => {
+  assert.equal(formatCopper(1572700), "15,727 gp");
+  assert.equal(formatCopper(99999), "999 gp, 9 sp, 9 cp");
+  assert.equal(formatCopper(100000), "1,000 gp");
+  assert.equal(formatCopper(-123456789), "−1,234,567 gp, 8 sp, 9 cp");
+  assert.equal(formatCopper(0), "0 cp");
+  assert.equal(groupThousands(1234567), "1,234,567");
+  for (const copper of [0, 5, 150, 100000, 123456789]) assert.equal(parsePrice(formatCopper(copper)), copper);
 });

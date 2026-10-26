@@ -25,6 +25,11 @@ export function fromCopper(total: number): Coins {
   return { pp: 0, gp, ep: 0, sp, cp: left };
 }
 
+/** Whole numbers with thousands grouped: 15727 → "15,727" (design plan D8). */
+export function groupThousands(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 export function formatCopper(total: number): string {
   const sign = total < 0 ? "−" : "";
   let left = Math.abs(Math.round(total));
@@ -33,7 +38,7 @@ export function formatCopper(total: number): string {
   const sp = Math.floor(left / COPPER.sp);
   left -= sp * COPPER.sp;
   const parts: string[] = [];
-  if (gp) parts.push(`${gp} gp`);
+  if (gp) parts.push(`${groupThousands(gp)} gp`);
   if (sp) parts.push(`${sp} sp`);
   if (left || parts.length === 0) parts.push(`${left} cp`);
   return sign + parts.join(", ");

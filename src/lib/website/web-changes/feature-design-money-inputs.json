@@ -1,0 +1,10 @@
+{
+  "title": "Copper amounts show their gold value",
+  "summary": "Fields that take an amount in copper now show it in gold as you type, and large gold amounts have thousands separators.",
+  "items": [
+    "Copper fields in finances, trade exchanges, ships, the blacksmith and property operations show the amount in gold under the field (25000 shows = 250 gp).",
+    "Every one of those fields can also take coins such as 2 gp 5 sp through Enter gold, silver or other coins.",
+    "Gold amounts of 1,000 or more read with separators, such as 15,727 gp.",
+    "Copper is still the saved amount, so nothing about existing campaigns changes."
+  ]
+}

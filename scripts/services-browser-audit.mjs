@@ -284,7 +284,7 @@ async function temple(page, width) {
   await fits(page, `${width} inbox`);
   await page.screenshot({ path: `${output}/temple-inbox-${width}.png`, fullPage: true });
   await row.getByLabel(/Note to the player/).fill("Thorn's soul answers. He wakes at dusk.");
-  await row.getByRole("button", { name: /^Approve · charge 2000 gp/ }).click();
+  await row.getByRole("button", { name: /^Approve · charge 2,000 gp/ }).click();
   await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1).status).toBe("completed");
   state = await readJournal(page);
   assert.ok(!state.holdings.some((h) => h.id === "diamond-500"), "the diamond is consumed once");

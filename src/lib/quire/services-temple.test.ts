@@ -127,7 +127,7 @@ test("approval reruns every check: funds, the diamond and the beneficiary", () =
   const broke = structuredClone(base);
   broke.purses.find((p) => p.id === "kael")!.coins = { cp: 0, sp: 0, ep: 0, gp: 100, pp: 0 };
   assert.throws(() => approve(broke), /can't afford/);
-  assert.ok(reviewChecks(broke, orders(broke)[0]).some((c) => !c.ok && /needs 2000 gp/.test(c.text)));
+  assert.ok(reviewChecks(broke, orders(broke)[0]).some((c) => !c.ok && /needs 2,000 gp/.test(c.text)));
 
   const stored = structuredClone(base);
   stored.holdings.find((h) => h.id === "diamond-500")!.reservedFor = "job";
