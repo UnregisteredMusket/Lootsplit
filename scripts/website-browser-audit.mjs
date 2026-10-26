@@ -77,6 +77,17 @@ try {
         await page.getByText("100% free, supported by donations", { exact: true }).waitFor();
       }
       if (path === "welcome") {
+        // Q35: "How joining works" is shown in place: three steps in order, then the player guide.
+        const join = page.getByRole("list", { name: "How joining works", exact: true });
+        await join.locator("li").nth(2).waitFor();
+        assert.deepEqual(
+          await join.locator("li strong").allInnerTexts(),
+          ["Get the link", "Pick your character", "Play"],
+        );
+        assert.match(
+          await page.getByRole("link", { name: "More in the player guide", exact: true }).getAttribute("href"),
+          /^\/help\?guide=player#first-campaign$/,
+        );
         // The maker's note closes the home page, signed with the owner's public handle.
         const why = page.locator("section#why, section[aria-labelledby='why']");
         assert.equal(await why.getByRole("heading", { name: "Why did I create Lootsplitter?", level: 2 }).count(), 1);

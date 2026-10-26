@@ -122,3 +122,11 @@ Feature footer AppLinks must set `returnLink`: returning to another feature must
 See `docs/plans/REPORT-FOLLOWUP.md` and `docs/audit/2026-10-12-report-followup.md`. Conditional polling is allowed only after a complete snapshot commits in the running document. Authenticate each read, query fresh encounter-active policy, and never acknowledge or replace pending work from an unchanged envelope. Manual refresh and legacy clients use full reads. Command batches own one working clone but retain every command validation, exact receipt deduplication and atomic CAS. Privacy-safe sampled/slow-read timings contain operation/phase/duration/outcome only.
 
 CPU/log policy is part of the immutable website artifact and checked after upload; preserve query redaction and recovery fencing. Failure-email readiness checks reveal only missing setting names and never claim delivery. Optional R2, Durable Objects, Queues or replicas are not activated by this work. Keep all nine release jobs and account deadlines unchanged; complete audits may move between groups. Generate current source inventory into verification artifacts, treating the old checked-in CSV as a historical snapshot. The UI redesign follows verified functionality and must preserve the complete feature/permission tree.
+
+## Website palette is fixed branding (owner decision, 2026-10-25)
+
+The public website (`/welcome`, `/features`, `/downloads`, `/updates`, `/help`, `/resources`, `/donate`, `/privacy`, `/community`, My account and the not-found page) keeps its fixed ink-and-paper palette (`src/components/website/website.css`) as Lootsplitter's branding. It deliberately does not follow the app's appearance setting (Parchment, Ironbound, light/dark accents). A visitor who chose Parchment in the app still sees the ink/paper site. This is design plan item W-8 (web-player audit #25), decided as recommended.
+
+- Do not map `--ink`/`--paper` to the app's appearance tokens without a new owner decision.
+- Website contrast and accessibility are still checked by the website and axe audits at every width.
+- The app's own screens keep every appearance option; nothing about app themes changed.

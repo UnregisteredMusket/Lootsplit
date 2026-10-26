@@ -7,7 +7,7 @@ import { PromoVideo } from "./promo-video";
 import { Kicker, PageHero, Shot } from "./parts";
 import { useReleaseIdentity } from "./release-identity";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Dices, Link2, Menu, UserRound, X } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import release from "@/lib/website/release.json";
 import { OPEN_APP } from "@/lib/website/labels";
@@ -242,6 +242,37 @@ const areas: Area[] = [
   ],
 ];
 
+/** "How joining works", shown in place on the home page (Q35): three steps, no detour to Help. */
+const JOIN_STEPS = [
+  [Link2, "Get the link", "Your DM sends an invitation link or code."],
+  [UserRound, "Pick your character", "Open it, type your name and choose the character your DM set up."],
+  [Dices, "Play", "Your sheet, coins and party chat are ready. No account needed."],
+] as const;
+
+function JoinSteps() {
+  return (
+    <div className="ls-join">
+      <h4 id="join-steps" className="ls-sc">
+        How joining works
+      </h4>
+      <ol className="ls-join-steps" aria-labelledby="join-steps">
+        {JOIN_STEPS.map(([Icon, title, text], index) => (
+          <li key={title}>
+            <span className="ls-join-icon" aria-hidden="true">
+              <Icon size={22} />
+              <span className="ls-join-no">{index + 1}</span>
+            </span>
+            <span className="ls-join-text">
+              <strong>{title}</strong>
+              <span>{text}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export function WelcomePage() {
   return (
     <Website>
@@ -444,8 +475,14 @@ export function WelcomePage() {
                 <li>Bank, finances, properties and your own journal</li>
                 <li>Barter with the party and chat in private</li>
               </ul>
-              <Link className="ls-btn ls-btn-ink ls-self-start" to="/help" hash="first-campaign">
-                How joining works
+              <JoinSteps />
+              <Link
+                className="ls-btn ls-btn-ink ls-self-start"
+                to="/help"
+                search={{ guide: "player" } as never}
+                hash="first-campaign"
+              >
+                More in the player guide
               </Link>
             </div>
           </div>
