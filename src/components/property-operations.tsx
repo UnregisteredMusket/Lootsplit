@@ -6,7 +6,7 @@ import {
 } from "./ship-management";
 import { SearchSelect } from "@/components/search-select";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { useEconomy } from "@/lib/quire/economy-context";
+import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
@@ -47,6 +47,7 @@ import {
 import { locationLabel, readMarketLocations } from "@/lib/quire/shop-locations";
 import type { CommandInput } from "@/lib/quire/commands";
 import type { Holding } from "@/lib/quire/types";
+import { ReviewCard, useReviewStubs, type ReviewDecision, type SavedReasons } from "./review-card";
 import { Button, Field, Fold, Select, TextArea, TextInput } from "./ui";
 import { AppLink } from "./app-link";
 import "./property-operations.css";
@@ -280,7 +281,7 @@ export function PropertyOperations({ holding: h }: { holding: Holding }) {
       )}
       <p>
         <AppLink href="/features/downtime">Review and advance campaign downtime</AppLink> ·{" "}
-        <AppLink href="/features/review">DM review inbox</AppLink>
+        <AppLink href="/features/review">Review Inbox</AppLink>
       </p>
     </section>
   );
@@ -630,7 +631,10 @@ function WithdrawalRequests({
   );
   return (
     <>
-      {requests.map((r) => (
+      {requests.map((r) =>
+        dm && r.status === "pending" ? (
+          <WithdrawalReviewCard key={JSON.stringify(r)} request={r} />
+        ) : (
         <article className="estate-record" key={JSON.stringify(r)}>
           <h4>
             Withdrawal: {r.quantity} ×{" "}
@@ -647,7 +651,8 @@ function WithdrawalRequests({
             </>
           )}
         </article>
-      ))}
+        ),
+      )}
     </>
   );
 }
@@ -848,7 +853,7 @@ function Projects({
     </>
   );
 }
-function JobCard({ job: j }: { job: EstateJob }) {
+export function JobCard({ job: j, review = false }: { job: EstateJob; review?: boolean }) {
   const dm = useSeat().role === "dm",
     [reason, setReason] = useState(""),
     [stage, setStage] = useState(j.stage),
@@ -868,7 +873,10 @@ function JobCard({ job: j }: { job: EstateJob }) {
       {dm && !closed && (
         <>
           <div className="estate-actions">
-            {["active", "paused", "cancelled", ...(j.status === "draft" ? ["denied"] : [])].map(
+            {(review
+              ? ["paused", "cancelled"]
+              : ["active", "paused", "cancelled", ...(j.status === "draft" ? ["denied"] : [])]
+            ).map(
               (status) => (
                 <ActionForm
                   key={status}
@@ -1949,12 +1957,16 @@ function Handover({ holding: h }: { holding: Holding }) {
 export function PropertyOperationReviews() {
   const t = useEstateTable(),
     state = readEstate(t.journal?.propertyOperations);
-  if (useSeat().role !== "dm") return null;
+  const dm = useSeat().role === "dm";
   const jobs = state.jobs.filter((j) => j.status === "draft"),
     staff = state.staff.filter((s) => s.status === "proposed"),
     withdrawals = state.withdrawals.filter((r) => r.status === "pending");
+  const hires = useReviewStubs(staff, (c) => c.id);
+  const work = useReviewStubs(jobs, (j) => j.id);
+  const takes = useReviewStubs(withdrawals, (r) => r.id);
+  if (!dm) return null;
   return (
-    <section className="estate-operations">
+    <section className="estate-operations" data-review-queue="">
       <h2>Property proposals</h2>
       {!jobs.length &&
         !staff.length &&
@@ -1965,40 +1977,129 @@ export function PropertyOperationReviews() {
         )}
       <ShipBoardingReviews />
       <ShipVoyageReviews />
-      <WithdrawalRequests state={state} pendingOnly />
-      {jobs.map((j) => (
-        <JobCard key={JSON.stringify(j)} job={j} />
+      {takes.rows.map((row) => (
+        <WithdrawalReviewCard
+          key={row.key}
+          request={row.item}
+          decided={row.decided}
+          onDecided={(d) => takes.mark(row.key, d)}
+        />
       ))}
-      {staff.map((c) => (
-        <article className="estate-record" key={c.id}>
-          <h3>
-            Proposed hire: {c.name} · {c.role}
-          </h3>
-          <p>
-            {formatCopper(c.wageCopper)} per {c.periodDays} days · {c.notes}
-          </p>
-          <p>
-            <AppLink href={`/features/properties#property-${encodeURIComponent(c.propertyId)}`}>
-              Review this property's staff and manager permissions
-            </AppLink>
-          </p>
-          {["active", "denied"].map((status) => (
-            <ActionForm
-              key={status}
-              title={`Review ${c.name}`}
-              label={status === "active" ? "Approve hire" : "Deny hire"}
-              command={() => ({
-                kind: "estate-staff",
-                before: c,
-                staff: { ...c, status: status as typeof c.status },
-              })}
-            >
-              <span />
-            </ActionForm>
-          ))}
-        </article>
+      {work.rows.map((row) => (
+        <JobReviewCard key={row.key} job={row.item} decided={row.decided} onDecided={(d) => work.mark(row.key, d)} />
+      ))}
+      {hires.rows.map((row) => (
+        <HireReviewCard key={row.key} staff={row.item} decided={row.decided} onDecided={(d) => hires.mark(row.key, d)} />
       ))}
     </section>
+  );
+}
+
+type CardState = { decided?: ReviewDecision; onDecided?: (d: ReviewDecision) => void; savedReasons?: SavedReasons };
+const holdingName = (t: { holdings: Holding[] }, id: string, fallback: string) =>
+  t.holdings.find((h) => h.id === id)?.name ?? fallback;
+
+/** Review Inbox: a proposed hire. Approve and Deny run the same `estate-staff` command as before. */
+export function HireReviewCard({ staff: c, decided, onDecided, savedReasons }: CardState & { staff: Estate["staff"][number] }) {
+  const t = useEstateTable(),
+    { commandOutcome } = useEconomy(),
+    { commandId } = useCommandId(`hire|${c.id}`);
+  const decide = (status: "active" | "denied") =>
+    commandOutcome({ id: `${commandId}-${status}`, kind: "estate-staff", before: c, staff: { ...c, status } });
+  return (
+    <ReviewCard
+      typeLabel="Hire"
+      who={holdingName(t, c.propertyId, "A property")}
+      what={`Hire ${c.name} as ${c.role} · ${formatCopper(c.wageCopper)} per ${c.periodDays} days`}
+      approveLabel="Approve hire"
+      denyLabel="Deny hire"
+      onApprove={() => decide("active")}
+      onDeny={() => decide("denied")}
+      decided={decided}
+      onDecided={onDecided}
+      savedReasons={savedReasons}
+      receiptHref={`/features/properties#property-${encodeURIComponent(c.propertyId)}`}
+      receiptLabel="View staff"
+    >
+      {c.notes && <p>{c.notes}</p>}
+      <p>
+        <AppLink href={`/features/properties#property-${encodeURIComponent(c.propertyId)}`}>
+          Review this property's staff and manager permissions
+        </AppLink>
+      </p>
+    </ReviewCard>
+  );
+}
+
+/** Review Inbox: a stored-goods withdrawal. The decision reason is recorded with it, as before. */
+export function WithdrawalReviewCard({
+  request: r,
+  decided,
+  onDecided,
+  savedReasons,
+}: CardState & { request: Estate["withdrawals"][number] }) {
+  const t = useEstateTable(),
+    { commandOutcome } = useEconomy(),
+    { commandId } = useCommandId(`withdrawal|${r.id}`);
+  const decide = (status: "approved" | "denied", reason: string) =>
+    commandOutcome({
+      id: `${commandId}-${status}`,
+      kind: "estate-withdrawal-review",
+      requestId: r.id,
+      before: canonicalJson(r),
+      status,
+      reason,
+    });
+  return (
+    <ReviewCard
+      typeLabel="Property"
+      who={t.purses.find((p) => p.id === r.purseId)?.name ?? "Character"}
+      what={`Withdraw ${r.quantity} × ${holdingName(t, r.holdingId, "Stored item")}`}
+      approveLabel="Approve withdrawal"
+      denyLabel="Deny withdrawal"
+      denyReason="optional"
+      denyReasonLabel="Withdrawal decision reason (optional)"
+      onApprove={() => decide("approved", "")}
+      onDeny={(reason) => decide("denied", reason)}
+      decided={decided}
+      onDecided={onDecided}
+      savedReasons={savedReasons}
+      receiptHref={`/features/properties#property-${encodeURIComponent(r.propertyId)}`}
+      receiptLabel="View storage"
+    >
+      {r.reason && <p>{r.reason}</p>}
+      <details>
+        <summary>Cancel instead</summary>
+        <WithdrawalDecision request={r} status="cancelled" />
+      </details>
+    </ReviewCard>
+  );
+}
+
+/** Review Inbox: proposed property work. Approve starts it; the other job controls stay below. */
+export function JobReviewCard({ job: j, decided, onDecided, savedReasons }: CardState & { job: EstateJob }) {
+  const t = useEstateTable(),
+    { commandOutcome } = useEconomy(),
+    { commandId } = useCommandId(`job|${j.id}`);
+  const decide = (status: "active" | "denied") =>
+    commandOutcome({ id: `${commandId}-${status}`, kind: "estate-job", before: j, job: { ...j, status } });
+  return (
+    <ReviewCard
+      typeLabel="Property"
+      who={t.purses.find((p) => p.id === j.purseId)?.name ?? holdingName(t, j.propertyId, "A property")}
+      what={`Property work: ${j.name} at ${holdingName(t, j.propertyId, "a property")}`}
+      approveLabel="Approve work"
+      denyLabel="Deny work"
+      onApprove={() => decide("active")}
+      onDeny={() => decide("denied")}
+      decided={decided}
+      onDecided={onDecided}
+      savedReasons={savedReasons}
+      receiptHref={`/features/properties#property-${encodeURIComponent(j.propertyId)}`}
+      receiptLabel="View property"
+    >
+      <JobCard job={j} review />
+    </ReviewCard>
   );
 }
 export function EstateWorkshop() {

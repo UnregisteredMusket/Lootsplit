@@ -31,6 +31,7 @@
   "node scripts/recovery-step.mjs dev-loot-claims 300 node scripts/loot-claims-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot-fairness 300 node scripts/loot-fairness-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-themed-confirm 180 node scripts/themed-confirm-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-review-inbox 300 node scripts/review-inbox-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-shop-stock 240 node scripts/shop-stock-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-control-panel 240 node scripts/control-panel-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-library-navigation 240 node scripts/library-navigation-browser-audit.mjs",

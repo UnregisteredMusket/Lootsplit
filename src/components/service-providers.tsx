@@ -721,7 +721,7 @@ export function NpcServicesToggle({ npc, table: t }: { npc: Npc; table: CloudTab
 }
 
 /** Review Inbox: service requests (DM decides; players see and can withdraw their own). */
-export function ServiceRequests() {
+export function ServiceRequests({ decidedOnly = false }: { decidedOnly?: boolean } = {}) {
   const t = useWorldTable() as unknown as CloudTable,
     seat = useSeat(),
     dm = seat.role === "dm";
@@ -730,7 +730,20 @@ export function ServiceRequests() {
   );
   const pending = orders.filter((o) => o.status === "requested");
   const decided = orders.filter((o) => o.status !== "requested").slice(-5).reverse();
-  if (!orders.length) return null;
+  if (!orders.length || (decidedOnly && !decided.length)) return null;
+  if (decidedOnly)
+    // Review Inbox history: pending requests are cards in the queue above.
+    return (
+      <section aria-label="Recently decided service requests">
+        <h3>Recently decided service requests</h3>
+        {decided.map((o) => (
+          <p key={o.id}>
+            <span className={`svc-status ${o.status}`}>{o.status}</span> {o.terms.offer.name} ·{" "}
+            {t.purses.find((p) => p.id === o.purseId)?.name ?? "A character"} · {formatCopper(o.terms.priceCopper)} · {o.message}
+          </p>
+        ))}
+      </section>
+    );
   return (
     <section aria-label="Service requests">
       <h3>Service requests · {pending.length} pending</h3>
@@ -757,7 +770,7 @@ export function ServiceRequests() {
   );
 }
 
-function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; table: CloudTable; dm: boolean }) {
+export function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; table: CloudTable; dm: boolean }) {
   const { commandOutcome } = useEconomy();
   const [note, setNote] = useState("");
   /** Identify: the answer, and the two optional item updates. */
@@ -845,6 +858,7 @@ function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; ta
           </label>
           <div className="svc-buttons">
             <Button
+              data-review-approve=""
               disabled={busy || checks.some((c) => !c.ok) || (!!o.terms.item && (!answer.trim() || (renaming && !rename.trim())))}
               onClick={() =>
                 void run(
@@ -865,7 +879,8 @@ function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; ta
               {o.terms.item ? "Answer" : "Approve"} · charge {formatCopper(o.terms.priceCopper)}
             </Button>
             <Button
-              variant="danger"
+              variant="secondary"
+              data-review-deny=""
               disabled={busy || !note.trim()}
               onClick={() => void run({ kind: "service-review", orderId: o.id, before: o, decision: "deny", reason: note.trim() }, `${o.id}-deny`)}
             >

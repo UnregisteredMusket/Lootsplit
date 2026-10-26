@@ -7,7 +7,14 @@ import "./characters/character-improvements.css";
 import { announceSheetChange } from "@/lib/quire/party-sheet-links";
 type Sheet = z.infer<typeof sheetSchema>;
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "Unable to review import.");
-export function CharacterImportReviews({ code }: { code: string }) {
+export function CharacterImportReviews({
+  code,
+  onPending,
+}: {
+  code: string;
+  /** Review Inbox: the pending count once loaded (null while loading or unavailable). */
+  onPending?: (count: number | null) => void;
+}) {
   const [requests, setRequests] = useState<
     { id: string; purse_id: string; target_revision?: number; body: Sheet; status: string }[]
   >([]);
@@ -65,6 +72,10 @@ export function CharacterImportReviews({ code }: { code: string }) {
       });
     return () => controller.abort();
   }, [code, refresh]);
+  const pendingCount = loading ? null : requests.filter((r) => r.status === "pending").length;
+  useEffect(() => {
+    onPending?.(pendingCount);
+  }, [pendingCount, onPending]);
   async function review(id: string, decision: string) {
     setBusy(true);
     setError("");

@@ -186,7 +186,7 @@ export const HELP_GROUPS: HelpGroup[] = [
           "Party → Split the party lets some characters go somewhere else while staying in the party. Name each group (up to 6, lettered A–F with their own colour), choose where each new group is and who goes where, review, then confirm. A group sent to a different place moves at once: no time passes and nothing is charged, like Move party here. Group A keeps the party's place.",
           "While split, Party → Characters shows a Groups panel: each group's place, members and coins, Move… (instant), Merge, and Hide this group's place from other groups' players (they see Elsewhere). Edit groups… renames and recolours groups and moves characters between them. Leaving the party is unchanged and stays in each character's placement.",
           "Everyone stays in the party: balances, companion funds, the treasure pool, fairness, coin splits and Give work across groups, and party funds belong to every group. Shops, services, NPCs nearby and property for sale follow each character's group, so a character can only buy, sell or talk where their own group is. Your own tools have no presence check, as before.",
-          "Players may ask to move their own group; the request waits in Review Inbox (Bank → Review Inbox) and on the Groups panel. Approve moves the group once; Deny keeps an optional reason you can show to the player. Merge… regroups groups at the same place (or one inside the other); a group on the road or on a journey waits. Pending downtime must be approved or cancelled before splitting, moving or merging. One campaign clock runs for everyone. Characters on downtime return to the group they left (or the group it merged into). Older apps see one party at group A's place and are asked to update before acting for a character in another group.",
+          "Players may ask to move their own group; the request waits in Review Inbox (Desk → Review Inbox) and on the Groups panel. Approve moves the group once; Deny keeps an optional reason you can show to the player. Merge… regroups groups at the same place (or one inside the other); a group on the road or on a journey waits. Pending downtime must be approved or cancelled before splitting, moving or merging. One campaign clock runs for everyone. Characters on downtime return to the group they left (or the group it merged into). Older apps see one party at group A's place and are asked to update before acting for a character in another group.",
         ],
         links: [
           ["Party", "/party"],
@@ -437,7 +437,21 @@ export const HELP_GROUPS: HelpGroup[] = [
         ],
         links: [
           ["Campaign finances & downtime", "/?view=overview#campaign-finance"],
-          ["Loan requests & approvals", "/?view=overview#review-inbox"],
+          ["Loan requests & approvals", "/features/review"],
+        ],
+      },
+      {
+        id: "review-inbox",
+        title: "Review Inbox",
+        audience: "DM approval required",
+        paragraphs: [
+          "Review Inbox (the Review Inbox card on the Desk, which also shows the count on the Desk tab) lists every request waiting for you in one queue, oldest first: payments, loans, hires, journeys, services, treasure pool claims, NPC training, group moves, property work, withdrawals, ships and account character imports. Type chips filter the queue; types with nothing pending are listed on one \"Nothing else pending\" line. A search box appears when more than five requests wait. With nothing pending it reads All caught up.",
+          "Each card shows who asked, what approving does, the amount and the account's balance afterwards. Approve is the gold button; Deny… is the outlined one and asks for a reason where the request records one (reasons you use are remembered on this device). Requests that need more than two buttons (services, journeys, training, the treasure pool, imports) keep their full review inside the card. After a decision the card stays in place as a one-line Approved or Denied note with a link to its record; there is no Undo, so use the record's own correction (for example a ledger Void) if needed.",
+          "Approve all payments under N gp approves the pending payments below that amount after one confirmation listing them and their total. Each payment is still its own approval, charged once; any that can't be recorded stay pending and are listed. On a keyboard, focus a card and press A to approve, D to deny, J and K for the next and previous card. Decided requests, history and imports are in the fold below the queue.",
+        ],
+        links: [
+          ["Review Inbox", "/features/review"],
+          ["Review Reports", "/features/reports"],
         ],
       },
       {

@@ -30,8 +30,8 @@ import { SettingsPage } from "@/components/settings-page";
 import { LocalAudioPanel } from "@/components/local-audio-panel";
 import { DowntimeActivities } from "@/components/downtime-activities";
 import { DowntimeJourneys } from "@/components/map-journeys";
-import { LootClaimsReview } from "@/components/treasure-pool";
 import { QuestsScreen } from "@/components/quests";
+import { ReviewInbox } from "@/components/review-inbox";
 // Load exchange editors only for this screen. Downtime shares the small review
 // without pulling every market editor into startup.
 const TradeEconomyPanel = lazy(() =>
@@ -172,14 +172,14 @@ function FeaturePage() {
             )}
             {feature === "review" && (
               <>
-                {(!code || code === room.code) && <LootClaimsReview />}
-                {(!code || code === room.code) && <DowntimeActivities reviewsOnly />}
-                <PropertyOperationReviews />
-                {(!code || code === room.code) && <CampaignJournal section="bank" reviewOnly />}
-                {code || room.joined ? (
-                  <CharacterImportReviews code={code || room.code} />
+                {!code || code === room.code ? (
+                  <ReviewInbox />
                 ) : (
-                  <p>Open a shared session to review account character imports.</p>
+                  // A link for another shared campaign's imports: only what can be read here.
+                  <>
+                    <PropertyOperationReviews />
+                    <CharacterImportReviews code={code} />
+                  </>
                 )}
                 <AppLink className="settings-link" href="/party">
                   Character permissions & editing →

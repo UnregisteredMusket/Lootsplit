@@ -258,6 +258,9 @@ jobs:
       - name: dev-themed-confirm
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-themed-confirm 180 node scripts/themed-confirm-browser-audit.mjs
+      - name: dev-review-inbox
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-review-inbox 300 node scripts/review-inbox-browser-audit.mjs
       - name: dev-finance
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs

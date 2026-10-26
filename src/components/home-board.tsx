@@ -218,7 +218,7 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
                           : loot.filter((holding) => holding.kind === "property").length}
                       </p>
                       <p className="text-sm text-muted">
-                        {seat.role === "dm" ? "Review inbox" : "Properties"}
+                        {seat.role === "dm" ? "Review Inbox" : "Properties"}
                       </p>
                     </Link>
                   </>

@@ -23,6 +23,7 @@ const featureAudits = {
   "market-shops": "scripts/market-shops-browser-audit.mjs",
   a11y: "scripts/a11y-browser-audit.mjs",
   "map-controls": "scripts/map-controls-browser-audit.mjs",
+  "review-inbox": "scripts/review-inbox-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))

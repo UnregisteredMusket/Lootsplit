@@ -340,6 +340,8 @@ export function Modal({
 }
 
 export type { ConfirmTone };
+/** The shared empty state (icon, one sentence, optional action); defined beside Card. */
+export { EmptyState } from "./terminal";
 
 /**
  * Themed confirmation (role="alertdialog"; Escape and Cancel close it, focus returns to the

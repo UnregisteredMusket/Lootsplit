@@ -1125,6 +1125,13 @@ export function JourneyInbox({ table }: { table: Table }) {
     </section>
   );
 }
+/** Review Inbox queue: one journey entry by ID, read from the current campaign. */
+export function JourneyReviewEntry({ journeyId }: { journeyId: string }) {
+  const world = useWorldTable() as unknown as CloudTable;
+  const table = { ...world, handouts: [] };
+  const j = journeysOf(table).find((x) => x.id === journeyId);
+  return j ? <JourneyInboxEntry table={table} journey={j} /> : null;
+}
 function JourneyInboxEntry({ table, journey: j }: { table: Table; journey: Journey }) {
   const actions = useJourneyActions();
   const [reason, setReason] = useState(""),
@@ -1201,6 +1208,7 @@ function JourneyInboxEntry({ table, journey: j }: { table: Table; journey: Journ
         {j.status === "proposed" && (
           <Button
             variant="secondary"
+            data-review-deny=""
             disabled={actions.busy}
             onClick={() =>
               void actions.run(async () =>
@@ -1221,6 +1229,7 @@ function JourneyInboxEntry({ table, journey: j }: { table: Table; journey: Journ
           </Button>
         )}
         <Button
+          data-review-approve=""
           disabled={actions.busy || !simulated.quote || !!quote?.lines.some((l) => l.short)}
           onClick={() =>
             void actions.run(async () => {
@@ -1267,6 +1276,7 @@ function PlayerJourneyRequest({ table, journey: j }: { table: Table; journey: Jo
         {j.status === "proposed" && (
           <Button
             variant="secondary"
+            data-review-deny=""
             disabled={actions.busy}
             onClick={() =>
               void actions.run(async () =>

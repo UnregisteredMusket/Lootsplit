@@ -429,7 +429,17 @@ export function DowntimeActivities({
           .reverse()
           .filter((r) => !reviewsOnly || r.status === "pending")
           .map((r) => (
-            <article className="journal-entry" key={r.id}>
+            <TrainingRequestArticle key={r.id} request={r} dm={dm} locked={locked} />
+          ))}
+      </Fold>
+      {!dm && <AppLink href="/features/journal">Open Journal →</AppLink>}
+    </section>
+  );
+}
+/** One NPC training request: its details, then the DM's decision or the player's Cancel. */
+function TrainingRequestArticle({ request: r, dm, locked }: { request: TrainingRequest; dm: boolean; locked: boolean }) {
+  return (
+    <article className="journal-entry">
               <h3>
                 {r.lessonOrderId
                   ? `${r.trainerName} learns ${r.topic} from ${r.npcName} · ${hours(r.minutes)} h`
@@ -461,11 +471,16 @@ export function DowntimeActivities({
                   )
                 ))}
             </article>
-          ))}
-      </Fold>
-      {!dm && <AppLink href="/features/journal">Open Journal →</AppLink>}
-    </section>
   );
+}
+
+/** Review Inbox queue: one pending training request by ID, with the same decision form. */
+export function TrainingReviewEntry({ requestId }: { requestId: string }) {
+  const t = useWorldTable();
+  const pending = !!t.journal.finance?.downtime.some((d) => d.status === "pending");
+  const { locked } = useFinanceReadiness(pending);
+  const r = readDowntimeActivities(t.journal.downtimeActivities).requests.find((x) => x.id === requestId);
+  return r ? <TrainingRequestArticle request={r} dm locked={locked} /> : null;
 }
 function HourSettings({
   settings,
