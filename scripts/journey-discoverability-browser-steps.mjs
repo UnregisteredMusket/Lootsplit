@@ -94,7 +94,13 @@ export async function checkJourneyDiscoverability(page, { origin, frame, width, 
   if (height >= 600)
     assert.ok((await box(link)).bottom <= height, `Downtime's Plan a journey is above the fold at ${label}`);
   assert.ok(
-    await travel.evaluate((e) => !e.previousElementSibling || e.previousElementSibling.tagName === "H1"),
+    // The title row holds the h1 (and the DM's Pin to Desk button).
+    await travel.evaluate(
+      (e) =>
+        !e.previousElementSibling ||
+        e.previousElementSibling.tagName === "H1" ||
+        e.previousElementSibling.classList.contains("feature-heading-row"),
+    ),
     "Travel is the Downtime screen's first section",
   );
   await page.screenshot({ path: `${output}/discover-downtime-${label}.png` });
