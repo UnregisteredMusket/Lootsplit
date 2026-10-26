@@ -110,7 +110,7 @@ test("1,000,003 cp among 7 conserves every copper: 142,857 each and 4 cp stay in
   assert.equal(lines.length, 8);
   assert.equal(lines.reduce((sum, l) => sum + l.copper, 0), 0);
   assert.ok(lines.every((l) => l.transactionType === "transfer"));
-  assert.match(lines[0]!.summary, /7 shares of 1428 gp, 5 sp, 7 cp\. The 4 cp left over stayed here \(party fund\)/);
+  assert.match(lines[0]!.summary, /7 shares of 1,428 gp, 5 sp, 7 cp\. The 4 cp left over stayed here \(party fund\)/);
 });
 
 test("a source short on small coins pays with exact change and breaks one larger coin", () => {

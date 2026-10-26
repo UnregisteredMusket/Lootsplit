@@ -94,5 +94,5 @@ test("missing, rounded, incompatible or undated analytics are unavailable rather
   const exact = ownerAnalyticsGroups(
     snapshot({ ...emptyMetrics(), spentCopper: Number.MAX_SAFE_INTEGER }),
   );
-  assert.equal(exact[0]?.metrics[0]?.value, "90071992547409 gp, 9 sp, 1 cp");
+  assert.equal(exact[0]?.metrics[0]?.value, "90,071,992,547,409 gp, 9 sp, 1 cp");
 });
