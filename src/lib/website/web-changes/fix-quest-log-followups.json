@@ -1,0 +1,10 @@
+{
+  "title": "Quest log fixes",
+  "summary": "View as player now shows exactly what a chosen character sees, and new quests announce themselves.",
+  "items": [
+    "DMs: View as player lets you pick a character and shows exactly what their device receives, leaving out anything about hidden objectives, people they can't see and places of hidden groups.",
+    "Players get a New quest notice when the DM shares a quest with them after the app is open.",
+    "Private quest notes are saved under your character who knows the quest.",
+    "Removing a campaign from this device also clears its quest follow and updated marks."
+  ]
+}

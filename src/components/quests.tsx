@@ -13,7 +13,9 @@ import { Button, Field, Modal, Switch, TextArea, TextInput, Select } from "@/com
 import { useEconomy, useCommandId } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { characterVisible } from "@/lib/quire/character-position";
-import { questCharacter, questsOf } from "@/lib/quire/quests";
+import { questAudienceCharacters, questCharacter, questsOf } from "@/lib/quire/quests";
+import { previewQuestAs } from "@/lib/quire/quest-preview";
+import { emptyCloudTable } from "@/lib/quire/cloud";
 import { MAX_QUEST_OBJECTIVES, type Quest, type QuestAudience, type QuestDraft } from "@/lib/quire/quests-schema";
 import { readMarketLocations } from "@/lib/quire/shop-locations";
 import { activeGroups, groupInfo, groupMembers, MAIN_GROUP, partySplit } from "@/lib/quire/party-groups";
@@ -33,6 +35,7 @@ import {
   revealed,
   stampLabel,
   writeQuestState,
+  noteOwner,
   type QuestTab,
 } from "@/lib/quire/quest-view";
 import type { CommandRequest } from "@/lib/quire/commands";
@@ -384,12 +387,13 @@ function Chronicle({ q, t, dm = false, heading = true }: { q: Quest; t: Table; d
 
 /** Private journal entries linked to the quest (owner decision D5). */
 function MyNotes({ q }: { q: Quest }) {
-  const { journal } = useEconomy();
+  const { journal, purses: economyPurses } = useEconomy();
   const seat = useSeat();
   const { busy, run } = useQuestCommand();
   const [text, setText] = useState("");
   const { commandId, renew } = useCommandId(`${q.id}:${text}`);
-  const own = seat.purseIds[0];
+  // The note belongs to one of this seat's characters who know the quest.
+  const own = noteOwner(q, seat.purseIds, economyPurses);
   const notes = (journal.entries ?? []).filter((e) => e.questId === q.id && e.visibility === "player");
   if (!own) return null;
   return (
@@ -745,7 +749,7 @@ function QuestEditor({ t, quest, onSaved, onCancel, onDeleted, giverNpcId }: { t
       {quest && sheet === "entry" && <EntrySheet quest={quest} close={() => setSheet("")} />}
       {quest && sheet === "preview" && (
         <Modal open onOpenChange={(o) => !o && setSheet("")} title="What players see">
-          <PlayerPreview t={t} quest={quest} />
+          <PlayerPreview quest={quest} />
         </Modal>
       )}
       {quest && sheet === "delete" && <DeleteDraft quest={quest} close={() => setSheet("")} onDeleted={onDeleted} />}
@@ -1044,29 +1048,68 @@ function ReceiptSheet({ t, quest, close }: { t: Table; quest: Quest; close: () =
   );
 }
 
-/** "View as player": the parts players would receive (hidden parts and DM notes left out). */
-function PlayerPreview({ t, quest }: { t: Table; quest: Quest }) {
-  const q: Quest = {
-    ...quest,
-    objectives: quest.objectives.filter((o) => !o.hidden),
-    log: quest.log.filter((l) => l.shared),
-    dmNotes: undefined,
-  };
+/**
+ * "View as player": the real player projection for one character (quest-preview.ts), so the DM
+ * sees exactly what that device receives. A draft is shown as if revealed to the party.
+ */
+function PlayerPreview({ quest }: { quest: Quest }) {
+  const economy = useEconomy();
+  const full = useMemo(
+    () =>
+      ({
+        ...emptyCloudTable(),
+        purses: economy.purses,
+        holdings: economy.holdings,
+        shops: economy.shops,
+        ledger: economy.ledger,
+        journal: economy.journal,
+      }) as CloudTable,
+    [economy.purses, economy.holdings, economy.shops, economy.ledger, economy.journal],
+  );
+  const viewers = questAudienceCharacters(full, quest);
+  const [viewer, setViewer] = useState(viewers[0]?.id ?? "");
+  const current = viewers.some((p) => p.id === viewer) ? viewer : (viewers[0]?.id ?? "");
+  const preview = useMemo(() => (current ? previewQuestAs(full, quest.id, current) : null), [full, quest.id, current]);
+  if (!viewers.length) return <p className="quest-muted">No player character can see this quest yet.</p>;
+  const q = preview?.quest;
+  const t = preview?.table;
   return (
     <div className="quest-detail preview">
-      {!revealed(quest) && <p className="quest-muted">Nobody can see this draft yet.</p>}
-      <h2 className="quest-title">{q.title}</h2>
-      {q.summary && <p className="quest-summary">{q.summary}</p>}
-      <ul className="quest-objectives">
-        {q.objectives.map((o) => (
-          <li key={o.id} className={o.state}>
-            <ObjectiveMark state={o.state} />
-            <span className="quest-objective-text">{o.text}</span>
-          </li>
-        ))}
-      </ul>
-      {q.rewardText && <p>Reward: {q.rewardText}</p>}
-      <Chronicle q={q} t={t} />
+      {!revealed(quest) && <p className="quest-muted">Nobody can see this draft yet. Shown as if you revealed it to the party.</p>}
+      {viewers.length > 1 && (
+        <Field label="See it as">
+          <Select value={current} onChange={(e) => setViewer(e.target.value)}>
+            {viewers.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </Select>
+        </Field>
+      )}
+      {!q || !t ? (
+        <p className="quest-muted">This character cannot see the quest.</p>
+      ) : (
+        <>
+          <h2 className="quest-title">{q.title}</h2>
+          {giverName(t, q) && <p><strong>{giverName(t, q)}</strong></p>}
+          {q.summary && <p className="quest-summary">{q.summary}</p>}
+          <ul className="quest-objectives">
+            {q.objectives.map((o) => (
+              <li key={o.id} className={o.state}>
+                <ObjectiveMark state={o.state} />
+                <span>
+                  <span className="quest-objective-text">{o.text}</span>
+                  {o.locationId && <small>{placeName(t, o.locationId)}</small>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {q.rewardText && <p>Reward: {q.rewardText}</p>}
+          {q.rewardLinks.map((l) => (
+            <Chip key={`${l.kind}:${l.id}`} tone="done">Linked: {l.label ?? "Receipt"}</Chip>
+          ))}
+          <Chronicle q={q} t={t} />
+        </>
+      )}
     </div>
   );
 }

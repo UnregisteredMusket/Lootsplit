@@ -334,7 +334,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Your quest log",
         paragraphs: [
           "Home → Quest log lists the quests your DM has shared with you: Active, Done and Failed. Open one to read what you were asked, who asked, the objectives (done ones are crossed out; New marks one added since you last looked), the promised reward and the chronicle of what happened, stamped with the session and campaign day. Only you know this, or You and other names, means only those characters were told; the DM decides who knows.",
-          "Follow this quest pins it to the top of your quest log and your Home, with Show on map and Open quest. Following and the Updated marks are kept on this device only. When the DM updates a quest you can see, a Quest updated notice says what changed. Talk opens the person who gave it, if they are nearby.",
+          "Follow this quest pins it to the top of your quest log and your Home, with Show on map and Open quest. Following and the Updated marks are kept on this device only. When the DM shares a new quest with you or updates one you can see, a New quest or Quest updated notice says what changed. Talk opens the person who gave it, if they are nearby.",
           "My notes are private journal entries only you can read; the DM cannot see them. Rewards are paid by the DM when the quest is done; a linked receipt shows what was paid.",
         ],
         links: [["Quest log", "/features/quests"]],

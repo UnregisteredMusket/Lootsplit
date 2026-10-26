@@ -148,3 +148,31 @@ export function latestChange(q: Quest) {
   const line = [...q.log].reverse().find((l) => l.shared);
   return line?.text ?? "New quest";
 }
+
+/** The seat's character a private quest note is written as: one in the quest's audience. */
+export function noteOwner(q: Pick<Quest, "audience">, purseIds: string[], purses: { id: string; kind: string }[]) {
+  const mine = purseIds.filter((id) => purses.some((p) => p.id === id && p.kind === "character"));
+  if (q.audience.kind === "characters") {
+    const listed = q.audience.purseIds;
+    return mine.find((id) => listed.includes(id));
+  }
+  return mine[0];
+}
+
+/**
+ * "Quest updated" toasts: which quests changed since the last table this seat saw. The first table
+ * only primes (no toast on opening the app); a quest that becomes visible later is new and toasts
+ * once, as does a newer player-visible change. Archived quests never toast.
+ */
+export function questChanges(previous: ReadonlyMap<string, number> | null, quests: Quest[]) {
+  const next = new Map(quests.map((q) => [q.id, q.updatedAt]));
+  if (!previous) return { next, changed: [] as { quest: Quest; isNew: boolean }[] };
+  const changed = quests.flatMap((quest) => {
+    const before = previous.get(quest.id);
+    if (quest.archived || (before !== undefined && quest.updatedAt <= before)) return [];
+    return [{ quest, isNew: before === undefined }];
+  });
+  // Keep quests that left this view (hidden again) so a later re-reveal counts as news only if newer.
+  for (const [id, at] of previous) if (!next.has(id)) next.set(id, at);
+  return { next, changed };
+}
