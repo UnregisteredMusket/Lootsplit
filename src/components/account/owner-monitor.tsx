@@ -9,6 +9,8 @@ import release from "@/lib/website/release.json";
 import type { MonitorData } from "./server-monitor";
 import "./owner-monitor.css";
 import { MonitorJournal, MonitorTaskSummary } from "./monitor-journal";
+import { FieldMonitorSummary } from "./field-monitor-summary";
+import { statusWord, type MonitorSeries, type RecentlyResolved } from "@/lib/monitor/field-summary";
 import type { JournalSnapshot } from "@/lib/monitor/types";
 import { AppLink } from "@/components/app-link";
 import {
@@ -66,6 +68,9 @@ type Snapshot = JournalSnapshot & {
   }>;
   traffic: Source<{ requests: number; errors: number; since: string; until: string }>;
   release: Source<{ commit: string }>;
+  /** The widget model's stored-row parts (`include=widget-data`); absent on older servers. */
+  series?: MonitorSeries;
+  recentlyResolved?: RecentlyResolved;
 };
 const count = (n: number | undefined) => (n === undefined ? "—" : n.toLocaleString());
 const age = (timestamp: number, now: number) => {
@@ -89,6 +94,8 @@ export function OwnerMonitor() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  // Only the time of the last good reading survives a failure; its private totals never do.
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null);
   const [automatic, setAutomatic] = useState(true);
   const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -102,7 +109,11 @@ export function OwnerMonitor() {
       setBusy(true);
       const timeout = setTimeout(() => request.abort(), 12000);
       try {
-        const next = await accountRequest<Snapshot>("owner/monitor", undefined, request.signal);
+        const next = await accountRequest<Snapshot>(
+          "owner/monitor?include=widget-data",
+          undefined,
+          request.signal,
+        );
         if (next.analytics.data) ownerAnalyticsGroups(next.analytics.data);
         if (alive && import.meta.env.VITE_MOBILE === "true") {
           const { OwnerWidget, hasOwnerWidget } = await import("@/lib/mobile/owner-widget");
@@ -125,6 +136,7 @@ export function OwnerMonitor() {
                 : next,
           );
           setError(false);
+          setLastSuccessAt(Date.now());
           setNow(Date.now());
         }
       } catch (failure) {
@@ -189,11 +201,16 @@ export function OwnerMonitor() {
   const development = data?.development.data;
   const games = data?.analytics.data?.metrics;
   return (
-    <section className="portal-card owner-monitor" aria-labelledby="owner-monitor-title">
+    <section
+      className="portal-card owner-monitor"
+      id="field-monitor"
+      aria-labelledby="owner-monitor-title"
+    >
       <header className="owner-monitor-heading">
         <div>
           <p className="portal-eyebrow">LOOTSPLITTER · PRIVATE OVERVIEW</p>
           <h2 id="owner-monitor-title">Field monitor</h2>
+          <p className="owner-monitor-theme">Always dark, like the website and the widget.</p>
         </div>
         <span className="owner-monitor-access">
           <ShieldCheck size={16} aria-hidden="true" /> Owner access
@@ -223,6 +240,9 @@ export function OwnerMonitor() {
         }
       >
         <Activity size={19} aria-hidden="true" />
+        <b className="owner-monitor-word" data-testid="field-status-word">
+          {data ? statusWord(data.overall, stale) : error ? "UNAVAILABLE" : "CHECKING"}
+        </b>
         <strong>
           {!data
             ? error
@@ -239,8 +259,19 @@ export function OwnerMonitor() {
         {data && <span>{age(data.checkedAt, now)}</span>}
       </div>
       {error && (
-        <p role="alert">
-          {errorMessage}{" "}
+        <p role="alert" className="owner-monitor-failed">
+          <span>
+            Last refresh failed: {errorMessage || "the monitor could not be reached"}.
+            {lastSuccessAt ? ` Last good reading ${age(lastSuccessAt, now)}.` : ""}
+          </span>{" "}
+          <button
+            type="button"
+            className="owner-monitor-retry"
+            disabled={busy}
+            onClick={() => setRevision((n) => n + 1)}
+          >
+            {busy ? "Retrying…" : "Retry"}
+          </button>{" "}
           <AppLink
             href="/account#account-sign-in"
             onClick={() => window.dispatchEvent(new Event("lootsplit-monitor-sign-in"))}
@@ -251,6 +282,7 @@ export function OwnerMonitor() {
       )}
       {data && (
         <>
+          <FieldMonitorSummary data={data} now={now} />
           {data.developmentStatus && <MonitorTaskSummary data={data} now={now} />}
           <div
             className="owner-monitor-scroll"

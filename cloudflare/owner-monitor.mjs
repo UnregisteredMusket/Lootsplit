@@ -420,8 +420,13 @@ export async function ownerMonitor(env, userId, sessionId, request, context = nu
   );
   // The widget's charts, recovered problems and live rooms come from stored rows only (no provider
   // calls); they are read before the authorization re-check below, so a revocation still wins.
+  // The website Field monitor's summary asks for the same stored-row parts (`include=widget-data`);
+  // the default dashboard view stays unchanged for older clients.
+  const withWidgetData =
+    view === "widget" ||
+    (request?.url ? new URL(request.url).searchParams.get("include") === "widget-data" : false);
   let widgetData = {};
-  if (view === "widget") {
+  if (withWidgetData) {
     const { monitorWidgetData } = await import("./monitor-journal.mjs");
     widgetData = await monitorWidgetData(env.DB, snapshot, snapshot.servedAt || Date.now());
   }
@@ -433,7 +438,9 @@ export async function ownerMonitor(env, userId, sessionId, request, context = nu
   if (!account) throw Object.assign(new Error("Sign in again."), { status: 401 });
   return view === "widget"
     ? widgetSnapshot({ ...snapshot, account, ...widgetData })
-    : { ...snapshot, account };
+    : withWidgetData
+      ? withSeverity({ ...snapshot, account, ...widgetData })
+      : { ...snapshot, account };
 }
 /** Completed main runs the Field monitor's Deploys tile shows (newest first, scheduled excluded). */
 export const MAIN_RUN_LIMIT = 20;
@@ -459,13 +466,18 @@ export function mainRuns(runs, limit = MAIN_RUN_LIMIT) {
  * Each omission is stated with its count, so nothing reads as zero. The full snapshot, history
  * and dashboard are unchanged.
  */
-export function widgetSnapshot(snapshot) {
-  const out = { ...snapshot, view: "widget" };
-  // Severity per diagnostic (✕ critical, ! warning, i info); older widgets ignore it.
-  if (Array.isArray(snapshot.diagnostics))
-    out.diagnostics = snapshot.diagnostics.map((check) =>
+/** Severity per diagnostic (✕ critical, ! warning, i info); older clients ignore it. */
+function withSeverity(snapshot) {
+  if (!Array.isArray(snapshot.diagnostics)) return snapshot;
+  return {
+    ...snapshot,
+    diagnostics: snapshot.diagnostics.map((check) =>
       check && typeof check === "object" ? { ...check, severity: widgetSeverity(check) } : check,
-    );
+    ),
+  };
+}
+export function widgetSnapshot(snapshot) {
+  const out = { ...withSeverity(snapshot), view: "widget" };
   const data = snapshot.development?.data;
   if (data && typeof data === "object") {
     const { runs, closedPulls, ...kept } = data;

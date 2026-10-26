@@ -1,5 +1,6 @@
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
@@ -18,6 +19,10 @@ const context = await browser.newContext({
   extraHTTPHeaders: { "cf-connecting-ip": "192.0.2.210" },
 });
 context.setDefaultTimeout(20000);
+// Copy diagnostics is checked by reading back what it put on the clipboard.
+await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
+// The website asks for the full snapshot plus the widget model (`?include=widget-data`).
+const monitorApi = /\/api\/account\/owner\/monitor(\?[^/]*)?$/;
 const DB = localAccountDb("data/account-dev.sqlite");
 const page = await context.newPage(),
   errors = [];
@@ -70,6 +75,10 @@ try {
   await page.getByText("Total accounts", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Close server monitor", exact: true }).click();
   assert.equal(await page.locator("#monitor-panel").count(), 0);
+  // The owner has a Field monitor section of its own (design plan M9), with a deep link.
+  const fieldTab = page.getByRole("tab", { name: "Field monitor", exact: true });
+  await fieldTab.click();
+  assert.equal(new URL(page.url()).hash, "#field-monitor");
   const overview = page.locator(".owner-monitor");
   await overview.getByText("Monitor Audit", { exact: true }).waitFor();
   await overview.getByText("Owner access", { exact: true }).waitFor();
@@ -77,7 +86,23 @@ try {
   await overview.getByRole("button", { name: "Refresh overview", exact: true }).waitFor();
   await overview
     .getByText("A read-only Cloudflare analytics connection is needed.", { exact: false })
+    .first()
     .waitFor();
+  // The widget model on the web: status word, ✕ ! i counts, Needs attention, Recently resolved,
+  // the traffic chart and plan-usage gauges, all above the full history.
+  await expect(overview.getByTestId("field-status-word")).toHaveText(
+    /^(HEALTHY|ATTENTION|FAILURE|UNVERIFIED|STALE)$/,
+  );
+  const counts = overview.getByRole("navigation", { name: "Diagnostics by severity" });
+  await expect(counts.getByRole("link")).toHaveCount(3);
+  for (const name of ["Needs attention", "Recently resolved", "Traffic", "Plan usage"])
+    await overview.getByRole("heading", { name, exact: true }).waitFor();
+  assert.ok(
+    (await overview.getByRole("heading", { name: "Needs attention", exact: true }).boundingBox())
+      .y <
+      (await overview.getByRole("navigation", { name: "Monitoring details" }).boundingBox()).y,
+    "the summary sits above the full history",
+  );
   // New controls use the real disposable owner API and persisted journal, not a response fixture.
   const detailsNav = overview.getByRole("navigation", { name: "Monitoring details" });
   await detailsNav.getByRole("link", { name: "Development task", exact: true }).click();
@@ -206,6 +231,12 @@ try {
   }
   await filters.getByRole("button", { name: "All", exact: true }).click();
   assert.equal(await overview.locator("#monitor-diagnostics article").count(), allDiagnostics);
+  // Tapping a summary count chip opens Diagnostics filtered to that severity, like the widget.
+  await counts.locator('[data-severity="warning"]').click();
+  await filters.locator('button[aria-pressed="true"]', { hasText: "Warning" }).waitFor();
+  expect(new URL(page.url()).hash).toBe("#monitor-diagnostics-warning");
+  await expect(fieldTab).toHaveAttribute("aria-selected", "true");
+  await filters.getByRole("button", { name: "All", exact: true }).click();
   assert.equal(
     await page.locator(".quire-dawn").count(),
     0,
@@ -213,8 +244,44 @@ try {
   );
   const snapshot = await (await context.request.get(origin + "/api/account/owner/monitor")).json();
   // Provider fixture exercises UI states only; real provider parsers/permissions have API tests.
+  const ownerEmail = "private.owner@example.test";
   const fixture = {
     ...snapshot,
+    diagnostics: [
+      ...(snapshot.diagnostics || []),
+      {
+        component: "Audit multiplayer probe",
+        color: "red",
+        state: "error",
+        symptom: `Round trip failed for room QZ7K4M2P (join https://lootsplitter.com/share?join=QZ7K4M2P&t=abc) seen by ${ownerEmail}`,
+        impact: "Players could not join.",
+        action: "Authorization: Bearer audit.fakecredential.abcdefghijklmnopqrstuvwxyz",
+        firstOccurredAt: Date.now() - 31 * 60000,
+        latestCheckAt: Date.now(),
+        lastSuccessAt: Date.now() - 32 * 60000,
+        durationMs: 31 * 60000,
+        errorCode: "PROBE_FAILED",
+        confirmedCause: null,
+        suspectedCause: null,
+        retainedFailure: false,
+      },
+    ],
+    recentlyResolved: {
+      state: "ready",
+      total: 1,
+      complete: true,
+      items: [
+        {
+          component: "Audit worker errors",
+          severity: "warning",
+          startedAt: Date.now() - 3 * 3600000,
+          resolvedAt: Date.now() - 2 * 3600000,
+          durationMs: 3600000,
+          resolution: "recovered",
+          symptom: "1 Worker error",
+        },
+      ],
+    },
     development: {
       state: "ready",
       checkedAt: Date.now(),
@@ -267,9 +334,25 @@ try {
       },
     },
   };
-  await page.route("**/api/account/owner/monitor", (route) => route.fulfill({ json: fixture }));
+  await page.route(monitorApi, (route) => route.fulfill({ json: fixture }));
   await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
   await overview.getByText("1 active workflow in recent activity", { exact: true }).waitFor();
+  // Needs attention lists the critical item first; Copy diagnostics copies a sanitized summary.
+  const attention = overview.locator('section[aria-labelledby="field-attention"]');
+  const item = attention.locator("details").first();
+  await expect(item.locator("summary")).toContainText("Audit multiplayer probe");
+  await item.locator("summary").click();
+  await item.getByRole("button", { name: "Copy diagnostics: Audit multiplayer probe" }).click();
+  await item.getByRole("status").waitFor();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  assert.match(copied, /CRIT · Audit multiplayer probe/);
+  for (const secret of [ownerEmail, "@", "QZ7K4M2P", "join=", "fakecredential", "abcdefghijklmnop"])
+    assert.ok(!copied.includes(secret), `copied diagnostics must not include ${secret}`);
+  const resolvedItem = overview
+    .locator('section[aria-labelledby="field-resolved"]')
+    .locator("details")
+    .first();
+  await expect(resolvedItem.locator("summary")).toContainText("Audit worker errors");
   // Agent activity companion destination: the same section lists recent GitHub events.
   await overview.getByText("Recent GitHub activity", { exact: true }).waitFor();
   await overview.locator(".owner-monitor-activity li").nth(1).waitFor();
@@ -287,16 +370,19 @@ try {
   fixture.checkedAt = Date.now() - 120000;
   await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
   await overview.getByText("Snapshot is stale", { exact: true }).waitFor();
-  await page.unroute("**/api/account/owner/monitor");
-  await page.route("**/api/account/owner/monitor", (route) =>
+  await page.unroute(monitorApi);
+  await page.route(monitorApi, (route) =>
     route.fulfill({ status: 503, json: { error: "Temporary outage" } }),
   );
   await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
   await overview.getByRole("alert").waitFor();
+  // The header mirrors the widget: "Last refresh failed: <reason> · Retry", without private data.
+  await expect(overview.getByRole("alert")).toContainText("Last refresh failed: Temporary outage");
+  await expect(overview.getByTestId("field-status-word")).toHaveText("UNAVAILABLE");
   assert.equal(await overview.getByText("Active accounts · 5m", { exact: true }).count(), 0);
   assert.equal(await overview.getByText("Monitor Audit", { exact: true }).count(), 0);
-  await page.unroute("**/api/account/owner/monitor");
-  await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await page.unroute(monitorApi);
+  await overview.getByRole("alert").getByRole("button", { name: "Retry", exact: true }).click();
   await overview.getByText("Monitor Audit", { exact: true }).waitFor();
   await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(id).run();
   await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();

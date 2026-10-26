@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { CopyDiagnostics } from "./field-monitor-summary";
+import { diagnosticCopy } from "@/lib/monitor/field-summary";
 import { AppLink } from "@/components/app-link";
 import { accountRequest } from "@/lib/account/client";
 import {
@@ -926,6 +928,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                   {check.retainedFailure && (
                     <p>A later disconnection has not cleared the previous confirmed failure.</p>
                   )}
+                  <CopyDiagnostics label={check.component} text={() => diagnosticCopy(check)} />
                 </details>
               </article>
             ))}
