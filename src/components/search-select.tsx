@@ -16,7 +16,8 @@ import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { registerBackOverlay } from "@/lib/mobile/back-handlers";
 
-type Option = { value: string; label: string; disabled: boolean };
+/** `keywords` (an option's `data-keywords`) are searched but not shown. */
+type Option = { value: string; label: string; disabled: boolean; keywords?: string };
 function text(node: ReactNode): string {
   return Children.toArray(node)
     .map((child) =>
@@ -33,6 +34,7 @@ function readOptions(children: ReactNode, group = "", inheritedDisabled = false)
         label?: string;
         disabled?: boolean;
         hidden?: boolean;
+        "data-keywords"?: string;
       }>(child)
     )
       return [];
@@ -50,6 +52,7 @@ function readOptions(children: ReactNode, group = "", inheritedDisabled = false)
         value: String(child.props.value ?? label),
         label: group ? `${group} · ${label}` : label,
         disabled: inheritedDisabled || !!child.props.disabled,
+        ...(child.props["data-keywords"] ? { keywords: child.props["data-keywords"] } : {}),
       },
     ];
   });
@@ -112,7 +115,9 @@ export function SearchSelect({
   const listId = useId(),
     current = String(value ?? defaultValue ?? "");
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
-  const matches = options.filter((o) => terms.every((t) => normalize(o.label).includes(t)));
+  const matches = options.filter((o) =>
+    terms.every((t) => normalize(o.keywords ? `${o.label} ${o.keywords}` : o.label).includes(t)),
+  );
   const shown = matches.slice(0, limit),
     selected = options.find((o) => o.value === current);
   function choose(option: Option) {

@@ -165,6 +165,7 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
     return () => observer.disconnect();
   }, []);
   const nearBottom = useRef(true);
+  const [scrolledUp, setScrolledUp] = useState(false);
   useEffect(() => {
     if (
       !library ||
@@ -351,6 +352,7 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
           const el = history.current;
           if (!el) return;
           nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          setScrolledUp(!nearBottom.current);
           if (nearBottom.current && inView) markRead(active.id, visible);
         }}
       >
@@ -420,6 +422,22 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
           ))}
         </ol>
       </div>
+      {scrolledUp && (
+        // Reading older messages: one tap back to the newest (plan Q24).
+        <button
+          type="button"
+          className="chat-jump-latest"
+          onClick={() => {
+            const el = history.current;
+            if (!el) return;
+            nearBottom.current = true;
+            setScrolledUp(false);
+            el.scrollTo({ top: el.scrollHeight });
+          }}
+        >
+          Jump to latest ↓
+        </button>
+      )}
       {legacy.length > 0 && (
         <details className="mt-3">
           <summary>Messages saved by an older version ({legacy.length})</summary>

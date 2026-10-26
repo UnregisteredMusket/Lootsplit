@@ -266,7 +266,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Meet nearby NPCs",
         paragraphs: [
           "People & NPCs lists visible people available at your current location. Open their record for shared details or start a private interaction. The DM or an assigned NPC controller responds. NPC visibility, availability and barter permission are campaign settings.",
-          "Expand Details & actions under an NPC to read its description and choose View & interact. The NPC name opens its shared Library entry. Find an NPC and Search NPC records remain available above the list.",
+          "Expand Details & actions under an NPC to read its description and choose View & interact. The NPC name opens its shared Library entry. Find an NPC searches names, places and descriptions. A Talk link or a chosen NPC opens that person's conversation first; everyone else at the location folds into Other people here (with the count).",
           "Dialogue is shared with the interacting character, DM and configured controller. Opening an NPC record does not assign its character sheet or configuration controls to you.",
         ],
         links: [["People & NPCs", "/features/npcs"]],
@@ -326,7 +326,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "notifications",
         title: "Party chat, journals and alerts",
         paragraphs: [
-          "Campaign → Chat supports party and permitted private messages. Home → Journal opens visible campaign entries; visibility determines who can read each entry. Campaign → Rolls and Alerts show recorded results and room/message notices.",
+          "Campaign → Chat supports party and permitted private messages. The conversation fills the tab and the message box stays above the bottom navigation; after scrolling up, Jump to latest returns to the newest message. Connection & recovery, device backups and manual sharing are on the Room tab. Home → Journal opens visible campaign entries; visibility determines who can read each entry. Campaign → Rolls and Alerts show recorded results and room/message notices.",
           "Browser notifications depend on your device and permission. Supported browsers can enable background new-message web push without message text. This is not email delivery or native Android push.",
         ],
         links: [

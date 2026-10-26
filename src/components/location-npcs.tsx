@@ -49,7 +49,88 @@ export function LocationNpcs() {
   useEffect(() => {
     setSelected(typeof requestedNpc === "string" ? requestedNpc : "");
   }, [requestedNpc]);
-  const [query, setQuery] = useState("");
+  // A deep link (?npc=) or a choice opens that conversation first and moves focus to it (P8, Q23).
+  const focusTarget = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!npc) return;
+    const el = focusTarget.current;
+    el?.focus({ preventScroll: true });
+    el?.scrollIntoView({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per chosen NPC
+  }, [npc?.id]);
+  // An element, not a component type, so open card details survive re-renders.
+  const npcCards = (
+    <>
+      {(npc ? npcs.filter((n) => n.id !== npc.id) : npcs).map((n) => (
+          <article className="world-card" key={n.id}>
+            <div className="world-row">
+              {n.portrait && <img width={64} height={64} src={n.portrait} alt={n.name} />}
+              <span>
+                <h2>
+                  <AppLink href={libraryRecordHref("npc", n.id)}>
+                    {n.name} <span aria-hidden="true">→</span>
+                  </AppLink>
+                </h2>
+                <p>
+                  {characterPosition(
+                    t,
+                    t.purses.find((p) => p.id === n.id)!,
+                  ).inParty
+                    ? "In party"
+                    : locationLabel(
+                        market,
+                        characterLocation(
+                          t,
+                          t.purses.find((p) => p.id === n.id)!,
+                        ),
+                      )}{" "}
+                  · {npcAvailableHere(n, t, seatGroups(t, seat)) ? "Nearby" : "Away / hidden"} ·{" "}
+                  {n.barterAllowed ? "Bartering allowed" : "No bartering"}
+                </p>
+              </span>
+            </div>
+            <MapRecordStrip reference={{ kind: "npc", id: n.id }} />
+            <NpcQuestStrip npcId={n.id} name={n.name} />
+            <details className="npc-record-details">
+              <summary aria-label={`Details & actions for ${n.name}`}>Details & actions</summary>
+              <div className="world-toolbar">
+                <Button onClick={() => setSelected(n.id)}>View & interact</Button>
+                {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
+                {dm && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setTemplate(npcCopy(n));
+                      setEdit(null);
+                    }}
+                  >
+                    Duplicate NPC
+                  </Button>
+                )}
+              </div>
+              <p>{n.description}</p>
+              {t.journal.blacksmith?.profiles
+                .filter((p) => p.npcId === n.id)
+                .map((p) => (
+                  <p key={p.shopId}>
+                    {p.skill} blacksmith ·{" "}
+                    <AppLink href={`/shop/${encodeURIComponent(p.shopId)}`}>
+                      Blacksmith services →
+                    </AppLink>
+                  </p>
+                ))}
+              {dm && t.journal.blacksmith?.profiles.some((p) => p.npcId === n.id) && (
+                <NpcSmithToggle npc={n} />
+              )}
+              {dm && <NpcServicesToggle npc={n} table={t as unknown as CloudTable} />}
+              {dm && n.barterAllowed && (
+                <NpcBarterConfigForm key={JSON.stringify(n.barter ?? null)} npc={n} table={t} />
+              )}
+            </details>
+          </article>
+        ))}
+    </>
+  );
   let imported: ReturnType<typeof npcImportSchema.parse> | undefined;
   try {
     if (importText) imported = npcImportSchema.parse(JSON.parse(importText));
@@ -65,6 +146,32 @@ export function LocationNpcs() {
       <AppLink className="settings-link" href="/features/trading">
         Open Trading & Barter →
       </AppLink>
+      {npcs.length > 0 && (
+        <label className="block mt-3">
+          Find an NPC
+          {/* One picker: it searches names, places and descriptions (the former record search). */}
+          <SearchSelect aria-label="Find an NPC" value={selected} onValueChange={setSelected}>
+            <option value="">Choose an NPC</option>
+            {npcs.map((n) => (
+              <option key={n.id} value={n.id} data-keywords={n.description.slice(0, 400)}>
+                {n.name} · {locationLabel(market, n.locationId)}
+              </option>
+            ))}
+          </SearchSelect>
+        </label>
+      )}
+      {npc && (
+        <div
+          className="npc-focus"
+          ref={focusTarget}
+          tabIndex={-1}
+          role="region"
+          aria-label={`${npc.name}, conversation`}
+        >
+          <NpcInteraction key={npc.id} npc={npc} table={t} />
+          {dm && <CharacterPlacement npcId={npc.id} />}
+        </div>
+      )}
       {dm && (
         <>
           <div className="world-toolbar">
@@ -179,107 +286,17 @@ export function LocationNpcs() {
           </Fold>
         </>
       )}
-      <label className="block mt-3">
-        Find an NPC
-        <SearchSelect aria-label="Find an NPC" value={selected} onValueChange={setSelected}>
-          <option value="">Choose an NPC</option>
-          {npcs.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.name} · {locationLabel(market, n.locationId)}
-            </option>
-          ))}
-        </SearchSelect>
-      </label>
-      <label className="block mt-3">
-        Search NPC records
-        <input
-          className="ledger-search w-full"
-          aria-label="Search NPC records"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </label>
-      {npcs
-        .filter((n) =>
-          `${n.name} ${n.description} ${locationLabel(market, n.locationId)}`
-            .toLocaleLowerCase()
-            .includes(query.toLocaleLowerCase()),
+      {npc ? (
+        npcs.length > 1 && (
+          <details className="npc-others">
+            <summary>Other people here ({npcs.length - 1})</summary>
+            {npcCards}
+          </details>
         )
-        .map((n) => (
-          <article className="world-card" key={n.id}>
-            <div className="world-row">
-              {n.portrait && <img width={64} height={64} src={n.portrait} alt={n.name} />}
-              <span>
-                <h2>
-                  <AppLink href={libraryRecordHref("npc", n.id)}>
-                    {n.name} <span aria-hidden="true">→</span>
-                  </AppLink>
-                </h2>
-                <p>
-                  {characterPosition(
-                    t,
-                    t.purses.find((p) => p.id === n.id)!,
-                  ).inParty
-                    ? "In party"
-                    : locationLabel(
-                        market,
-                        characterLocation(
-                          t,
-                          t.purses.find((p) => p.id === n.id)!,
-                        ),
-                      )}{" "}
-                  · {npcAvailableHere(n, t, seatGroups(t, seat)) ? "Nearby" : "Away / hidden"} ·{" "}
-                  {n.barterAllowed ? "Bartering allowed" : "No bartering"}
-                </p>
-              </span>
-            </div>
-            <MapRecordStrip reference={{ kind: "npc", id: n.id }} />
-            <NpcQuestStrip npcId={n.id} name={n.name} />
-            <details className="npc-record-details">
-              <summary aria-label={`Details & actions for ${n.name}`}>Details & actions</summary>
-              <div className="world-toolbar">
-                <Button onClick={() => setSelected(n.id)}>View & interact</Button>
-                {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
-                {dm && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setTemplate(npcCopy(n));
-                      setEdit(null);
-                    }}
-                  >
-                    Duplicate NPC
-                  </Button>
-                )}
-              </div>
-              <p>{n.description}</p>
-              {t.journal.blacksmith?.profiles
-                .filter((p) => p.npcId === n.id)
-                .map((p) => (
-                  <p key={p.shopId}>
-                    {p.skill} blacksmith ·{" "}
-                    <AppLink href={`/shop/${encodeURIComponent(p.shopId)}`}>
-                      Blacksmith services →
-                    </AppLink>
-                  </p>
-                ))}
-              {dm && t.journal.blacksmith?.profiles.some((p) => p.npcId === n.id) && (
-                <NpcSmithToggle npc={n} />
-              )}
-              {dm && <NpcServicesToggle npc={n} table={t as unknown as CloudTable} />}
-              {dm && n.barterAllowed && (
-                <NpcBarterConfigForm key={JSON.stringify(n.barter ?? null)} npc={n} table={t} />
-              )}
-            </details>
-          </article>
-        ))}
-      {!npcs.length && <p>No NPCs are available at this location.</p>}
-      {npc && (
-        <>
-          {dm && <CharacterPlacement npcId={npc.id} />}
-          <NpcInteraction key={npc.id} npc={npc} table={t} />
-        </>
+      ) : (
+        npcCards
       )}
+      {!npcs.length && <p>No NPCs are available at this location.</p>}
     </div>
   );
 }
@@ -533,6 +550,9 @@ function NpcInteraction({
     // Split the party: near the chosen character's group.
     near = npcAvailableHere(npc, table, character ? actingGroups(table, character, seat.purseIds) : seatGroups(table, seat)),
     purse = table.purses.find((p) => p.id === npc.id)!;
+  const stock = table.holdings.filter(
+    (h) => h.purseId === npc.id && h.quantity > 0 && !h.custody && !h.reservedFor,
+  );
   return (
     <section className="world-card">
       <h2>{npc.name} · interaction</h2>
@@ -542,10 +562,8 @@ function NpcInteraction({
           (!npc.controllerPurseId && npcServices(table, npc.id, undefined).length > 0)) && (
         <NpcConversation key={npc.id} npc={npc} table={table} />
       )}
-      <h3>Inventory</h3>
-      {table.holdings
-        .filter((h) => h.purseId === npc.id && h.quantity > 0 && !h.custody && !h.reservedFor)
-        .map((h) => (
+      {(dm || stock.length > 0) && <h3>Inventory</h3>}
+      {stock.map((h) => (
           <div className="world-row" key={h.id}>
             <span>
               {h.quantity} × {h.name} · {formatCopper(h.unitCopper)} each
