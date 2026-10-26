@@ -1,0 +1,11 @@
+{
+  "title": "Review Inbox: one queue, clear decisions",
+  "summary": "Everything waiting for the DM now sits in one list, oldest first, with a clear Approve and Deny on each request.",
+  "items": [
+    "Payments, loans, hires, journeys, services, treasure pool claims, training and more share one queue with type chips; empty types fold into a single \"Nothing else pending\" line, and an empty inbox says All caught up.",
+    "Each request shows who asked, what it does, the amount and the balance afterwards. Approve is the gold button; Deny… is outlined and can take a reason, and reasons you use are remembered.",
+    "A decided request stays in place as a short Approved or Denied note with a link to its record, so the page no longer jumps.",
+    "Approve all payments under an amount you choose, after one confirmation; each payment is still approved and charged once.",
+    "Keyboard: A approves, D denies, J and K move between requests. The Desk tab shows how many requests are waiting."
+  ]
+}

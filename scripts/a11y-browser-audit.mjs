@@ -43,7 +43,7 @@ const SEEDED = {
     [SHOP, "text=The Brass Lantern"],
     [SHEET, "[role=tab]"],
     ["/features/npcs", "text=Find an NPC"],
-    ["/features/review", "text=Property proposals"],
+    ["/features/review", "#review-inbox-heading"],
   ],
   player: [
     ["/?view=home", "text=Open character sheet"],

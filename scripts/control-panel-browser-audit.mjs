@@ -179,15 +179,14 @@ try {
   await page.evaluate(() => {
     window.reviewNavigationMarker = "same-document";
   });
-  await page.locator(".readout").filter({ hasText: "Pending reviews" }).click();
+  await page.locator(".readout").filter({ hasText: "Review Inbox" }).click();
   await expect(page.getByRole("heading", { name: "Review Inbox", exact: true })).toBeVisible();
   await expect(page.locator("#review-inbox")).toBeVisible();
-  await expect(page.locator("#review-inbox summary")).toContainText(
-    "Payments & loans awaiting approval",
-  );
+  // Nothing pending: one "All caught up" state instead of empty section headers (design D2).
   await expect(
-    page.getByText("No payments or loans need approval.", { exact: true }),
+    page.locator("#review-inbox").getByRole("heading", { name: "All caught up", exact: true, level: 2 }),
   ).toBeVisible();
+  await expect(page.locator("#review-inbox [data-review-card]")).toHaveCount(0);
   await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submit request", exact: true })).toHaveCount(0);
   assert.equal(await page.evaluate(() => window.reviewNavigationMarker), "same-document");
@@ -415,15 +414,15 @@ try {
     t.setSeat({ ...t.getSeat(), role: "dm" });
   });
   await visit("/");
-  await page.locator(".readout").filter({ hasText: "Pending reviews" }).click();
+  await page.locator(".readout").filter({ hasText: "Review Inbox" }).click();
   const paymentRequest = page
-    .locator("#review-inbox .journal-entry")
+    .locator("#review-inbox [data-review-card]")
     .filter({ hasText: "Review audit inn bill" });
   await expect(
     paymentRequest.getByRole("button", { name: "Approve payment", exact: true }),
   ).toBeVisible();
   await paymentRequest.getByRole("button", { name: "Decline", exact: true }).click();
-  await expect(paymentRequest).toContainText("denied");
+  await expect(paymentRequest.locator(".review-stub")).toContainText("Denied");
   await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
   await page

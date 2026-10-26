@@ -27,6 +27,7 @@ import { MarketReadout } from "./market-readout";
 import type { Purse } from "@/lib/quire/types";
 import { lootReviewEncounters, lootReviewHref } from "@/lib/encounters/loot-review";
 import { DeskLootReviews } from "./desk-loot-review";
+import { reviewItems } from "@/lib/quire/review-inbox";
 type Roll = NonNullable<Purse["rolls"]>[number];
 
 export function DmDesk() {
@@ -140,6 +141,10 @@ function DmDeskContents() {
       lotClaims({ purses, holdings, journal }, h.id).some((c) => c.choice !== "pass"),
     ).length,
     lootPending = lootReviews?.length ?? 0,
+    // Review Inbox (design Q13): journeys, services, training and group moves, counted the same way.
+    otherPending = reviewItems({ purses, holdings, journal, loans }).filter((i) =>
+      ["journeys", "services", "training", "groups"].includes(i.type),
+    ).length,
     totals = session ? sessionSummary(ledger, session) : null,
     allCoins = purses
       .filter((p) => inParty({ purses, journal }, p))
@@ -201,16 +206,18 @@ function DmDeskContents() {
           <AppLink href="/features/review?from=%2F" className="readout">
             <FantasyIcon ui="gift" size={30} />
             <span>
-              <small>Pending reviews</small>
+              <small>Review Inbox</small>
               <strong>
-                {imports === null
+                {room.joined && imports === null
                   ? `${pending} financial · ${propertyPending} property${lootPending ? ` · ${lootPending} loot` : ""}`
-                  : pending + imports + propertyPending + poolPending + lootPending}
+                  : pending + (imports ?? 0) + propertyPending + poolPending + lootPending + otherPending ||
+                    "All caught up"}
               </strong>
               <small>
                 {pending} financial · {propertyPending} property
                 {poolPending ? ` · ${poolPending} treasure pool` : ""}
                 {lootPending ? ` · ${lootPending} loot ${lootPending === 1 ? "review" : "reviews"}` : ""}
+                {otherPending ? ` · ${otherPending} other` : ""}
                 {room.joined
                   ? imports !== null
                     ? ` · ${imports} imports`

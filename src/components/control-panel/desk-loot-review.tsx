@@ -5,7 +5,7 @@ import "./desk-loot-review.css";
 
 /**
  * Desk: "Ready for loot review · <encounter>" for each concluded encounter waiting for its award.
- * Nothing renders when none wait; the Pending reviews readout counts the same rows.
+ * Nothing renders when none wait; the Review Inbox readout counts the same rows.
  */
 export function DeskLootReviews({ rows }: { rows: { id: string; name: string }[] | null }) {
   if (!rows?.length) return null;

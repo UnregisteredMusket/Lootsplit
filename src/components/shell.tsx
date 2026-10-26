@@ -13,6 +13,7 @@ import { dismissDialog } from "@/lib/quire/confirm-store";
 import { runBackHandlers } from "@/lib/mobile/back-handlers";
 import { rememberScreen } from "@/lib/quire/map-navigation";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
+import { useReviewCount } from "@/lib/quire/use-review-count";
 import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
 import { getCampaigns, subscribeCampaigns, serverCampaigns } from "@/lib/quire/campaigns";
 import { SyncStatus } from "./sync-status";
@@ -27,6 +28,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -80,6 +82,8 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
   const { job } = useLibrary();
   const seat = useSeat();
   const { count: unreadCount } = useChatUnread();
+  // Review Inbox count on the DM's Desk tab (design Q13).
+  const reviewCount = useReviewCount(seat.role === "dm");
   const seatKnown = useSeatKnown();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -472,7 +476,8 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
               note={splitOn && right && !link.active ? "open in right pane" : ""}
               icon={<FantasyIcon ui={link.icon} size={layout === "compact" ? 24 : 26} />}
               label={link.label}
-              badge={link.to === "/share" ? unreadCount : 0}
+              badge={link.to === "/share" ? unreadCount : dm && link.to === "/" ? reviewCount : 0}
+              badgeLabel={dm && link.to === "/" ? reviewBadgeLabel(reviewCount) : undefined}
             />
           );
         })}
@@ -630,6 +635,7 @@ function NavLink({
   label,
   layout,
   badge = 0,
+  badgeLabel,
 }: {
   to: Dest;
   search?: { book: string } | { q: string } | { view: "home" | "sheet" };
@@ -641,11 +647,17 @@ function NavLink({
   icon: ReactNode;
   label: string;
   badge?: number;
+  /** Describes the badge without changing the link's name (the Review Inbox count). */
+  badgeLabel?: string;
   layout: "tab" | "rail" | "compact";
 }) {
+  const badgeId = useId();
+  const described = !!badgeLabel && badge > 0;
   return (
+    <>
     <Link
       to={to}
+      aria-describedby={described ? badgeId : undefined}
       aria-current={current ? "page" : undefined}
       aria-label={layout === "compact" || note ? `${label}${note ? ` (${note})` : ""}` : undefined}
       title={layout === "compact" ? label : undefined}
@@ -665,13 +677,26 @@ function NavLink({
       <span className="relative">
         {icon}
         {badge > 0 ? (
-          <span className="chat-nav-badge" aria-label={`${badge} unread messages`}>
-            {badge > 99 ? "99+" : badge}
-          </span>
+          described ? (
+            <span className="chat-nav-badge review-nav-badge" aria-hidden="true">
+              {badge > 99 ? "99+" : badge}
+            </span>
+          ) : (
+            <span className="chat-nav-badge" aria-label={`${badge} unread messages`}>
+              {badge > 99 ? "99+" : badge}
+            </span>
+          )
         ) : null}
       </span>
       {layout === "compact" ? null : label}
     </Link>
+    {/* Outside the link so its name stays "Desk"; a hidden element still describes it. */}
+    {described ? (
+      <span id={badgeId} hidden>
+        {badgeLabel}
+      </span>
+    ) : null}
+    </>
   );
 }
 
@@ -763,3 +788,6 @@ function searchString(search: unknown): string {
   if (typeof search !== "object" || search === null || !("q" in search)) return "";
   return typeof search.q === "string" ? search.q : "";
 }
+
+const reviewBadgeLabel = (n: number) =>
+  `${n} ${n === 1 ? "request" : "requests"} waiting in Review Inbox`;

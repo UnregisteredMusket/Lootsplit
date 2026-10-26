@@ -1,4 +1,5 @@
 import { ServiceRequests } from "./service-providers";
+import { LoanReviewCard, PaymentReviewCard } from "./review-cards-finance";
 import { GroupRequestInbox } from "./party-groups";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
@@ -109,7 +110,7 @@ export function CampaignJournal({
 }) {
   const navigate = useNavigate();
   const reviewRef = useDisclosureAnchor("review-inbox");
-  const { journal, ledger, purses, command, commandOutcome, loans, decideLoan } = useEconomy();
+  const { journal, ledger, purses, command, commandOutcome, loans } = useEconomy();
   const seat = useSeat();
   const archiveSeat = useArchiveReaderSeat(seat);
   const dm = seat.role === "dm";
@@ -231,7 +232,10 @@ export function CampaignJournal({
     return () => cancelAnimationFrame(frame);
   }, [linkedLoanRequestId, hash, reviewRef]);
   const pending = loanRequests.filter((x) => x.status === "pending");
+  // Review Inbox: pending requests are cards in its queue; this section keeps the decided history.
+  const history = dm && reviewOnly;
   const matchesRequest = (request: { status: string; note: string; purseId: string }) =>
+    (!history || request.status !== "pending") &&
     (requestStatus === "all" ||
       (requestStatus === "pending"
         ? request.status === "pending"
@@ -609,10 +613,18 @@ export function CampaignJournal({
         </>
       )}
       {section === "bank" && (
-        <details open ref={reviewRef} id="review-inbox" className="review-inbox">
+        <details
+          open
+          ref={history ? undefined : reviewRef}
+          id={history ? "review-history" : "review-inbox"}
+          className="review-inbox"
+        >
           <summary>
-            {dm ? "Payments & loans awaiting approval" : "My payment and loan requests"} ·{" "}
-            {pending.length + requests.filter((x) => x.status === "pending").length} pending
+            {history
+              ? "Payment & loan history"
+              : `${dm ? "Payments & loans awaiting approval" : "My payment and loan requests"} · ${
+                  pending.length + requests.filter((x) => x.status === "pending").length
+                } pending`}
           </summary>
           <p className="text-sm text-muted">
             {dm
@@ -621,9 +633,15 @@ export function CampaignJournal({
             Permitted shop purchases use Buy in the Market.
           </p>
           <FinanceReadiness />
-          <JourneyRequests />
-          <GroupRequestInbox />
-          <ServiceRequests />
+          {history ? (
+            <ServiceRequests decidedOnly />
+          ) : (
+            <>
+              <JourneyRequests />
+              <GroupRequestInbox />
+              <ServiceRequests />
+            </>
+          )}
           <div className="flex flex-wrap gap-2 my-3">
             <input
               className="ledger-search"
@@ -664,16 +682,26 @@ export function CampaignJournal({
             </Button>
           </div>
           <p className="text-sm text-muted">
-            {shownLoanRequests.length + shownRequests.length} of{" "}
-            {loanRequests.length + requests.length} requests shown.{" "}
-            {pending.length + requests.filter((request) => request.status === "pending").length}{" "}
-            still need DM review; filters do not change their status.
+            {history
+              ? `${shownLoanRequests.length + shownRequests.length} decided requests shown. Pending requests are in the queue above.`
+              : <>
+                  {shownLoanRequests.length + shownRequests.length} of{" "}
+                  {loanRequests.length + requests.length} requests shown.{" "}
+                  {pending.length + requests.filter((request) => request.status === "pending").length}{" "}
+                  still need DM review; filters do not change their status.
+                </>}
           </p>
-          {dm && !pending.length && !requests.some((x) => x.status === "pending") && (
+          {dm && !history && !pending.length && !requests.some((x) => x.status === "pending") && (
             <p role="status">No payments or loans need approval.</p>
           )}
           {shownLoanRequests.map((x) => {
             const debt = debtForLoanRequest(x, readFinance(journal.finance).loans);
+            if (dm && x.status === "pending")
+              return (
+                <div key={x.id} id={loanRequestRecordId(x.id)} style={{ scrollMarginTop: "6rem" }}>
+                  <LoanReviewCard loan={x} />
+                </div>
+              );
             return (
               <div
                 className="journal-entry"
@@ -700,27 +728,13 @@ export function CampaignJournal({
                       remains available.
                     </p>
                   ))}
-                {dm && x.status === "pending" ? (
-                  <div className="flex gap-2">
-                    <Button
-                      disabled={busy}
-                      onClick={() => void run(() => decideLoan(x.id, "approved"))}
-                    >
-                      Approve loan
-                    </Button>
-                    <Button
-                      disabled={busy}
-                      variant="secondary"
-                      onClick={() => void run(() => decideLoan(x.id, "denied"))}
-                    >
-                      Decline
-                    </Button>
-                  </div>
-                ) : null}
               </div>
             );
           })}
-          {[...shownRequests].reverse().map((x) => (
+          {[...shownRequests].reverse().map((x) =>
+            dm && x.status === "pending" ? (
+              <PaymentReviewCard key={x.id} request={x} />
+            ) : (
             <div className="journal-entry" key={x.id}>
               <strong>
                 Payment · {purses.find((p) => p.id === x.purseId)?.name} · {formatCopper(x.copper)}
@@ -735,41 +749,9 @@ export function CampaignJournal({
                   </AppLink>
                 </p>
               )}
-              {dm && x.status === "pending" ? (
-                <div className="flex gap-2">
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() =>
-                        command({
-                          kind: "payment-decision",
-                          requestId: x.id,
-                          status: "approved",
-                        }),
-                      )
-                    }
-                  >
-                    Approve payment
-                  </Button>
-                  <Button
-                    disabled={busy}
-                    variant="secondary"
-                    onClick={() =>
-                      void run(() =>
-                        command({
-                          kind: "payment-decision",
-                          requestId: x.id,
-                          status: "denied",
-                        }),
-                      )
-                    }
-                  >
-                    Decline
-                  </Button>
-                </div>
-              ) : null}
             </div>
-          ))}
+            ),
+          )}
           {!shownLoanRequests.length && !shownRequests.length && (
             <p>No requests match. Clear request filters to see the complete authorized history.</p>
           )}

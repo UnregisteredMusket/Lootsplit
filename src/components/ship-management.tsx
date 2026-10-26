@@ -21,6 +21,8 @@ import { characterPosition } from "@/lib/quire/character-position";
 import { formatCopper } from "@/lib/quire/money";
 import type { Holding } from "@/lib/quire/types";
 import { ActionForm, NumberField, useEstateTable } from "./property-operations";
+import { ReviewCard, useReviewStubs, type ReviewDecision, type SavedReasons } from "./review-card";
+import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { Button, Field, Fold, Select, TextArea, TextInput } from "./ui";
 import { SearchSelect } from "./search-select";
 import { LocationOptions } from "./market-locations";
@@ -392,69 +394,100 @@ export function ShipBoardingReviews({ propertyId }: { propertyId?: string }) {
       t.journal?.fleet?.boarding.filter(
         (r) => r.status === "pending" && (!propertyId || r.propertyId === propertyId),
       ) ?? [];
+  const stubs = useReviewStubs(rows, (r) => r.id);
+  if (!dm)
+    return (
+      <>
+        {rows.map((r) => (
+          <article className="estate-record" key={r.id}>
+            <p>
+              {t.purses.find((p) => p.id === r.purseId)?.name}: {r.action}{" "}
+              {t.holdings.find((h) => h.id === r.propertyId)?.name} · awaiting review
+            </p>
+          </article>
+        ))}
+      </>
+    );
   return (
     <>
-      {rows.map((r) => (
-        <article className="estate-record" key={r.id}>
-          <p>
-            {t.purses.find((p) => p.id === r.purseId)?.name}: {r.action}{" "}
-            {t.holdings.find((h) => h.id === r.propertyId)?.name} · awaiting review
-          </p>
-          {dm &&
-            [true, false].map((approve) => (
-              <ActionForm
-                key={String(approve)}
-                title={`${approve ? "Approve" : "Deny"} ${r.action}`}
-                command={() => ({ kind: "ship-board-review", requestId: r.id, before: r, approve })}
-              >
-                <span />
-              </ActionForm>
-            ))}
-        </article>
+      {stubs.rows.map((row) => (
+        <BoardingReviewCard key={row.key} request={row.item} decided={row.decided} onDecided={(d) => stubs.mark(row.key, d)} />
       ))}
     </>
   );
 }
 
+type Boarding = NonNullable<NonNullable<ReturnType<typeof useEstateTable>["journal"]>["fleet"]>["boarding"][number];
+type Voyage = NonNullable<NonNullable<ReturnType<typeof useEstateTable>["journal"]>["fleet"]>["voyages"][number];
+type CardState = { decided?: ReviewDecision; onDecided?: (d: ReviewDecision) => void; savedReasons?: SavedReasons };
+
+/** Review Inbox: a boarding or disembarking request (`ship-board-review`, unchanged). */
+export function BoardingReviewCard({ request: r, decided, onDecided, savedReasons }: CardState & { request: Boarding }) {
+  const t = useEstateTable(),
+    { commandOutcome } = useEconomy(),
+    { commandId } = useCommandId(`boarding|${r.id}`);
+  const ship = t.holdings.find((h) => h.id === r.propertyId)?.name ?? "the ship";
+  const decide = (approve: boolean) =>
+    commandOutcome({ id: `${commandId}-${approve ? "approve" : "deny"}`, kind: "ship-board-review", requestId: r.id, before: r, approve });
+  return (
+    <ReviewCard
+      typeLabel="Ships"
+      who={t.purses.find((p) => p.id === r.purseId)?.name ?? "A character"}
+      what={`${r.action[0]?.toUpperCase()}${r.action.slice(1)} ${ship}`}
+      approveLabel={`Approve ${r.action}`}
+      denyLabel={`Deny ${r.action}`}
+      onApprove={() => decide(true)}
+      onDeny={() => decide(false)}
+      decided={decided}
+      onDecided={onDecided}
+      savedReasons={savedReasons}
+      receiptHref={`/features/properties#property-${encodeURIComponent(r.propertyId)}`}
+      receiptLabel="View ship"
+    />
+  );
+}
+
 export function ShipVoyageReviews() {
-  const t = useEstateTable();
-  if (useSeat().role !== "dm") return null;
+  const t = useEstateTable(),
+    dm = useSeat().role === "dm";
+  const voyages = t.journal?.fleet?.voyages.filter((v) => v.status === "proposed") ?? [];
+  const stubs = useReviewStubs(voyages, (v) => v.id);
+  if (!dm) return null;
   return (
     <>
-      {t.journal?.fleet?.voyages
-        .filter((v) => v.status === "proposed")
-        .map((v) => (
-          <article className="estate-record" key={v.id}>
-            <h3>Proposed voyage · {t.holdings.find((h) => h.id === v.propertyId)?.name}</h3>
-            <p>
-              {locationLabel(readMarketLocations(t.journal?.market), v.originId)} →{" "}
-              {locationLabel(readMarketLocations(t.journal?.market), v.destinationId)} ·{" "}
-              {v.durationMinutes / 1440} days · {formatCopper(v.budgetCopper)} budget.
-            </p>
-            <p>{v.routeNotes}</p>
-            <ActionForm
-              title="Approve voyage"
-              command={() => ({
-                kind: "ship-voyage",
-                before: v,
-                voyage: { ...v, status: "active" },
-              })}
-            >
-              <span />
-            </ActionForm>
-            <ActionForm
-              title="Deny voyage"
-              command={() => ({
-                kind: "ship-voyage",
-                before: v,
-                voyage: { ...v, status: "denied" },
-              })}
-            >
-              <span />
-            </ActionForm>
-          </article>
-        ))}
+      {stubs.rows.map((row) => (
+        <VoyageReviewCard key={row.key} voyage={row.item} decided={row.decided} onDecided={(d) => stubs.mark(row.key, d)} />
+      ))}
     </>
+  );
+}
+
+/** Review Inbox: a proposed voyage (`ship-voyage` to active or denied, unchanged). */
+export function VoyageReviewCard({ voyage: v, decided, onDecided, savedReasons }: CardState & { voyage: Voyage }) {
+  const t = useEstateTable(),
+    { commandOutcome } = useEconomy(),
+    { commandId } = useCommandId(`voyage|${v.id}`);
+  const market = readMarketLocations(t.journal?.market);
+  const decide = (status: "active" | "denied") =>
+    commandOutcome({ id: `${commandId}-${status}`, kind: "ship-voyage", before: v, voyage: { ...v, status } });
+  return (
+    <ReviewCard
+      typeLabel="Ships"
+      who={t.holdings.find((h) => h.id === v.propertyId)?.name ?? "A ship"}
+      what={`Proposed voyage ${locationLabel(market, v.originId)} → ${locationLabel(market, v.destinationId)} · ${v.durationMinutes / 1440} days`}
+      approveLabel="Approve voyage"
+      denyLabel="Deny voyage"
+      onApprove={() => decide("active")}
+      onDeny={() => decide("denied")}
+      decided={decided}
+      onDecided={onDecided}
+      savedReasons={savedReasons}
+      receiptHref={`/features/properties#property-${encodeURIComponent(v.propertyId)}`}
+      receiptLabel="View ship"
+    >
+      <p>Budget {formatCopper(v.budgetCopper)}.</p>
+      {v.routeNotes && <p>{v.routeNotes}</p>}
+    </ReviewCard>
   );
 }
 function Berthing({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel }) {

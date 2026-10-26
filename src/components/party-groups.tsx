@@ -46,6 +46,7 @@ import {
 import { groupColours, MAX_PARTY_GROUPS } from "@/lib/quire/world-schema";
 import type { Purse } from "@/lib/quire/types";
 import { Button, Modal } from "./ui";
+import { ReviewCard, useReviewStubs, type ReviewDecision, type SavedReasons } from "./review-card";
 import { AppLink } from "./app-link";
 import { LocationOptions } from "./market-locations";
 import "./party-groups.css";
@@ -856,55 +857,65 @@ function MergeDialog({ initial, onClose }: { initial: string[]; onClose: () => v
 
 /* ------------------------------------------------------------------ Move requests */
 
-function GroupRequestReview({ requestId }: { requestId: string }) {
+/** Review Inbox: one group move (`party-group-request-review`, its ID unchanged). */
+export function GroupRequestReview({
+  requestId,
+  decided,
+  onDecided,
+  savedReasons,
+}: {
+  requestId: string;
+  decided?: ReviewDecision;
+  onDecided?: (d: ReviewDecision) => void;
+  savedReasons?: SavedReasons;
+}) {
   const t = useTable();
-  const { busy, error, run, commandOutcome } = useRun();
+  const { commandOutcome } = useEconomy();
   const r = t.journal?.world?.groupRequests?.find((x) => x.id === requestId);
-  const [denying, setDenying] = useState(false);
-  const [reason, setReason] = useState("");
   const [share, setShare] = useState(true);
-  if (!r || r.status !== "pending") return null;
+  if (!r || (r.status !== "pending" && !decided)) return null;
   const info = groupInfo(t, r.groupId);
   const who = t.purses.find((p) => p.id === r.purseId)?.name ?? "A player";
-  const decide = (approve: boolean) =>
-    run(
-      () =>
-        commandOutcome({
-          id: `${r.id}-review`,
-          kind: "party-group-request-review",
-          requestId: r.id,
-          approve,
-          ...(approve ? {} : { reason: { text: reason.trim(), showToPlayer: share } }),
-        } as CommandRequest),
-      approve ? `${info.name} moved.` : "Request denied.",
-    );
+  const decide = async (approve: boolean, reason = "") => {
+    const outcome = await commandOutcome({
+      id: `${r.id}-review`,
+      kind: "party-group-request-review",
+      requestId: r.id,
+      approve,
+      ...(approve ? {} : { reason: { text: reason.trim(), showToPlayer: share } }),
+    } as CommandRequest);
+    toast.success(mutationNotice(outcome, approve ? `${info.name} moved.` : "Request denied."));
+    return outcome;
+  };
   return (
-    <div className={`grequest g-${info.colour}`} role="group" aria-label={`${who} asks to move ${info.name}`}>
-      <p>
-        <GroupBadge letter={info.letter} colour={info.colour} /> <b>{who}</b> asks to move <b>{info.name}</b> to {placeLabel(t, r.locationId) || "a place"}.
-      </p>
+    <ReviewCard
+      className={`grequest g-${info.colour}`}
+      typeLabel="Group move"
+      who={who}
+      what={
+        <>
+          <GroupBadge letter={info.letter} colour={info.colour} /> Move <b>{info.name}</b> to {placeLabel(t, r.locationId) || "a place"}
+        </>
+      }
+      at={r.createdAt}
+      approveLabel="Approve move"
+      denyLabel="Deny request"
+      denyReason="optional"
+      denyExtra={
+        <label className="gcheck">
+          <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /> Show the reason to the player
+        </label>
+      }
+      onApprove={() => decide(true)}
+      onDeny={(reason) => decide(false, reason)}
+      decided={decided}
+      onDecided={onDecided}
+      savedReasons={savedReasons}
+      receiptHref="/party?section=characters"
+      receiptLabel="View groups"
+    >
       {r.message && <blockquote>“{r.message}”</blockquote>}
-      {denying && (
-        <div className="gmove">
-          <label className="gfield">
-            Reason (optional)
-            <input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
-          </label>
-          <label className="gcheck">
-            <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /> Show the reason to the player
-          </label>
-        </div>
-      )}
-      <div className="gactions">
-        <Button disabled={busy} onClick={() => void decide(true)}>
-          Approve move
-        </Button>
-        <Button variant="secondary" disabled={busy} onClick={() => (denying ? void decide(false) : setDenying(true))}>
-          {denying ? "Deny request" : "Deny…"}
-        </Button>
-      </div>
-      {error && <p role="alert" className="gerror">{error}</p>}
-    </div>
+    </ReviewCard>
   );
 }
 
@@ -914,12 +925,15 @@ export function GroupRequestInbox() {
   const seat = useSeat();
   const { busy, error, run, commandOutcome } = useRun();
   const requests = (t.journal?.world?.groupRequests ?? []).filter((r) => (seat.role === "dm" ? r.status === "pending" : seat.purseIds.includes(r.purseId)));
-  if (!requests.length) return null;
+  const stubs = useReviewStubs(seat.role === "dm" ? requests : [], (r) => r.id);
+  if (!requests.length && !stubs.rows.length) return null;
   return (
     <section className="ginbox" aria-label="Group move requests">
       <h3>Group moves</h3>
       {seat.role === "dm"
-        ? requests.map((r) => <GroupRequestReview key={r.id} requestId={r.id} />)
+        ? stubs.rows.map((row) => (
+            <GroupRequestReview key={row.key} requestId={row.item.id} decided={row.decided} onDecided={(d) => stubs.mark(row.key, d)} />
+          ))
         : requests.slice(-5).map((r) => {
             const info = groupInfo(t, r.groupId);
             return (
