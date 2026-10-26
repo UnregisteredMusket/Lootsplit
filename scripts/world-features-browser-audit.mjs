@@ -3,7 +3,6 @@ import {
   closeMapSettings,
   selectWorkspaceMap,
   selectMapType,
-  openMoreMapTools,
 } from "./map-workspace-browser.mjs";
 import { checkFullscreenMap, mapMarkerColor } from "./fullscreen-map-browser-check.mjs";
 import { auditCharacterPlacement } from "./character-placement-browser.mjs";

@@ -3860,6 +3860,11 @@ input,select,textarea { max-width: 100%; }
 .map-workspace .map-hotbar-anchor.map-setup-anchor[data-layout="phone"] { top:calc(62px + env(safe-area-inset-top)); bottom:auto; left:max(10px,env(safe-area-inset-left)); right:max(10px,env(safe-area-inset-right)); }
 .map-workspace .map-setup-panel { right:auto; left:calc(max(14px,env(safe-area-inset-left)) + var(--map-setup-w) + 8px); }
 .map-workspace .map-hotbar-anchor.map-setup-anchor[data-tool-names] .map-hotbar { width:196px; }
+/* Reveal tools' options (fog, walls, lights) open beside the setup rail on desktop. */
+@media(min-width:651px) {
+ .map-workspace .map-tool-context.map-tool-context-setup { top:calc(76px + env(safe-area-inset-top)); right:auto; left:calc(max(14px,env(safe-area-inset-left)) + var(--map-setup-w) + 8px); width:340px; max-height:calc(var(--map-usable-height,100dvh) - 170px); }
+}
+.map-tool-context-setup h3 { font-size:13px; margin:10px 0 4px; }
 .map-setup-note { font-size:12px; color:var(--color-muted); margin:0 0 8px; }
 .map-setup-panel .world-form label { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
 .map-setup-panel .world-form input:not([type=checkbox]),.map-setup-panel .world-form textarea,.map-setup-panel .world-form select { width:100%; }

@@ -636,12 +636,9 @@ export function useMapTabletopTools(
       : null;
   const fogBytes = dm ? fogStorageBytes(settings) : 0,
     fogLarge = fogBytes >= 400_000 || settings.fog.shapes.length >= 450;
-  const configurationControls = (
+  /** Fog actions and storage: Settings › Exploration & lighting and each fog tool's panel. */
+  const fogActions = dm && (
     <>
-      {dm && <SceneConfiguration map={map} />}
-      {dm && (
-        <Fold title="Exploration & lighting">
-          {" "}
           <div className="tabletop-tool-row">
             {(
               [
@@ -765,7 +762,13 @@ export function useMapTabletopTools(
           <Button aria-pressed={showPreview} onClick={() => setShowPreview(!showPreview)}>
             Player-view preview
           </Button>
-        </Fold>
+    </>
+  );
+  const configurationControls = (
+    <>
+      {dm && <SceneConfiguration map={map} />}
+      {dm && (
+        <Fold title="Exploration & lighting">{fogActions}</Fold>
       )}
     </>
   );
@@ -804,6 +807,79 @@ export function useMapTabletopTools(
           {!cloud.mine && ` · Waiting for ${cloud.who}`}
         </p>
       )}
+    </>
+  );
+  /** The walls and lights lists: the inspector and the Walls & doors / Lights panels. */
+  const wallsList = dm && (
+    <>
+            {settings.walls.map((wall) => (
+              <div className="world-row" key={wall.id}>
+                <span>
+                  {wall.kind} · {wall.open ? "open" : "closed"}
+                </span>
+                <Button
+                  disabled={disabled}
+                  onClick={() =>
+                    void configure({
+                      ...settings,
+                      walls: settings.walls.map((value) =>
+                        value.id === wall.id ? { ...value, open: !value.open } : value,
+                      ),
+                    })
+                  }
+                >
+                  {wall.open ? "Close" : "Open"}
+                </Button>
+                <Button
+                  disabled={disabled}
+                  variant="ghost"
+                  onClick={() =>
+                    void configure({
+                      ...settings,
+                      walls: settings.walls.filter((value) => value.id !== wall.id),
+                    })
+                  }
+                >
+                  Remove segment
+                </Button>
+              </div>
+            ))}
+    </>
+  );
+  const lightsList = dm && (
+    <>
+            {settings.lights.map((light) => (
+              <div className="world-row" key={light.id}>
+                <span>
+                  {(light.radiusFeet * settings.unitsPerFoot).toFixed(1)} {settings.unitLabel}
+                </span>
+                <Button
+                  disabled={disabled}
+                  onClick={() =>
+                    void configure({
+                      ...settings,
+                      lights: settings.lights.map((value) =>
+                        value.id === light.id ? { ...value, visible: !value.visible } : value,
+                      ),
+                    })
+                  }
+                >
+                  {light.visible ? "Extinguish" : "Light"}
+                </Button>
+                <Button
+                  disabled={disabled}
+                  variant="ghost"
+                  onClick={() =>
+                    void configure({
+                      ...settings,
+                      lights: settings.lights.filter((value) => value.id !== light.id),
+                    })
+                  }
+                >
+                  Remove light
+                </Button>
+              </div>
+            ))}
     </>
   );
   const panel = inspector && (
@@ -869,74 +945,8 @@ export function useMapTabletopTools(
       {dm && (
         <>
           <SceneConfiguration map={map} />
-          <Fold title={`Walls & doors (${settings.walls.length})`}>
-            {settings.walls.map((wall) => (
-              <div className="world-row" key={wall.id}>
-                <span>
-                  {wall.kind} · {wall.open ? "open" : "closed"}
-                </span>
-                <Button
-                  disabled={disabled}
-                  onClick={() =>
-                    void configure({
-                      ...settings,
-                      walls: settings.walls.map((value) =>
-                        value.id === wall.id ? { ...value, open: !value.open } : value,
-                      ),
-                    })
-                  }
-                >
-                  {wall.open ? "Close" : "Open"}
-                </Button>
-                <Button
-                  disabled={disabled}
-                  variant="ghost"
-                  onClick={() =>
-                    void configure({
-                      ...settings,
-                      walls: settings.walls.filter((value) => value.id !== wall.id),
-                    })
-                  }
-                >
-                  Remove segment
-                </Button>
-              </div>
-            ))}
-          </Fold>
-          <Fold title={`Lights (${settings.lights.length})`}>
-            {settings.lights.map((light) => (
-              <div className="world-row" key={light.id}>
-                <span>
-                  {(light.radiusFeet * settings.unitsPerFoot).toFixed(1)} {settings.unitLabel}
-                </span>
-                <Button
-                  disabled={disabled}
-                  onClick={() =>
-                    void configure({
-                      ...settings,
-                      lights: settings.lights.map((value) =>
-                        value.id === light.id ? { ...value, visible: !value.visible } : value,
-                      ),
-                    })
-                  }
-                >
-                  {light.visible ? "Extinguish" : "Light"}
-                </Button>
-                <Button
-                  disabled={disabled}
-                  variant="ghost"
-                  onClick={() =>
-                    void configure({
-                      ...settings,
-                      lights: settings.lights.filter((value) => value.id !== light.id),
-                    })
-                  }
-                >
-                  Remove light
-                </Button>
-              </div>
-            ))}
-          </Fold>
+          <Fold title={`Walls & doors (${settings.walls.length})`}>{wallsList}</Fold>
+          <Fold title={`Lights (${settings.lights.length})`}>{lightsList}</Fold>
         </>
       )}
       <Fold title={`Persistent areas (${settings.templates.length})`}>
@@ -1102,6 +1112,9 @@ export function useMapTabletopTools(
     activateTool,
     contextControls,
     configurationControls,
+    fogActions,
+    wallsList,
+    lightsList,
     playerTemplates: dm || settings.playerTemplates,
     undoFog: () => act({ kind: "map-fog", mapId: map.id, before: settings.fog, action: "undo" }),
     redoFog: () => act({ kind: "map-fog", mapId: map.id, before: settings.fog, action: "redo" }),

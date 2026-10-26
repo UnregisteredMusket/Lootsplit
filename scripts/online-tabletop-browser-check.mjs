@@ -3,7 +3,7 @@ import {
   closeMapSettings,
   selectWorkspaceMap,
   selectMapType,
-  openMoreMapTools,
+  openFogOptions,
 } from "./map-workspace-browser.mjs";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
@@ -13,8 +13,8 @@ import { chooseOption } from "./search-select-browser.mjs";
 export async function checkOnlineTabletop(dm, player, origin, width, output, journal) {
   await navigateApplication(dm, origin + "/maps");
   await selectMapType(dm, "property");
-  await openMoreMapTools(dm);
-  await dm.getByRole("button", { name: "Inspector", exact: true }).click();
+  await closeMapSettings(dm);
+  await dm.getByRole("button", { name: "Objects & inspector", exact: true }).click();
   const inspector = dm.getByRole("complementary", { name: "Map inspector" });
   await inspector.getByRole("button", { name: "Scene permissions & vision", exact: true }).click();
   await inspector
@@ -141,7 +141,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   }
   await expect.poll(() => alpha(0.2, 0.2)).toBe(0);
   await closeMapSettings(player);
-  await openMoreMapTools(dm);
+  await closeMapSettings(dm);
   await dm.getByRole("button", { name: "Fog rectangle", exact: true }).click();
   await dm.getByRole("button", { name: "Close tool options", exact: true }).click();
   const dmView = dm.getByRole("region", { name: "Interactive campaign map", exact: true });
@@ -156,7 +156,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await expect.poll(() => alpha(0.95, 0.95)).toBe(0);
   await expect(ownToken).toBeVisible();
   await expect(player.locator(".campaign-maps")).not.toContainText("Hidden guard");
-  await openMoreMapTools(dm);
+  await openFogOptions(dm);
   await dm.getByRole("button", { name: "Undo fog", exact: true }).click();
   await expect.poll(() => alpha(0.2, 0.2)).toBe(0);
   await dm.getByRole("button", { name: "Redo fog", exact: true }).click();
@@ -177,7 +177,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await dm.getByRole("button", { name: "Consolidate fog…", exact: true }).click();
   await expect(dm.getByText(/Fog is already consolidated/)).toBeVisible();
   await closeMapSettings(dm);
-  await openMoreMapTools(dm);
+  await closeMapSettings(dm);
   await dm.getByRole("button", { name: "Fog rectangle", exact: true }).click();
   await dm.getByRole("button", { name: "Close tool options", exact: true }).click();
   await dm.mouse.move(rect.x + rect.width * 0.22, rect.y + rect.height * 0.22);
@@ -197,7 +197,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await expect.poll(() => alpha(0.2, 0.2)).toBe(255);
   await expect.poll(() => alpha(0.95, 0.95)).toBe(0);
   await closeMapSettings(dm);
-  await openMoreMapTools(dm);
+  await openFogOptions(dm);
   await dm.getByRole("button", { name: "Undo fog", exact: true }).click();
   await expect.poll(async () => (await scene()).tabletop.fog.shapes.length).toBe(2);
   await dm.getByRole("button", { name: "Redo fog", exact: true }).click();

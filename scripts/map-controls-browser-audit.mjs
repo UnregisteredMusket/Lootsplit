@@ -253,6 +253,11 @@ async function checkChrome(page, { role, appearance, width, height }) {
   }
   if (role === "dm")
     await expect(page.getByRole("button", { name: "Initiative", exact: true })).toBeVisible();
+  else {
+    const inspector = page.getByRole("button", { name: "Inspector", exact: true });
+    await inspector.scrollIntoViewIfNeeded();
+    await expect(inspector).toBeVisible();
+  }
   if (await more.isVisible()) {
     if ((await more.getAttribute("aria-expanded")) === "true") await more.click();
   }
@@ -382,6 +387,46 @@ async function checkSetupRail(page) {
     .toBe(true);
   await page.keyboard.press("Escape");
   await sameDocument(page, "dm entrance panel");
+
+  // Reveal, Combat and Objects (map controls PR 4): options beside the setup rail.
+  await expect(page.getByRole("button", { name: "More map tools", exact: true })).toHaveCount(0);
+  for (const group of ["Place", "Reveal", "Combat", "Objects"])
+    await expect(setupBar.getByRole("group", { name: group, exact: true })).toBeVisible();
+  const options = page.getByRole("complementary", { name: "Tool options", exact: true });
+  await setupBar.getByRole("button", { name: "Fog brush", exact: true }).click();
+  await expect(options).toBeVisible();
+  await expect(options.getByRole("button", { name: "Undo fog", exact: true })).toBeVisible();
+  await expect(options.getByRole("button", { name: "Consolidate fog…", exact: true })).toBeVisible();
+  const optionsBox = await options.boundingBox();
+  assert.ok(optionsBox.x < 640, "Fog options open beside the setup rail (left)");
+  await page.keyboard.press("Control+z");
+  // A fog rectangle drawn after closing its options is saved.
+  const fogShapes = async () =>
+    (await journalMaps(page)).find((m) => m.id === "tide-cove").tabletop?.fog?.shapes?.length ?? 0;
+  const shapesBefore = await fogShapes();
+  await setupBar.getByRole("button", { name: "Fog rectangle", exact: true }).click();
+  await options.getByRole("button", { name: "Close tool options", exact: true }).click();
+  const layerBox = await viewport.locator(".map-layer").boundingBox();
+  await page.mouse.move(layerBox.x + layerBox.width * 0.4, layerBox.y + layerBox.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(layerBox.x + layerBox.width * 0.7, layerBox.y + layerBox.height * 0.6, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(fogShapes).toBe(shapesBefore + 1);
+  await setupBar.getByRole("button", { name: "Walls & doors", exact: true }).click();
+  await expect(options.getByRole("region", { name: "Walls and doors on this map" })).toBeVisible();
+  await setupBar.getByRole("button", { name: "Lights", exact: true }).click();
+  await expect(options.getByRole("region", { name: "Lights on this map" })).toBeVisible();
+  await setupBar.getByRole("button", { name: "Grid & scale", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Grid & scale", exact: true })).toBeVisible();
+  await viewport.focus();
+  await page.keyboard.press("Shift+T");
+  await expect(page.getByRole("dialog", { name: "Combat token", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await setupBar.getByRole("button", { name: "Objects & inspector", exact: true }).click();
+  await expect(page.getByRole("complementary", { name: "Map inspector" })).toBeVisible();
+  await page.getByRole("button", { name: "Close inspector", exact: true }).click();
+  assert.equal(page.url(), url, "Reveal and combat panels change no route");
+  await sameDocument(page, "dm reveal and combat panels");
 
   // Phone: row-2 setup bar, Search as a row-1 icon, the panel is a bottom sheet.
   await page.setViewportSize({ width: 390, height: 844 });

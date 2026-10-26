@@ -101,10 +101,9 @@ export async function checkMobileMapControls(page) {
     await button.scrollIntoViewIfNeeded();
     await expect.poll(() => unobstructed(button)).toBe(true);
   }
-  const more = page.getByRole("button", { name: "More map tools", exact: true });
-  await more.click();
+  // The DM's setup bar (row 2 on phones, a side rail in landscape) replaces More map tools.
   for (const button of await page
-    .getByRole("toolbar", { name: "Additional map tools", exact: true })
+    .getByRole("toolbar", { name: "Map setup", exact: true })
     .getByRole("button")
     .all()) {
     await button.scrollIntoViewIfNeeded();
@@ -112,7 +111,6 @@ export async function checkMobileMapControls(page) {
   }
   for (const button of await page.locator(".map-navigation").getByRole("button").all())
     await expect.poll(() => unobstructed(button)).toBe(true);
-  await more.click();
 }
 
 /** Retained viewport/camera/panel preservation checks for the default Maps workspace. */

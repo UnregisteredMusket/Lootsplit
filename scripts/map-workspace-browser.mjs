@@ -19,10 +19,15 @@ export async function mapBack(page) {
   await openMapNavigation(page);
   await page.getByRole("button", { name: "Back to map", exact: true }).click();
 }
-export async function openMoreMapTools(page) {
+/** DM fog tools live in the setup rail; arming (or re-choosing) one opens its options beside
+ * the rail, including Undo fog, Redo fog and the other fog actions. */
+export async function openFogOptions(page, tool = "Fog rectangle") {
   await closeMapSettings(page);
-  const button = page.getByRole("button", { name: "More map tools", exact: true });
-  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  await page
+    .getByRole("toolbar", { name: "Map setup", exact: true })
+    .getByRole("button", { name: tool, exact: true })
+    .click();
+  await expect(page.getByRole("complementary", { name: "Tool options", exact: true })).toBeVisible();
 }
 
 export async function selectWorkspaceMap(page, id) {
