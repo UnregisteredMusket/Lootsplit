@@ -11,6 +11,9 @@ import { Button, Modal } from "@/components/ui";
 import { FANTASY_LOOKS } from "@/lib/quire/theme";
 import { usePrefs, useShowDollars } from "@/lib/quire/prefs";
 import { Campaigns } from "@/components/campaigns";
+import { useRouterState } from "@tanstack/react-router";
+import { openShortcutSheet } from "@/components/command-palette";
+import { OPEN_WORKSPACE_WINDOWS } from "@/components/split-view";
 type Group = {
   name: string;
   icon: string;
@@ -33,6 +36,36 @@ export function ManagementPanel({
   const { prefs, setPrefs } = usePrefs(),
     showDollars = useShowDollars(),
     [expanded, setExpanded] = useState("");
+  const href = useRouterState({ select: (s) => s.location.href });
+  const native = import.meta.env.VITE_MOBILE === "true";
+  const tools = (
+    <div className="settings-tool-buttons">
+      {!native && (
+        <button
+          type="button"
+          className="settings-link"
+          onClick={() => {
+            onOpenChange(false);
+            window.dispatchEvent(new CustomEvent(OPEN_WORKSPACE_WINDOWS, { detail: href }));
+          }}
+        >
+          Tabs & windows…<span aria-hidden="true">›</span>
+        </button>
+      )}
+    </div>
+  );
+  const shortcuts = (
+    <button
+      type="button"
+      className="settings-link"
+      onClick={() => {
+        onOpenChange(false);
+        openShortcutSheet();
+      }}
+    >
+      Keyboard shortcuts<span aria-hidden="true">›</span>
+    </button>
+  );
   const appearance = (
     <div className="setting-preferences">
       <label>
@@ -140,7 +173,7 @@ export function ManagementPanel({
         {
           name: "Appearance & notifications",
           icon: "Appearance",
-          content: appearance,
+          content: <>{appearance}{tools}</>,
           links: [
             ["Custom colors & display preferences", "/settings#appearance"],
             ["Message & turn notifications", "/share?tab=notifications"],
@@ -158,6 +191,7 @@ export function ManagementPanel({
         {
           name: "Help & administration",
           icon: "Help",
+          content: shortcuts,
           links: [
             ["Guides & help", "/help?guide=dm"],
             ["Report a bug", "/account#bug-reports"],
@@ -190,7 +224,7 @@ export function ManagementPanel({
           content: <RollModeSetting />,
           links: [["Dice rolls & history", "/characters#dice"]],
         },
-        { name: "Appearance", icon: "Appearance", content: appearance },
+        { name: "Appearance", icon: "Appearance", content: <>{appearance}{tools}</> },
         {
           name: "Notifications",
           icon: "Notifications",
@@ -212,6 +246,7 @@ export function ManagementPanel({
         {
           name: "Help",
           icon: "Help",
+          content: shortcuts,
           links: [
             ["Guides & help", "/help?guide=player"],
             ["Report a bug", "/account#bug-reports"],

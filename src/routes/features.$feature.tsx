@@ -49,6 +49,7 @@ export const Route = createFileRoute("/features/$feature")({
     bank?: string;
     lesson?: string;
     quest?: string;
+    hours?: string;
   } => ({
     from: safeReturn(s.from),
     code: typeof s.code === "string" ? s.code.slice(0, 24) : undefined,
@@ -58,12 +59,18 @@ export const Route = createFileRoute("/features/$feature")({
     bank: typeof s.bank === "string" ? s.bank.slice(0, 150) : undefined,
     lesson: typeof s.lesson === "string" ? s.lesson.slice(0, 150) : undefined,
     quest: typeof s.quest === "string" ? s.quest.slice(0, 150) : undefined,
+    // Session Time: hours to enter in advance (1–24); the DM still approves the advance.
+    hours:
+      (typeof s.hours === "string" || typeof s.hours === "number") &&
+      /^(?:[1-9]|1\d|2[0-4])$/.test(String(s.hours))
+        ? String(s.hours)
+        : undefined,
   }),
   component: FeaturePage,
 });
 function FeaturePage() {
   const { feature } = Route.useParams(),
-    { from, code, bank, lesson, quest } = Route.useSearch(),
+    { from, code, bank, lesson, quest, hours } = Route.useSearch(),
     seat = useSeat(),
     dm = seat.role === "dm";
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
@@ -89,7 +96,7 @@ function FeaturePage() {
               </Suspense>
             )}
             {feature === "trading" && <CampaignTrading />}
-            {feature === "time" && <SessionTime />}
+            {feature === "time" && <SessionTime initialHours={hours} />}
             {feature === "music" && <LocalAudioPanel />}
             {feature === "bank" && (
               <>

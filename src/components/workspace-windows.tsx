@@ -63,19 +63,23 @@ export function WorkspaceWindows() {
   return (
     <>
       <PlayerDisplayButton icon />
-      <button
-        type="button"
-        className="header-icon"
-        aria-label="Tabs & windows"
-        title="Tabs & windows"
-        aria-haspopup="dialog"
-        onClick={() => {
-          setError("");
-          setOpen(true);
-        }}
-      >
-        <PanelsTopLeft size={23} />
-      </button>
+      {/* Below 1024 px and in the Android app the header leaves this out (design M4); on the web
+          it stays one tap away in Settings & Management → Appearance → Tabs & windows…. */}
+      {!native && (
+        <button
+          type="button"
+          className="header-icon workspace-windows-trigger"
+          aria-label="Tabs & windows"
+          title="Tabs & windows"
+          aria-haspopup="dialog"
+          onClick={() => {
+            setError("");
+            setOpen(true);
+          }}
+        >
+          <PanelsTopLeft size={23} />
+        </button>
+      )}
       <Modal open={open} onOpenChange={setOpen} title="Tabs & windows">
         <div className="space-y-4">
           <p>

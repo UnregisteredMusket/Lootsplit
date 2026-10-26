@@ -1,3 +1,4 @@
+import { openTabsAndWindows } from "./workspace-windows-browser.mjs";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import assert from "node:assert/strict";
@@ -296,7 +297,7 @@ try {
     // Both accepted requests must survive instead of replacing an old snapshot.
     await go("bank");
     // Open through the shipped multi-window control; the child keeps the same campaign.
-    await page.getByRole("button", { name: "Tabs & windows", exact: true }).click();
+    await openTabsAndWindows(page);
     await page.screenshot({ path: `${output}/workspace-controls-${width}.png` });
     await page.getByLabel("Screen to open", { exact: true }).selectOption("/features/bank");
     const openedTab = context.waitForEvent("page");
@@ -354,7 +355,7 @@ try {
     const parentCampaign = await page.evaluate(() =>
       sessionStorage.getItem("lootsplit.window.campaign.v1"),
     );
-    await page.getByRole("button", { name: "Tabs & windows", exact: true }).click();
+    await openTabsAndWindows(page);
     await page.getByLabel("Screen to open", { exact: true }).selectOption("/maps");
     const openedWindow = context.waitForEvent("page");
     await page.getByRole("button", { name: "Open separate window", exact: true }).click();

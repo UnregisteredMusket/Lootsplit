@@ -9,11 +9,11 @@ import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm } from "./world-tools";
 import { Fold } from "./ui";
 import { AppLink } from "./app-link";
-export function SessionTime() {
+export function SessionTime({ initialHours = "1" }: { initialHours?: string } = {}) {
   const t = useWorldTable(),
     f = readFinance(t.journal.finance),
     world = readWorld(t.journal.world),
-    [hours, setHours] = useState("1"),
+    [hours, setHours] = useState(initialHours),
     [rest, setRest] = useState<"none" | "short" | "long">("none"),
     [allowDowntime, setAllowDowntime] = useState(false),
     [recipients, setRecipients] = useState<string[]>([]),
@@ -39,7 +39,7 @@ export function SessionTime() {
       </p>
       <CommandForm
         label="Approve & advance session time"
-        dirty={hours !== "1" || rest !== "none" || allowDowntime || !!note}
+        dirty={hours !== initialHours || rest !== "none" || allowDowntime || !!note}
         submit={() => {
           if (!active) throw Error("Start a recorded session first.");
           if (!preview) throw Error(error);

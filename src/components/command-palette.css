@@ -1,0 +1,150 @@
+/* Command palette and keyboard cheat sheet (design D5, Q1, Q12). */
+.command-palette {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  top: max(12vh, calc(env(safe-area-inset-top) + 0.75rem));
+  translate: -50% 0;
+  width: min(40rem, calc(100% - 2rem));
+  max-height: min(34rem, calc(100dvh - 14vh - 1rem));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-elevated);
+  color: var(--color-fg);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.35);
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .command-palette {
+    top: calc(env(safe-area-inset-top) + 0.5rem);
+    width: calc(100% - 1rem);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 1rem);
+  }
+}
+.command-palette-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0.35rem 0.25rem 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-muted);
+}
+.command-palette-field input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: 1rem;
+  outline: none;
+}
+.command-palette-field:focus-within {
+  box-shadow: inset 0 -2px 0 var(--color-lead);
+}
+.command-palette-close {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+}
+.command-palette-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.35rem;
+}
+.command-palette-group {
+  padding: 0.55rem 0.6rem 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.command-palette-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.command-palette-option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.command-palette-option > small {
+  flex-shrink: 0;
+  max-width: 45%;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  text-align: right;
+}
+.command-palette-option[aria-selected="true"] {
+  background: color-mix(in srgb, var(--color-lead) 18%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-lead);
+}
+.command-palette-empty {
+  padding: 1rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+.command-palette-hint {
+  margin: 0;
+  padding: 0.45rem 0.9rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+.command-palette-hint button {
+  min-height: 32px;
+  color: var(--color-lead);
+  text-decoration: underline;
+}
+@media (hover: none) {
+  /* Touch screens: the arrow-key hint means nothing there. */
+  .command-palette-hint {
+    display: none;
+  }
+}
+.shortcut-sheet-list {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+.shortcut-sheet-list > div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 32px;
+}
+.shortcut-sheet-list kbd {
+  display: inline-block;
+  min-width: 1.6rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--panel);
+  font: 600 0.8rem/1.4 var(--font-mono, ui-monospace, monospace);
+  text-align: center;
+}
+.shortcut-sheet-list dt span[aria-hidden] {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+/* Tabs & windows: header button on wide web screens only (design M4); Settings keeps it. */
+@media (max-width: 1023.98px) {
+  .workspace-windows-trigger {
+    display: none !important;
+  }
+}
+button.settings-link {
+  width: 100%;
+  text-align: left;
+}
