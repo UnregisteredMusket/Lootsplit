@@ -4,7 +4,6 @@ import {
   closeMapSettings,
   openMapNavigation,
   mapBack,
-  openMoreMapTools,
 } from "./map-workspace-browser.mjs";
 import assert from "node:assert/strict";
 import { blankEncounter, blankCombatant } from "../src/lib/encounters/model.mjs";
@@ -308,8 +307,9 @@ export async function checkConnectedMaps({ browser, origin, output }) {
         .evaluateAll((es) => es.map((e) => e.parentElement.style.cssText));
       assert.equal(points.length, 2);
       assert.notEqual(points[0], points[1]);
-      await openMoreMapTools(page);
-      await frame.getByRole("button", { name: "Start encounter here", exact: true }).click();
+      // Initiative (I) in the tools bar opens the encounter panel (map controls redesign).
+      await closeMapSettings(page);
+      await frame.getByRole("button", { name: "Initiative", exact: true }).click();
       const combat = frame.getByRole("region", { name: "Encounter map panel", exact: true });
       await chooseOption(
         combat.getByLabel("Saved encounter to start", { exact: true }),
@@ -326,8 +326,7 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(
         frame.getByRole("button", { name: "Encounter grid active", exact: true }),
       ).toBeDisabled();
-      await openMoreMapTools(page);
-      await frame.getByRole("button", { name: "Open encounter map controls", exact: true }).click();
+      await frame.getByRole("button", { name: "Initiative", exact: true }).click();
       await combat.getByRole("button", { name: "Open encounter tracker", exact: true }).click();
       await combat.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
       await answerThemedDialog(page);

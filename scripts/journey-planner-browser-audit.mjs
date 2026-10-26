@@ -133,7 +133,7 @@ try {
     await expect(frame.getByRole("img", { name: "Vale of Harrow", exact: true })).toBeVisible();
     await frame.getByRole("button", { name: "Fit map", exact: true }).click();
     // Open the planner: the map has no grid or scale yet.
-    await frame.getByRole("button", { name: "Plan route", exact: true }).click();
+    await frame.getByRole("button", { name: "Plan journey", exact: true }).click();
     await expect(planner).toBeVisible();
     await expect(planner).toContainText("Routes need a scale.");
     assert.ok(await noSideways(page), `planner fits at ${width}px`);

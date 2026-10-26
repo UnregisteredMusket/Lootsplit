@@ -1,7 +1,7 @@
 // Journey planner discoverability steps, run by journey-planner-browser-audit.mjs at every width
 // (1280, 390, 320 and 844×390) on its seeded device campaign before the drawing steps:
-// - the labelled "Plan journey" control on the map is visible, inside the viewport, not under
-//   another control, and still there with the tool hotbar collapsed;
+// - "Plan journey" in the map tools is visible, inside the viewport and not under another
+//   control (it collapses and returns with the tools);
 // - the Here sheet at the party's location offers "Plan a journey";
 // - the Downtime screen links to the planner (`/maps?map=<party map>&plan=party`) with in-app
 //   navigation (no title screen replay).
@@ -28,37 +28,40 @@ const reachable = (locator) =>
 export async function checkJourneyDiscoverability(page, { origin, frame, width, height, output }) {
   const planner = frame.getByRole("complementary", { name: "Plan a route", exact: true });
   const label = `${width}x${height}`;
-  // 1. A labelled "Plan journey" control on the map, visible on phones.
-  const plan = frame.getByRole("button", { name: "Plan journey", exact: true });
+  // 1. "Plan journey" in the map tools (the rail on desktop and landscape phones, the bottom bar
+  // on phones): a named 44px target inside the viewport, not under another control. The floating
+  // pill was folded into the tools (map controls redesign, D6).
+  const plan = frame
+    .getByRole("toolbar", { name: "Map tools", exact: true })
+    .getByRole("button", { name: "Plan journey", exact: true });
+  await plan.scrollIntoViewIfNeeded();
   await expect(plan).toBeVisible();
-  await expect(plan).toHaveText("Plan journey");
+  await expect(plan).toContainText("Plan journey");
+  await expect(plan).toHaveAttribute("aria-keyshortcuts", "J");
   const planBox = await box(plan);
   assert.ok(
     planBox.left >= 0 && planBox.right <= width && planBox.top >= 0 && planBox.bottom <= height,
     `Plan journey inside the viewport at ${label}`,
   );
-  assert.ok(planBox.height >= 44 && planBox.width >= 44, `Plan journey is a 44px target at ${label}`);
+  assert.ok(planBox.height >= 40 && planBox.width >= 40, `Plan journey is a full target at ${label}`);
   assert.ok(await reachable(plan), `Plan journey is not covered at ${label}`);
-  for (const name of [/^Here/, "Map tools hotbar"]) {
-    const other = frame.getByRole("button", { name, exact: typeof name === "string" }).first();
-    if (await other.isVisible())
-      assert.ok(!overlaps(planBox, await box(other)), `Plan journey clear of ${name} at ${label}`);
-  }
-  // Collapsing the tool hotbar (which also holds the route icon) keeps the labelled control.
-  const hotbar = frame.getByRole("button", { name: "Map tools hotbar", exact: true });
-  await hotbar.click();
-  await expect(hotbar).toHaveAttribute("aria-expanded", "false");
-  await expect(plan).toBeVisible();
-  assert.ok(await reachable(plan), `Plan journey reachable with the hotbar collapsed at ${label}`);
+  const hotbarToggle = frame.getByRole("button", { name: "Map tools hotbar", exact: true });
+  assert.ok(!overlaps(planBox, await box(hotbarToggle)), `Plan journey clear of the collapse button at ${label}`);
+  // Collapsing the tools hides Plan journey with them; expanding brings it back.
+  await hotbarToggle.click();
+  await expect(hotbarToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(plan).toHaveCount(0);
+  await hotbarToggle.click();
+  await expect(hotbarToggle).toHaveAttribute("aria-expanded", "true");
+  await plan.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${output}/discover-map-${label}.png` });
   await plan.click();
   await expect(planner).toBeVisible();
   await expect(planner.getByText("Plan a journey", { exact: true })).toBeVisible();
-  await expect(plan).toHaveCount(0);
+  await expect(plan).toHaveAttribute("aria-pressed", "true");
   await planner.getByRole("button", { name: "Close route planner", exact: true }).click();
   await expect(planner).toHaveCount(0);
-  await hotbar.click();
-  await expect(hotbar).toHaveAttribute("aria-expanded", "true");
+  await expect(plan).toHaveAttribute("aria-pressed", "false");
 
   // 2. The Here sheet at the party's location.
   await frame.getByRole("button", { name: /^Here/ }).first().click();

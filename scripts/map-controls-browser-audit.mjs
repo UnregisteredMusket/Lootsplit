@@ -31,6 +31,7 @@ const SIZES = [
   [390, 844],
   [320, 640],
   [844, 390],
+  [1280, 680],
 ];
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
@@ -145,7 +146,14 @@ async function checkChrome(page, { role, appearance, width, height }) {
       const el = document.querySelector(selector);
       if (!el || !el.getClientRects().length) return null;
       const r = el.getBoundingClientRect();
-      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width };
+      return {
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        width: r.width,
+        height: r.height,
+      };
     };
     const capsule = document.querySelector(".map-title-capsule");
     return {
@@ -162,6 +170,15 @@ async function checkChrome(page, { role, appearance, width, height }) {
       titleFont: getComputedStyle(document.querySelector(".map-title-button")).fontFamily,
       fg: getComputedStyle(capsule).color,
       appFg: getComputedStyle(document.body).color,
+      toolbar: box('[role="toolbar"][aria-label="Map tools"]'),
+      orientation: document
+        .querySelector('[role="toolbar"][aria-label="Map tools"]')
+        ?.getAttribute("aria-orientation"),
+      tabStops: [
+        ...document.querySelectorAll('[role="toolbar"][aria-label="Map tools"] [data-map-tool]'),
+      ].filter((b) => b.tabIndex === 0).length,
+      zoom: box(".map-navigation"),
+      pills: document.querySelectorAll(".map-here-button,.map-plan-journey-button").length,
       zoomButtons: [...document.querySelectorAll(".map-navigation button")].map((b) => {
         const style = getComputedStyle(b);
         return `${style.backgroundImage}|${style.backgroundColor}`;
@@ -187,8 +204,38 @@ async function checkChrome(page, { role, appearance, width, height }) {
     assert.ok(facts.search.left >= facts.title.right + 4, `${tag}: search clears the title`);
     assert.ok(facts.search.right <= facts.actions.left - 4, `${tag}: search clears Settings/X`);
   }
-  if (width <= 650 && height > 550)
+  within(facts.toolbar, "Map tools toolbar");
+  within(facts.zoom, "zoom pill");
+  assert.equal(facts.tabStops, 1, `${tag}: the tools toolbar is one Tab stop (roving tabindex)`);
+  assert.equal(facts.pills, 0, `${tag}: Here and Plan journey live in the tools bar, not floating`);
+  assert.ok(facts.zoom.width > facts.zoom.height, `${tag}: zoom is a horizontal pill`);
+  if (width <= 650 && height > 550) {
     assert.ok(facts.hotbar.bottom >= height - 20, `${tag}: phone tools bar stays along the bottom`);
+    assert.equal(facts.orientation, "horizontal", `${tag}: phone tools bar is horizontal`);
+  } else {
+    // Desktop and landscape: a vertical rail at the right edge; nothing runs sideways.
+    assert.equal(facts.orientation, "vertical", `${tag}: tools rail is vertical`);
+    assert.ok(facts.toolbar.width <= 180, `${tag}: rail width ${facts.toolbar.width}`);
+    assert.ok(facts.toolbar.height > facts.toolbar.width, `${tag}: rail is taller than wide`);
+    assert.ok(facts.toolbar.right >= width - 24, `${tag}: rail hugs the right edge`);
+    assert.ok(facts.toolbar.bottom <= facts.zoom.top + 1 || facts.toolbar.right <= facts.zoom.left + 1, `${tag}: rail clears the zoom pill`);
+  }
+  // Every tool is reachable at this size: in the bar or rail, or in More tools on short desktops.
+  const more = page.getByRole("button", { name: "More tools", exact: true });
+  if (width > 650 && height < 720 && height > 550) {
+    await more.click();
+    await expect(page.getByRole("toolbar", { name: "More tools", exact: true })).toBeVisible();
+  }
+  for (const name of ["Pan", "Ping", "Measure", "Draw & notes", "Plan journey", "Layers", /^Here/]) {
+    const tool = page.getByRole("button", { name, exact: typeof name === "string" }).first();
+    await tool.scrollIntoViewIfNeeded();
+    await expect(tool).toBeVisible();
+  }
+  if (role === "dm")
+    await expect(page.getByRole("button", { name: "Initiative", exact: true })).toBeVisible();
+  if (await more.isVisible()) {
+    if ((await more.getAttribute("aria-expanded")) === "true") await more.click();
+  }
   assert.equal(facts.stepper, 0, `${tag}: the scene stepper is gone (Back and the title menu)`);
   assert.notEqual(facts.capsuleBg, "rgba(22, 26, 31, 0.82)", `${tag}: title uses theme tokens`);
   assert.equal(facts.fg, facts.appFg, `${tag}: title text uses the app foreground`);
@@ -301,10 +348,59 @@ try {
       `${role}: Backspace and Alt+ArrowUp open the parent; ignored in text fields; Alt+arrows still pan the canvas`,
     );
 
-    // Every role, look and size.
+    // Tools rail (desktop): tool names on first use, roving focus, Layers, Ping options.
     await enterCove();
+    const tools = page.getByRole("toolbar", { name: "Map tools", exact: true });
+    const railWidth = () => tools.evaluate((el) => el.getBoundingClientRect().width);
+    const hint = page.getByRole("region", { name: "Tool names are showing", exact: true });
+    await expect(hint).toBeVisible();
+    assert.ok((await railWidth()) > 140, `${role}: first use shows a labelled rail`);
+    await expect(tools.locator(".map-tool-label", { hasText: "Plan journey" })).toBeVisible();
+    await hint.getByRole("button", { name: "Keep showing", exact: true }).click();
+    await expect(hint).toHaveCount(0);
+    const pan = tools.getByRole("button", { name: "Pan", exact: true });
+    await pan.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(tools.getByRole("button", { name: "Select / move", exact: true })).toBeFocused();
+    await page.keyboard.press("End");
+    assert.equal(
+      await tools.evaluate((el) => el.contains(document.activeElement)),
+      true,
+      `${role}: End stays in the toolbar`,
+    );
+    const url = page.url();
+    await tools.getByRole("button", { name: "Layers", exact: true }).click();
+    const layers = page.getByRole("dialog", { name: "Layers", exact: true });
+    await expect(layers).toBeVisible();
+    await expect(layers.getByRole("group", { name: "Show on map" })).toBeVisible();
+    await layers.getByRole("button", { name: "Hide all", exact: true }).click();
+    await layers.getByRole("button", { name: "Show all", exact: true }).click();
+    assert.equal(page.url(), url, `${role}: Layers changes no route`);
+    await sameDocument(page, `${role} Layers`);
+    await page.keyboard.press("Escape");
+    await expect(layers).toHaveCount(0);
+    await tools.getByRole("button", { name: "Ping", exact: true }).click();
+    await expect(page.getByLabel("Ping color for this tool", { exact: true })).toBeVisible();
+    await tools.getByRole("button", { name: "Pan", exact: true }).click();
+    await tools.getByRole("button", { name: /^Here/ }).click();
+    await expect(page.getByRole("region", { name: "Here", exact: true })).toBeVisible();
+    await tools.getByRole("button", { name: /^Here/ }).click();
+    await expect(page.getByRole("region", { name: "Here", exact: true })).toHaveCount(0);
+    await sameDocument(page, `${role} Here`);
+    checks.push(
+      `${role}: labelled rail on first use, roving arrows, Layers/Here/Ping options without navigation`,
+    );
+
+    // Every role, look and size: names shown (dark), then hidden from Settings (light).
     for (const appearance of ["dark", "light"]) {
       await look(page, appearance);
+      if (appearance === "light") {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.locator(".map-top-actions .map-settings-toggle").click();
+        await page.getByLabel("Show tool names (desktop)", { exact: true }).uncheck();
+        await page.getByRole("button", { name: "Close settings", exact: true }).click();
+        assert.ok((await railWidth()) <= 64, `${role}: icon-only rail once names are hidden`);
+      }
       for (const [width, height] of SIZES)
         await checkChrome(page, { role, appearance, width, height });
     }

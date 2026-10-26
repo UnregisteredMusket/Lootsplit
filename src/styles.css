@@ -3776,6 +3776,82 @@ input,select,textarea { max-width: 100%; }
  .map-workspace .map-record-icon[aria-pressed="true"]::before { background:Highlight; border-color:HighlightText; }
 }
 
+/* Map controls: tools rail (desktop and landscape phones), zoom pill, Layers, tool names.
+   Phones (650 px or less) keep today's bottom hotbar; groups are display:contents there. */
+.map-workspace { --map-tools-w:0px; }
+.map-tool-caption,.map-tool-label,.map-tool-key { display:none; }
+.map-tool-group { display:contents; }
+.map-workspace .map-tool { position:relative; }
+.map-workspace .map-tool > svg { flex:none; }
+.map-tool-badge { position:absolute; top:1px; right:0; min-width:17px; height:16px; padding:0 4px; border-radius:8px; background:var(--color-lead); color:var(--color-bg); font-size:10px; font-weight:700; line-height:16px; text-align:center; pointer-events:none; }
+.map-tool-tip { position:absolute; z-index:70; pointer-events:none; white-space:nowrap; padding:6px 10px; border-radius:10px; font-size:12.5px; background:var(--color-fg); color:var(--color-bg); box-shadow:var(--map-shadow); }
+.map-tool-tip[data-side="left"] { transform:translate(calc(-100% - 10px),-50%); }
+.map-tool-tip[data-side="top"] { transform:translate(-50%,calc(-100% - 8px)); }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) { top:calc(76px + env(safe-area-inset-top)); bottom:calc(76px + env(safe-area-inset-bottom)); right:max(14px,env(safe-area-inset-right)); left:auto; max-width:none; flex-direction:column; align-items:flex-end; justify-content:flex-start; gap:6px; pointer-events:none; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) > * { pointer-events:auto; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar { flex-direction:column; flex:0 1 auto; min-height:0; max-width:none; max-height:100%; overflow-x:hidden; overflow-y:auto; padding:5px; gap:2px; border-radius:16px; scrollbar-width:none; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar::-webkit-scrollbar { display:none; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar-tools { display:flex; flex-direction:column; gap:2px; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-tool-group { display:flex; flex-direction:column; gap:2px; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-tool-group + .map-tool-group,
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-more-tools { margin-top:4px; padding-top:4px; border-top:1px solid var(--map-edge); border-radius:0; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-more-tools { border-radius:0 0 12px 12px; height:48px; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"]) .map-tool { width:44px; min-width:44px; height:44px; min-height:44px; border-radius:12px; }
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar-toggle.map-glass { width:44px; height:44px; border-radius:14px; flex:none; }
+/* The additional (DM) tools open beside the rail as a two-column panel, never sideways across the map. */
+.map-workspace .map-hotbar-anchor:is([data-layout="desktop"],[data-layout="short"],[data-layout="landscape"]) .map-hotbar-more { top:auto; bottom:0; right:calc(100% + 8px); width:auto; max-width:none; max-height:100%; overflow:auto; display:grid; grid-template-columns:repeat(2,44px); gap:2px; padding:5px; border-radius:16px; }
+/* Show tool names: labelled rail on desktop (first use until dismissed). */
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-hotbar { width:176px; }
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-tool { width:100%; justify-content:flex-start; gap:10px; padding:0 10px; height:44px; min-height:44px; }
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-tool-label { display:inline; font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-tool-key { display:inline; margin-left:auto; padding:0 5px; border:1px solid var(--map-edge); border-radius:5px; font:600 10.5px var(--font-sans); color:var(--color-muted); }
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-tool[aria-pressed="true"] .map-tool-key { color:inherit; border-color:currentColor; }
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-tool-badge { position:static; margin-left:auto; }
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-tool-badge + .map-tool-key { margin-left:4px; }
+.map-workspace .map-hotbar-anchor[data-tool-names] .map-tool-caption { display:block; padding:2px 10px 1px; font-size:9.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--color-muted); }
+.map-tool-names-hint { position:absolute; z-index:44; top:calc(76px + env(safe-area-inset-top)); right:calc(var(--map-tools-w) + 24px); width:270px; padding:14px; }
+.map-tool-names-hint h2 { font-family:var(--font-display); font-size:19px; margin:0 0 6px; }
+.map-tool-names-hint p { font-size:13px; color:var(--color-muted); margin:0 0 10px; }
+.map-tool-names-hint div { display:flex; gap:8px; }
+.map-tool-names-hint button { min-height:40px; padding:0 12px; border-radius:10px; border:1px solid var(--map-edge); font-size:13px; font-weight:600; }
+.map-tool-names-hint .map-hint-primary { background:var(--color-accent); color:var(--color-bg); border-color:transparent; }
+/* Landscape phones: the rail scrolls with 40 px tools and a fade at its foot. */
+.map-workspace .map-hotbar-anchor[data-layout="landscape"] { top:56px; bottom:8px; right:max(8px,env(safe-area-inset-right)); }
+.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-tool { width:40px; min-width:40px; height:40px; min-height:40px; }
+.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-hotbar { padding:3px; -webkit-mask-image:linear-gradient(#000 calc(100% - 22px),transparent); mask-image:linear-gradient(#000 calc(100% - 22px),transparent); padding-bottom:22px; }
+.map-workspace .map-hotbar-anchor[data-layout="landscape"] .map-hotbar-toggle.map-glass { width:40px; height:40px; }
+/* Panels beside the rail clear its width (--map-tools-w is measured by the map). */
+.map-workspace.map-view-frame .map-settings-drawer { right:calc(max(14px,env(safe-area-inset-right)) + var(--map-tools-w) + 8px); }
+.map-workspace .map-tool-context { right:calc(max(14px,env(safe-area-inset-right)) + var(--map-tools-w) + 8px); }
+.map-workspace.map-view-frame .tabletop-inspector,.map-workspace.map-view-frame .map-record-details.map-service-open { right:calc(14px + var(--map-tools-w) + 8px); }
+.map-workspace .map-side-panel { position:absolute; z-index:50; top:calc(76px + env(safe-area-inset-top)); right:calc(max(14px,env(safe-area-inset-right)) + var(--map-tools-w) + 8px); width:340px; max-width:calc(100% - 28px - var(--map-tools-w)); max-height:calc(var(--map-usable-height,100dvh) - 160px); overflow:auto; overscroll-behavior:contain; padding:14px; }
+.map-layers-panel .map-filters { display:flex; flex-direction:column; gap:6px; border:0; padding:0; margin:0 0 12px; }
+.map-layers-panel .map-filters legend { font-weight:600; margin-bottom:6px; }
+.map-layers-panel .map-filters label { display:flex; align-items:center; gap:8px; min-height:36px; }
+.map-layer-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:44px; padding:0 10px; border:1px solid var(--map-edge); border-radius:12px; }
+.map-layer-toggle span { margin-left:auto; color:var(--color-muted); font-size:12px; }
+.map-layer-toggle[aria-pressed="true"] { border-color:var(--color-accent); }
+.map-ping-options { display:flex; flex-direction:column; gap:4px; font-size:12px; margin-bottom:8px; }
+.map-ping-options select { width:100%; min-height:40px; }
+.map-check-row { display:flex !important; align-items:center; gap:8px; min-height:44px; }
+/* Zoom: a horizontal pill, bottom-right (desktop); between the rails on landscape phones. */
+.map-workspace.map-view-frame .map-navigation { flex-direction:row; width:auto; max-width:none; padding:3px; border-radius:14px; bottom:max(14px,env(safe-area-inset-bottom)); right:max(14px,env(safe-area-inset-right)); }
+.map-workspace.map-view-frame .map-navigation output { min-width:42px; padding:0 4px; font-size:11px; color:var(--color-muted); font-variant-numeric:tabular-nums; }
+@media(max-width:650px) {
+ .map-workspace.map-view-frame .map-navigation { bottom:calc(72px + env(safe-area-inset-bottom)); right:max(10px,env(safe-area-inset-right)); padding:2px; border-radius:15px; }
+ .map-workspace.map-view-frame .map-navigation output { min-width:36px; font-size:10px; color:inherit; }
+ .map-workspace .map-side-panel { left:0; right:0; top:auto; bottom:0; width:100%; max-width:100%; max-height:calc(100dvh - 132px); border-radius:18px 18px 0 0; padding-bottom:max(18px,env(safe-area-inset-bottom)); }
+ .map-workspace .map-tool-tip[data-side="top"] { transform:translate(-50%,calc(-100% - 8px)); }
+}
+@media(max-height:550px) and (orientation:landscape) {
+ .map-workspace.map-view-frame .map-navigation { bottom:8px; right:calc(max(8px,env(safe-area-inset-right)) + var(--map-tools-w) + 8px); width:auto; max-width:none; flex-direction:row; }
+ .map-workspace.map-view-frame .map-navigation button { width:36px; min-width:36px; height:36px; min-height:36px; }
+ .map-workspace .map-side-panel { top:56px; bottom:8px; max-height:none; }
+}
+/* Below 720 px tall (desktop): Table, View and Setup fold into "More tools" at the rail foot. */
+.map-workspace .map-rail-overflow { position:absolute; right:calc(100% + 8px); bottom:50px; max-height:calc(100% - 50px); display:flex; pointer-events:auto; }
+@media(prefers-reduced-motion:reduce) { .map-tool-tip { transition:none; } }
+
 /* Split view: two screens in one window (desktop web and tablet landscape, >=1024px).
    Uses theme tokens only, so Adventurer's Ledger, Ironbound Dragon and custom colors apply. */
 .split-passthrough { display: contents; }

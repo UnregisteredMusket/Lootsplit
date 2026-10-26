@@ -83,6 +83,10 @@ import {
   Redo2,
   Crosshair,
   Maximize,
+  House,
+  Layers,
+  ChevronsDown,
+  ChevronRight,
   Plus,
   Minus,
   X,
@@ -130,6 +134,16 @@ import {
 } from "@/lib/quire/place-hub";
 import { mapReferenceRecord } from "@/lib/quire/connected-maps";
 import { accessibleParent, openingView } from "@/lib/quire/map-navigation";
+import { isRailLayout, toolNamesVisible } from "@/lib/quire/map-toolbar";
+import {
+  MapTool,
+  MapToolGroup,
+  MapToolbar,
+  ToolNamesHint,
+  setToolNames,
+  useMapLayout,
+  useToolNames,
+} from "./map-tools-rail";
 
 const MapCombatWorkspace = lazy(() =>
   import("./map-combat-workspace").then((m) => ({ default: m.MapCombatWorkspace })),
@@ -1516,7 +1530,22 @@ function MapViewport({
     [placeAnnouncement, setPlaceAnnouncement] = useState(""),
     [cardFocus, setCardFocus] = useState<string>(),
     [deepLinkedCard, setDeepLinkedCard] = useState<MapRecordReference>(),
-    [hereOpen, setHereOpen] = useState(false);
+    [hereOpen, setHereOpen] = useState(false),
+    [layersOpen, setLayersOpen] = useState(false),
+    [railMore, setRailMore] = useState(false);
+  // Desktop and landscape phones: vertical tools rail; phones keep today's bottom hotbar.
+  const layout = useMapLayout(),
+    rail = isRailLayout(layout),
+    toolNames = useToolNames(),
+    railNames = rail && layout !== "landscape" && toolNamesVisible(toolNames);
+  // Panels beside the rail (Settings, inspector, tool options) clear its current width.
+  useLayoutEffect(() => {
+    const frame = root.current?.closest<HTMLElement>(".map-workspace");
+    if (!frame) return;
+    const anchor = frame.querySelector<HTMLElement>(".map-hotbar-anchor");
+    const width = rail && !interfaceHidden && anchor ? anchor.getBoundingClientRect().width : 0;
+    frame.style.setProperty("--map-tools-w", `${Math.round(width)}px`);
+  });
   const viewer = useSeat(),
     navigate = useNavigate();
   const serviceTable = recordTable;
@@ -1932,6 +1961,77 @@ function MapViewport({
     setContextOpen(false);
     tools.hideInspector();
   };
+  const combatHere =
+    recordTable.journal?.world?.combat?.mapId === map.id &&
+    recordTable.journal?.world?.combat?.phase === "active";
+  const togglePing = () => {
+    afterContextChange(() => {
+      tools.cancel();
+      sketches.cancel();
+      stopPlacing();
+      setPinging(!pinging);
+      // Ping's options (its colour) open beside the rail while it is armed.
+      setContextOpen(!pinging);
+      setDrawerOpen(false);
+      root.current?.focus();
+    });
+  };
+  const openDraw = () => {
+    afterContextChange(() => {
+      chooseTool("pan");
+      sketches.setActive(true);
+      setContextOpen(true);
+    });
+  };
+  // Right-side panels (Initiative, Here, Layers, Settings) replace each other.
+  const toggleHere = () => {
+    if (hereOpen) {
+      setHereOpen(false);
+      return;
+    }
+    afterContextChange(() => {
+      setDetails([]);
+      setService(undefined);
+      setDrawerOpen(false);
+      setCombatOpen(false);
+      setLayersOpen(false);
+      tools.hideInspector();
+      setHereOpen(true);
+    });
+  };
+  const toggleLayers = () => {
+    if (layersOpen) {
+      setLayersOpen(false);
+      return;
+    }
+    afterContextChange(() => {
+      setDrawerOpen(false);
+      setHereOpen(false);
+      setCombatOpen(false);
+      setMoreTools(false);
+      setLayersOpen(true);
+    });
+  };
+  const toggleCombat = () => {
+    if (combatOpen) {
+      if (allowContextChange(() => setCombatOpen(false))) setCombatOpen(false);
+      return;
+    }
+    setHereOpen(false);
+    setLayersOpen(false);
+    openCombat();
+  };
+  /** Panel and tool shortcuts shared by the map canvas and the rest of the workspace. */
+  const panelShortcut = (key: string) => {
+    const k = key.toLowerCase();
+    if (k === "d") openDraw();
+    else if (k === "j") openPlanner();
+    else if (k === "e" && !placeBar) toggleHere();
+    else if (k === "l") toggleLayers();
+    else if (k === "i" && useDm) toggleCombat();
+    else return false;
+    return true;
+  };
   const chooseTool = (tool: Parameters<typeof tools.activateTool>[0]) => {
     if (!allowContextChange(() => chooseTool(tool))) return;
     if (planner.active && !["pan", "select"].includes(tool)) planner.close();
@@ -1998,6 +2098,7 @@ function MapViewport({
         return;
       if (e.key === "Escape") {
         if (drawerOpen) setDrawerOpen(false);
+        else if (layersOpen) setLayersOpen(false);
         else if (moreTools) setMoreTools(false);
         else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
           const closeAll = () => {
@@ -2065,7 +2166,8 @@ function MapViewport({
       if (tool && !drawerOpen && !service && !combatOpen) {
         e.preventDefault();
         chooseTool(tool);
-      }
+      } else if (!drawerOpen && !service && !combatOpen && !e.shiftKey && panelShortcut(e.key))
+        e.preventDefault();
     };
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
@@ -2135,6 +2237,74 @@ function MapViewport({
             }))),
     ]),
   ];
+  // Table, View and (for now) Setup groups: in the rail, or folded into More on short desktops.
+  const lowerGroups = (
+    <>
+    <MapToolGroup caption="Table">
+      {useDm && (
+        <MapTool
+          icon={<Swords size={19} />}
+          label="Initiative"
+          name={
+            recordTable.journal?.world?.combat
+              ? "Initiative"
+              : "Initiative · start encounter here"
+          }
+          shortcut="I"
+          keys="I"
+          badge={combatHere ? "●" : undefined}
+          badgeLabel="Encounter on this map"
+          expanded={combatOpen}
+          onClick={toggleCombat}
+        />
+      )}
+      {!placeBar && (
+        <MapTool
+          icon={<House size={19} />}
+          label={here.mode === "road" ? "Here: on the road" : "Here"}
+          shortcut="E"
+          keys="E"
+          badge={here.mode === "here" ? here.rows.length : undefined}
+          badgeLabel="places to use here"
+          expanded={hereOpen}
+          onClick={toggleHere}
+        />
+      )}
+    </MapToolGroup>
+    <MapToolGroup caption="View">
+      <MapTool
+        icon={<Layers size={19} />}
+        label="Layers"
+        shortcut="L"
+        keys="L"
+        expanded={layersOpen}
+        controls="map-layers"
+        onClick={toggleLayers}
+      />
+    </MapToolGroup>
+    {useDm && (
+      // Setup tools stay here until the setup rail (map controls PR 3 and 4).
+      <MapToolGroup caption="Setup">
+        <MapTool
+          icon={<MapPin size={19} />}
+          label="Place marker"
+          pressed={placementKind === "marker"}
+          onClick={() => {
+            afterContextChange(() => {
+              tools.cancel();
+              sketches.cancel();
+              setPinging(false);
+              beginMarker();
+              setDrawerOpen(false);
+              setContextOpen(false);
+              root.current?.focus();
+            });
+          }}
+        />
+      </MapToolGroup>
+    )}
+    </>
+  );
   return (
     <MapFrame title={map.name} interfaceHidden={interfaceHidden}>
       <MapWorkspaceChrome
@@ -2159,6 +2329,7 @@ function MapViewport({
         onBack={goParent && (() => afterContextChange(goParent))}
         closePanel={() => {
           if (drawerOpen) setDrawerOpen(false);
+          else if (layersOpen) setLayersOpen(false);
           else if (moreTools) setMoreTools(false);
           else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
             const closeAll = () => {
@@ -2296,6 +2467,14 @@ function MapViewport({
                 ))}
               </select>
             </label>
+            <label className="map-check-row">
+              <input
+                type="checkbox"
+                checked={toolNames !== "hidden"}
+                onChange={(e) => setToolNames(e.target.checked ? "shown" : "hidden")}
+              />
+              Show tool names (desktop)
+            </label>
             {useDm && (
               <>
                 <Button
@@ -2346,128 +2525,121 @@ function MapViewport({
       </div>
       {!interfaceHidden && (
         <>
-          <div className="map-hotbar-anchor">
+          <div
+            className="map-hotbar-anchor"
+            data-layout={layout}
+            data-tool-names={railNames ? "" : undefined}
+          >
             {hotbarOpen && (
-              <div className="map-hotbar map-glass" role="toolbar" aria-label="Map tools">
+              <MapToolbar
+                className="map-hotbar map-glass"
+                label="Map tools"
+                orientation={rail ? "vertical" : "horizontal"}
+              >
                 <div className="map-hotbar-tools">
-                  <button
-                    className="map-icon-button"
-                    title="Pan (V)"
-                    aria-label="Pan"
-                    aria-pressed={tools.tool === "pan" && !pinging && !placing && !sketches.active}
-                    onClick={() => chooseTool("pan")}
-                  >
-                    <Hand size={19} />
-                  </button>
-                  <button
-                    className="map-icon-button"
-                    title="Select / move (S)"
-                    aria-label="Select / move"
-                    aria-pressed={
-                      tools.tool === "select" && !pinging && !placing && !sketches.active
-                    }
-                    onClick={() => chooseTool("select")}
-                  >
-                    <MousePointer2 size={19} />
-                  </button>
-                  <button
-                    className="map-icon-button"
-                    title="Ping (P)"
-                    aria-label="Ping"
-                    disabled={signals.viewOnly}
-                    aria-pressed={pinging}
-                    onClick={() => {
-                      afterContextChange(() => {
-                        tools.cancel();
-                        sketches.cancel();
-                        stopPlacing();
-                        setPinging(!pinging);
-                        setContextOpen(false);
-                        setDrawerOpen(false);
-                        root.current?.focus();
-                      });
-                    }}
-                  >
-                    <Crosshair size={19} />
-                  </button>
-                  <button
-                    className="map-icon-button"
-                    title="Measure (M)"
-                    aria-label="Measure"
-                    aria-pressed={tools.tool === "measure"}
-                    onClick={() => chooseTool("measure")}
-                  >
-                    <Ruler size={19} />
-                  </button>
-                  <button
-                    className="map-icon-button"
-                    title="Plan route"
-                    aria-label="Plan route"
-                    aria-pressed={planner.active}
-                    onClick={openPlanner}
-                  >
-                    <RouteIcon size={19} />
-                  </button>
-                  {tools.playerTemplates && (
-                    <button
-                      className="map-icon-button"
-                      title="Area template (T)"
-                      aria-label="Area template"
-                      aria-pressed={tools.tool === "template"}
-                      onClick={() => chooseTool("template")}
-                    >
-                      <Shapes size={19} />
-                    </button>
+                  <MapToolGroup caption="Move">
+                    <MapTool
+                      icon={<Hand size={19} />}
+                      label="Pan"
+                      shortcut="V"
+                      keys="V"
+                      pressed={tools.tool === "pan" && !pinging && !placing && !sketches.active}
+                      onClick={() => chooseTool("pan")}
+                    />
+                    <MapTool
+                      icon={<MousePointer2 size={19} />}
+                      label="Select / move"
+                      shortcut="S"
+                      keys="S"
+                      pressed={
+                        tools.tool === "select" && !pinging && !placing && !sketches.active
+                      }
+                      onClick={() => chooseTool("select")}
+                    />
+                  </MapToolGroup>
+                  <MapToolGroup caption="Play">
+                    <MapTool
+                      icon={<Crosshair size={19} />}
+                      label="Ping"
+                      shortcut="P"
+                      keys="P"
+                      disabled={signals.viewOnly}
+                      pressed={pinging}
+                      onClick={togglePing}
+                    />
+                    <MapTool
+                      icon={<Ruler size={19} />}
+                      label="Measure"
+                      shortcut="M"
+                      keys="M"
+                      pressed={tools.tool === "measure"}
+                      onClick={() => chooseTool("measure")}
+                    />
+                    {tools.playerTemplates && (
+                      <MapTool
+                        icon={<Shapes size={19} />}
+                        label="Area template"
+                        shortcut="T"
+                        keys="T"
+                        pressed={tools.tool === "template"}
+                        onClick={() => chooseTool("template")}
+                      />
+                    )}
+                    <MapTool
+                      icon={<Pencil size={19} />}
+                      label="Draw & notes"
+                      shortcut="D"
+                      keys="D"
+                      pressed={sketches.active}
+                      onClick={openDraw}
+                    />
+                    {/* One entry for the journey planner (the floating pill is gone, D6). */}
+                    <MapTool
+                      icon={<RouteIcon size={19} />}
+                      label="Plan journey"
+                      shortcut="J"
+                      keys="J"
+                      pressed={planner.active}
+                      onClick={openPlanner}
+                    />
+                  </MapToolGroup>
+                  {layout === "short" ? (
+                    // Below 720 px tall the lower groups fold into More at the rail foot (D14).
+                    <MapTool
+                      icon={<ChevronsDown size={19} />}
+                      label="More tools"
+                      expanded={railMore}
+                      controls="map-rail-overflow"
+                      onClick={() => setRailMore(!railMore)}
+                    />
+                  ) : (
+                    lowerGroups
                   )}
-                  {useDm && (
-                    <button
-                      className="map-icon-button"
-                      title="Place marker"
-                      aria-label="Place marker"
-                      aria-pressed={placementKind === "marker"}
-                      onClick={() => {
-                        afterContextChange(() => {
-                          tools.cancel();
-                          sketches.cancel();
-                          setPinging(false);
-                          beginMarker();
-                          setDrawerOpen(false);
-                          setContextOpen(false);
-                          root.current?.focus();
-                        });
-                      }}
-                    >
-                      <MapPin size={19} />
-                    </button>
-                  )}
-                  <button
-                    className="map-icon-button"
-                    aria-label="Drawing & annotations"
-                    title="Drawing & annotations"
-                    aria-pressed={sketches.active}
-                    onClick={() => {
-                      afterContextChange(() => {
-                        chooseTool("pan");
-                        sketches.setActive(true);
-                        setContextOpen(true);
-                      });
-                    }}
-                  >
-                    <Pencil size={19} />
-                  </button>
                 </div>
-                <button
-                  className="map-icon-button"
-                  title="More map tools"
-                  aria-label="More map tools"
-                  aria-expanded={moreTools}
+                <MapTool
+                  icon={<MoreHorizontal size={20} />}
+                  label="More map tools"
+                  className="map-more-tools"
+                  expanded={moreTools}
                   onClick={() => {
-                    if (!moreTools) setContextOpen(false);
+                    if (!moreTools) {
+                      setContextOpen(false);
+                      setLayersOpen(false);
+                    }
                     setMoreTools(!moreTools);
                   }}
+                />
+              </MapToolbar>
+            )}
+            {hotbarOpen && layout === "short" && railMore && (
+              <div id="map-rail-overflow" className="map-rail-overflow">
+                <MapToolbar
+                  className="map-hotbar map-glass"
+                  label="More tools"
+                  orientation="vertical"
                 >
-                  <MoreHorizontal size={20} />
-                </button>
+                  <div className="map-hotbar-tools">{lowerGroups}</div>
+                </MapToolbar>
               </div>
             )}
             <button
@@ -2477,7 +2649,15 @@ function MapViewport({
               title={hotbarOpen ? "Collapse map tools" : "Show map tools"}
               onClick={() => setHotbarOpen(!hotbarOpen)}
             >
-              {hotbarOpen ? <ChevronDown size={20} /> : <Pencil size={20} />}
+              {hotbarOpen ? (
+                rail ? (
+                  <ChevronRight size={20} />
+                ) : (
+                  <ChevronDown size={20} />
+                )
+              ) : (
+                <Pencil size={20} />
+              )}
             </button>
             {hotbarOpen && moreTools && (
               <div
@@ -2551,18 +2731,6 @@ function MapViewport({
                     </button>
                     <button
                       className="map-icon-button"
-                      title="Start encounter here"
-                      aria-label={
-                        recordTable.journal?.world?.combat
-                          ? "Open encounter map controls"
-                          : "Start encounter here"
-                      }
-                      onClick={openCombat}
-                    >
-                      <Swords size={19} />
-                    </button>
-                    <button
-                      className="map-icon-button"
                       title="Undo fog"
                       aria-label="Undo fog"
                       disabled={!tools.canUndoFog}
@@ -2581,21 +2749,6 @@ function MapViewport({
                     </button>
                   </>
                 )}
-                {map.grid && (
-                  <button
-                    className="map-icon-button"
-                    title={gridLocked ? "Encounter controls the grid" : "Grid display"}
-                    aria-label="Grid display"
-                    aria-pressed={tileMode && (gridLocked || gridVisible)}
-                    disabled={gridLocked}
-                    onClick={() => {
-                      if (!tileMode) toggleGrid();
-                      setGridVisible(tileMode ? !gridVisible : true);
-                    }}
-                  >
-                    <Grid3X3 size={19} />
-                  </button>
-                )}
                 <button
                   className="map-icon-button"
                   title="Inspector"
@@ -2610,10 +2763,79 @@ function MapViewport({
               </div>
             )}
           </div>
+          {railNames && <ToolNamesHint />}
+          {layersOpen && !drawerOpen && (
+            <aside
+              id="map-layers"
+              className="map-side-panel map-layers-panel map-glass"
+              role="dialog"
+              aria-modal="false"
+              aria-labelledby="map-layers-heading"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setLayersOpen(false);
+                  root.current?.focus();
+                }
+              }}
+            >
+              <div className="map-panel-heading">
+                <strong id="map-layers-heading">Layers</strong>
+                <button
+                  className="map-icon-button"
+                  aria-label="Close layers"
+                  onClick={() => {
+                    setLayersOpen(false);
+                    root.current?.focus();
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <fieldset className="map-filters">
+                <legend>Show on map</legend>
+                {mapRecordKinds.map((kind) => (
+                  <label key={kind}>
+                    <input
+                      type="checkbox"
+                      checked={visible.includes(kind)}
+                      onChange={(e) =>
+                        setVisible((v) =>
+                          e.target.checked ? [...v, kind] : v.filter((k) => k !== kind),
+                        )
+                      }
+                    />
+                    {kind === "NPC" ? "Characters / NPCs" : kind}
+                  </label>
+                ))}
+                <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
+                <Button onClick={() => setVisible([])}>Hide all</Button>
+              </fieldset>
+              {map.grid && (
+                <button
+                  className="map-layer-toggle"
+                  title={gridLocked ? "Encounter controls the grid" : "Grid display"}
+                  aria-label="Grid display"
+                  aria-pressed={tileMode && (gridLocked || gridVisible)}
+                  disabled={gridLocked}
+                  onClick={() => {
+                    if (!tileMode) toggleGrid();
+                    setGridVisible(tileMode ? !gridVisible : true);
+                  }}
+                >
+                  <Grid3X3 size={18} aria-hidden="true" />
+                  Grid display
+                  <span>{tileMode && (gridLocked || gridVisible) ? "On" : "Off"}</span>
+                </button>
+              )}
+            </aside>
+          )}
           {contextOpen && !drawerOpen && (
             <aside className="map-tool-context map-glass" aria-label="Tool options">
               <div className="map-panel-heading">
-                <strong>{sketches.active ? "Drawing & annotations" : tools.toolLabel}</strong>
+                <strong>
+                  {sketches.active ? "Draw & notes" : pinging ? "Ping" : tools.toolLabel}
+                </strong>
                 <button
                   className="map-icon-button"
                   aria-label="Close tool options"
@@ -2622,12 +2844,32 @@ function MapViewport({
                   <X size={16} />
                 </button>
               </div>
-              {sketches.active ? sketches.controls : tools.contextControls}
+              {sketches.active ? (
+                sketches.controls
+              ) : pinging ? (
+                <label className="map-ping-options">
+                  Ping colour
+                  <select
+                    aria-label="Ping color for this tool"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
+                  >
+                    {pingColors.map((c) => (
+                      <option key={c} value={c}>
+                        {c[0].toUpperCase() + c.slice(1)} ({pingShapes[c]})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                tools.contextControls
+              )}
               <button
                 onClick={() => {
                   afterContextChange(() => {
                     tools.cancel();
                     sketches.cancel();
+                    setPinging(false);
                     setContextOpen(false);
                   });
                 }}
@@ -2701,47 +2943,6 @@ function MapViewport({
       {!interfaceHidden && !reviewJourney && !planner.active && journeyView.panel}
       {!interfaceHidden && !placeBar && !reviewJourney && journeyView.chip}
       {journeyView.arrival}
-      {!interfaceHidden && !hereOpen && !placeBar && !planner.active && (
-        <button
-          type="button"
-          className="map-here-button map-glass"
-          title="What you can use at the party's location"
-          onClick={() => {
-            afterContextChange(() => {
-              setDetails([]);
-              setService(undefined);
-              setDrawerOpen(false);
-              setCombatOpen(false);
-              tools.hideInspector();
-              setHereOpen(true);
-            });
-          }}
-        >
-          {here.mode === "road" ? "Here: on the road" : "Here"}
-          {here.mode === "here" && <span className="map-here-count">{here.rows.length}</span>}
-        </button>
-      )}
-      {/* The journey planner, labelled where phones and desktops both see it (the hotbar's route
-          icon stays too). While the party is on a journey its status chip takes this place. In
-          tile (encounter grid) mode it steps aside so it never covers tokens; the hotbar keeps
-          Plan route there. */}
-      {!interfaceHidden &&
-        !tileMode &&
-        !hereOpen &&
-        !placeBar &&
-        !planner.active &&
-        !reviewJourney &&
-        !(journeyView.journey && journeyView.journey.status !== "planned") && (
-          <button
-            type="button"
-            className="map-plan-journey-button map-glass"
-            title="Plan a party journey or ship voyage on this map"
-            onClick={openPlanner}
-          >
-            <RouteIcon size={17} aria-hidden="true" />
-            Plan journey
-          </button>
-        )}
       <div className="map-feedback" hidden={interfaceHidden}>
         <MapRenderBadge />
         {full && (
@@ -2796,12 +2997,11 @@ function MapViewport({
                 }
                 if (e.key.toLowerCase() === "p" && !signals.viewOnly) {
                   e.preventDefault();
-                  afterContextChange(() => {
-                    tools.cancel();
-                    sketches.cancel();
-                    stopPlacing();
-                    setPinging(!pinging);
-                  });
+                  togglePing();
+                  return;
+                }
+                if (!e.shiftKey && panelShortcut(e.key)) {
+                  e.preventDefault();
                   return;
                 }
               }
