@@ -1,4 +1,4 @@
-import { openApplication, continueIntoApp } from "./title-screen-navigation.mjs";
+import { openApplication, continueIntoApp, NOT_FOUND_AUDIT_PATH } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -189,6 +189,9 @@ try {
         assert.equal(await nav.isVisible(), false);
       }
       if (path === "account") {
+        // W-1: My account has its own tab title and never shows the app's title screen.
+        assert.equal(await page.title(), "My account · Lootsplitter");
+        assert.equal(await page.locator(".loot-opening").count(), 0, "account shows no title screen");
         const theme = await page.evaluate(() => {
           const site = getComputedStyle(document.querySelector(".ls-site"));
           const account = getComputedStyle(document.querySelector(".ls-account"));
@@ -323,6 +326,27 @@ try {
       );
       await page.screenshot({ path: `${output}/${path}-${width}.png`, fullPage: true });
     }
+    // W-1: an unknown address shows the website's not-found page with a way on, never the
+    // app's title screen or sign-in gate.
+    const missing = await page.goto(`${origin}${NOT_FOUND_AUDIT_PATH}`, { waitUntil: "networkidle" });
+    assert.equal(missing.status(), 404);
+    await page.getByRole("heading", { level: 1, name: "This page wandered off", exact: true }).waitFor();
+    assert.equal(await page.title(), "Page not found · Lootsplitter");
+    assert.equal(await page.locator(".loot-opening").count(), 0, "404 shows no title screen");
+    assert.equal(await page.getByText("Create an account or sign in", { exact: false }).count(), 0);
+    const onward = page.getByRole("navigation", { name: "Where to go next" });
+    for (const label of ["Home", "Help", "Open the app"])
+      assert.equal(await onward.getByRole("link", { name: label, exact: true }).count(), 1, `404 ${label}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `404 overflows ${width}`);
+    await page.screenshot({ path: `${output}/not-found-${width}.png`, fullPage: true });
+    // A website link into My account keeps the document and shows no title screen.
+    await onward.getByRole("link", { name: "Home", exact: true }).click();
+    await page.getByRole("heading", { level: 1 }).filter({ hasText: "Split the loot." }).waitFor();
+    await page.evaluate(() => (window.websiteAuditMarker = "account"));
+    await page.getByRole("navigation", { name: "Website footer" }).getByRole("link", { name: "My account", exact: true }).click();
+    await page.getByRole("heading", { level: 1 }).filter({ hasText: "Welcome to your next chapter." }).waitFor();
+    assert.equal(await page.evaluate(() => window.websiteAuditMarker), "account");
+    assert.equal(await page.locator(".loot-opening").count(), 0, "My account link replayed the title screen");
     await page.getByRole("link", { name: "Downloads", exact: true }).first().click();
     await page.getByRole("heading", { name: "One party. Your platform." }).waitFor();
     const download = page.getByRole("link", { name: "Download for Android", exact: true });

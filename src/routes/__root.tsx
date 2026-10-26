@@ -25,6 +25,8 @@ import { useEffect } from "react";
 import { APP_VISITOR_COOKIE } from "@/lib/deployment/public-urls.mjs";
 import { SplitViewProvider, usePane } from "@/components/split-view";
 import { retainBeside } from "@/lib/quire/split-view";
+import { NotFoundPage } from "@/components/website/not-found";
+import { NOT_FOUND_TITLE, isUnmatchedRoute, useUnmatchedRoute } from "@/lib/website/not-found-route";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Lootsplitter";
@@ -32,11 +34,13 @@ const APP_NAME = "Lootsplitter";
 export const Route = createRootRoute({
   // Navigation in the main (left) pane keeps the split-view pane beside it.
   search: { middlewares: [retainBeside] },
-  head: () => ({
+  head: ({ matches }) => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: APP_NAME },
+      // An unknown address gets its own tab title (W-1); every page route sets its own.
+      { title: isUnmatchedRoute(matches) ? NOT_FOUND_TITLE : APP_NAME },
+      ...(isUnmatchedRoute(matches) ? [{ name: "robots", content: "noindex" }] : []),
       {
         name: "description",
         content: APP_DESCRIPTION,
@@ -50,6 +54,7 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
+  notFoundComponent: NotFoundPage,
   component: function RootComponent() {
     // The right split-view pane renders this route tree inside the existing document.
     return usePane() ? <Outlet /> : <RootDocument />;
@@ -70,8 +75,13 @@ function RootDocument() {
     "/community",
   ].includes(pathname.replace(/\/$/, "")) || pathname.startsWith("/community/");
   const playerDisplay = pathname.replace(/\/$/, "") === "/player-display";
+  // My account and the not-found page are drawn in website chrome, so the app's title screen
+  // never stands in front of them (W-1). My account still marks the browser as an app visitor,
+  // as it always has; a broken link does not.
+  const accountPage = pathname.replace(/\/$/, "") === "/account";
+  const notFound = useUnmatchedRoute();
   installMobileApi();
-  const appPage = !publicPage && !playerDisplay;
+  const appPage = !publicPage && !playerDisplay && !notFound;
   useEffect(() => {
     // Opening the app marks this browser as a returning player, so the bare address skips the
     // public home page next time (landingRedirect in public-urls.mjs). Public pages never set it.
@@ -102,7 +112,7 @@ function RootDocument() {
         {playerDisplay ? (
           <Outlet />
         ) : (
-          <OpeningGate publicPage={publicPage}>
+          <OpeningGate publicPage={publicPage || accountPage || notFound} settle={accountPage}>
             <AuthProvider>
               <CampaignGate>
                 <LibraryProvider>
@@ -128,6 +138,18 @@ function RootDocument() {
   );
 }
 
-function OpeningGate({ publicPage, children }: { publicPage: boolean; children: React.ReactNode }) {
-  return <OpeningDawn bypass={publicPage}>{children}</OpeningDawn>;
+function OpeningGate({
+  publicPage,
+  settle,
+  children,
+}: {
+  publicPage: boolean;
+  settle: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <OpeningDawn bypass={publicPage} settle={settle}>
+      {children}
+    </OpeningDawn>
+  );
 }

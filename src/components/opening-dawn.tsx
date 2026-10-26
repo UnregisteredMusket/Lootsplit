@@ -8,9 +8,25 @@ import { LootLoader } from "./loot-loader";
 // The root gate survives SPA navigation; a fresh app load gets its opening back.
 let dismissedInDocument = false;
 
-export function OpeningDawn({ children, bypass = false }: { children: ReactNode; bypass?: boolean }) {
+export function OpeningDawn({
+  children,
+  bypass = false,
+  settle = false,
+}: {
+  children: ReactNode;
+  /** A website page: draw it without the title screen. */
+  bypass?: boolean;
+  /** Showing this page counts as entering the app (My account): its app links never open the
+   * title screen afterwards, as when the account page itself used to show it. */
+  settle?: boolean;
+}) {
   const [on, setOn] = useState<boolean | null>(null);
   const screen = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!settle) return;
+    dismissedInDocument = true;
+    setOn(false);
+  }, [settle]);
   useEffect(() => {
     if (!dismissedInDocument) {
       try { dismissedInDocument = consumeNavigationResume(sessionStorage, location.pathname); } catch { /* Storage may be blocked. */ }

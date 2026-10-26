@@ -58,7 +58,19 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { downloadJson } from "@/lib/quire/table";
 import { requestConfirm, requestPrompt } from "@/lib/quire/confirm-store";
-export const Route = createFileRoute("/account")({ component: Account });
+export const Route = createFileRoute("/account")({
+  head: () => ({
+    meta: [
+      { title: "My account \u00b7 Lootsplitter" },
+      {
+        name: "description",
+        content:
+          "Sign in or create a free Lootsplitter account to keep campaigns, characters and backups, and to run shared rooms.",
+      },
+    ],
+  }),
+  component: Account,
+});
 function Account() {
   const [library, setLibrary] = useState<AccountLibrary | null>(null),
     [loading, setLoading] = useState(true),

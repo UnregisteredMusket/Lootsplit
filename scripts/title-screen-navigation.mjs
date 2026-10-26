@@ -6,6 +6,8 @@ import { APP_VISITOR_COOKIE } from "../src/lib/deployment/public-urls.mjs";
 export async function markAppVisitor(context, origin) {
   await context.addCookies([{ name: APP_VISITOR_COOKIE, value: "1", url: new URL(origin).origin }]);
 }
+/** An address no route matches; audits use it to check the website's not-found page. */
+export const NOT_FOUND_AUDIT_PATH = "/this-page-does-not-exist";
 const publicPaths = new Set([
   "/welcome",
   "/features",
@@ -16,6 +18,10 @@ const publicPaths = new Set([
   "/donate",
   "/privacy",
   "/community",
+  // My account is drawn in website chrome and never shows the title screen (W-1).
+  "/account",
+  // The website's not-found page (W-1); any unknown address renders it.
+  NOT_FOUND_AUDIT_PATH,
 ]);
 /** Website pages (no title screen, no DM fixture): the listed pages plus community profiles. */
 const isPublicPath = (path) => publicPaths.has(path) || path.startsWith("/community/");
