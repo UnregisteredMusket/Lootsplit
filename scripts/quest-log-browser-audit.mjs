@@ -247,7 +247,7 @@ try {
     await context.close();
   }
   console.log(
-    "PASS quest log: DM draft with hidden objective and DM notes, reveal to one character with a private message, DM-only chronicle line, objective done, Desk card and NPC strip; player view without hidden parts, follow, private note, Quest updated toast, Home card, Here sheet; another player sees nothing; close to Done; nothing moved; 1280/390/320 px without sideways scrolling.",
+    "PASS quest log: DM draft with hidden objective and DM notes, reveal to one character with a private message, DM-only chronicle line, objective done, View as player, Desk card and NPC strip; player view without hidden parts, follow, private note, Quest updated toast, Home card, Here sheet; another player sees nothing; close to Done; nothing moved; 1280/390/320 px without sideways scrolling.",
   );
 } finally {
   await browser.close();
