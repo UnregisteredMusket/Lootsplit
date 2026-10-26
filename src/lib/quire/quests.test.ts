@@ -450,3 +450,29 @@ test("View as player uses the real projection for the chosen character", () => {
   assert.equal(previewQuestAs(d, "d1", "bram").quest?.title, "Hollin's Missing Mare");
   assert.equal(questsOf(d)[0]!.audience.kind, "none");
 });
+
+test("projection: a radius marker in concealed fog or on a map the player cannot open is never sent", () => {
+  let t = revealedCampaign();
+  const fogged = structuredClone(t);
+  const map = fogged.journal!.world!.maps[0]!;
+  (map as any).tabletop = { fog: { enabled: true, base: "concealed", shapes: [] } };
+  fogged.journal!.world!.maps[0] = campaignMapSchema.parse(map);
+  assert.deepEqual(questsOf(projectRecord(fogged, player("aria")))[0]!.areas, []);
+  assert.equal(questsOf(projectRecord(fogged, dm))[0]!.areas.length, 2);
+  const hiddenMap = structuredClone(t);
+  hiddenMap.journal!.world!.maps[0]!.visible = false;
+  assert.deepEqual(questsOf(projectRecord(hiddenMap, player("aria")))[0]!.areas, []);
+  t = run(t, { id: "o3", kind: "quest-objective", questId: "q1", revision: rev(t), objectiveId: "o-secret", action: "reveal" });
+  assert.deepEqual(questsOf(projectRecord(t, player("aria")))[0]!.areas.map((a) => a.id), ["area-public", "area-secret"]);
+});
+
+test("projection: on a player's device (maps already projected) areas the server sent are kept", () => {
+  const t = revealedCampaign();
+  const fogged = structuredClone(t);
+  const map = fogged.journal!.world!.maps[0]!;
+  (map as any).tabletop = { fog: { enabled: true, base: "concealed", shapes: [] } };
+  fogged.journal!.world!.maps[0] = campaignMapSchema.parse(map);
+  // The redacted fog (concealed, no shapes) must not hide what the server already let through.
+  const local = projectRecord(fogged, player("aria"), { tabletopProjected: true });
+  assert.deepEqual(questsOf(local)[0]!.areas.map((a) => a.id), ["area-public"]);
+});

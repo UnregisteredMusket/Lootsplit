@@ -242,6 +242,7 @@ export function projectRecord(
       (table.journal?.world?.groups ?? []).filter((g) => g.status === "active" && g.hidden && !groups.includes(g.id)).map((g) => g.id),
     );
     const questPlaces = projectQuests(table, t.journal, seat, {
+      tabletopProjected: options.tabletopProjected,
       readableNpcs,
       // A hidden group's place, unless the seat's own group or the party is there too.
       hiddenPlaces: new Set(

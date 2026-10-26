@@ -1,0 +1,11 @@
+{
+  "title": "Quests on the map",
+  "summary": "Quests and objectives can point to places, map pins and search areas, and the map has a Quests panel.",
+  "items": [
+    "DMs can tie a quest or any objective to a place, an existing map pin, or a radius area drawn on a map, for example \"Harkon's horse is somewhere in here\".",
+    "Draw an area, drag its centre or edge, or type its radius in the map's own units; place it off the real target if you want only a general idea.",
+    "The map's Quests tool lists the quests on that map with Show all, Only followed or None; pick one to highlight it and zoom to its pins and areas.",
+    "Players see accent diamonds and dashed circles only for what the DM shared: areas for hidden objectives, or under fog, never reach them.",
+    "Show on map in the quest log now opens the map on that quest, and Layers can hide quest markers or areas."
+  ]
+}

@@ -14,6 +14,7 @@ import { isNpc } from "./coin-split.ts";
 import { readFinance } from "./finance.ts";
 import { formatCopper } from "./money.ts";
 import { readMarketLocations } from "./shop-locations.ts";
+import { mapAccessible, mapPointVisibleTo } from "./tabletop.ts";
 import type { Purse } from "./types.ts";
 import {
   MAX_QUEST_LOG,
@@ -421,6 +422,11 @@ export type QuestProjectionContext = {
   readableNpcs: Set<string>;
   /** Places of hidden groups this seat is not in. */
   hiddenPlaces: Set<string>;
+  /**
+   * The maps were already projected for this seat (a joined player's device): the server applied
+   * fog and vision, so the redacted geometry must not be used to judge sight again.
+   */
+  tabletopProjected?: boolean;
 };
 /**
  * A player's copy of the quest log. Runs on the unprojected `table` (audiences and receipts are
@@ -462,6 +468,11 @@ export function projectQuests(
     return readable.length ? [{ kind: link.kind, id: link.id, label: receiptLabel(link.kind, readable) }] : [];
   };
   const place = (id: string | undefined) => !!id && !context.hiddenPlaces.has(id);
+  const visibleOn = new Map<string, (p: { x: number; y: number }) => boolean>();
+  const pointVisible = (map: NonNullable<Journal["world"]>["maps"][number]) => {
+    if (!visibleOn.has(map.id)) visibleOn.set(map.id, mapPointVisibleTo(table, map, seat));
+    return visibleOn.get(map.id)!;
+  };
   const quests = readQuests(raw)
     .quests.filter((q) => questReadable(table, q, seat))
     .map((q): Quest => {
@@ -487,7 +498,13 @@ export function projectQuests(
               }
             : q.audience,
         locationIds: q.locationIds.filter(place),
-        areas: q.areas.filter((a) => !a.objectiveId || visibleObjectives.has(a.objectiveId)),
+        // A radius marker reaches a player only on a map they can open, with its centre outside
+        // concealed fog and within vision: the rule pins and templates follow (docs/MAP-TILES.md).
+        areas: q.areas.filter((a) => {
+          if (a.objectiveId && !visibleObjectives.has(a.objectiveId)) return false;
+          const map = table.journal?.world?.maps.find((m) => m.id === a.mapId);
+          return !!map && mapAccessible(table, map, seat) && (context.tabletopProjected || pointVisible(map)(a));
+        }),
         objectives,
         log: q.log
           .filter((l) => l.shared && (!l.objectiveId || visibleObjectives.has(l.objectiveId)))
