@@ -4860,3 +4860,19 @@ button.quest-chip { min-height: 44px; }
 .quest-map-tools { display:grid; gap:.6rem; padding-top:.6rem; border-top:1px solid var(--color-border); }
 .quest-map-item { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
 .quest-map-add, .quest-map-area { display:grid; gap:.4rem; padding:.6rem; border:1px dashed var(--color-border); border-radius:8px; }
+
+/* Character sheet chrome (plan P5, Q25). */
+.sheet-breadcrumb { font-size: .9rem; color: var(--color-muted); }
+.sheet-breadcrumb a { color: var(--color-lead); display: inline-flex; align-items: center; min-height: 2.75rem; }
+.character-heading.is-player { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .25rem; }
+.sheet-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.sheet-mode-row .play-mode-switch { margin: 0; }
+.sheet-lock { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 999px; color: var(--color-muted); border: 1px solid color-mix(in srgb, var(--color-lead) 30%, transparent); }
+.sheet-tools-button { margin-left: auto; }
+.play-sheet .character-savebar.is-clean, .concept-shell .play-sheet .character-savebar.is-clean { position: static; display: block; box-shadow: none; background: transparent; border: 0; padding: .25rem 0; min-height: 0; font-size: .85rem; color: var(--color-muted); }
+.play-sheet .character-savebar.is-clean strong { font-weight: 500; }
+.quick-hp { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .5rem 0; }
+.quick-hp button { min-height: 2.75rem; min-width: 4.5rem; }
+.quick-hp-note { font-size: .8rem; color: var(--color-muted); }
+.last-roll-chip { display: inline-flex; align-items: center; min-height: 2rem; padding: .2rem .65rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--color-lead) 45%, transparent); font-size: .85rem; margin-inline-start: .5rem; }
+.character-library-below { margin-top: 1.25rem; }

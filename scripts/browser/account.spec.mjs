@@ -752,7 +752,8 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
     buffer: Buffer.from(picture, "base64"),
   });
   await phone.getByRole("button", { name: "Save character", exact: true }).click();
-  await expect(phone.getByRole("button", { name: "Save character", exact: true })).toBeDisabled();
+  // The save bar shows only while there are unsaved edits (plan P5); then "Saved character".
+  await expect(phone.getByText("Saved character", { exact: true })).toBeVisible();
   portrait = `data:image/png;base64,${picture}`;
   // Save is complete before either device reads it. Preserve the server check
   // and both actual Party card/decoded-image assertions without serializing

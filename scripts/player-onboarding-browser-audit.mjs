@@ -7,6 +7,9 @@
 // - the join link finds its characters by itself, the support panels fold into one group until
 //   joining, an empty name is refused inline, "Your name" is remembered, and the player lands on
 //   Home with "You're playing <character>" and a dismissible Sheet · Inventory & coins · Chat strip;
+// - the character sheet opens straight to the sheet with a Home breadcrumb, the DM lock as an
+//   icon, no save bar until an edit, quick ±HP that saves, a "Last roll" chip and the shared-room
+//   roll-log wording; the character library is folded below the sheet and opens from Sheet tools;
 // - on Campaign, players read the room mode ("The DM runs this room in Live mode") and no
 //   DM invite instructions;
 // - no screen scrolls sideways.
@@ -68,10 +71,17 @@ try {
       const { applyCloudTable } = await import("/src/lib/quire/economy.ts");
       const { readJournal } = await import("/src/lib/quire/journal.ts");
       const coins = (gp) => ({ cp: 0, sp: 0, ep: 0, gp, pp: 0 });
+      const { blankSheet } = await import("/src/lib/characters/model.mjs");
       await applyCloudTable({
         purses: [
           { id: "hoard", name: "The Hoard", kind: "party", coins: coins(40) },
-          ...players.map((p) => ({ id: p.id, name: p.name, kind: "character", coins: coins(12) })),
+          ...players.map((p) => ({
+            id: p.id,
+            name: p.name,
+            kind: "character",
+            coins: coins(12),
+            sheet: { ...blankSheet(), name: p.name, hp: 10, maxHp: 12 },
+          })),
         ],
         holdings: [],
         shops: [],
@@ -156,6 +166,41 @@ try {
     await page.keyboard.press("Escape");
     await fits(page, `home ${player.width}`);
     await page.screenshot({ path: `${output}/home-${player.width}.png`, fullPage: true });
+    // The character sheet opens straight to the sheet (P5, Q25).
+    await page.getByRole("link", { name: "Open character sheet →", exact: true }).click();
+    await page.waitForURL((u) => u.pathname === "/characters");
+    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
+    await expect(breadcrumb).toContainText("Home › Character sheet");
+    await expect(page.getByRole("heading", { name: player.name, exact: true, level: 2 })).toBeVisible();
+    // Library and import wait below the sheet, folded; the DM lock is an icon beside Edit.
+    await expect(page.locator("#character-library")).not.toHaveAttribute("open", "");
+    const sheetTop = await page.locator(".play-sheet").evaluate((el) => el.getBoundingClientRect().top);
+    const libraryTop = await page.locator("#character-library").evaluate((el) => el.getBoundingClientRect().top);
+    assert.ok(libraryTop > sheetTop, `${player.width}: the library sits below the sheet`);
+    await expect(page.getByRole("img", { name: /Character editing is locked by the DM/ })).toBeVisible();
+    await expect(page.getByText("Saved character", { exact: true })).toBeVisible();
+    await expect(page.locator(".character-savebar.is-dirty")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Save character", exact: true })).toHaveCount(0);
+    // Quick ±HP saves at once.
+    await page.getByRole("button", { name: "+1 HP", exact: true }).click();
+    await expect(page.locator(".play-vitals")).toContainText("11 / 12");
+    await expect(page.getByText("Saved character", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "−1 HP", exact: true }).click();
+    await expect(page.locator(".play-vitals")).toContainText("10 / 12");
+    await expect(page.getByText("Saved character", { exact: true })).toBeVisible();
+    // A roll shows beside the dice button, and the room log says where it is kept.
+    await page.getByRole("button", { name: /^Initiative / }).first().click();
+    await expect(page.locator(".last-roll-chip")).toContainText(/^Last roll · Initiative -?\d+$/);
+    await expect(page.getByText(/Visible to current campaign members\.|Saved with this character in the shared campaign\./)).toBeVisible();
+    await expect(page.locator(".roll-log li").first()).toContainText("Initiative");
+    await expect(page.getByText(/Saved with this character on this device\./)).toHaveCount(0);
+    await fits(page, `sheet ${player.width}`);
+    await page.screenshot({ path: `${output}/sheet-${player.width}.png`, fullPage: true });
+    await page.getByRole("button", { name: "Sheet tools", exact: true }).click();
+    await page.getByRole("button", { name: "My characters · choose, create or import", exact: true }).click();
+    await expect(page.locator("#character-library")).toHaveAttribute("open", "");
+    await expect(page.getByLabel("Choose character", { exact: true })).toBeVisible();
+
     if (player.width === 1280) {
       // "Your name" is remembered on this device for the next join.
       await navigateApplication(page, origin + "/share");
@@ -170,7 +215,7 @@ try {
   }
   await dm.context.close();
   assert.deepEqual(errors, []);
-  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips and read-only room mode at 1280/390/320.");
+  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips, read-only room mode and the character sheet at 1280/390/320.");
 } finally {
   await browser.close();
 }
