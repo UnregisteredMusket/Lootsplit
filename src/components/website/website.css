@@ -2440,3 +2440,95 @@
   font: 700 16px/1.3 var(--sc);
   letter-spacing: 0.12em;
 }
+
+/* ---------- Home, For players: "How joining works" in three steps (Q35) ---------- */
+.ls-join {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule-soft);
+}
+.ls-join h4 {
+  font-size: 15px;
+}
+.ls-join-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  counter-reset: none;
+}
+.ls-join-steps li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+/* A thin rule joins each step to the next. */
+.ls-join-steps li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 23px;
+  left: 56px;
+  right: -8px;
+  border-top: 2px dotted var(--paper-link);
+  opacity: 0.55;
+}
+.ls-join-icon {
+  flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--paper-link);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--paper-link);
+}
+.ls-join-no {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--paper-link);
+  color: var(--paper-card);
+  font: 700 12px/1 var(--sc);
+}
+.ls-join-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 15px;
+  color: var(--paper-muted-2);
+}
+.ls-join-text strong {
+  color: var(--paper-ink);
+  font-size: 16px;
+}
+@media (max-width: 1100px) {
+  .ls-join-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ls-join-steps li {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .ls-join-steps li:not(:last-child)::after {
+    top: 50px;
+    bottom: -12px;
+    left: 22px;
+    right: auto;
+    border-top: none;
+    border-left: 2px dotted var(--paper-link);
+  }
+}
