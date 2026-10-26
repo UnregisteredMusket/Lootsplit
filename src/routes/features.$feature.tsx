@@ -1,6 +1,7 @@
 import { LocationNpcs } from "@/components/location-npcs";
 import { CampaignTrading } from "@/components/campaign-trading";
 import { SessionTime } from "@/components/session-time";
+import { PinToDesk } from "@/components/control-panel/pins";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { CampaignReports } from "@/components/campaign-reports";
 import { createFileRoute } from "@tanstack/react-router";
@@ -84,7 +85,10 @@ function FeaturePage() {
         className="feature-screen"
         key={`${campaigns.activeId}:${room.code}:${room.sessionId}:${seat.role}:${seat.purseIds.join(",")}:${feature}`}
       >
-        <h1>{screen ? featureTitle(feature as Feature, dm) : "Feature unavailable"}</h1>
+        <div className="feature-heading-row">
+          <h1>{screen ? featureTitle(feature as Feature, dm) : "Feature unavailable"}</h1>
+          {screen && dm && <PinToDesk feature={feature} />}
+        </div>
         {!screen || (screen.dm && !dm) ? (
           <p>This screen is available to the campaign DM.</p>
         ) : (

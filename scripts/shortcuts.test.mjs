@@ -36,3 +36,21 @@ test("Character Sheet opens sheets for the DM and the assigned-sheet view for pl
   assert.equal(destinationsFor("player").find(x => x.id === "character").href, "/?view=sheet");
   assert.equal(normalizeShortcuts([{ destination: "character", label: "My sheets", icon: "users" }], "dm")[0].destination, "character");
 });
+test("Pin to Desk keeps six buttons, puts the pin first and unpins to a default", async () => {
+  const { pinShortcut, unpinShortcut } = await import("../src/lib/quire/shortcuts.mjs");
+  const start = normalizeShortcuts(null, "dm");
+  const pinned = pinShortcut(start, "quests", "dm");
+  assert.equal(pinned.length, 6);
+  assert.equal(pinned[0].destination, "quests");
+  assert.deepEqual(pinned.slice(1), start.slice(0, 5), "the last button makes room");
+  assert.equal(pinShortcut(pinned, "quests", "dm"), pinned, "pinning twice changes nothing");
+  const unpinned = unpinShortcut(pinned, "quests", "dm");
+  assert.equal(unpinned.length, 6);
+  assert.ok(!unpinned.some((x) => x.destination === "quests"));
+  assert.deepEqual(unpinned, start, "the dropped default comes back");
+  assert.throws(() => pinShortcut(start, "javascript:alert(1)", "dm"));
+  // Players cannot pin DM-only screens; DM-only feature IDs are not player destinations.
+  assert.throws(() => pinShortcut(normalizeShortcuts(null, "player"), "time", "player"));
+  assert.throws(() => pinShortcut(normalizeShortcuts(null, "player"), "review", "player"));
+  assert.ok(destinationsFor("player").some((x) => x.id === "quests"));
+});

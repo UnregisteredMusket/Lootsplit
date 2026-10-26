@@ -1,0 +1,89 @@
+/* Pin to Desk and the Desk's Pinned row (design Q8). */
+.pin-to-desk {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--color-lead);
+  font-size: 0.85rem;
+}
+.pin-to-desk[aria-pressed="true"] {
+  border-color: var(--color-lead);
+}
+.feature-heading-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.desk-pins {
+  margin: 0 0 1rem;
+}
+.desk-pins-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.desk-pins-heading h2 {
+  font-size: 1.1rem;
+}
+.desk-pins-heading a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-lead);
+  font-size: 0.85rem;
+}
+.desk-pins-row {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+@media (min-width: 640px) {
+  .desk-pins-row {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+}
+.desk-pin {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+/* Quick HP ± on the Desk's party cards during an encounter (design Q11). */
+.information-party-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+}
+.quick-hp {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+.quick-hp button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  background: var(--panel);
+}
+.quick-hp button:disabled {
+  opacity: 0.45;
+}

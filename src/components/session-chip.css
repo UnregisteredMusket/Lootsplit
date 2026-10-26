@@ -1,0 +1,123 @@
+/* Header session chip, session sheet and the Desk's "Since last session" (design D5, Q7). */
+.session-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--color-fg);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.session-chip:hover {
+  border-color: var(--color-lead);
+}
+@media (max-width: 639.98px) {
+  /* Phones: Settings & Management carries the chip, so the campaign name keeps its width. */
+  .concept-shell header .session-chip {
+    display: none;
+  }
+}
+.session-sheet {
+  display: grid;
+  gap: 0.75rem;
+}
+.session-sheet h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+.session-sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.session-digest-lines {
+  display: grid;
+  gap: 0.25rem;
+}
+.session-digest-lines li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.2rem 0.75rem;
+  min-height: 32px;
+  align-items: center;
+  border-bottom: 1px solid var(--edge);
+  font-size: 0.85rem;
+}
+.session-digest-lines li > span {
+  color: var(--color-muted);
+}
+.session-digest-lines strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.session-digest-lines a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--color-lead);
+}
+.desk-since {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--panel);
+  scroll-margin-top: 6rem;
+}
+@media (min-width: 800px) {
+  .desk-since {
+    max-width: 650px;
+  }
+}
+.desk-since h2 {
+  font-size: 1.2rem;
+}
+.desk-since > small {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+.management-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.management-quick > a,
+.management-quick > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 44px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  background: var(--panel);
+  font-size: 0.85rem;
+}
+/* On the Desk the digest is a compact row of label/value pairs. */
+.desk-since .session-digest-lines {
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.5rem 1rem;
+}
+.desk-since .session-digest-lines li {
+  display: grid;
+  justify-content: start;
+  align-content: start;
+  gap: 0.1rem;
+  border-bottom: 0;
+}
+.desk-since .session-digest-lines strong {
+  text-align: left;
+}
+@media (min-width: 800px) {
+  .desk-since {
+    max-width: none;
+  }
+}
