@@ -18,6 +18,58 @@ final class CompanionSettings {
     static final String LEGACY_DEFAULT = "Development";
     static final String[] THEMES = {"terminal", "light", "dark", "system"};
     private static final String FILE = "widget-presentation", DEFAULTS_V2 = "defaults-v2";
+    /** The settings a preset sets (appearance is chosen separately and kept when a preset is picked). */
+    static final String[] PRESET_FIELDS = {"first", "second", "charts", "action1", "action2"};
+    /** The preset whose choices these settings match, or "Custom"; saved settings store no preset name. */
+    static String presetOf(JSONObject settings) {
+        if (settings == null) return DEFAULT_PRESET;
+        for (String name : PRESETS) {
+            JSONObject preset = preset(name); boolean same = true;
+            for (String field : PRESET_FIELDS) if (!preset.optString(field).equals(settings.optString(field, "charts".equals(field) ? "off" : ""))) { same = false; break; }
+            if (same) return name;
+        }
+        return "Custom";
+    }
+    /** Human names for the saved values shown in the settings screen (the stored values do not change). */
+    static String label(String value) {
+        switch (value == null ? "" : value) {
+            case "health": return "Overall health";
+            case "analytics": return "Players, accounts and campaigns";
+            case "traffic": return "Requests and errors (24 h)";
+            case "task": return "Development task";
+            case "timer": return "Task timer";
+            case "log": return "Latest log entry";
+            case "warning": return "Warnings";
+            case "report": return "Daily report";
+            case "activity": return "Agent activity (GitHub)";
+            case "incident": return "Most severe problem";
+            case "summary": return "Counts and recoveries (24 h)";
+            case "off": return "Hide";
+            case "on": return "Show";
+            case "terminal": return "Terminal (green on black)";
+            case "light": return "Light";
+            case "dark": return "Dark";
+            case "system": return "Follow system (light or dark)";
+            default: return value;
+        }
+    }
+    static String[] labels(String[] values) { String[] out = new String[values.length]; for (int i = 0; i < values.length; i++) out[i] = label(values[i]); return out; }
+    /** One line under the Preset choice describing what it shows. */
+    static String presetNote(String preset) {
+        switch (preset == null ? "" : preset) {
+            case "Agent activity": return "GitHub workflow runs and pull requests: ✓ succeeded or merged, ! running or needs attention, ✕ failed. Checks about once a minute while a workflow runs and the screen is on, without waking the phone. The development chat is not shown.";
+            case "Development": return "The development task and its timer.";
+            case "Server Health": return "Overall health and any warning.";
+            case "Analytics": return "Players, accounts and campaigns, and 24-hour requests.";
+            case "Quick Actions": return "Overall health and the daily report, with Refresh and My account buttons.";
+            case "Status + charts": return "The most severe active problem (✕ CRIT, ! WARN) and how long it has lasted, the warning count and problems resolved in 24 hours, plus a requests chart and the last main runs.";
+            default: return "Your own choice of lines and buttons.";
+        }
+    }
+    /** Whether {@code theme} draws light (system follows night mode), as WidgetAppearance does for saved settings. */
+    static boolean light(Context context, String theme) {
+        return "light".equals(theme) || "system".equals(theme) && (context.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) != android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
     static JSONObject preset(String name) {
         JSONObject out = new JSONObject();
         try {

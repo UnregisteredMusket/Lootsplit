@@ -578,20 +578,60 @@ public class OwnerWidgetTest {
             instrumentation.runOnMainSync(()->{
                 // A new companion opens on the Agent activity default; every earlier preset is still listed.
                 assertEquals(CompanionSettings.DEFAULT_PRESET,settings.choices.get("preset").getSelectedItem().toString());
-                assertEquals("activity",settings.choices.get("first").getSelectedItem().toString());
+                assertEquals("activity",settings.value("first"));
+                // Choices read as words, not stored keys; the stored values are unchanged.
+                assertEquals("Agent activity (GitHub)",settings.choices.get("first").getSelectedItem().toString());
+                for(String key:new String[]{"first","second","charts","theme"})
+                    for(int i=0;i<settings.choices.get(key).getCount();i++)
+                        assertFalse(key+" shows a raw key",java.util.Arrays.asList("health","incident","summary","on","off","terminal").contains(settings.choices.get(key).getItemAtPosition(i).toString()));
+                // A live preview of this widget sits above the choices.
+                assertTrue("The preview shows the widget",settings.preview.getChildCount()==1&&settings.preview.findViewById(R.id.companion_first)!=null);
+                // Every earlier action is still offered (buttons and the ⋮ overflow).
+                assertEquals(WidgetActions.ACTIONS.length,settings.choices.get("action1").getCount());
+                java.util.ArrayList<View> overflow=new java.util.ArrayList<>();
+                settings.getWindow().getDecorView().findViewsWithText(overflow,"More actions",View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION);
+                assertEquals("More actions sit in one ⋮ overflow button",1,overflow.size());
+                assertTrue(overflow.get(0).hasOnClickListeners());
                 settings.choices.get("preset").setSelection(java.util.Arrays.asList(CompanionSettings.PRESETS).indexOf("Server Health"));
             });
             instrumentation.waitForIdleSync();
-            instrumentation.runOnMainSync(()->assertTrue(textView(settings.getWindow().getDecorView(),"Apply preset").performClick()));
+            // Picking a preset applies it at once: no Apply step.
+            instrumentation.runOnMainSync(()->{
+                assertEquals("health",settings.value("first"));assertEquals("warning",settings.value("second"));
+                settings.select("theme","light");
+                // Changing one line shows Custom; changing it back shows the preset again.
+                settings.select("second","log");
+            });
             instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(()->{
+                assertEquals(CompanionWidgetConfigureActivity.CUSTOM,settings.value("preset"));settings.select("second","warning");
+                // The preview follows the unsaved appearance.
+                android.graphics.drawable.Drawable background=settings.preview.findViewById(R.id.companion_root).getBackground();
+                assertEquals(android.graphics.Color.rgb(247,242,228),((android.graphics.drawable.ColorDrawable)background).getColor());
+                settings.select("theme","terminal");
+            });
+            instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(()->assertEquals("Server Health",settings.value("preset")));
+            // Save sits in the bottom bar, visible without scrolling.
             androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withText("Save widget"))
-                .perform(androidx.test.espresso.action.ViewActions.scrollTo(),androidx.test.espresso.action.ViewActions.click());
+                .check(androidx.test.espresso.assertion.ViewAssertions.matches(androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed()))
+                .perform(androidx.test.espresso.action.ViewActions.click());
             long deadline=android.os.SystemClock.elapsedRealtime()+5000;
             while(screen.configurationResult==Integer.MIN_VALUE&&android.os.SystemClock.elapsedRealtime()<deadline)android.os.SystemClock.sleep(20);
             assertEquals(android.app.Activity.RESULT_OK,screen.configurationResult);
             assertEquals(id,screen.configuredWidget);
             assertEquals("health",CompanionSettings.read(context,id).getString("first"));
             assertEquals("A fresh, unconfigured companion uses Agent activity","activity",CompanionSettings.read(context,second).getString("first"));
+            assertFalse("The preset name is not stored; it is matched from the choices",CompanionSettings.read(context,id).has("preset"));
+            // Reopening the settings restores the saved preset instead of starting on the default.
+            instrumentation.runOnMainSync(()->host.startAppWidgetConfigureActivityForResult(screen,id,0,902,null));
+            CompanionWidgetConfigureActivity reopened=(CompanionWidgetConfigureActivity)monitor.waitForActivityWithTimeout(5000);
+            assertNotNull("Settings reopen",reopened);
+            instrumentation.waitForIdleSync();
+            AtomicReference<String> restored=new AtomicReference<>("");
+            instrumentation.runOnMainSync(()->{restored.set(reopened.value("preset"));reopened.finish();});
+            instrumentation.waitForIdleSync();
+            assertEquals("Server Health",restored.get());
             assertTrue("Adding/configuring must not create authorization",WidgetStore.read(context).optString("token").isEmpty());
             String preserved=WidgetStore.connect(context,"synthetic-registration-preservation");
             if(android.os.Build.VERSION.SDK_INT>=28) {

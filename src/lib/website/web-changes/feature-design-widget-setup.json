@@ -1,0 +1,9 @@
+{
+  "title": "Widget settings help",
+  "summary": "For the site owner: Help now describes the clearer Android widget settings screen and the new widget-list previews coming in Android 1.14.0.",
+  "items": [
+    "The settings screen shows a live preview, names each choice in words, opens on the saved preset and applies a preset as soon as it is picked.",
+    "Save widget stays at the bottom; the extra app actions are in the ⋮ menu.",
+    "The Widgets list shows a sample healthy preview instead of \"SIGN IN REQUIRED\"."
+  ]
+}
