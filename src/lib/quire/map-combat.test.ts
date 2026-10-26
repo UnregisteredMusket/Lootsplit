@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { finishMapEncounter } from "../encounters/map-transition.ts";
 import { mapCombatBindingSchema } from "./map-combat-schema.ts";
-import { projectMapCombat } from "./map-combat.ts";
+import { projectMapCombat, projectMapCombatOrder } from "./map-combat.ts";
+import { previousTurn, nextTurn } from "../encounters/model.mjs";
 import { emptyCloudTable, type CloudSeat } from "./cloud.ts";
 import { campaignMapSchema } from "./world-schema.ts";
 import { applyCommand } from "./commands.ts";
@@ -185,4 +186,64 @@ test("HUD shares only a revealed projected token identity, round and lifecycle",
   assert.equal(projectMapCombat(battle, "encounter", privateRow).activeTokenId, "visible");
   battle.tokens = [];
   assert.equal(projectMapCombat(battle, "encounter", privateRow).activeTokenId, undefined);
+});
+
+test("initiative panel shares revealed order, round and turn, and only the seat's own HP", () => {
+  const battle = map("battle");
+  battle.tokens = [
+    { id: "t-mira", kind: "character", label: "Mira", entityId: "mira", column: 0, row: 0, visibility: "party" },
+    { id: "t-bram", kind: "character", label: "Bram", entityId: "bram", column: 1, row: 0, visibility: "party" },
+    { id: "t-scout", kind: "creature", label: "Known scout", encounterId: "encounter", combatantId: "scout", column: 2, row: 0, visibility: "party" },
+    { id: "t-dragon", kind: "creature", label: "Secret dragon", encounterId: "encounter", combatantId: "dragon", column: 3, row: 0, visibility: "dm" },
+  ];
+  const row = {
+    status: "active",
+    body: {
+      round: 4,
+      activeId: "scout",
+      notes: "Private tactics",
+      combatants: [
+        { id: "dragon", name: "Ancient dragon", initiative: 25, hp: 300, maxHp: 300, conditions: "Invisible", notes: "Lair action" },
+        { id: "mira", name: "Mira Ashfall", initiative: 21, hp: 38, maxHp: 44, conditions: "Blessed" },
+        { id: "scout", name: "Black Gull scout", initiative: 16, hp: 4, maxHp: 16, conditions: "Prone", notes: "Flees at 2 HP" },
+        { id: "bram", name: "Bram", initiative: 12, hp: 47, maxHp: 52 },
+        { id: "unplaced", name: "Unplaced cultist", initiative: 9, hp: 9, maxHp: 9 },
+      ],
+    },
+  };
+  const order = projectMapCombatOrder(battle, "encounter", row, ["mira"]);
+  assert.deepEqual(order, {
+    mapId: "battle",
+    status: "active",
+    round: 4,
+    entries: [
+      { tokenId: "t-mira", label: "Mira", initiative: 21, active: false, own: true, hp: 38, maxHp: 44 },
+      { tokenId: "t-scout", label: "Known scout", initiative: null, active: true, own: false },
+      { tokenId: "t-bram", label: "Bram", initiative: null, active: false, own: false },
+    ],
+  });
+  const text = JSON.stringify(order);
+  for (const secret of ["dragon", "Ancient", "300", "Invisible", "Lair", "Prone", "Flees", "Blessed", "Black Gull", "cultist", "Private", "47"])
+    assert.ok(!text.includes(secret), `the panel never carries "${secret}"`);
+  // A seat with no character on the map sees order and turn only; no HP at all.
+  const watcher = projectMapCombatOrder(battle, "encounter", row, []);
+  assert.ok(watcher.entries.every((e) => e.hp === undefined && e.maxHp === undefined && !e.own));
+  // A hidden combatant's turn is not revealed: no entry is active.
+  const hiddenTurn = projectMapCombatOrder(battle, "encounter", { ...row, body: { ...row.body, activeId: "dragon" } }, ["mira"]);
+  assert.ok(hiddenTurn.entries.every((e) => !e.active));
+  // Malformed tracker rows are ignored, never echoed.
+  const odd = projectMapCombatOrder(battle, "encounter", { status: "weird", body: { round: -2, combatants: [null, 7, { id: 5 }] } }, ["mira"]);
+  assert.deepEqual(odd, { mapId: "battle", status: "concluded", round: 0, entries: [] });
+});
+
+test("Previous turn steps back and wraps a round; Next turn is unchanged", () => {
+  const e = { round: 2, activeId: "b", combatants: [{ id: "a" }, { id: "b" }, { id: "c" }] } as never;
+  assert.deepEqual(previousTurn(e), { ...(e as object), activeId: "a", round: 2 });
+  const first = { ...(e as object), activeId: "a" } as never;
+  assert.deepEqual(previousTurn(first), { ...(first as object), activeId: "c", round: 1 });
+  const roundOne = { ...(e as object), activeId: "a", round: 1 } as never;
+  assert.equal((previousTurn(roundOne) as { round: number }).round, 1);
+  assert.equal((previousTurn(nextTurn(e)) as { activeId: string }).activeId, "b");
+  const none = { ...(e as object), activeId: "" } as never;
+  assert.equal((previousTurn(none) as { activeId: string }).activeId, "c");
 });

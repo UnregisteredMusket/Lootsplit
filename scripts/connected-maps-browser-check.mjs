@@ -310,6 +310,11 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       // Initiative (I) in the tools bar opens the encounter panel (map controls redesign).
       await closeMapSettings(page);
       await frame.getByRole("button", { name: "Initiative", exact: true }).click();
+      // Initiative (map controls PR 6): no encounter here yet, so it offers Start encounter here.
+      await frame
+        .getByRole("dialog", { name: "Initiative", exact: true })
+        .getByRole("button", { name: "Start encounter here", exact: true })
+        .click();
       const combat = frame.getByRole("region", { name: "Encounter map panel", exact: true });
       await chooseOption(
         combat.getByLabel("Saved encounter to start", { exact: true }),
@@ -328,6 +333,11 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       ).toBeDisabled();
       await closeMapSettings(page);
       await frame.getByRole("button", { name: "Initiative", exact: true }).click();
+      // The running encounter's turn order, with Previous/Next turn, then its map controls.
+      const initiative = frame.getByRole("dialog", { name: "Initiative", exact: true });
+      await expect(initiative.getByRole("list", { name: "Turn order" })).toBeVisible();
+      await expect(initiative.getByRole("button", { name: "Previous turn", exact: true })).toBeVisible();
+      await initiative.getByRole("button", { name: "Encounter map controls", exact: true }).click();
       await combat.getByRole("button", { name: "Open encounter tracker", exact: true }).click();
       await combat.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
       await answerThemedDialog(page);

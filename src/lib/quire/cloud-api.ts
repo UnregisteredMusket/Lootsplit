@@ -223,6 +223,16 @@ export const readMapCombatPresentation = createServerFn({method:"POST"})
     const {mapCombatPresentation}=await import("./cloud.server.ts");return mapCombatPresentation(data);
   });
 
+/** The seat's initiative panel: revealed order, round and turn, own HP only (map controls PR 6). */
+export const readMapCombatOrder = createServerFn({method:"POST"})
+  .validator((input:{code:string;token:string;mapId:string})=>input)
+  .handler(async({data})=>{
+    const {setResponseHeader}=await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control","no-store");
+    const {guardMemberSeat}=await import("./member-access.server.ts");await guardMemberSeat(data);
+    const {mapCombatOrder}=await import("./cloud.server.ts");return mapCombatOrder(data);
+  });
+
 /** Read-only NPC barter quote for a seat; players receive no valuation (docs/NPC-BARTER.md). */
 export const quoteCloudNpcBarter = createServerFn({ method: "POST" })
   .validator((input: { code: string; token: string; [key: string]: unknown }) => input)

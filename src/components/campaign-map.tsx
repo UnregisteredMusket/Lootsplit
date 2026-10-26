@@ -23,6 +23,7 @@ import {
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeatKnown } from "@/lib/quire/seat";
 import { MapCombatHud } from "./map-combat-hud";
+import { MapInitiativePanel } from "./map-initiative-panel";
 import { MapConnectedTools, type EntranceDraft } from "./map-connected-tools";
 import {
   defaultLocationMap,
@@ -1835,6 +1836,7 @@ function MapViewport({
     [deepLinkedCard, setDeepLinkedCard] = useState<MapRecordReference>(),
     [hereOpen, setHereOpen] = useState(false),
     [layersOpen, setLayersOpen] = useState(false),
+    [initiativeOpen, setInitiativeOpen] = useState(false),
     [railMore, setRailMore] = useState(false);
   // Desktop and landscape phones: vertical tools rail; phones keep today's bottom hotbar.
   const layout = useMapLayout(),
@@ -2323,6 +2325,7 @@ function MapViewport({
       setDrawerOpen(false);
       setCombatOpen(false);
       setLayersOpen(false);
+      setInitiativeOpen(false);
       tools.hideInspector();
       setHereOpen(true);
     });
@@ -2337,17 +2340,25 @@ function MapViewport({
       setHereOpen(false);
       setCombatOpen(false);
       setMoreTools(false);
+      setInitiativeOpen(false);
       setLayersOpen(true);
     });
   };
-  const toggleCombat = () => {
-    if (combatOpen) {
-      if (allowContextChange(() => setCombatOpen(false))) setCombatOpen(false);
+  // Initiative (I): the turn-order panel. DMs always; players while combat is shown on this map.
+  const combatShownHere = recordTable.journal?.world?.tabletop?.presentation?.mapId === map.id;
+  const initiativeAvailable = useDm || combatShownHere;
+  const toggleInitiative = () => {
+    if (initiativeOpen) {
+      setInitiativeOpen(false);
       return;
     }
-    setHereOpen(false);
-    setLayersOpen(false);
-    openCombat();
+    afterContextChange(() => {
+      setDrawerOpen(false);
+      setHereOpen(false);
+      setLayersOpen(false);
+      setCombatOpen(false);
+      setInitiativeOpen(true);
+    });
   };
   const setupPanelRef = useRef<HTMLElement>(null);
   const armSetup = (tool: SetupTool) => {
@@ -2496,7 +2507,7 @@ function MapViewport({
     else if (k === "j") openPlanner();
     else if (k === "e" && !placeBar) toggleHere();
     else if (k === "l") toggleLayers();
-    else if (k === "i" && useDm) toggleCombat();
+    else if (k === "i" && initiativeAvailable) toggleInitiative();
     else return false;
     return true;
   };
@@ -2568,6 +2579,7 @@ function MapViewport({
         if (drawerOpen) setDrawerOpen(false);
         else if (setupOpen) closeSetupPanel();
         else if (layersOpen) setLayersOpen(false);
+        else if (initiativeOpen) setInitiativeOpen(false);
         else if (moreTools) setMoreTools(false);
         else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
           const closeAll = () => {
@@ -2722,16 +2734,17 @@ function MapViewport({
   const lowerGroups = (
     <>
       <MapToolGroup caption="Table">
-        {useDm && (
+        {initiativeAvailable && (
           <MapTool
             icon={<Swords size={19} />}
             label="Initiative"
             shortcut="I"
             keys="I"
-            badge={combatHere ? "●" : undefined}
+            badge={combatHere || (!useDm && combatShownHere) ? "●" : undefined}
             badgeLabel="Encounter on this map"
-            expanded={combatOpen}
-            onClick={toggleCombat}
+            expanded={initiativeOpen}
+            controls="map-initiative"
+            onClick={toggleInitiative}
           />
         )}
         {!placeBar && (
@@ -2799,6 +2812,7 @@ function MapViewport({
           if (drawerOpen) setDrawerOpen(false);
           else if (setupOpen) closeSetupPanel();
           else if (layersOpen) setLayersOpen(false);
+          else if (initiativeOpen) setInitiativeOpen(false);
           else if (moreTools) setMoreTools(false);
           else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
             const closeAll = () => {
@@ -3237,6 +3251,21 @@ function MapViewport({
                 <Button onClick={entryPick.cancel}>Cancel</Button>
               </div>
             </section>
+          )}
+          {initiativeOpen && !drawerOpen && !combatOpen && (
+            <MapInitiativePanel
+              map={map}
+              dm={useDm}
+              binding={useDm ? (recordTable.journal?.world?.combat ?? undefined) : undefined}
+              openControls={() => {
+                setInitiativeOpen(false);
+                openCombat();
+              }}
+              close={() => {
+                setInitiativeOpen(false);
+                root.current?.focus();
+              }}
+            />
           )}
           {layersOpen && !drawerOpen && (
             <aside

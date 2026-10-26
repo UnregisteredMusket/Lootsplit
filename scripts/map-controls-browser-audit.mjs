@@ -388,6 +388,14 @@ async function checkSetupRail(page) {
   await page.keyboard.press("Escape");
   await sameDocument(page, "dm entrance panel");
 
+  // Initiative (I): the turn-order panel; with no encounter on this map it offers to start one.
+  await page.getByRole("button", { name: "Initiative", exact: true }).click();
+  const initiative = page.getByRole("dialog", { name: "Initiative", exact: true });
+  await expect(initiative).toContainText("No encounter is running on this map.");
+  await expect(initiative.getByRole("button", { name: "Start encounter here", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(initiative).toHaveCount(0);
+
   // Reveal, Combat and Objects (map controls PR 4): options beside the setup rail.
   await expect(page.getByRole("button", { name: "More map tools", exact: true })).toHaveCount(0);
   for (const group of ["Place", "Reveal", "Combat", "Objects"])

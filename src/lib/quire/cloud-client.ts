@@ -1449,6 +1449,15 @@ export async function requestMapAssets(request: unknown) {
   return result;
 }
 
+/** The seat's initiative panel (revealed order, round, own HP); null when not shown here. */
+export async function readSharedMapCombatOrder(mapId:string) {
+  const expected=captureMutationScope(),current=requireSession();
+  const {readMapCombatOrder}=await import("./cloud-api");
+  const {mapCombatOrderSchema}=await import("./map-combat-schema");
+  const result=await readMapCombatOrder({data:{code:current.code,token:current.token,mapId}});
+  assertMutationScope(expected);
+  return result===null?null:mapCombatOrderSchema.parse(result);
+}
 export async function readSharedMapCombat(mapId:string) {
   const expected=captureMutationScope(),current=requireSession();
   const {readMapCombatPresentation}=await import("./cloud-api");
