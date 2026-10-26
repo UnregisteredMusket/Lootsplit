@@ -368,6 +368,13 @@ try {
     await page.getByLabel("Marker name", { exact: true }).fill("Rendezvous");
     await page.getByLabel("Details", { exact: true }).fill("Meet at the quay");
     await page.getByRole("button", { name: "Save live marker", exact: true }).click();
+    // The setup rail's Marker stays armed after saving (map controls D8); Esc returns to Pan.
+    await expect(page.getByRole("dialog", { name: "Marker", exact: true })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Place marker", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     await closeMapSettings(page);
     const marker = page.getByRole("button", { name: "Marker: 1 record", exact: true });
     await expect(marker).toBeVisible();

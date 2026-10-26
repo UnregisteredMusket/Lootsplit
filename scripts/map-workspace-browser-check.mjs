@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
 import { mapCamera, expectMapFillsScreen } from "./fullscreen-map-browser-check.mjs";
-import { openMapSettings, closeMapSettings, selectWorkspaceMap } from "./map-workspace-browser.mjs";
+import {
+  openMapSettings,
+  closeMapSettings,
+  selectWorkspaceMap,
+  openMapSearch,
+} from "./map-workspace-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { navigateApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { themedDialog } from "./themed-dialogs.mjs";
@@ -37,6 +42,7 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await expect(page.getByRole("img", { name: "The Green March", exact: true })).toBeVisible();
   await expect.poll(same).toBe(true);
   const search = page.getByRole("combobox", { name: "Search maps and places", exact: true });
+  await openMapSearch(page);
   await search.fill("Ash & Anvil");
   const result = page.getByRole("option").filter({ hasText: "Brackenford" });
   await expect(result).toHaveCount(1);
@@ -196,6 +202,7 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await reloadApplication(page);
   await expect(page.getByRole("img", { name: "Old Watchtower", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Place marker", exact: true })).toHaveCount(0);
+  await openMapSearch(page);
   await search.fill("Brackenford");
   await expect(page.getByRole("option")).toHaveCount(0);
   await expect(page.getByText("No accessible maps or places found.")).toBeVisible();

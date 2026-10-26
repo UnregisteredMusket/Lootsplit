@@ -1,5 +1,12 @@
 import { SyncStatus } from "./sync-status";
-import { groupInfo, groupPlace, groupRefs, MAIN_GROUP, partySplit, seatGroups } from "@/lib/quire/party-groups";
+import {
+  groupInfo,
+  groupPlace,
+  groupRefs,
+  MAIN_GROUP,
+  partySplit,
+  seatGroups,
+} from "@/lib/quire/party-groups";
 import { mapGroupPins, type GroupPin } from "@/lib/quire/party-groups-map";
 import { HereGroupSwitch } from "./party-groups-map";
 import { useMapSketches } from "./map-sketch-tools";
@@ -16,7 +23,7 @@ import {
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeatKnown } from "@/lib/quire/seat";
 import { MapCombatHud } from "./map-combat-hud";
-import { MapConnectedTools } from "./map-connected-tools";
+import { MapConnectedTools, type EntranceDraft } from "./map-connected-tools";
 import {
   defaultLocationMap,
   mapsForLocation,
@@ -85,6 +92,9 @@ import {
   Maximize,
   House,
   Layers,
+  DoorOpen,
+  MapPinned,
+  Users,
   ChevronsDown,
   ChevronRight,
   Plus,
@@ -148,6 +158,24 @@ import {
 const MapCombatWorkspace = lazy(() =>
   import("./map-combat-workspace").then((m) => ({ default: m.MapCombatWorkspace })),
 );
+
+type SetupTool = "party" | "marker" | "entrance" | "record" | "anchor";
+/** The setup rail's Place group (DM). `label` stays the accessible name audits and help use. */
+const SETUP_TOOLS = [
+  { tool: "party", label: "Party position", name: "Party position", shortcut: "P", Icon: Users },
+  { tool: "marker", label: "Place marker", name: "Marker", shortcut: "M", Icon: MapPin },
+  { tool: "entrance", label: "Entrance", name: "Entrance", shortcut: "E", Icon: DoorOpen },
+  { tool: "record", label: "Place record", name: "Place record", shortcut: "R", Icon: Store },
+  { tool: "anchor", label: "Location link", name: "Location link", shortcut: "L", Icon: MapPinned },
+] as const satisfies readonly { tool: SetupTool; label: string; name: string; shortcut: string; Icon: unknown }[];
+const setupName = (tool: SetupTool) => SETUP_TOOLS.find((t) => t.tool === tool)!.name;
+const SETUP_PLACEMENT = {
+  party: "party",
+  marker: "marker",
+  entrance: "record",
+  record: "record",
+  anchor: "anchor",
+} as const;
 
 export function CampaignMaps() {
   const seat = useSeat(),
@@ -213,6 +241,14 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     [typeFilter, setTypeFilter] = useState(""),
     [tileMode, setTileMode] = useState(true),
     [selectedToken, setSelectedToken] = useState("");
+  // Map controls: the DM's setup rail. A tool arms placement; the first click opens its panel.
+  const [setupTool, setSetupTool] = useState<SetupTool | "">(""),
+    [entranceDraft, setEntranceDraft] = useState<EntranceDraft>(),
+    [entryPick, setEntryPick] = useState<EntranceDraft>();
+  // Re-arms a setup tool on a map we are switching to (after the map-change reset below).
+  const pendingSetup = useRef<{ mapId: string; tool: SetupTool; point?: { x: number; y: number } }>(
+    undefined,
+  );
   const requestedMap = useRouterState({ select: (s) => s.location.search.map }),
     requestedRecord = useRouterState({ select: (s) => s.location.search.record }),
     requestedPlace = useRouterState({ select: (s) => s.location.search.place }),
@@ -321,6 +357,14 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     setPoint(undefined);
     // A DM's "Place on map" link chose this map: keep its placement mode.
     if (placeRequest?.mapId !== viewedMapId) setPlacement("");
+    setSetupTool("");
+    const pending = pendingSetup.current;
+    if (pending?.mapId === viewedMapId) {
+      pendingSetup.current = undefined;
+      setSetupTool(pending.tool);
+      setPlacement(SETUP_PLACEMENT[pending.tool]);
+      setPoint(pending.point);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewedMapId, viewScope.key, viewScope.ephemeral]);
   // Place hub deep link: /maps?map=&record=kind:id centres on the pin and opens its card. Any
@@ -448,7 +492,14 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           id: n.id,
           label: n.name,
           kind: "NPC",
-          point: anchorFor(map, t, characterLocation(t, t.purses.find((p) => p.id === n.id)!)),
+          point: anchorFor(
+            map,
+            t,
+            characterLocation(
+              t,
+              t.purses.find((p) => p.id === n.id)!,
+            ),
+          ),
           href: libraryRecordHref("npc", n.id),
         })),
       ...t.purses
@@ -614,9 +665,13 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
       <p className="text-muted">
         {partySplit(t)
           ? groupRefs(t)
-              .map((g) => `${groupInfo(t, g).name}: ${partyEnvironment(groupPlace(t, g).position) || locationLabel(market, groupPlace(t, g).locationId)}`)
+              .map(
+                (g) =>
+                  `${groupInfo(t, g).name}: ${partyEnvironment(groupPlace(t, g).position) || locationLabel(market, groupPlace(t, g).locationId)}`,
+              )
               .join(" · ")
-          : partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)}{" "}
+          : partyEnvironment(w.partyPosition) ||
+            locationLabel(market, market.currentLocationId)}{" "}
         ·{" "}
         {party || groupPins?.length
           ? "Party position shown"
@@ -665,6 +720,143 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
       )}
     </>
   );
+  // Location link and Marker forms: in Settings, or in their own panel from the setup rail.
+  const anchorForm = (onDone: () => void) =>
+    map &&
+    point && (
+      <CommandForm
+        label="Save location anchor"
+        // Only typed or chosen fields count as a draft (closing a fresh pin asks nothing).
+        dirty={!!location}
+        submit={() => {
+          if (!location) throw Error("Choose an existing location.");
+          return {
+            kind: "map-save",
+            mapId: map.id,
+            before: map,
+            map: {
+              ...map,
+              anchors: [
+                ...map.anchors.filter((a) => a.locationId !== location),
+                { locationId: location, ...point },
+              ],
+            },
+          };
+        }}
+        onDone={onDone}
+      >
+        <label>
+          Linked location
+          <SearchSelect
+            aria-label="Linked location"
+            required
+            value={location}
+            onValueChange={(selectedValue) => setLocation(selectedValue)}
+          >
+            <option value="">Choose location</option>
+            {LocationOptions({ market: market })}
+          </SearchSelect>
+        </label>
+      </CommandForm>
+    );
+  const markerForm = (onDone: () => void) =>
+    map &&
+    point && (
+      <CommandForm
+        label="Save live marker"
+        dirty={!!(label || description)}
+        submit={() => {
+          const id = crypto.randomUUID();
+          return {
+            kind: "map-marker",
+            mapId: map.id,
+            markerId: id,
+            before: null,
+            marker: {
+              id,
+              label,
+              description,
+              visibility: secret ? "dm" : "party",
+              ...point,
+            },
+          };
+        }}
+        onDone={() => {
+          setLabel("");
+          setDescription("");
+          onDone();
+        }}
+      >
+        <label>
+          Marker name
+          <input
+            required
+            maxLength={160}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        </label>
+        <label>
+          Details
+          <textarea
+            maxLength={2000}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </label>
+        <label>
+          <input type="checkbox" checked={secret} onChange={(e) => setSecret(e.target.checked)} />
+          DM only
+        </label>
+      </CommandForm>
+    );
+  const setupPanel =
+    map && dm && setupTool && point ? (
+      setupTool === "party" ? (
+        <PartyPlacement
+          bare
+          key={`setup-party-${map.id}`}
+          map={map}
+          table={t}
+          point={point}
+          begin={() => {}}
+          done={() => setPoint(undefined)}
+        />
+      ) : setupTool === "marker" ? (
+        markerForm(() => setPoint(undefined))
+      ) : setupTool === "anchor" ? (
+        anchorForm(() => setPoint(undefined))
+      ) : (
+        <MapConnectedTools
+          only={setupTool}
+          key={`setup-${setupTool}-${map.id}-${entranceDraft?.mapId === map.id ? JSON.stringify(entranceDraft.entry) : ""}`}
+          map={map}
+          table={t}
+          point={point}
+          begin={() => {}}
+          done={() => {
+            setEntranceDraft(undefined);
+            setPoint(undefined);
+          }}
+          entranceDraft={
+            setupTool === "entrance" && entranceDraft?.mapId === map.id ? entranceDraft : undefined
+          }
+          pickEntry={
+            setupTool === "entrance"
+              ? (draft) => {
+                  // The draft is kept here, so the form unmounts first (no discard prompt), then
+                  // the destination opens for picking its entry view.
+                  setEntryPick(draft);
+                  setSetupTool("");
+                  setPlacement("");
+                  setPoint(undefined);
+                  window.setTimeout(() => selectMap(draft.target), 0);
+                }
+              : undefined
+          }
+        />
+      )
+    ) : undefined;
   const setup = map && (
     <>
       {" "}
@@ -677,7 +869,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           key={`party-placement-${map.id}`}
           map={map}
           table={t}
-          point={placement === "party" ? point : undefined}
+          point={placement === "party" && !setupTool ? point : undefined}
           begin={() => {
             setPlacement("party");
             setPoint(undefined);
@@ -732,98 +924,20 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               .
             </p>
           )}
-          {point && placement === "anchor" && (
-            <CommandForm
-              label="Save location anchor"
-              dirty
-              submit={() => {
-                if (!location) throw Error("Choose an existing location.");
-                return {
-                  kind: "map-save",
-                  mapId: map.id,
-                  before: map,
-                  map: {
-                    ...map,
-                    anchors: [
-                      ...map.anchors.filter((a) => a.locationId !== location),
-                      { locationId: location, ...point },
-                    ],
-                  },
-                };
-              }}
-              onDone={() => {
-                setPoint(undefined);
-                setPlacement("");
-              }}
-            >
-              <label>
-                Linked location
-                <SearchSelect
-                  aria-label="Linked location"
-                  required
-                  value={location}
-                  onValueChange={(selectedValue) => setLocation(selectedValue)}
-                >
-                  <option value="">Choose location</option>
-                  {LocationOptions({ market: market })}
-                </SearchSelect>
-              </label>
-            </CommandForm>
-          )}
-          {point && placement === "marker" && (
-            <CommandForm
-              label="Save live marker"
-              dirty
-              submit={() => {
-                const id = crypto.randomUUID();
-                return {
-                  kind: "map-marker",
-                  mapId: map.id,
-                  markerId: id,
-                  before: null,
-                  marker: {
-                    id,
-                    label,
-                    description,
-                    visibility: secret ? "dm" : "party",
-                    ...point,
-                  },
-                };
-              }}
-              onDone={() => {
-                setPoint(undefined);
-                setPlacement("");
-                setLabel("");
-                setDescription("");
-              }}
-            >
-              <label>
-                Marker name
-                <input
-                  required
-                  maxLength={160}
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                />
-              </label>
-              <label>
-                Details
-                <textarea
-                  maxLength={2000}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={secret}
-                  onChange={(e) => setSecret(e.target.checked)}
-                />
-                DM only
-              </label>
-            </CommandForm>
-          )}
+          {!setupTool &&
+            point &&
+            placement === "anchor" &&
+            anchorForm(() => {
+              setPoint(undefined);
+              setPlacement("");
+            })}
+          {!setupTool &&
+            point &&
+            placement === "marker" &&
+            markerForm(() => {
+              setPoint(undefined);
+              setPlacement("");
+            })}
         </Fold>
       )}
       <section className="world-register">
@@ -943,10 +1057,6 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               if (!combatPresentation) setTileMode(!tileMode);
             }}
             gridLocked={!!combatPresentation}
-            beginMarker={() => {
-              setPlacement("marker");
-              setPoint(undefined);
-            }}
             beginRecord={() => {
               setPlacement("record");
               setPoint(undefined);
@@ -1021,8 +1131,9 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                     key={`connected-${map.id}`}
                     map={map}
                     table={t}
-                    point={placement === "record" ? point : undefined}
+                    point={placement === "record" && !setupTool ? point : undefined}
                     begin={() => {
+                      setSetupTool("");
                       setPlacement("record");
                       setPoint(undefined);
                     }}
@@ -1093,7 +1204,51 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
             stopPlacing={() => {
               setPlacement("");
               setPoint(undefined);
+              setSetupTool("");
             }}
+            setup={
+              dm
+                ? {
+                    tool: setupTool,
+                    arm: (tool) => {
+                      setSetupTool(tool);
+                      setPlacement(SETUP_PLACEMENT[tool]);
+                      setPoint(undefined);
+                    },
+                    panel: setupPanel,
+                    closePanel: () => setPoint(undefined),
+                  }
+                : undefined
+            }
+            entryPick={
+              entryPick && entryPick.target === map.id
+                ? {
+                    label: entryPick.label,
+                    use: (camera) => {
+                      const draft = { ...entryPick, entry: camera };
+                      setEntryPick(undefined);
+                      setEntranceDraft(draft);
+                      pendingSetup.current = {
+                        mapId: draft.mapId,
+                        tool: "entrance",
+                        point: draft.point,
+                      };
+                      selectMap(draft.mapId);
+                    },
+                    cancel: () => {
+                      const draft = entryPick;
+                      setEntryPick(undefined);
+                      setEntranceDraft(draft);
+                      pendingSetup.current = {
+                        mapId: draft.mapId,
+                        tool: "entrance",
+                        point: draft.point,
+                      };
+                      selectMap(draft.mapId);
+                    },
+                  }
+                : undefined
+            }
             point={point}
             onPlace={setPoint}
             entities={[
@@ -1435,7 +1590,6 @@ function MapViewport({
   viewScope,
   toggleGrid,
   gridLocked,
-  beginMarker,
   beginRecord,
   placementKind,
   navigation,
@@ -1447,6 +1601,8 @@ function MapViewport({
   dismissNotice,
   onRecordMissing,
   selectMap,
+  setup,
+  entryPick,
   parentMap,
   goParent,
   locationMaps,
@@ -1475,7 +1631,6 @@ function MapViewport({
   viewScope: { key: string; ephemeral: boolean };
   toggleGrid: () => void;
   gridLocked: boolean;
-  beginMarker: () => void;
   beginRecord: () => void;
   placementKind: string;
   navigation: ReactNode;
@@ -1491,6 +1646,19 @@ function MapViewport({
   dismissNotice?: () => void;
   onRecordMissing?: () => void;
   selectMap: (id: string, entry?: { x: number; y: number; zoom: number }) => void;
+  /** DM map setup rail (map controls): the armed tool, its panel once placed. */
+  setup?: {
+    tool: SetupTool | "";
+    arm: (tool: SetupTool) => void;
+    panel?: ReactNode;
+    closePanel: () => void;
+  };
+  /** Picking an entrance's entry camera on this (destination) map. */
+  entryPick?: {
+    label: string;
+    use: (camera: { x: number; y: number; zoom: number }) => void;
+    cancel: () => void;
+  };
   /** The accessible parent map, for ← Back, Backspace and Android Back. */
   parentMap?: CampaignMap;
   goParent?: () => void;
@@ -1542,9 +1710,13 @@ function MapViewport({
   useLayoutEffect(() => {
     const frame = root.current?.closest<HTMLElement>(".map-workspace");
     if (!frame) return;
-    const anchor = frame.querySelector<HTMLElement>(".map-hotbar-anchor");
+    const anchor = frame.querySelector<HTMLElement>(".map-hotbar-anchor:not(.map-setup-anchor)");
     const width = rail && !interfaceHidden && anchor ? anchor.getBoundingClientRect().width : 0;
     frame.style.setProperty("--map-tools-w", `${Math.round(width)}px`);
+    const setupRail = frame.querySelector<HTMLElement>(".map-setup-anchor");
+    const setupWidth =
+      rail && !interfaceHidden && setupRail ? setupRail.getBoundingClientRect().width : 0;
+    frame.style.setProperty("--map-setup-w", `${Math.round(setupWidth)}px`);
   });
   const viewer = useSeat(),
     navigate = useNavigate();
@@ -1558,11 +1730,11 @@ function MapViewport({
   }, [map.id]);
   useEffect(() => {
     // "Place on map" keeps its own bar; the settings drawer stays closed.
-    if (placing && full && placementKind !== "place") {
+    if (placing && full && placementKind !== "place" && !setup?.tool) {
       setDrawerOpen(!!point);
       if (point) setSettingsTab("settings");
     }
-  }, [placing, point, full, placementKind]);
+  }, [placing, point, full, placementKind, setup?.tool]);
   const signals = useMapPings(map.id),
     useDm = useSeat().role === "dm",
     tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
@@ -1594,7 +1766,13 @@ function MapViewport({
           }))
       : []),
     ...(groupPins
-      ? groupPins.map((g) => ({ id: `group:${g.ref}`, label: g.name, kind: "Party", point: g.point, description: `Group ${g.letter} · ${g.where}` }))
+      ? groupPins.map((g) => ({
+          id: `group:${g.ref}`,
+          label: g.name,
+          kind: "Party",
+          point: g.point,
+          description: `Group ${g.letter} · ${g.where}`,
+        }))
       : party
         ? [{ id: "party", label: "Party", kind: "Party", point: party }]
         : []),
@@ -1612,11 +1790,21 @@ function MapViewport({
   // Split the party: the Here sheet shows one group's place (the DM: every group; a player: theirs).
   const hereGroups = seatGroups(recordTable, viewer);
   const [hereGroupChoice, setHereGroup] = useState<string>();
-  const hereGroup = hereGroupChoice && hereGroups.includes(hereGroupChoice) ? hereGroupChoice : hereGroups[0];
+  const hereGroup =
+    hereGroupChoice && hereGroups.includes(hereGroupChoice) ? hereGroupChoice : hereGroups[0];
   const here = useMemo(
     () => hereSheet(recordTable, viewer, map, hereGroup),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [recordTable.journal, recordTable.shops, recordTable.holdings, recordTable.listings, recordTable.purses, viewer, map, hereGroup],
+    [
+      recordTable.journal,
+      recordTable.shops,
+      recordTable.holdings,
+      recordTable.listings,
+      recordTable.purses,
+      viewer,
+      map,
+      hereGroup,
+    ],
   );
   const drawnRecord = (reference: MapRecordReference) =>
     records.find((r) => sameRecord(r.reference, reference) && r.point);
@@ -1869,10 +2057,12 @@ function MapViewport({
     if (planRequest === "party") planner.start("party");
     else if (planRequest.startsWith("journey:")) {
       const id = planRequest.slice("journey:".length);
-      if (useDm && recordTable.journal?.world?.journeys?.some((j) => j.id === id && j.status !== "completed"))
+      if (
+        useDm &&
+        recordTable.journal?.world?.journeys?.some((j) => j.id === id && j.status !== "completed")
+      )
         setReviewJourney(id);
-    }
-    else if (planRequest.startsWith("ship:"))
+    } else if (planRequest.startsWith("ship:"))
       planner.start("ship", { shipId: planRequest.slice("ship:".length) });
     // Handled once per URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2021,6 +2211,66 @@ function MapViewport({
     setLayersOpen(false);
     openCombat();
   };
+  const setupPanelRef = useRef<HTMLElement>(null);
+  const armSetup = (tool: SetupTool) => {
+    if (!setup) return;
+    afterContextChange(() => {
+      tools.cancel();
+      sketches.cancel();
+      setPinging(false);
+      setContextOpen(false);
+      setMoreTools(false);
+      if (planner.active) planner.close();
+      setup.arm(tool);
+      root.current?.focus();
+    });
+  };
+  const closeSetupPanel = () => {
+    if (!setup?.panel) return false;
+    afterContextChange(() => {
+      setup.closePanel();
+      root.current?.focus();
+    });
+    return true;
+  };
+  // A placed pin opens its panel with focus on the first field; on phones (a bottom sheet) the
+  // camera moves the pin into the free band above the sheet.
+  const setupOpen = !!(setup?.tool && setup.panel);
+  useEffect(() => {
+    if (!setupOpen) return;
+    const panel = setupPanelRef.current;
+    panel
+      ?.querySelector<HTMLElement>("input:not([type=hidden]),select,textarea,button[role=combobox]")
+      ?.focus({ preventScroll: true });
+    if (!point || !panel || !window.matchMedia("(max-width: 650px)").matches) return;
+    const frame = requestAnimationFrame(() => {
+      const region = root.current?.getBoundingClientRect(),
+        sheet = panel.getBoundingClientRect();
+      if (!region) return;
+      const area = freeArea(
+        { width: region.width, height: region.height },
+        {
+          left: sheet.left - region.left,
+          top: sheet.top - region.top,
+          right: sheet.right - region.left,
+          bottom: sheet.bottom - region.top,
+        },
+        { left: 10, top: 112, right: 10, bottom: 10 },
+      );
+      const next = frameRoute([point], viewRef.current, { w, h }, area);
+      if (next) setView(next);
+    });
+    return () => cancelAnimationFrame(frame);
+    // Once per opened panel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setupOpen]);
+  /** Shift shortcuts for the setup rail (DM): ⇧P ⇧M ⇧E ⇧R ⇧L. */
+  const setupShortcut = (key: string) => {
+    const tool = SETUP_TOOLS.find((t) => t.shortcut === key.toUpperCase());
+    if (!setup || !tool) return false;
+    armSetup(tool.tool);
+    return true;
+  };
   /** Panel and tool shortcuts shared by the map canvas and the rest of the workspace. */
   const panelShortcut = (key: string) => {
     const k = key.toLowerCase();
@@ -2098,6 +2348,7 @@ function MapViewport({
         return;
       if (e.key === "Escape") {
         if (drawerOpen) setDrawerOpen(false);
+        else if (setupOpen) closeSetupPanel();
         else if (layersOpen) setLayersOpen(false);
         else if (moreTools) setMoreTools(false);
         else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
@@ -2141,11 +2392,14 @@ function MapViewport({
         e.altKey
       )
         return;
-      const tool = ({ v: "pan", s: "select", m: "measure", t: "template" } as const)[
-        e.key.toLowerCase() as "v"
-      ];
+      const tool = e.shiftKey
+        ? undefined
+        : ({ v: "pan", s: "select", m: "measure", t: "template" } as const)[
+            e.key.toLowerCase() as "v"
+          ];
       if (
         e.key.toLowerCase() === "p" &&
+        !e.shiftKey &&
         !signals.viewOnly &&
         !drawerOpen &&
         !service &&
@@ -2167,6 +2421,8 @@ function MapViewport({
         e.preventDefault();
         chooseTool(tool);
       } else if (!drawerOpen && !service && !combatOpen && !e.shiftKey && panelShortcut(e.key))
+        e.preventDefault();
+      else if (!drawerOpen && !service && !combatOpen && e.shiftKey && setupShortcut(e.key))
         e.preventDefault();
     };
     document.addEventListener("keydown", key);
@@ -2237,72 +2493,46 @@ function MapViewport({
             }))),
     ]),
   ];
-  // Table, View and (for now) Setup groups: in the rail, or folded into More on short desktops.
+  // Table and View groups: in the rail, or folded into More on short desktops.
   const lowerGroups = (
     <>
-    <MapToolGroup caption="Table">
-      {useDm && (
+      <MapToolGroup caption="Table">
+        {useDm && (
+          <MapTool
+            icon={<Swords size={19} />}
+            label="Initiative"
+            shortcut="I"
+            keys="I"
+            badge={combatHere ? "●" : undefined}
+            badgeLabel="Encounter on this map"
+            expanded={combatOpen}
+            onClick={toggleCombat}
+          />
+        )}
+        {!placeBar && (
+          <MapTool
+            icon={<House size={19} />}
+            label={here.mode === "road" ? "Here: on the road" : "Here"}
+            shortcut="E"
+            keys="E"
+            badge={here.mode === "here" ? here.rows.length : undefined}
+            badgeLabel="places to use here"
+            expanded={hereOpen}
+            onClick={toggleHere}
+          />
+        )}
+      </MapToolGroup>
+      <MapToolGroup caption="View">
         <MapTool
-          icon={<Swords size={19} />}
-          label="Initiative"
-          name={
-            recordTable.journal?.world?.combat
-              ? "Initiative"
-              : "Initiative · start encounter here"
-          }
-          shortcut="I"
-          keys="I"
-          badge={combatHere ? "●" : undefined}
-          badgeLabel="Encounter on this map"
-          expanded={combatOpen}
-          onClick={toggleCombat}
-        />
-      )}
-      {!placeBar && (
-        <MapTool
-          icon={<House size={19} />}
-          label={here.mode === "road" ? "Here: on the road" : "Here"}
-          shortcut="E"
-          keys="E"
-          badge={here.mode === "here" ? here.rows.length : undefined}
-          badgeLabel="places to use here"
-          expanded={hereOpen}
-          onClick={toggleHere}
-        />
-      )}
-    </MapToolGroup>
-    <MapToolGroup caption="View">
-      <MapTool
-        icon={<Layers size={19} />}
-        label="Layers"
-        shortcut="L"
-        keys="L"
-        expanded={layersOpen}
-        controls="map-layers"
-        onClick={toggleLayers}
-      />
-    </MapToolGroup>
-    {useDm && (
-      // Setup tools stay here until the setup rail (map controls PR 3 and 4).
-      <MapToolGroup caption="Setup">
-        <MapTool
-          icon={<MapPin size={19} />}
-          label="Place marker"
-          pressed={placementKind === "marker"}
-          onClick={() => {
-            afterContextChange(() => {
-              tools.cancel();
-              sketches.cancel();
-              setPinging(false);
-              beginMarker();
-              setDrawerOpen(false);
-              setContextOpen(false);
-              root.current?.focus();
-            });
-          }}
+          icon={<Layers size={19} />}
+          label="Layers"
+          shortcut="L"
+          keys="L"
+          expanded={layersOpen}
+          controls="map-layers"
+          onClick={toggleLayers}
         />
       </MapToolGroup>
-    )}
     </>
   );
   return (
@@ -2323,12 +2553,14 @@ function MapViewport({
               );
           });
         }}
+        compactSearch={!!setup}
         settingsOpen={drawerOpen}
         toggleSettings={openSettings}
         parent={parentMap}
         onBack={goParent && (() => afterContextChange(goParent))}
         closePanel={() => {
           if (drawerOpen) setDrawerOpen(false);
+          else if (setupOpen) closeSetupPanel();
           else if (layersOpen) setLayersOpen(false);
           else if (moreTools) setMoreTools(false);
           else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
@@ -2551,9 +2783,7 @@ function MapViewport({
                       label="Select / move"
                       shortcut="S"
                       keys="S"
-                      pressed={
-                        tools.tool === "select" && !pinging && !placing && !sketches.active
-                      }
+                      pressed={tools.tool === "select" && !pinging && !placing && !sketches.active}
                       onClick={() => chooseTool("select")}
                     />
                   </MapToolGroup>
@@ -2764,6 +2994,79 @@ function MapViewport({
             )}
           </div>
           {railNames && <ToolNamesHint />}
+          {setup && (
+            <div
+              className="map-hotbar-anchor map-setup-anchor"
+              data-layout={layout}
+              data-tool-names={railNames ? "" : undefined}
+            >
+              <MapToolbar
+                className="map-hotbar map-setup-bar map-glass"
+                label="Map setup"
+                orientation={rail ? "vertical" : "horizontal"}
+              >
+                <div className="map-hotbar-tools">
+                  <MapToolGroup caption="Place">
+                    {SETUP_TOOLS.map(({ tool, label, name, shortcut, Icon }) => (
+                      <MapTool
+                        key={tool}
+                        icon={<Icon size={19} />}
+                        label={label}
+                        name={name}
+                        shortcut={`⇧${shortcut}`}
+                        keys={`Shift+${shortcut}`}
+                        pressed={setup.tool === tool}
+                        onClick={() => armSetup(tool)}
+                      />
+                    ))}
+                  </MapToolGroup>
+                </div>
+              </MapToolbar>
+            </div>
+          )}
+          {setup?.tool && setup.panel && (
+            <aside
+              ref={setupPanelRef}
+              className="map-side-panel map-setup-panel map-glass"
+              role="dialog"
+              aria-modal="false"
+              aria-labelledby="map-setup-heading"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  closeSetupPanel();
+                }
+              }}
+            >
+              <div className="map-panel-heading">
+                <strong id="map-setup-heading">{setupName(setup.tool)}</strong>
+                <button
+                  className="map-icon-button"
+                  aria-label={`Close ${setupName(setup.tool)} panel`}
+                  onClick={closeSetupPanel}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="map-setup-note">
+                Click the map again to move the pin. Saving keeps the tool ready for the next one;
+                Esc twice returns to Pan.
+              </p>
+              {setup.panel}
+            </aside>
+          )}
+          {entryPick && (
+            <section className="map-entry-pick map-glass" aria-label="Pick the entry view">
+              <p>
+                <strong>Entry view for {entryPick.label || "the entrance"}</strong>
+                Pan and zoom to what arriving players should see, then use this view.
+              </p>
+              <div>
+                <Button onClick={() => entryPick.use(currentCamera())}>Use this view</Button>
+                <Button onClick={entryPick.cancel}>Cancel</Button>
+              </div>
+            </section>
+          )}
           {layersOpen && !drawerOpen && (
             <aside
               id="map-layers"
@@ -2896,7 +3199,12 @@ function MapViewport({
             >
               <Minus size={18} aria-hidden="true" />
             </button>
-            <button className="map-icon-button" onClick={fit} aria-label="Fit map" title="Fit map (Home)">
+            <button
+              className="map-icon-button"
+              onClick={fit}
+              aria-label="Fit map"
+              title="Fit map (Home)"
+            >
               <Maximize size={18} aria-hidden="true" />
             </button>
             <button
@@ -2908,7 +3216,10 @@ function MapViewport({
                 const p =
                   currentDetails[0]?.point ??
                   (map.grid && map.tokens?.find((t) => t.id === selectedToken)
-                    ? sceneTokenPoint(map.grid, map.tokens!.find((t) => t.id === selectedToken)!)
+                    ? sceneTokenPoint(
+                        map.grid,
+                        map.tokens!.find((t) => t.id === selectedToken)!,
+                      )
                     : party);
                 if (p)
                   setView((v) => ({
@@ -2947,7 +3258,9 @@ function MapViewport({
         <MapRenderBadge />
         {full && (
           <p className="map-active-tool" role="status">
-            {pinging
+            {setup?.tool
+              ? `${setupName(setup.tool)}: ${point ? "fill in its panel, or click the map to move the pin" : "click the map to place it"}`
+              : pinging
               ? `Ping · ${color} ${pingShapes[color]}`
               : sketches.active
                 ? "Personal annotations"
@@ -2986,7 +3299,11 @@ function MapViewport({
             aria-label="Interactive campaign map"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+              if (!e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey && setupShortcut(e.key)) {
+                e.preventDefault();
+                return;
+              }
+              if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
                 const shortcut = ({ v: "pan", s: "select", m: "measure", t: "template" } as const)[
                   e.key.toLowerCase() as "v"
                 ];
@@ -3406,7 +3723,12 @@ function MapViewport({
               }}
               groupSwitch={
                 partySplit(recordTable) ? (
-                  <HereGroupSwitch table={recordTable} groups={hereGroups} value={hereGroup} onChange={setHereGroup} />
+                  <HereGroupSwitch
+                    table={recordTable}
+                    groups={hereGroups}
+                    value={hereGroup}
+                    onChange={setHereGroup}
+                  />
                 ) : undefined
               }
               close={() => {
@@ -3453,7 +3775,8 @@ function MapViewport({
                 });
               }}
               canLocate={(reference) =>
-                !!drawnRecord(reference) || recordMapSpots(recordTable, reference, viewer, maps).length > 0
+                !!drawnRecord(reference) ||
+                recordMapSpots(recordTable, reference, viewer, maps).length > 0
               }
               locate={(reference) => {
                 const drawn = drawnRecord(reference);
@@ -3517,7 +3840,8 @@ function MapViewport({
               locationMaps={locationMaps}
               focusKey={cardFocus}
               deepLinked={
-                currentDetails.length === 1 && sameRecord(currentDetails[0].reference, deepLinkedCard)
+                currentDetails.length === 1 &&
+                sameRecord(currentDetails[0].reference, deepLinkedCard)
               }
             />
           )}
@@ -3549,7 +3873,10 @@ function MapRecordGlyph({
         ? table.purses.find((person) => person.id === token.entityId)?.portrait
         : pinnedPortrait || undefined;
   // Split the party: a group's marker carries its letter in its colour.
-  const group = kind === "Party" && records[0]?.id.startsWith("group:") ? groupInfo(table, records[0].id.slice(6)) : undefined;
+  const group =
+    kind === "Party" && records[0]?.id.startsWith("group:")
+      ? groupInfo(table, records[0].id.slice(6))
+      : undefined;
   if (group)
     return (
       <span className={`gbadge map-group-badge g-${group.colour}`} aria-hidden="true">

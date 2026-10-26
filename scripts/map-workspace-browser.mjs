@@ -37,3 +37,10 @@ export async function selectMapType(page, id) {
   await chooseOption(page.getByLabel("Map type filter", { exact: true }), id);
   await openMapSettings(page);
 }
+
+/** DM phones show Search as a row-1 icon (the setup bar takes row 2); open the field first. */
+export async function openMapSearch(page) {
+  const toggle = page.getByRole("button", { name: "Search maps and places", exact: true });
+  if (await toggle.isVisible()) await toggle.click();
+  return page.getByRole("combobox", { name: "Search maps and places", exact: true });
+}

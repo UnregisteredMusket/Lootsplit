@@ -1,0 +1,11 @@
+{
+  "title": "Map setup tools on the left",
+  "summary": "Dungeon Masters now place the party, markers, entrances, records and location links from a setup rail on the left of the map, each with its own small panel.",
+  "items": [
+    "Choose a setup tool, click the map, and its panel opens right beside it, instead of inside the long Settings drawer.",
+    "After saving, the tool stays ready, so you can drop several markers in a row. Esc closes the panel; Esc again returns to panning.",
+    "Entrances can pick their arrival view on the destination map: pan and zoom there, then choose Use this view.",
+    "On phones the setup tools sit in a second bar under the title, and search becomes a magnifier icon. Players' phone layout is unchanged.",
+    "Every form is still in Settings as before."
+  ]
+}

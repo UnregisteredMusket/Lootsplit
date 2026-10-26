@@ -284,10 +284,12 @@ try {
     await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
     const selectedColor = await mapMarkerColor(heroIcon);
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
-    // Pan the corner token below the floating navigation, without moving any token.
+    // Pan the corner token below the floating navigation and clear of the DM's setup rail on
+    // the left (map controls), without moving any token.
     await viewport.focus();
     await viewport.press("Alt+ArrowUp");
     await viewport.press("Alt+ArrowUp");
+    for (let i = 0; i < 6; i++) await viewport.press("Alt+ArrowLeft");
     await guardIcon.click();
     await expect(guardIcon).toHaveAttribute("aria-pressed", "true");
     await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
