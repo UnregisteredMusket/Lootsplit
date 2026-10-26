@@ -1,0 +1,11 @@
+{
+  "title": "A tidier Desk",
+  "summary": "The Desk's Information cards now fit their content: six tiles side by side on a wide screen, and a swipe strip with dots on a phone. New campaigns get a short setup checklist.",
+  "items": [
+    "On a computer, Session, Party, Funds, Market, Activity and Rolls show as a 3×2 grid of tiles, all visible at once.",
+    "On a phone, swipe the cards or tap the dots under them; the duplicate arrow pager is gone.",
+    "The Session tile names the current session and has End & start next (or Start session) right at the top.",
+    "A new campaign shows \"Set up your campaign\": add your party, a first place, a shop, a map and your players. Steps tick themselves, and the list can be hidden.",
+    "Empty readouts point to a next step (\"Plan an encounter\") instead of listing zeros."
+  ]
+}

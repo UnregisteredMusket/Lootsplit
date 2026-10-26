@@ -28,6 +28,7 @@ import type { Purse } from "@/lib/quire/types";
 import { lootReviewEncounters, lootReviewHref } from "@/lib/encounters/loot-review";
 import { DeskLootReviews } from "./desk-loot-review";
 import { reviewItems } from "@/lib/quire/review-inbox";
+import { DeskSetupChecklist } from "./setup-checklist";
 type Roll = NonNullable<Purse["rolls"]>[number];
 
 export function DmDesk() {
@@ -126,6 +127,8 @@ function DmDeskContents() {
   }, [contextKey, room.revision, room.joined, room.code, refresh]);
   const party = purses.filter((p) => p.kind === "character" && inParty({ purses, journal }, p)),
     session = journal.sessions.find((x) => !x.endedAt),
+    // "Session N" counts recorded sessions; the next one is N + 1 until it starts.
+    sessionNumber = session ? journal.sessions.indexOf(session) + 1 : journal.sessions.length + 1,
     fund = purses.filter((p) => p.kind === "party").reduce((sum, p) => sum + toCopper(p.coins), 0),
     pending =
       journal.requests.filter((x) => x.status === "pending").length +
@@ -182,6 +185,7 @@ function DmDeskContents() {
             Multiplayer settings
           </AppLink>
         </div>
+        <DeskSetupChecklist campaign={contextKey} online={room.joined} />
         <div className="readout-grid desk-pinned-readouts">
           <AppLink
             href={encounter?.status === "review" && encounter.id ? lootReviewHref(encounter.id) : "/encounters?resume=1"}
@@ -197,10 +201,12 @@ function DmDeskContents() {
                     : encounter.status === "review"
                       ? "Loot review"
                       : "Ready to play"
-                  : encounterState || "Choose encounter"}
+                  : encounterState || "None planned yet"}
               </strong>
               {encounter && <small>{encounter.name}</small>}
-              <small className="readout-action">Open encounter →</small>
+              <small className="readout-action">
+                {encounter || encounterState ? "Open encounter →" : "Plan an encounter →"}
+              </small>
             </span>
           </AppLink>
           <AppLink href="/features/review?from=%2F" className="readout">
@@ -209,22 +215,29 @@ function DmDeskContents() {
               <small>Review Inbox</small>
               <strong>
                 {room.joined && imports === null
-                  ? `${pending} financial · ${propertyPending} property${lootPending ? ` · ${lootPending} loot` : ""}`
+                  ? pending + propertyPending + poolPending + lootPending + otherPending ||
+                    (importError ? "Nothing else waiting" : "Checking imports…")
                   : pending + (imports ?? 0) + propertyPending + poolPending + lootPending + otherPending ||
                     "All caught up"}
               </strong>
               <small>
-                {pending} financial · {propertyPending} property
-                {poolPending ? ` · ${poolPending} treasure pool` : ""}
-                {lootPending ? ` · ${lootPending} loot ${lootPending === 1 ? "review" : "reviews"}` : ""}
-                {otherPending ? ` · ${otherPending} other` : ""}
-                {room.joined
-                  ? imports !== null
-                    ? ` · ${imports} imports`
-                    : importError
-                      ? " · Imports unavailable"
-                      : " · Imports loading…"
-                  : " · Imports online"}
+                {/* Only what waits is listed (dm #16): no "0 financial · 0 property" rows. */}
+                {[
+                  pending && `${pending} financial`,
+                  propertyPending && `${propertyPending} property`,
+                  poolPending && `${poolPending} treasure pool`,
+                  lootPending && `${lootPending} loot ${lootPending === 1 ? "review" : "reviews"}`,
+                  otherPending && `${otherPending} other`,
+                  room.joined
+                    ? imports !== null
+                      ? imports && `${imports} imports`
+                      : importError
+                        ? "Imports unavailable"
+                        : "Imports loading…"
+                    : "Imports online",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </small>
               <small className="readout-action">Open Review Inbox →</small>
             </span>
@@ -240,13 +253,24 @@ function DmDeskContents() {
             content: (
               <>
                 <h2>Current session</h2>
-                <AppLink href="/?view=home#sessions" className="readout session-readout">
-                  <FantasyIcon ui="Campaign" size={30} />
+                <div className="information-session-line">
                   <span>
-                    <small>Recorded play session</small>
+                    <small>
+                      {session
+                        ? /^session\s*\d/i.test(session.name)
+                          ? "In progress"
+                          : `Session ${sessionNumber} · in progress`
+                        : `Session ${sessionNumber} not started`}
+                    </small>
                     <strong>{session?.name || "No active session"}</strong>
                   </span>
-                </AppLink>
+                  <AppLink
+                    href="/?view=home#sessions"
+                    className="information-session-action session-readout"
+                  >
+                    {session ? "End & start next" : "Start session"}
+                  </AppLink>
+                </div>
                 <p>
                   {party.length} party {party.length === 1 ? "character" : "characters"} · Campaign
                   day {journal.finance?.day ?? 0}

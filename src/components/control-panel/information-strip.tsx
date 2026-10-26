@@ -1,6 +1,11 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import "./desk-tiles.css";
 
+/**
+ * Desk Information (design D4). Wide screens show the panels as a 3×2 grid of compact tiles, all
+ * visible at once. Phones and narrow panes keep the swipe strip, with one row of dots as its only
+ * pager (each dot is a button named after its panel, so every panel stays one tap or Tab away).
+ */
 export function InformationStrip({
   panels,
   resetKey,
@@ -55,27 +60,6 @@ export function InformationStrip({
     <section className="desk-information" aria-label="Campaign information">
       <div className="panel-heading">
         <h2>Information</h2>
-        <div className="information-controls">
-          <button
-            aria-label="Previous information panel"
-            aria-controls={id}
-            disabled={selected === 0}
-            onClick={() => go(selected - 1)}
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <span aria-live="polite">
-            {selected + 1} / {panels.length}
-          </span>
-          <button
-            aria-label="Next information panel"
-            aria-controls={id}
-            disabled={selected === panels.length - 1}
-            onClick={() => go(selected + 1)}
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
       </div>
       <div className="information-strip" id={id} ref={strip}>
         {panels.map((panel) => (
@@ -88,15 +72,18 @@ export function InformationStrip({
           </section>
         ))}
       </div>
-      <div className="information-selectors" aria-label="Jump to information">
+      <div className="information-selectors" role="group" aria-label="Jump to information">
         {panels.map((panel, index) => (
           <button
             key={panel.name}
+            type="button"
+            aria-label={panel.name}
+            title={panel.name}
             aria-pressed={selected === index}
             aria-controls={id}
             onClick={() => go(index)}
           >
-            {panel.name}
+            <span aria-hidden="true" />
           </button>
         ))}
       </div>

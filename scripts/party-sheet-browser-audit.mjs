@@ -112,7 +112,8 @@ try {
   await dm.page.getByLabel("Equip Sentinel sword", { exact: true }).check();
   await save(dm.page);
   await visit(dm.page, "/");
-  await dm.page.locator(".information-selectors").getByRole("button", { name: "Party", exact: true }).click();
+  // At 1440 px the Desk shows every Information tile at once (design D4); no pager to use.
+  assert.equal(await dm.page.locator(".information-selectors").isVisible(), false);
   const partyReadout = dm.page.getByRole("region", { name: "Party information", exact: true });
   const characterReadout = partyReadout.getByRole("link").filter({ hasText: characterName });
   await characterReadout.getByText("10/115 HP", { exact: false }).waitFor();

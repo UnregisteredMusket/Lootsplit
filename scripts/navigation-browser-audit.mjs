@@ -213,6 +213,13 @@ async function menus(page, role) {
   }
 }
 
+// Desk Information: phones page with dots; desktop shows every tile at once (design D4).
+async function showInformation(page, name) {
+  const dot = page.locator(".information-selectors").getByRole("button", { name, exact: true });
+  if (await dot.isVisible()) await dot.click();
+  await expect(page.getByRole("region", { name: `${name} information`, exact: true })).toBeVisible();
+}
+
 try {
   for (const width of [390, 1280]) {
     const context = await browser.newContext({
@@ -274,10 +281,7 @@ try {
       1,
       `${width}: one Settings & Management control`,
     );
-    await page
-      .locator(".information-selectors")
-      .getByRole("button", { name: "Market", exact: true })
-      .click();
+    await showInformation(page, "Market");
     const panel = page.getByRole("region", { name: "Market information", exact: true });
     await expect(panel).toContainText("Season 1");
     await expect(panel).toContainText("Automatic economy");
@@ -292,10 +296,7 @@ try {
       "Global market readout",
     );
     await back(page);
-    await page
-      .locator(".information-selectors")
-      .getByRole("button", { name: "Market", exact: true })
-      .click();
+    await showInformation(page, "Market");
     const quoteLink = panel.locator(".information-market-quotes a").first();
     const selected = new URL(await quoteLink.getAttribute("href"), origin);
     await click(page, quoteLink, "Exact commodity/exchange readout");
@@ -313,10 +314,7 @@ try {
     await page.evaluate(() => {
       window.navigationAuditDocument = "same-document";
     });
-    await page
-      .locator(".information-selectors")
-      .getByRole("button", { name: "Market", exact: true })
-      .click();
+    await showInformation(page, "Market");
     await expect(panel).toContainText("Closed here · visit a city");
     await expect(panel).toContainText("Ask 1 gp, 3 sp");
     await click(
