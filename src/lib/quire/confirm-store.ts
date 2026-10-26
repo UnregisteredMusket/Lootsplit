@@ -93,10 +93,21 @@ export function settleDialog(id: number, value: boolean | string | null) {
   else request.resolve(typeof value === "string" ? value : null);
 }
 
-// A fullscreen map hides everything outside its element, so dialogs open inside it.
-const container = () =>
-  (typeof document !== "undefined" && (document.fullscreenElement as HTMLElement | null)) ||
-  undefined;
+// A fullscreen element or a native modal <dialog> (the map editor) puts everything outside it
+// behind the top layer and makes it inert, so the question opens inside the topmost one.
+const container = () => {
+  if (typeof document === "undefined") return undefined;
+  const modal = [...document.querySelectorAll<HTMLDialogElement>("dialog[open]")]
+    .filter((dialog) => {
+      try {
+        return dialog.matches(":modal");
+      } catch {
+        return false;
+      }
+    })
+    .at(-1);
+  return modal ?? (document.fullscreenElement as HTMLElement | null) ?? undefined;
+};
 const opener = () => {
   const focused = typeof document !== "undefined" ? document.activeElement : null;
   return focused && focused !== document.body && "focus" in focused

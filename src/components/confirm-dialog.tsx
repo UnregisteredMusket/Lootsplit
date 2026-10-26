@@ -49,10 +49,7 @@ function PromptView({ request }: { request: Extract<DialogRequest, { kind: "prom
   const [value, setValue] = useState(options.defaultValue ?? "");
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    input.current?.focus();
-    input.current?.select();
-  }, []);
+  const selected = useRef(false);
   const fieldId = `themed-prompt-${request.id}`;
   return (
     <Modal
@@ -87,6 +84,14 @@ function PromptView({ request }: { request: Extract<DialogRequest, { kind: "prom
         <TextInput
           ref={input}
           id={fieldId}
+          // The portal mounts after this component's effects, so autoFocus (kept by the dialog's
+          // focus scope) puts the caret in the field; the default text starts selected, as before.
+          autoFocus
+          onFocus={(event) => {
+            if (selected.current) return;
+            selected.current = true;
+            event.currentTarget.select();
+          }}
           value={value}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${fieldId}-error` : undefined}
