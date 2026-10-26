@@ -50,7 +50,10 @@ import {
 export type ProbeAccess = { monitorProbe: true; code: string };
 /** Probe rooms answer exactly like a missing room to every caller except the probe itself. */
 function refuseProbeRoom(room: CloudRoom, probe?: ProbeAccess) {
-  if ((room.monitorProbe || isProbeRoomCode(room.code)) && !(probe?.monitorProbe && probe.code === room.code))
+  if (
+    (room.monitorProbe || isProbeRoomCode(room.code)) &&
+    !(probe?.monitorProbe && probe.code === room.code)
+  )
     throw new Error("No table uses that code.");
 }
 
@@ -203,11 +206,14 @@ export async function characterRoll(input: {
   return roll;
 }
 
-export async function openRoom(input: {
-  name: string;
-  table: CloudTable;
-  userId?: string;
-}, probe?: ProbeAccess): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
+export async function openRoom(
+  input: {
+    name: string;
+    table: CloudTable;
+    userId?: string;
+  },
+  probe?: ProbeAccess,
+): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
   const table = readCloudTableForImport(input.table);
   if (!table)
     throw new Error(
@@ -226,18 +232,23 @@ export async function openRoom(input: {
     purseIds: [],
   };
   const { hostedCampaignLimit } = await import("../../../cloudflare/hosted-campaigns.mjs");
-  await createRoom({
-    ownerId: input.userId,
-    sessionId: input.userId ? crypto.randomUUID() : undefined,
-    code,
-    revision: 1,
-    turn: 0,
-    live: false,
-    seats: [seat],
-    table,
-    seen: { gifts: [], sales: [] },
-    ...(probe ? { monitorProbe: true } : {}),
-  }, input.userId ? { hostLimit: { userId: input.userId, limit: hostedCampaignLimit(), path: "open" } } : {});
+  await createRoom(
+    {
+      ownerId: input.userId,
+      sessionId: input.userId ? crypto.randomUUID() : undefined,
+      code,
+      revision: 1,
+      turn: 0,
+      live: false,
+      seats: [seat],
+      table,
+      seen: { gifts: [], sales: [] },
+      ...(probe ? { monitorProbe: true } : {}),
+    },
+    input.userId
+      ? { hostLimit: { userId: input.userId, limit: hostedCampaignLimit(), path: "open" } }
+      : {},
+  );
   return { code, token: seat.token, seatId: seat.id, revision: 1, userId: seat.userId };
 }
 
@@ -264,14 +275,17 @@ export async function previewRoom(
   };
 }
 
-export async function joinRoom(input: {
-  code: string;
-  purseId: string;
-  name: string;
-  invitation?: string;
-  userId?: string;
-  sessionId?: string;
-}, probe?: ProbeAccess): Promise<{
+export async function joinRoom(
+  input: {
+    code: string;
+    purseId: string;
+    name: string;
+    invitation?: string;
+    userId?: string;
+    sessionId?: string;
+  },
+  probe?: ProbeAccess,
+): Promise<{
   token: string;
   seatId: string;
   revision: number;
@@ -637,7 +651,8 @@ export async function authorizedRoomImage(input: {
   token: string;
   reference: string;
 }): Promise<{ image: string } | { status: 403 | 404 }> {
-  const { ROOM_IMAGE_REFERENCE, readRoomImage } = await import("../../../cloudflare/room-images.mjs");
+  const { ROOM_IMAGE_REFERENCE, readRoomImage } =
+    await import("../../../cloudflare/room-images.mjs");
   if (!ROOM_IMAGE_REFERENCE.test(input.reference)) return { status: 404 };
   const db = database();
   if (!db) return { status: 404 };
@@ -674,9 +689,7 @@ function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): Cl
     ...npcs.filter((n) => npcController(n, seat)).map((n) => n.id),
   ]);
   const readableNpcs = new Set((record.journal?.world?.npcs ?? []).map((n) => n.id));
-  const treasuries = new Set(
-    (table.journal?.tradeEconomy?.exchanges ?? []).map((e) => e.purseId),
-  );
+  const treasuries = new Set((table.journal?.tradeEconomy?.exchanges ?? []).map((e) => e.purseId));
   const partyPlayer = (p: Purse) =>
     characterVisible(table, p) &&
     !p.nonParty &&
@@ -749,7 +762,7 @@ export async function submitCommands(input: {
   endTurn?: boolean;
   stage?: boolean;
 }): Promise<RoomView> {
-  const { commandSchema, applyCommandBatch } = await import("./commands.ts");
+  const { commandSchema, applyCommandBatch, compactPatch } = await import("./commands.ts");
   const { commandIdentity, canonicalJson, sameCommand } = await import("./command-identity.ts");
   if (JSON.stringify(input).length > 2_000_000)
     throw new Error("The pending batch is too large. Submit smaller changes.");
@@ -776,7 +789,9 @@ export async function submitCommands(input: {
   // Treasure-pool claims move nothing and resolutions are rolled by the room: both are sent
   // directly, never staged with a turn.
   if (input.stage && commands.some((c) => c.kind === "loot-claim" || c.kind === "loot-resolve"))
-    throw Error("Treasure-pool claims and resolutions are sent to the room directly. Send it again.");
+    throw Error(
+      "Treasure-pool claims and resolutions are sent to the room directly. Send it again.",
+    );
   // Quest commands move nothing and are the DM's alone: sent directly, never staged with a turn.
   if (input.stage && commands.some((c) => c.kind.startsWith("quest-")))
     throw Error("Quest changes are sent to the room directly. Send it again.");
@@ -828,7 +843,8 @@ export async function submitCommands(input: {
           "An action ID contains conflicting changes. Export your pending actions before retrying.",
         );
       const staged = room.drafts?.[seat.id]?.find((c) => c.id === command.id);
-      if (staged && !sameCommand(staged, command))
+      // A draft staged with the whole journal equals its split form (journal-patch.ts).
+      if (staged && !sameCommand(compactPatch(staged), compactPatch(command)))
         throw Error(
           "Another device saved different changes for this action. Export your pending actions before retrying.",
         );
@@ -851,7 +867,9 @@ export async function submitCommands(input: {
     // Quest changes (DM only, nothing moves) are not bound to the turn either.
     const messagesOnly =
       commands.length > 0 &&
-      commands.every((c) => c.kind === "message" || c.kind === "loot-claim" || c.kind.startsWith("quest-"));
+      commands.every(
+        (c) => c.kind === "message" || c.kind === "loot-claim" || c.kind.startsWith("quest-"),
+      );
     if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
     const seen = new Set(room.commands ?? []);
@@ -865,11 +883,16 @@ export async function submitCommands(input: {
           : total,
       0,
     );
-    const allowance = takeSubmitAllowance(room.submitAllowance?.[seat.id], Date.now(), messageChars);
+    const allowance = takeSubmitAllowance(
+      room.submitAllowance?.[seat.id],
+      Date.now(),
+      messageChars,
+    );
     if (!allowance) throw Object.assign(Error(SUBMIT_LIMIT_MESSAGE), { status: 429 });
     const drafts = { ...(room.drafts ?? {}) };
     if (input.stage) {
-      const pending = [...(drafts[seat.id] ?? [])];
+      // Drafts staged before journal changes were split keep their action IDs in the split form.
+      const pending = (drafts[seat.id] ?? []).map((c) => compactPatch(c));
       const known = new Set(pending.map((c) => c.id));
       for (const command of commands)
         if (!seen.has(seat.id + ":" + command.id) && !known.has(command.id)) {
@@ -1099,21 +1122,44 @@ export async function manageRoom(input: {
 }
 
 /** Read-only, freshly authorized combat presentation for the map being viewed. */
-export async function mapCombatPresentation(input: {code:string;token:string;mapId:string}) {
-  const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
-  if(!initialSeat)throw Error("This browser is not seated at that table.");
-  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
-  const db=database();
-  if(!db)return null;
-  const row=await db.prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?").bind(binding.encounterId,initial.code).first<{body:string;status:string}>();
-  if(!row)return null;
+export async function mapCombatPresentation(input: { code: string; token: string; mapId: string }) {
+  const initial = await must(input.code),
+    initialSeat = initial.seats.find((s) => s.token === input.token),
+    binding = initial.table.journal?.world?.combat;
+  if (!initialSeat) throw Error("This browser is not seated at that table.");
+  if (!binding || binding.phase !== "active" || binding.mapId !== input.mapId) return null;
+  const db = database();
+  if (!db) return null;
+  const row = await db
+    .prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?")
+    .bind(binding.encounterId, initial.code)
+    .first<{ body: string; status: string }>();
+  if (!row) return null;
   // Recheck revocation, current scene and visibility after the private store read.
-  const room=await must(input.code),seat=room.seats.find(s=>s.token===input.token),current=room.table.journal?.world?.combat;
-  if(!seat)throw Error("This browser is not seated at that table.");
-  if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
-  if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
-  const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
-  if(!map)return null;
-  const {projectMapCombat}=await import("./map-combat.ts");
-  return projectMapCombat(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)});
+  const room = await must(input.code),
+    seat = room.seats.find((s) => s.token === input.token),
+    current = room.table.journal?.world?.combat;
+  if (!seat) throw Error("This browser is not seated at that table.");
+  if (
+    current?.id !== binding.id ||
+    current.encounterId !== binding.encounterId ||
+    current.phase !== "active"
+  )
+    return null;
+  if (
+    seat.role !== "dm" &&
+    (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id !== current.id)
+  )
+    return null;
+  const projected = projectRecord(
+      { ...room.table, journal: { ...room.table.journal!, reports: [] } },
+      seat,
+    ),
+    map = projected.journal?.world?.maps.find((m) => m.id === input.mapId);
+  if (!map) return null;
+  const { projectMapCombat } = await import("./map-combat.ts");
+  return projectMapCombat(map, binding.encounterId, {
+    status: row.status,
+    body: JSON.parse(row.body),
+  });
 }

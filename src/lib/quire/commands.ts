@@ -1,11 +1,18 @@
 import { shipCommands, type ShipCommand } from "./ships-schema.ts";
-import { downtimeActivityCommands, type DowntimeActivityCommand } from "./downtime-activities-schema.ts";
+import {
+  downtimeActivityCommands,
+  type DowntimeActivityCommand,
+} from "./downtime-activities-schema.ts";
 import { applyDowntimeActivity, validateDowntimeActivities } from "./downtime-activities.ts";
 import { orderedTable } from "./journey-engine.ts";
 import { smithCommands, type SmithCommand } from "./blacksmith-schema.ts";
 import { applyShipCommand, validateFleet, assertShipTradingHere } from "./ships.ts";
 import { characterVisible, canReadCharacter } from "./character-position.ts";
-import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange } from "./city-exchanges.ts";
+import {
+  ensureCityExchanges,
+  removeUnusedCityExchange,
+  renameUnusedCityExchange,
+} from "./city-exchanges.ts";
 import { worldCommands, readWorld, type WorldCommand } from "./world-schema.ts";
 import { journeyCommands, journeyKinds, type JourneyCommand } from "./journey-schema.ts";
 import {
@@ -19,22 +26,57 @@ import { npcBarterCommands, npcBarterKinds, type NpcBarterCommand } from "./npc-
 import { applyNpcBarterCommand, validateNpcBarter } from "./npc-barter.ts";
 import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
-import { applyTradeCommand, prepareTradeSeason, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
+import {
+  applyTradeCommand,
+  prepareTradeSeason,
+  recordShopTrade,
+  validateTradeEconomy,
+} from "./trade-economy.ts";
 import { applyWorldCommand, validateWorld, shopVisible, shopAsking } from "./world.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { estateCommands } from "./estate-schema.ts";
-import { estateImportCommand, estateImportFingerprint, previewEstateImport } from "./estate-import.ts";
-import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEstatePurchase, removeEstateSite, validateEstate } from "./estate.ts";
-import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
+import {
+  estateImportCommand,
+  estateImportFingerprint,
+  previewEstateImport,
+} from "./estate-import.ts";
+import {
+  applyEstateCommand,
+  assertCarried,
+  assertEstateDisposable,
+  initializeEstatePurchase,
+  removeEstateSite,
+  validateEstate,
+} from "./estate.ts";
+import {
+  marketLocationSchema,
+  readMarketLocations,
+  validateShopLocations,
+} from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
-import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
+import {
+  applyFundSplit,
+  planCoinSplit,
+  remainderText,
+  SPLIT_RULES,
+  MAX_SPLIT_RECIPIENTS,
+  partyFunds,
+} from "./coin-split.ts";
 import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
 import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
 import { questCommands, questKinds, type QuestCommand } from "./quests-schema.ts";
 import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
-import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
-import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
+import {
+  applyLedgerVoid,
+  assertNoPartialTradeVoid,
+  ledgerVoidCommandSchema,
+} from "./ledger-reversal.ts";
+import {
+  marketNameRowsSchema,
+  marketNameFingerprint,
+  previewMarketNames,
+} from "./market-name-import.ts";
 import {
   characterPermissionSchema,
   canEditCharacterField,
@@ -52,7 +94,12 @@ import {
 } from "./finance.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { archiveSession } from "./session-records.ts";
-import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
+import {
+  readJournal,
+  preserveJournalMetadata,
+  encounterLootProvenanceSchema,
+  encounterLootEntryId,
+} from "./journal.ts";
 import { z } from "zod";
 import { referencePolicySchema, referencePolicy } from "./reference-access.ts";
 import { artworkSchema } from "./artwork.ts";
@@ -66,9 +113,25 @@ import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { formatCopper, fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
 import { validateEconomyRows } from "./validation.ts";
-import { listingSchema, propertyProfileSchema, propertyAvailableToGroups, validatePropertyLocations } from "./property.ts";
-import { actingGroups, activeGroups, groupInfo, MAIN_GROUP, partySplit, purseGroup } from "./party-groups.ts";
-import { partyGroupCommands, partyGroupKinds, type PartyGroupCommand } from "./party-groups-schema.ts";
+import {
+  listingSchema,
+  propertyProfileSchema,
+  propertyAvailableToGroups,
+  validatePropertyLocations,
+} from "./property.ts";
+import {
+  actingGroups,
+  activeGroups,
+  groupInfo,
+  MAIN_GROUP,
+  partySplit,
+  purseGroup,
+} from "./party-groups.ts";
+import {
+  partyGroupCommands,
+  partyGroupKinds,
+  type PartyGroupCommand,
+} from "./party-groups-schema.ts";
 import { applyGroupLocation, applyPartyGroupCommand } from "./party-groups-command.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
 import { locationLabel } from "./shop-locations.ts";
@@ -79,12 +142,26 @@ import { applyServiceCommand } from "./services-command.ts";
 // After services-command: finance must load after journal here (see services-lessons.ts).
 import { chargeLesson } from "./services-lessons.ts";
 import { validateServices } from "./services-validation.ts";
+import {
+  diffJournal,
+  journalChangeId,
+  journalChangePath,
+  LEGACY_JOURNAL_CHANGE_ID,
+  writeJournalPath,
+} from "./journal-patch.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
-  z.object({ ...base, kind: z.literal("reference-policy"), before: referencePolicySchema, policy: referencePolicySchema }).strict(),
+  z
+    .object({
+      ...base,
+      kind: z.literal("reference-policy"),
+      before: referencePolicySchema,
+      policy: referencePolicySchema,
+    })
+    .strict(),
   ledgerVoidCommandSchema,
   ...tradeCommands,
   ...worldCommands,
@@ -97,25 +174,85 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...serviceCommands,
   ...downtimeActivityCommands,
   estateImportCommand,
-  z.object({ ...base, kind: z.literal("resource-pack-import"), before: z.string().max(30000), pack: resourcePackSchema }).strict(),
-  z.object({ ...base, kind: z.literal("listing-edit"), listingId: id, before: listingSchema.nullable(), after: listingSchema.nullable() }),
-  z.object({ ...base, kind: z.literal("property-profile"), holdingId: id,
+  z
+    .object({
+      ...base,
+      kind: z.literal("resource-pack-import"),
+      before: z.string().max(30000),
+      pack: resourcePackSchema,
+    })
+    .strict(),
+  z.object({
+    ...base,
+    kind: z.literal("listing-edit"),
+    listingId: id,
+    before: listingSchema.nullable(),
+    after: listingSchema.nullable(),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("property-profile"),
+    holdingId: id,
     before: z.object({ locationId: id.nullable(), property: propertyProfileSchema.nullable() }),
-    locationId: id.nullable(), property: propertyProfileSchema.nullable() }),
-  z.object({ ...base, kind: z.literal("market-name-import"), before: z.string(), rows: marketNameRowsSchema }),
-  z.object({ ...base, kind: z.literal("shop-location"), shopId: id,
+    locationId: id.nullable(),
+    property: propertyProfileSchema.nullable(),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("market-name-import"),
+    before: z.string(),
+    rows: marketNameRowsSchema,
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("shop-location"),
+    shopId: id,
     before: z.object({ locationId: id.nullable(), image: artworkSchema.nullable() }),
-    locationId: id.nullable(), image: artworkSchema.nullable() }),
-  z.object({ ...base, kind: z.literal("market-location"), locationId: id, before: marketLocationSchema.nullable(), after: marketLocationSchema.nullable() }),
-  z.object({ ...base, kind: z.literal("party-location"), before: id.nullable(), locationId: id.nullable(), beforePosition: z.string().optional(),
+    locationId: id.nullable(),
+    image: artworkSchema.nullable(),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("market-location"),
+    locationId: id,
+    before: marketLocationSchema.nullable(),
+    after: marketLocationSchema.nullable(),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("party-location"),
+    before: id.nullable(),
+    locationId: id.nullable(),
+    beforePosition: z.string().optional(),
     /** Journey planner: "Move party here" on arrival completes this journey. */
     journeyId: id.optional(),
     /** Split the party: move this group (absent or "main" = the main group, as before). */
-    groupId: id.optional() }),
+    groupId: id.optional(),
+  }),
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
-  z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
-  z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
-  z.object({ ...base, kind: z.literal("property-plan"), holdingId: id, income: amount, upkeep: amount, periodDays: z.number().int().min(1).max(3650), active: z.boolean() }),
+  z.object({
+    ...base,
+    kind: z.literal("property-details"),
+    holdingId: id,
+    before: z.object({ name: z.string(), notes: z.string() }),
+    name: z.string().trim().min(1).max(160),
+    notes: z.string().max(4000),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("shop-schedule"),
+    shopId: id,
+    schedule: shopScheduleSchema.nullable(),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("property-plan"),
+    holdingId: id,
+    income: amount,
+    upkeep: amount,
+    periodDays: z.number().int().min(1).max(3650),
+    active: z.boolean(),
+  }),
   z.object({
     ...base,
     kind: z.literal("downtime-preference"),
@@ -208,7 +345,14 @@ export const commandSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ ...base, kind: z.literal("buy"), stockId: id, purseId: id, quantity: qty }),
   z.object({ ...base, kind: z.literal("sell"), holdingId: id, shopId: id, quantity: qty }),
-  z.object({ ...base, kind: z.literal("listing"), listingId: id, purseId: id, quantity: qty, before: listingSchema.optional() }),
+  z.object({
+    ...base,
+    kind: z.literal("listing"),
+    listingId: id,
+    purseId: id,
+    quantity: qty,
+    before: listingSchema.optional(),
+  }),
   z.object({
     ...base,
     kind: z.literal("give"),
@@ -225,9 +369,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
       sourceId: id,
       copper: amount.min(1),
       recipientIds: z.array(id).min(1).max(MAX_SPLIT_RECIPIENTS),
-      remainder: z
-        .object({ rule: z.enum(SPLIT_RULES), purseId: id.optional() })
-        .strict(),
+      remainder: z.object({ rule: z.enum(SPLIT_RULES), purseId: id.optional() }).strict(),
       // What the reviewed preview showed; a split that would now differ is refused.
       expect: z.object({ share: amount.min(1), remainderTo: id.nullable() }).strict(),
       makeDefault: z.boolean().optional(),
@@ -302,16 +444,32 @@ export type CommandInput = Command extends infer C
  * Without an `id` a fresh one is generated and no duplicate check is possible.
  */
 export type CommandRequest = CommandInput & { id?: string };
-export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution = {}): CloudTable {
+export function applyCommand(
+  input: CloudTable,
+  seat: CloudSeat,
+  raw: Command,
+  execution: TradeExecution = {},
+): CloudTable {
   return applyOwnedCommand(structuredClone(input), seat, raw, execution);
 }
 /** One private working copy per atomic batch. Every command retains its full validation. */
-export function applyCommandBatch(input: CloudTable, seat: CloudSeat, commands: Command[], executionFor: (command: Command) => TradeExecution = () => ({})): CloudTable {
+export function applyCommandBatch(
+  input: CloudTable,
+  seat: CloudSeat,
+  commands: Command[],
+  executionFor: (command: Command) => TradeExecution = () => ({}),
+): CloudTable {
   let table = structuredClone(input);
-  for (const command of commands) table = applyOwnedCommand(table, seat, command, executionFor(command));
+  for (const command of commands)
+    table = applyOwnedCommand(table, seat, command, executionFor(command));
   return table;
 }
-function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution): CloudTable {
+function applyOwnedCommand(
+  t: CloudTable,
+  seat: CloudSeat,
+  raw: Command,
+  execution: TradeExecution,
+): CloudTable {
   const originalLocations = structuredClone(t.journal?.market?.locations);
   const cmd = commandSchema.parse(raw);
   const at = Date.now();
@@ -412,13 +570,20 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     return f;
   };
   if (seat.role === "player" && ["buy", "sell", "listing"].includes(cmd.kind)) {
-    const payerId = "purseId" in cmd ? cmd.purseId : "holdingId" in cmd ? t.holdings.find(h=>h.id===cmd.holdingId)?.purseId : undefined;
+    const payerId =
+      "purseId" in cmd
+        ? cmd.purseId
+        : "holdingId" in cmd
+          ? t.holdings.find((h) => h.id === cmd.holdingId)?.purseId
+          : undefined;
     if (payerId) assertShipTradingHere(t, payerId);
   }
   if (cmd.kind === "ledger-void") {
     applyLedgerVoid(t, seat, cmd, at, execution.source === "local");
-  } else if (downtimeActivityCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
-    applyDowntimeActivity(t, seat, cmd as DowntimeActivityCommand, at, execution.preview === true, { chargeLesson });
+  } else if (downtimeActivityCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
+    applyDowntimeActivity(t, seat, cmd as DowntimeActivityCommand, at, execution.preview === true, {
+      chargeLesson,
+    });
   } else if (tradeCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
   } else if (lootKinds.has(cmd.kind)) {
@@ -495,9 +660,15 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (!h) throw Error("Property no longer exists.");
     if (!same({ locationId: h.locationId ?? null, property: h.property ?? null }, cmd.before))
       throw Error("Property location or features changed elsewhere. Reload before saving.");
-    if (journal.fleet?.vessels.some(v=>v.propertyId===h.id) && cmd.locationId!==(h.locationId??null)) throw Error("Use ship travel or DM Teleport Ship to move this vessel and its occupants.");
-    if (cmd.locationId) h.locationId = cmd.locationId; else delete h.locationId;
-    if (cmd.property) h.property = cmd.property; else delete h.property;
+    if (
+      journal.fleet?.vessels.some((v) => v.propertyId === h.id) &&
+      cmd.locationId !== (h.locationId ?? null)
+    )
+      throw Error("Use ship travel or DM Teleport Ship to move this vessel and its occupants.");
+    if (cmd.locationId) h.locationId = cmd.locationId;
+    else delete h.locationId;
+    if (cmd.property) h.property = cmd.property;
+    else delete h.property;
     event(`Property location and features saved: ${h.name}`, "management", h.purseId);
   } else if (cmd.kind === "resource-pack-import") {
     dm();
@@ -512,10 +683,14 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   } else if (cmd.kind === "market-name-import") {
     dm();
     const market = readMarketLocations(journal.market);
-    if (marketNameFingerprint(market, t.shops) !== cmd.before) throw Error("Location or shop names changed elsewhere. Review a fresh import preview.");
+    if (marketNameFingerprint(market, t.shops) !== cmd.before)
+      throw Error("Location or shop names changed elsewhere. Review a fresh import preview.");
     const plan = previewMarketNames(market, t.shops, cmd.rows, cmd.id);
     if (plan.locations.length || plan.shops.length) {
-      journal.market = readMarketLocations({ ...market, locations: [...market.locations, ...plan.locations] });
+      journal.market = readMarketLocations({
+        ...market,
+        locations: [...market.locations, ...plan.locations],
+      });
       t.shops.push(...plan.shops);
       event(`Names imported: ${plan.locations.length} locations, ${plan.shops.length} shops`);
     }
@@ -523,9 +698,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     dm();
     const shop = t.shops.find((shop) => shop.id === cmd.shopId);
     if (!shop) throw Error("This shop no longer exists.");
-    if (!same({ locationId: shop.locationId ?? null, image: shop.image ?? null }, cmd.before)) throw Error("This shop's location or image changed elsewhere. Refresh before saving.");
-    if (cmd.locationId) shop.locationId = cmd.locationId; else delete shop.locationId;
-    if (cmd.image) shop.image = cmd.image; else delete shop.image;
+    if (!same({ locationId: shop.locationId ?? null, image: shop.image ?? null }, cmd.before))
+      throw Error("This shop's location or image changed elsewhere. Refresh before saving.");
+    if (cmd.locationId) shop.locationId = cmd.locationId;
+    else delete shop.locationId;
+    if (cmd.image) shop.image = cmd.image;
+    else delete shop.image;
     event(`Shop location and image saved: ${shop.name}`);
   } else if (cmd.kind === "market-location") {
     dm();
@@ -544,9 +722,15 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
           (s) => s.locationId === cmd.locationId || s.downtime?.returnLocationId === cmd.locationId,
         ) ||
         activeGroups(t).some((g) => g.locationId === cmd.locationId) ||
-        journal.world?.groupRequests?.some((r) => r.status === "pending" && r.locationId === cmd.locationId) ||
-        journal.fleet?.facilities.some(y=>y.locationId===cmd.locationId) ||
-        journal.fleet?.voyages.some(v=>!["arrived","cancelled","dm-overridden","denied"].includes(v.status)&&(v.originId===cmd.locationId||v.destinationId===cmd.locationId)) ||
+        journal.world?.groupRequests?.some(
+          (r) => r.status === "pending" && r.locationId === cmd.locationId,
+        ) ||
+        journal.fleet?.facilities.some((y) => y.locationId === cmd.locationId) ||
+        journal.fleet?.voyages.some(
+          (v) =>
+            !["arrived", "cancelled", "dm-overridden", "denied"].includes(v.status) &&
+            (v.originId === cmd.locationId || v.destinationId === cmd.locationId),
+        ) ||
         journal.world?.npcs.some((n) => n.locationId === cmd.locationId) ||
         journal.world?.maps.some(
           (m) =>
@@ -558,8 +742,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw Error(
         "Move the party, child locations, assigned shops and properties before removing this location.",
       );
-    if (current?.kind === "city" && cmd.after?.kind !== "city") removeUnusedCityExchange(t, current);
-    if (current?.kind === "city" && cmd.after?.kind === "city") renameUnusedCityExchange(t, current, cmd.after);
+    if (current?.kind === "city" && cmd.after?.kind !== "city")
+      removeUnusedCityExchange(t, current);
+    if (current?.kind === "city" && cmd.after?.kind === "city")
+      renameUnusedCityExchange(t, current, cmd.after);
     market.locations = [
       ...market.locations.filter((location) => location.id !== cmd.locationId),
       ...(cmd.after ? [cmd.after] : []),
@@ -585,15 +771,24 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   } else if (cmd.kind === "party-location") {
     dm();
     const market = readMarketLocations(journal.market);
-    if (market.currentLocationId !== cmd.before) throw Error("The party moved elsewhere. Refresh before changing location.");
-    if (journal.world?.partyPosition && canonicalJson(journal.world.partyPosition) !== cmd.beforePosition) throw Error("The party travel position changed. Refresh before choosing a location.");
-    if (journal.finance?.downtime.some(d=>d.status==="pending")) throw Error("Approve or cancel pending downtime before moving the party.");
+    if (market.currentLocationId !== cmd.before)
+      throw Error("The party moved elsewhere. Refresh before changing location.");
+    if (
+      journal.world?.partyPosition &&
+      canonicalJson(journal.world.partyPosition) !== cmd.beforePosition
+    )
+      throw Error("The party travel position changed. Refresh before choosing a location.");
+    if (journal.finance?.downtime.some((d) => d.status === "pending"))
+      throw Error("Approve or cancel pending downtime before moving the party.");
     const travelling = travellingJourney(t, MAIN_GROUP);
     if (cmd.journeyId) {
       // "Move party here" on arrival: no time passes and nothing is charged.
       if (!travelling || travelling.id !== cmd.journeyId || travelling.status !== "arrived")
         throw Error("This journey hasn't arrived. Refresh before moving the party.");
-      if (!cmd.locationId || (travelling.destinationLocationId && travelling.destinationLocationId !== cmd.locationId))
+      if (
+        !cmd.locationId ||
+        (travelling.destinationLocationId && travelling.destinationLocationId !== cmd.locationId)
+      )
         throw Error("Move the party to the journey's destination, or stop the journey first.");
       travelling.status = "completed";
       travelling.decidedAt = at;
@@ -616,8 +811,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     );
     if (!h) throw Error("Property no longer exists.");
     own(h.purseId);
-    if (h.name !== cmd.before.name || h.notes !== cmd.before.notes) throw Error("Property details changed. Reload before saving.");
-    h.name = cmd.name; h.notes = cmd.notes;
+    if (h.name !== cmd.before.name || h.notes !== cmd.before.notes)
+      throw Error("Property details changed. Reload before saving.");
+    h.name = cmd.name;
+    h.notes = cmd.notes;
     event(`Property details updated: ${h.name}`, "management", h.purseId);
   } else if (cmd.kind === "shop-schedule") {
     const f = editableFinance();
@@ -630,7 +827,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     event(`Shop schedule ${cmd.schedule ? "updated" : "disabled"}: ${shop.name}`);
   } else if (cmd.kind === "property-plan") {
     const f = editableFinance();
-    const holding = t.holdings.find((h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
+    const holding = t.holdings.find(
+      (h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0,
+    );
     if (!holding) throw Error("Choose an owned campaign property.");
     own(holding.purseId);
     if (f.rules.some((r) => r.holdingId === holding.id && r.estateOperation))
@@ -640,10 +839,15 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     for (const kind of ["income", "expense"] as const) {
       const copper = kind === "income" ? cmd.income : cmd.upkeep;
       const existing = f.rules.filter((r) => r.holdingId === holding.id && r.kind === kind);
-      if (existing.length > 1) throw Error("This property has multiple schedules of the same type. Review them in Recurring revenue & expenses before using a property plan.");
+      if (existing.length > 1)
+        throw Error(
+          "This property has multiple schedules of the same type. Review them in Recurring revenue & expenses before using a property plan.",
+        );
       const prior = existing[0];
-      if (prior && prior.purseId !== holding.purseId) throw Error("Settle the former owner's property agreements before transferring this plan.");
-      if (prior?.carryDays && prior.periodDays !== cmd.periodDays) throw Error("Finish the current property period before changing its length.");
+      if (prior && prior.purseId !== holding.purseId)
+        throw Error("Settle the former owner's property agreements before transferring this plan.");
+      if (prior?.carryDays && prior.periodDays !== cmd.periodDays)
+        throw Error("Finish the current property period before changing its length.");
       if (!prior && !copper) continue;
       const next = {
         id: prior?.id || `${cmd.id}-${kind}`,
@@ -759,7 +963,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     )
       throw Error("Choose inventory owned by this campaign account.");
     const prior = f.rules.find((r) => r.id === cmd.rule.id);
-    if (prior?.estateOperation || cmd.rule.estateOperation) throw Error("Reviewed property schedules follow their tenancy or staff contract. Edit that contract in Property Management, or use Settle arrears for an outstanding expense.");
+    if (prior?.estateOperation || cmd.rule.estateOperation)
+      throw Error(
+        "Reviewed property schedules follow their tenancy or staff contract. Edit that contract in Property Management, or use Settle arrears for an outstanding expense.",
+      );
     if (prior && prior.purseId !== cmd.rule.purseId)
       throw Error("Keep the original account; create a new schedule to use another account.");
     if (prior && prior.kind !== cmd.rule.kind)
@@ -783,7 +990,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     dm();
     const f = finance();
     if (cmd.advanceSeason) {
-      if (journal.tradeEconomy?.pendingSeason) throw Error("Cancel the manual seasonal preview before preparing seasonal downtime.");
+      if (journal.tradeEconomy?.pendingSeason)
+        throw Error("Cancel the manual seasonal preview before preparing seasonal downtime.");
       if (journal.tradeEconomy?.settings.enabled) prepareTradeSeason(t, execution);
     }
     // The one-click approval hashes its quote from the table in ID order (screens sort by name).
@@ -791,14 +999,33 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // A journey is frozen (route, scale, duration, travellers, prices) when it is reviewed.
     const moving = [...(cmd.journeyId ? [cmd.journeyId] : []), ...(cmd.journeyIds ?? [])];
     if (new Set(moving).size !== moving.length) throw Error("Choose each journey once.");
-    if (cmd.journeyIds?.length && !cmd.journeyId) throw Error("Choose the journey to review first.");
+    if (cmd.journeyIds?.length && !cmd.journeyId)
+      throw Error("Choose the journey to review first.");
     for (const journeyId of moving) prepareJourneyPlan(t, journeyId);
-    const quote = previewDowntime(t, f, cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId, cmd.journeyIds);
+    const quote = previewDowntime(
+      t,
+      f,
+      cmd.days,
+      undefined,
+      cmd.advanceSeason ? cmd.id : undefined,
+      cmd.journeyId,
+      cmd.journeyIds,
+    );
     if (cmd.expectedQuoteHash && quoteHash(quote) !== cmd.expectedQuoteHash) {
       for (const journeyId of moving) prepareJourneyPlan(ordered!, journeyId);
-      const same = previewDowntime(ordered!, readFinance(ordered!.journal?.finance), cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId, cmd.journeyIds);
+      const same = previewDowntime(
+        ordered!,
+        readFinance(ordered!.journal?.finance),
+        cmd.days,
+        undefined,
+        cmd.advanceSeason ? cmd.id : undefined,
+        cmd.journeyId,
+        cmd.journeyIds,
+      );
       if (quoteHash(same) !== cmd.expectedQuoteHash)
-        throw Error("Something changed since this request was drawn up (balances, the route's map or a pending preview). Open the full review.");
+        throw Error(
+          "Something changed since this request was drawn up (balances, the route's map or a pending preview). Open the full review.",
+        );
     }
     journal.downtimePrompt = { enabled: true, days: cmd.days };
     for (const d of f.downtime) if (d.status === "pending") d.status = "cancelled";
@@ -839,7 +1066,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw Error("Session report not found.");
     if (cmd.questId) {
       const quest = questsOf(t).find((q) => q.id === cmd.questId);
-      if (!quest || !questReadable(t, quest, seat)) throw Error("This quest is not in your quest log.");
+      if (!quest || !questReadable(t, quest, seat))
+        throw Error("This quest is not in your quest log.");
       if (cmd.provenance) throw Error("A loot summary cannot be a quest note.");
     }
     if (cmd.provenance) {
@@ -985,13 +1213,17 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const s = t.stock.find((x) => x.id === cmd.stockId),
       shop = t.shops.find((x) => x.id === s?.shopId);
     if (!s || !shop) throw new Error("Item or shop no longer exists.");
-    if (seat.role === "player" && !shopVisible(shop, t, actingGroups(t, cmd.purseId, seat.purseIds))) throw Error(notHere(cmd.purseId, "This shop"));
-    if (shop.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
+    if (
+      seat.role === "player" &&
+      !shopVisible(shop, t, actingGroups(t, cmd.purseId, seat.purseIds))
+    )
+      throw Error(notHere(cmd.purseId, "This shop"));
+    if (shop.blackMarket && !journal.world?.blackMarketActive)
+      throw Error("This black-market vendor is hidden.");
     if (shop.closed) throw new Error("This shop is closed.");
     if (s.quantity !== null && s.quantity < cmd.quantity)
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
-    const cost =
-      priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
+    const cost = priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
     const purchasedHolding: import("./types.ts").Holding | null = isService(s)
@@ -1024,16 +1256,33 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (purchasedHolding) t.holdings.push(purchasedHolding);
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
     const purchase = t.ledger[t.ledger.length - 1];
-    purchase.purchase = { stockId: s.id, quantity: cmd.quantity, holding: structuredClone(purchasedHolding) };
-    const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: s.id, purseId: cmd.purseId, direction: "buy", quantity: cmd.quantity, copper: cost });
+    purchase.purchase = {
+      stockId: s.id,
+      quantity: cmd.quantity,
+      holding: structuredClone(purchasedHolding),
+    };
+    const receipt = recordShopTrade(t, {
+      id: cmd.id,
+      at,
+      stockId: s.id,
+      purseId: cmd.purseId,
+      direction: "buy",
+      quantity: cmd.quantity,
+      copper: cost,
+    });
     if (receipt) purchase.trade = { receiptId: receipt.id, leg: "owner" };
   } else if (cmd.kind === "listing") {
     own(cmd.purseId);
     const l = t.listings.find((x) => x.id === cmd.listingId);
     if (!l) throw new Error("Listing no longer exists.");
-    if (cmd.before && !same(l, cmd.before)) throw Error("This listing changed. Review its current price and details before buying.");
-    if (l.kind === "property" && l.status && l.status !== "available") throw Error("This property is not currently for sale.");
-    if (seat.role === "player" && !propertyAvailableToGroups(l, t, actingGroups(t, cmd.purseId, seat.purseIds)))
+    if (cmd.before && !same(l, cmd.before))
+      throw Error("This listing changed. Review its current price and details before buying.");
+    if (l.kind === "property" && l.status && l.status !== "available")
+      throw Error("This property is not currently for sale.");
+    if (
+      seat.role === "player" &&
+      !propertyAvailableToGroups(l, t, actingGroups(t, cmd.purseId, seat.purseIds))
+    )
       throw Error(notHere(cmd.purseId, "This property"));
     if (l.quantity !== null && l.quantity < cmd.quantity)
       throw new Error("Not enough listing stock.");
@@ -1077,15 +1326,22 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         : {}),
     };
     t.holdings.push(holding);
-    if (holding.kind === "property") initializeEstatePurchase(t, holding, l.estateTemplateKey, l.estateAttachments);
+    if (holding.kind === "property")
+      initializeEstatePurchase(t, holding, l.estateTemplateKey, l.estateAttachments);
     log(cmd.purseId, `Bought ${cmd.quantity} ${l.name} from the market`, -cost);
-    t.ledger[t.ledger.length - 1].listingPurchase = { listingId: l.id, quantity: cmd.quantity, holding: structuredClone(holding) };
+    t.ledger[t.ledger.length - 1].listingPurchase = {
+      listingId: l.id,
+      quantity: cmd.quantity,
+      holding: structuredClone(holding),
+    };
   } else if (cmd.kind === "sell") {
     const h = t.holdings.find((x) => x.id === cmd.holdingId),
       s = t.shops.find((x) => x.id === cmd.shopId);
     if (!h || !s) throw new Error("Item or shop no longer exists.");
-    if (seat.role === "player" && !shopVisible(s, t, actingGroups(t, h.purseId, seat.purseIds))) throw Error(notHere(h.purseId, "This shop"));
-    if (s.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
+    if (seat.role === "player" && !shopVisible(s, t, actingGroups(t, h.purseId, seat.purseIds)))
+      throw Error(notHere(h.purseId, "This shop"));
+    if (s.blackMarket && !journal.world?.blackMarketActive)
+      throw Error("This black-market vendor is hidden.");
     if (s.closed) throw new Error("This shop is closed.");
     own(h.purseId);
     assertCarried(h);
@@ -1101,7 +1357,15 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       (line) => line.shopId === s.id && line.commodityId === h.commodityId && h.commodityId,
     );
     if (linked) {
-      const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: linked.id, purseId: h.purseId, direction: "sell", quantity: cmd.quantity, copper: paid });
+      const receipt = recordShopTrade(t, {
+        id: cmd.id,
+        at,
+        stockId: linked.id,
+        purseId: h.purseId,
+        direction: "sell",
+        quantity: cmd.quantity,
+        copper: paid,
+      });
       if (receipt) t.ledger[t.ledger.length - 1].trade = { receiptId: receipt.id, leg: "owner" };
     }
     if (h.kind === "property" && h.quantity === 0) removeEstateSite(t, h.id);
@@ -1140,8 +1404,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         const site = t.journal.propertyOperations.sites.find((s) => s.propertyId === h.id);
         if (site && h.quantity === 0) site.propertyId = cmd.id + "-item";
         if (h.quantity === 0 && journal.fleet) {
-          for(const v of journal.fleet.vessels) if(v.propertyId===h.id)v.propertyId=cmd.id+"-item";
-          for(const y of journal.fleet.facilities) if(y.propertyId===h.id)y.propertyId=cmd.id+"-item";
+          for (const v of journal.fleet.vessels)
+            if (v.propertyId === h.id) v.propertyId = cmd.id + "-item";
+          for (const y of journal.fleet.facilities)
+            if (y.propertyId === h.id) y.propertyId = cmd.id + "-item";
         }
       }
     }
@@ -1169,7 +1435,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         ...(cmd.remainder.purseId ? { purseId: cmd.remainder.purseId } : {}),
       },
       // A player's client previews pending commands on its projected table (cloud-client.ts).
-      { actor: seat.role === "dm" ? "dm" : "player", projected: execution.preview === true && seat.role !== "dm" },
+      {
+        actor: seat.role === "dm" ? "dm" : "player",
+        projected: execution.preview === true && seat.role !== "dm",
+      },
     );
     if (plan.share !== cmd.expect.share || plan.remainderTo !== cmd.expect.remainderTo)
       throw Error(
@@ -1213,20 +1482,29 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (plan.npc) receipt.dmOnly = true;
     // Chat keeps 500 characters; a long roster is summarized by count rather than cut off.
     const leftover = remainderText(plan, name);
-    const full = [`Split ${formatCopper(plan.copper)} from ${source.name}: ${formatCopper(plan.share)} each to ${list}.`, leftover]
+    const full = [
+      `Split ${formatCopper(plan.copper)} from ${source.name}: ${formatCopper(plan.share)} each to ${list}.`,
+      leftover,
+    ]
       .filter(Boolean)
       .join(" ");
     const text =
       full.length <= 500
         ? full
-        : [`Split ${formatCopper(plan.copper)} from ${source.name}: ${formatCopper(plan.share)} each to ${plan.n} characters.`, leftover]
+        : [
+            `Split ${formatCopper(plan.copper)} from ${source.name}: ${formatCopper(plan.share)} each to ${plan.n} characters.`,
+            leftover,
+          ]
             .filter(Boolean)
             .join(" ")
             .slice(0, 500);
     // A split that pays an NPC posts its note to the DM only (filed under that NPC's account).
     const npcId = plan.recipientIds.find((purseId) => {
       const p = t.purses.find((p) => p.id === purseId);
-      return p?.kind === "character" && (p.control === "npc" || !!journal.world?.npcs.some((n) => n.id === p.id));
+      return (
+        p?.kind === "character" &&
+        (p.control === "npc" || !!journal.world?.npcs.some((n) => n.id === p.id))
+      );
     });
     t.notes.push({
       id: cmd.id + "-note",
@@ -1297,11 +1575,23 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         assertFinanceAccountRemovable(t.journal?.finance, change.id);
       if (change.store === "journal") {
         const currentJournal = readJournal(t.journal);
-        if (!currentJournal.tradeEconomy && readJournal(change.after).tradeEconomy)
-          throw Error("Configure a new trade economy with reviewed economy commands; seasonal rolls require DM authority.");
-        if (!same(currentJournal, preserveJournalMetadata(change.before, currentJournal)))
+        // A part of the journal (journal-patch.ts) is checked and applied exactly like the whole
+        // journal: the rest of `before`/`after` is the current journal itself.
+        let before = change.before,
+          after = change.after;
+        if (change.id !== LEGACY_JOURNAL_CHANGE_ID) {
+          const path = journalChangePath(change.id);
+          if (!path) throw new Error("Invalid journal change.");
+          before = writeJournalPath(currentJournal, path, change.before);
+          after = writeJournalPath(currentJournal, path, change.after);
+        }
+        if (!currentJournal.tradeEconomy && readJournal(after).tradeEconomy)
+          throw Error(
+            "Configure a new trade economy with reviewed economy commands; seasonal rolls require DM authority.",
+          );
+        if (!same(currentJournal, preserveJournalMetadata(before, currentJournal)))
           throw new Error("Activity changed elsewhere. Refresh and retry.");
-        t.journal = preserveJournalMetadata(change.after, currentJournal);
+        t.journal = preserveJournalMetadata(after, currentJournal);
         continue;
       }
       if (change.store === "realm") {
@@ -1376,8 +1666,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     }
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
-  if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
-    !same(originalLocations, t.journal?.market?.locations))
+  if (
+    cmd.kind === "market-location" ||
+    cmd.kind === "market-name-import" ||
+    cmd.kind === "trade-exchange" ||
+    !same(originalLocations, t.journal?.market?.locations)
+  )
     ensureCityExchanges(t);
   validateEconomyRows(t);
   validateShopLocations(t.shops, t.journal?.market);
@@ -1444,12 +1738,41 @@ export function tablePatch(before: CloudTable, after: CloudTable): CommandInput 
       before: before.realm ?? null,
       after: after.realm ?? null,
     });
-  if (!same(before.journal ?? readJournal(null), after.journal ?? readJournal(null)))
+  // Only the parts of the journal that changed (journal-patch.ts): a whole journal with its
+  // inline map artwork can exceed the batch limit and the device's storage for pending actions.
+  for (const part of diffJournal(
+    before.journal ?? readJournal(null),
+    after.journal ?? readJournal(null),
+  ))
     changes.push({
       store: "journal",
-      id: "journal",
-      before: before.journal ?? readJournal(null),
-      after: after.journal ?? readJournal(null),
+      id: journalChangeId(part.path),
+      before: part.before,
+      after: part.after,
     });
   return { kind: "patch", changes };
+}
+
+/**
+ * The same patch with any whole-journal change (older drafts and clients) split into the parts
+ * that changed. Applying either form gives the same table.
+ */
+export function compactPatch<C extends { kind: string }>(command: C): C {
+  if (command.kind !== "patch") return command;
+  const patch = command as unknown as Extract<Command, { kind: "patch" }>;
+  if (!patch.changes.some((c) => c.store === "journal" && c.id === LEGACY_JOURNAL_CHANGE_ID))
+    return command;
+  return {
+    ...command,
+    changes: patch.changes.flatMap((c) =>
+      c.store === "journal" && c.id === LEGACY_JOURNAL_CHANGE_ID
+        ? diffJournal(c.before ?? readJournal(null), c.after ?? readJournal(null)).map((part) => ({
+            store: "journal" as const,
+            id: journalChangeId(part.path),
+            before: part.before,
+            after: part.after,
+          }))
+        : [c],
+    ),
+  } as C;
 }

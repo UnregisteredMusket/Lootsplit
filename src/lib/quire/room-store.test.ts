@@ -5,7 +5,13 @@ import { smithFixture, smithDesign } from "./test-fixtures/blacksmith.ts";
 import { deploymentOrigins } from "../deployment/origins.mjs";
 import { smithQuote } from "./blacksmith.ts";
 import { readFileSync } from "node:fs";
-import { createRoom, readRoom, readRoomAccess, updateRoom, deleteRoom } from "./room-store.server.ts";
+import {
+  createRoom,
+  readRoom,
+  readRoomAccess,
+  updateRoom,
+  deleteRoom,
+} from "./room-store.server.ts";
 import { emptyCloudTable } from "./cloud.ts";
 import { tradeFixture } from "./test-fixtures/trade-economy.ts";
 import { STARTER_COMMODITIES } from "./commodity-catalog.ts";
@@ -13,7 +19,14 @@ import { commodityImportFingerprint } from "./commodity-import.ts";
 import { exchangeQuoteKey, tradeSeasonFingerprint } from "./trade-economy.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { applyCommand, tablePatch } from "./commands.ts";
-import { openRoom, joinRoom, roomState, pollRoom, previewRoom, submitCommands } from "./cloud.server.ts";
+import {
+  openRoom,
+  joinRoom,
+  roomState,
+  pollRoom,
+  previewRoom,
+  submitCommands,
+} from "./cloud.server.ts";
 import { emptyCoins, fromCopper, toCopper } from "./money.ts";
 import { resourcePackFixture } from "./test-fixtures/resource-pack.ts";
 import {
@@ -25,32 +38,81 @@ import {
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
 test("shared blacksmith commissions debit materials and funds once, enforce DM enchantments and collect once after approved downtime", async () => {
-  const table = smithFixture(), host = await openRoom({ name: "Smith DM", table });
-  const guest = await joinRoom({ code: host.code, purseId: "hero", name: "Smith hero" }), auth = { code: host.code, token: guest.token };
-  const { choosePace } = await import("./cloud.server.ts"); await choosePace({ ...host, live: true });
-  const initial = (await roomState(auth)).table, design = smithDesign(initial); design.parts[0].holdingId = "steel-lot";
-  const q = smithQuote(initial, "forge", "hero", design), command = { id: "shared-smith-order", kind: "smith-order", shopId: "forge", purseId: "hero", design, before: q.before };
+  const table = smithFixture(),
+    host = await openRoom({ name: "Smith DM", table });
+  const guest = await joinRoom({ code: host.code, purseId: "hero", name: "Smith hero" }),
+    auth = { code: host.code, token: guest.token };
+  const { choosePace } = await import("./cloud.server.ts");
+  await choosePace({ ...host, live: true });
+  const initial = (await roomState(auth)).table,
+    design = smithDesign(initial);
+  design.parts[0].holdingId = "steel-lot";
+  const q = smithQuote(initial, "forge", "hero", design),
+    command = {
+      id: "shared-smith-order",
+      kind: "smith-order",
+      shopId: "forge",
+      purseId: "hero",
+      design,
+      before: q.before,
+    };
   const p = table.journal!.blacksmith!.profiles[0];
-  await assert.rejects(submitCommands({ ...auth, batchId: "smith-forged-config", commands: [{ id: "forged-smith", kind: "smith-profile", shopId: "forge", before: p, profile: { ...p, magicalForge: true } }] }), /Only the DM/);
+  await assert.rejects(
+    submitCommands({
+      ...auth,
+      batchId: "smith-forged-config",
+      commands: [
+        {
+          id: "forged-smith",
+          kind: "smith-profile",
+          shopId: "forge",
+          before: p,
+          profile: { ...p, magicalForge: true },
+        },
+      ],
+    }),
+    /Only the DM/,
+  );
   await submitCommands({ ...auth, batchId: "smith-order-first", commands: [command] });
   await submitCommands({ ...auth, batchId: "smith-order-lost-response", commands: [command] });
   let saved = (await roomState(host)).table;
-  assert.equal(saved.journal!.blacksmith!.orders.length, 1); assert.equal(saved.holdings[0].quantity, 5);
-  assert.equal(toCopper(saved.purses.find(p => p.id === "hero")!.coins), 100000 - q.terms.costCopper);
-  assert.equal(saved.ledger.filter(l => l.shopId === "forge").length, 1);
+  assert.equal(saved.journal!.blacksmith!.orders.length, 1);
+  assert.equal(saved.holdings[0].quantity, 5);
+  assert.equal(
+    toCopper(saved.purses.find((p) => p.id === "hero")!.coins),
+    100000 - q.terms.costCopper,
+  );
+  assert.equal(saved.ledger.filter((l) => l.shopId === "forge").length, 1);
   const preview = { id: "smith-downtime", kind: "downtime-plan", name: "Forge downtime", days: 5 };
-  await assert.rejects(submitCommands({ ...auth, batchId: "forged-smith-downtime", commands: [preview] }), /Only the DM/);
+  await assert.rejects(
+    submitCommands({ ...auth, batchId: "forged-smith-downtime", commands: [preview] }),
+    /Only the DM/,
+  );
   await submitCommands({ ...host, batchId: "smith-preview", commands: [preview] });
-  await submitCommands({ ...host, batchId: "smith-approve", commands: [{ id: "smith-approval", kind: "downtime-apply", downtimeId: preview.id, endSession: false }] });
-  saved = (await roomState(auth)).table; const o = saved.journal!.blacksmith!.orders[0]; assert.equal(o.status, "ready");
+  await submitCommands({
+    ...host,
+    batchId: "smith-approve",
+    commands: [
+      { id: "smith-approval", kind: "downtime-apply", downtimeId: preview.id, endSession: false },
+    ],
+  });
+  saved = (await roomState(auth)).table;
+  const o = saved.journal!.blacksmith!.orders[0];
+  assert.equal(o.status, "ready");
   const collect = { id: "smith-collection", kind: "smith-claim", orderId: o.id, before: o };
   await submitCommands({ ...auth, batchId: "smith-collect-first", commands: [collect] });
   await submitCommands({ ...auth, batchId: "smith-collect-retry", commands: [collect] });
   saved = (await roomState(host)).table;
-  assert.equal(saved.holdings.filter(h => h.id.endsWith("-crafted")).length, 1); assert.equal(saved.journal!.blacksmith!.orders[0].status, "claimed");
-  assert.match(saved.holdings.find(h => h.id.endsWith("-crafted"))!.notes, /Made by Aster/);
+  assert.equal(saved.holdings.filter((h) => h.id.endsWith("-crafted")).length, 1);
+  assert.equal(saved.journal!.blacksmith!.orders[0].status, "claimed");
+  assert.match(saved.holdings.find((h) => h.id.endsWith("-crafted"))!.notes, /Made by Aster/);
 });
-sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0008_encounters.sql", import.meta.url), "utf8"));
+sql.exec(
+  readFileSync(
+    new URL("../../../cloudflare/migrations/0008_encounters.sql", import.meta.url),
+    "utf8",
+  ),
+);
 test("shared hourly training preserves private NPC budgets and applies requests, decisions and resets once", async () => {
   const { choosePace } = await import("./cloud.server.ts");
   const { blankSheet } = await import("../characters/model.mjs");
@@ -151,54 +213,154 @@ test("shared hourly training preserves private NPC budgets and applies requests,
   assert.equal(trainingCounters(saved.journal!.downtimeActivities!)[0].lifetimeMinutes, 480);
   await deleteRoom(host.code, (await roomState(host)).revision);
 });
-test("shared ships enforce DM overrides, player-owned boarding reviews, projection privacy and one-time receipts", async()=>{
-  const {defaultShip}=await import("./ships-schema.ts"),{shipFingerprint}=await import("./ships.ts");
-  let table=tradeFixture();
-  const seat={id:"dm",token:"",name:"DM",role:"dm" as const,purseIds:[]};
-  table=applyCommand(table,seat,{id:"ship-setup",kind:"ship-configure",before:null,vessel:{...defaultShip(),propertyId:"warehouse",mode:"docked",facilityId:null,installed:[],arrearsCopper:0,expenseRemainder:0,dmNotes:"Private navigation clue"}});
-  const host=await openRoom({name:"Ship DM",table});
-  const guest=await joinRoom({code:host.code,purseId:"a",name:"Ship player"}),auth={code:host.code,token:guest.token};
-  const {choosePace}=await import("./cloud.server.ts");await choosePace({...host,live:true});
-  const view=(await roomState(auth)).table;assert.equal(view.journal!.fleet!.vessels[0].dmNotes,"");
-  const forbidden={id:"forged-teleport",kind:"ship-teleport",propertyId:"warehouse",destinationId:"desert",facilityId:null,before:shipFingerprint(view,"warehouse"),reason:""};
-  await assert.rejects(submitCommands({...auth,batchId:"forged-ship",commands:[forbidden]}),/Only the DM/);
-  const request={id:"board-review",kind:"ship-board",propertyId:"warehouse",purseId:"a",action:"board",before:shipFingerprint(view,"warehouse")};
-  await submitCommands({...auth,batchId:"board-first",commands:[request]});await submitCommands({...auth,batchId:"board-response-retry",commands:[request]});
-  let saved=(await roomState(host)).table;assert.equal(saved.journal!.fleet!.boarding.length,1);assert.equal(saved.journal!.fleet!.aboard.length,0);
-  const r=saved.journal!.fleet!.boarding[0],approve={id:"approve-board",kind:"ship-board-review",requestId:r.id,before:r,approve:true};
-  await submitCommands({...host,batchId:"approve-first",commands:[approve]});await submitCommands({...host,batchId:"approve-retry",commands:[approve]});
-  saved=(await roomState(host)).table;assert.equal(saved.journal!.fleet!.aboard.length,1);
-  const teleport={...forbidden,id:"real-teleport",before:shipFingerprint(saved,"warehouse"),reason:"DM portal"};
-  const coins=saved.purses.map(p=>p.coins),day=saved.journal!.finance!.day;
-  await submitCommands({...host,batchId:"teleport-first",commands:[teleport]});await submitCommands({...host,batchId:"teleport-response-retry",commands:[teleport]});
-  saved=(await roomState(host)).table;assert.deepEqual(saved.purses.map(p=>p.coins),coins);assert.equal(saved.journal!.finance!.day,day);
-  assert.equal(saved.journal!.world!.characterPositions.find(p=>p.purseId==="a")!.locationId,"desert");
-  assert.equal(saved.journal!.events.filter(e=>e.id==="real-teleport-ship").length,1);
+test("shared ships enforce DM overrides, player-owned boarding reviews, projection privacy and one-time receipts", async () => {
+  const { defaultShip } = await import("./ships-schema.ts"),
+    { shipFingerprint } = await import("./ships.ts");
+  let table = tradeFixture();
+  const seat = { id: "dm", token: "", name: "DM", role: "dm" as const, purseIds: [] };
+  table = applyCommand(table, seat, {
+    id: "ship-setup",
+    kind: "ship-configure",
+    before: null,
+    vessel: {
+      ...defaultShip(),
+      propertyId: "warehouse",
+      mode: "docked",
+      facilityId: null,
+      installed: [],
+      arrearsCopper: 0,
+      expenseRemainder: 0,
+      dmNotes: "Private navigation clue",
+    },
+  });
+  const host = await openRoom({ name: "Ship DM", table });
+  const guest = await joinRoom({ code: host.code, purseId: "a", name: "Ship player" }),
+    auth = { code: host.code, token: guest.token };
+  const { choosePace } = await import("./cloud.server.ts");
+  await choosePace({ ...host, live: true });
+  const view = (await roomState(auth)).table;
+  assert.equal(view.journal!.fleet!.vessels[0].dmNotes, "");
+  const forbidden = {
+    id: "forged-teleport",
+    kind: "ship-teleport",
+    propertyId: "warehouse",
+    destinationId: "desert",
+    facilityId: null,
+    before: shipFingerprint(view, "warehouse"),
+    reason: "",
+  };
+  await assert.rejects(
+    submitCommands({ ...auth, batchId: "forged-ship", commands: [forbidden] }),
+    /Only the DM/,
+  );
+  const request = {
+    id: "board-review",
+    kind: "ship-board",
+    propertyId: "warehouse",
+    purseId: "a",
+    action: "board",
+    before: shipFingerprint(view, "warehouse"),
+  };
+  await submitCommands({ ...auth, batchId: "board-first", commands: [request] });
+  await submitCommands({ ...auth, batchId: "board-response-retry", commands: [request] });
+  let saved = (await roomState(host)).table;
+  assert.equal(saved.journal!.fleet!.boarding.length, 1);
+  assert.equal(saved.journal!.fleet!.aboard.length, 0);
+  const r = saved.journal!.fleet!.boarding[0],
+    approve = {
+      id: "approve-board",
+      kind: "ship-board-review",
+      requestId: r.id,
+      before: r,
+      approve: true,
+    };
+  await submitCommands({ ...host, batchId: "approve-first", commands: [approve] });
+  await submitCommands({ ...host, batchId: "approve-retry", commands: [approve] });
+  saved = (await roomState(host)).table;
+  assert.equal(saved.journal!.fleet!.aboard.length, 1);
+  const teleport = {
+    ...forbidden,
+    id: "real-teleport",
+    before: shipFingerprint(saved, "warehouse"),
+    reason: "DM portal",
+  };
+  const coins = saved.purses.map((p) => p.coins),
+    day = saved.journal!.finance!.day;
+  await submitCommands({ ...host, batchId: "teleport-first", commands: [teleport] });
+  await submitCommands({ ...host, batchId: "teleport-response-retry", commands: [teleport] });
+  saved = (await roomState(host)).table;
+  assert.deepEqual(
+    saved.purses.map((p) => p.coins),
+    coins,
+  );
+  assert.equal(saved.journal!.finance!.day, day);
+  assert.equal(
+    saved.journal!.world!.characterPositions.find((p) => p.purseId === "a")!.locationId,
+    "desert",
+  );
+  assert.equal(saved.journal!.events.filter((e) => e.id === "real-teleport-ship").length, 1);
 });
 test("shared commodity imports are DM-only, isolated and replay-safe; global trade is checked against the room's city location", async () => {
-  const table=tradeFixture(); table.journal!.tradeEconomy!.exchanges[0].locationId=null;
-  const host=await openRoom({name:"City market DM",table}), other=await openRoom({name:"Other commodity campaign",table:tradeFixture()});
-  const guest=await joinRoom({code:host.code,purseId:"a",name:"Trader"});
-  const player={code:host.code,token:guest.token};
-  const {choosePace}=await import("./cloud.server.ts"); await choosePace({...host,live:true});
-  const command={id:"add-catalog",kind:"trade-commodity-import",before:commodityImportFingerprint(table.journal!.tradeEconomy!),commodities:STARTER_COMMODITIES,reason:"Reviewed starter definitions"};
-  await assert.rejects(submitCommands({...player,batchId:"unauthorized-catalog",commands:[command]}),/Only the DM/);
-  await submitCommands({...host,batchId:"catalog-first",commands:[command]});
-  await submitCommands({...host,batchId:"catalog-response-retry",commands:[command]});
-  const saved=(await roomState(host)).table;
-  assert.equal(saved.journal!.tradeEconomy!.commodities.length,61);
-  assert.deepEqual(saved.purses,table.purses); assert.deepEqual(saved.holdings,table.holdings);
-  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.commodities.length,1);
-  assert.equal(saved.journal!.events.filter(e=>e.id==="add-catalog-event").length,1);
-  const e=saved.journal!.tradeEconomy!, buy={id:"global-away-buy",kind:"trade-buy",exchangeId:"harbor",commodityId:"timber",purseId:"a",quantity:1,before:exchangeQuoteKey(e,e.exchanges[0],e.commodities[0])};
-  await submitCommands({...host,batchId:"leave-city",commands:[{id:"leave-city",kind:"party-location",before:"dock",locationId:"desert"}]});
-  assert.equal((await roomState(player)).table.journal!.tradeEconomy!.exchanges.length,0);
-  const away=await readRoom(host.code);
-  await assert.rejects(submitCommands({...player,batchId:"global-away-buy",commands:[buy]}),/city/);
-  assert.deepEqual(await readRoom(host.code),away,"Rejected remote trade does not partly spend or move goods");
-  await submitCommands({...host,batchId:"return-city",commands:[{id:"return-city",kind:"party-location",before:"desert",locationId:"dock"}]});
-  await submitCommands({...player,batchId:"global-city-buy",commands:[buy]});
-  assert.equal((await roomState(host)).table.journal!.tradeEconomy!.receipts.length,1);
+  const table = tradeFixture();
+  table.journal!.tradeEconomy!.exchanges[0].locationId = null;
+  const host = await openRoom({ name: "City market DM", table }),
+    other = await openRoom({ name: "Other commodity campaign", table: tradeFixture() });
+  const guest = await joinRoom({ code: host.code, purseId: "a", name: "Trader" });
+  const player = { code: host.code, token: guest.token };
+  const { choosePace } = await import("./cloud.server.ts");
+  await choosePace({ ...host, live: true });
+  const command = {
+    id: "add-catalog",
+    kind: "trade-commodity-import",
+    before: commodityImportFingerprint(table.journal!.tradeEconomy!),
+    commodities: STARTER_COMMODITIES,
+    reason: "Reviewed starter definitions",
+  };
+  await assert.rejects(
+    submitCommands({ ...player, batchId: "unauthorized-catalog", commands: [command] }),
+    /Only the DM/,
+  );
+  await submitCommands({ ...host, batchId: "catalog-first", commands: [command] });
+  await submitCommands({ ...host, batchId: "catalog-response-retry", commands: [command] });
+  const saved = (await roomState(host)).table;
+  assert.equal(saved.journal!.tradeEconomy!.commodities.length, 61);
+  assert.deepEqual(saved.purses, table.purses);
+  assert.deepEqual(saved.holdings, table.holdings);
+  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.commodities.length, 1);
+  assert.equal(saved.journal!.events.filter((e) => e.id === "add-catalog-event").length, 1);
+  const e = saved.journal!.tradeEconomy!,
+    buy = {
+      id: "global-away-buy",
+      kind: "trade-buy",
+      exchangeId: "harbor",
+      commodityId: "timber",
+      purseId: "a",
+      quantity: 1,
+      before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
+    };
+  await submitCommands({
+    ...host,
+    batchId: "leave-city",
+    commands: [{ id: "leave-city", kind: "party-location", before: "dock", locationId: "desert" }],
+  });
+  assert.equal((await roomState(player)).table.journal!.tradeEconomy!.exchanges.length, 0);
+  const away = await readRoom(host.code);
+  await assert.rejects(
+    submitCommands({ ...player, batchId: "global-away-buy", commands: [buy] }),
+    /city/,
+  );
+  assert.deepEqual(
+    await readRoom(host.code),
+    away,
+    "Rejected remote trade does not partly spend or move goods",
+  );
+  await submitCommands({
+    ...host,
+    batchId: "return-city",
+    commands: [{ id: "return-city", kind: "party-location", before: "desert", locationId: "dock" }],
+  });
+  await submitCommands({ ...player, batchId: "global-city-buy", commands: [buy] });
+  assert.equal((await roomState(host)).table.journal!.tradeEconomy!.receipts.length, 1);
 });
 test("shared NPC transfers, sheet privacy and campaign-time returns survive retries and independent seat reads", async () => {
   const { characterPosition } = await import("./character-position.ts");
@@ -308,48 +470,102 @@ test("shared exchange corrections restore both cash legs once across retries and
   const joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
   await choosePace({ ...host, live: true });
   const auth = { code: host.code, token: joined.token };
-  const initial = (await roomState(host)).table, e = initial.journal!.tradeEconomy!;
+  const initial = (await roomState(host)).table,
+    e = initial.journal!.tradeEconomy!;
   const purchase = {
-    id: "correction-buy", kind: "trade-buy", exchangeId: "harbor", commodityId: "timber",
-    purseId: "a", quantity: 10, before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
+    id: "correction-buy",
+    kind: "trade-buy",
+    exchangeId: "harbor",
+    commodityId: "timber",
+    purseId: "a",
+    quantity: 10,
+    before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
   };
   await submitCommands({ ...auth, batchId: "correction-purchase", commands: [purchase] });
-  const bought = (await roomState(host)).table, receipt = bought.journal!.tradeEconomy!.receipts[0];
+  const bought = (await roomState(host)).table,
+    receipt = bought.journal!.tradeEconomy!.receipts[0];
   const correction = {
-    id: "shared-correction", kind: "ledger-void", target: { kind: "trade", id: receipt.id },
-    before: canonicalJson(receipt), reason: "The party reviewed the mistaken purchase.",
+    id: "shared-correction",
+    kind: "ledger-void",
+    target: { kind: "trade", id: receipt.id },
+    before: canonicalJson(receipt),
+    reason: "The party reviewed the mistaken purchase.",
   };
   const unchanged = await readRoom(host.code);
-  await assert.rejects(submitCommands({ ...auth, batchId: "player-forged-correction", commands: [correction] }), /Only the DM/);
+  await assert.rejects(
+    submitCommands({ ...auth, batchId: "player-forged-correction", commands: [correction] }),
+    /Only the DM/,
+  );
   assert.deepEqual(await readRoom(host.code), unchanged);
   await submitCommands({ ...host, batchId: "correct-first", commands: [correction] });
   await submitCommands({ ...host, batchId: "correct-lost-response", commands: [correction] });
   const corrected = (await roomState(host)).table;
   assert.deepEqual(corrected.holdings, initial.holdings);
-  assert.equal(toCopper(corrected.purses.find(p => p.id === "a")!.coins), 100000);
-  assert.equal(toCopper(corrected.purses.find(p => p.id === "exchange-treasury")!.coins), 50000);
+  assert.equal(toCopper(corrected.purses.find((p) => p.id === "a")!.coins), 100000);
+  assert.equal(toCopper(corrected.purses.find((p) => p.id === "exchange-treasury")!.coins), 50000);
   assert.equal(corrected.journal!.tradeEconomy!.exchanges[0].offers[0].stock, 100);
   assert.equal(corrected.journal!.tradeEconomy!.receipts.length, 2);
   assert.equal(corrected.ledger.length, 4);
-  assert.equal(corrected.journal!.events.filter(event => event.summary.startsWith("Ledger correction:")).length, 1);
+  assert.equal(
+    corrected.journal!.events.filter((event) => event.summary.startsWith("Ledger correction:"))
+      .length,
+    1,
+  );
   assert.equal(canonicalJson(corrected.journal!.tradeEconomy!.receipts[0]), canonicalJson(receipt));
-  await submitCommands({ ...host, batchId: "independent-duplicate-correction", commands: [{ ...correction, id: "independent-correction" }] });
+  await submitCommands({
+    ...host,
+    batchId: "independent-duplicate-correction",
+    commands: [{ ...correction, id: "independent-correction" }],
+  });
   assert.deepEqual((await roomState(host)).table, corrected);
   const playerView = (await roomState(auth)).table;
   assert.equal(playerView.journal!.tradeEconomy!.receipts.length, 2);
-  assert.ok(playerView.journal!.tradeEconomy!.receipts.every(r => !r.settlement && !r.operationId));
-  assert.equal(toCopper(playerView.purses.find(p => p.id === "a")!.coins), 100000);
+  assert.ok(
+    playerView.journal!.tradeEconomy!.receipts.every((r) => !r.settlement && !r.operationId),
+  );
+  assert.equal(toCopper(playerView.purses.find((p) => p.id === "a")!.coins), 100000);
 
-  await submitCommands({ ...auth, batchId: "second-buy", commands: [{ ...purchase, id: "second-correction-buy", quantity: 2 }] });
-  const later = (await roomState(host)).table, laterReceipt = later.journal!.tradeEconomy!.receipts.at(-1)!;
-  await submitCommands({ ...auth, batchId: "goods-moved", commands: [{
-    id: "goods-moved", kind: "give", fromId: "a", toId: "b", copper: 0,
-    holdingId: later.holdings.find(h => h.commodityId)!.id, quantity: 1,
-  }] });
+  await submitCommands({
+    ...auth,
+    batchId: "second-buy",
+    commands: [{ ...purchase, id: "second-correction-buy", quantity: 2 }],
+  });
+  const later = (await roomState(host)).table,
+    laterReceipt = later.journal!.tradeEconomy!.receipts.at(-1)!;
+  await submitCommands({
+    ...auth,
+    batchId: "goods-moved",
+    commands: [
+      {
+        id: "goods-moved",
+        kind: "give",
+        fromId: "a",
+        toId: "b",
+        copper: 0,
+        holdingId: later.holdings.find((h) => h.commodityId)!.id,
+        quantity: 1,
+      },
+    ],
+  });
   const moved = await readRoom(host.code);
-  const rejected = { ...correction, id: "changed-goods-correction", target: { kind: "trade", id: laterReceipt.id }, before: canonicalJson(laterReceipt) };
-  await assert.rejects(submitCommands({ ...host, batchId: "changed-goods-correction", commands: [rejected] }), /changed or left/);
-  await assert.rejects(submitCommands({ ...host, batchId: "stale-correction-review", commands: [{ ...rejected, id: "stale-review", before: "{}" }] }), /receipt changed/);
+  const rejected = {
+    ...correction,
+    id: "changed-goods-correction",
+    target: { kind: "trade", id: laterReceipt.id },
+    before: canonicalJson(laterReceipt),
+  };
+  await assert.rejects(
+    submitCommands({ ...host, batchId: "changed-goods-correction", commands: [rejected] }),
+    /changed or left/,
+  );
+  await assert.rejects(
+    submitCommands({
+      ...host,
+      batchId: "stale-correction-review",
+      commands: [{ ...rejected, id: "stale-review", before: "{}" }],
+    }),
+    /receipt changed/,
+  );
   assert.deepEqual(await readRoom(host.code), moved);
   await deleteRoom(host.code, moved!.revision);
 });
@@ -357,29 +573,88 @@ test("shared exchange corrections restore both cash legs once across retries and
 test("shared linked shop corrections preserve seasonal feedback and reject legacy partial table patches", async () => {
   const { choosePace } = await import("./cloud.server.ts");
   const table = tradeFixture();
-  table.shops.push({ id: "reviewed-shop", name: "Reviewed shop", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5, wealth: "modest", category: "mixed", priceScale: 1, locationId: "port" });
-  table.stock.push({ id: "reviewed-stock", shopId: "reviewed-shop", name: "Timber bundle", copper: 100, quantity: 100, notes: "", baseCopper: 100, rarity: "common", category: "general", commodityId: "timber", tradeExchangeId: "harbor" });
-  const host = await openRoom({ name: "Shop DM", table }), joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
+  table.shops.push({
+    id: "reviewed-shop",
+    name: "Reviewed shop",
+    keeper: "",
+    place: "",
+    notes: "",
+    sellRate: 1,
+    buyRate: 0.5,
+    wealth: "modest",
+    category: "mixed",
+    priceScale: 1,
+    locationId: "port",
+  });
+  table.stock.push({
+    id: "reviewed-stock",
+    shopId: "reviewed-shop",
+    name: "Timber bundle",
+    copper: 100,
+    quantity: 100,
+    notes: "",
+    baseCopper: 100,
+    rarity: "common",
+    category: "general",
+    commodityId: "timber",
+    tradeExchangeId: "harbor",
+  });
+  const host = await openRoom({ name: "Shop DM", table }),
+    joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
   await choosePace({ ...host, live: true });
-  await submitCommands({ code: host.code, token: joined.token, batchId: "linked-shop-purchase", commands: [{ id: "linked-shop-buy", kind: "buy", stockId: "reviewed-stock", purseId: "a", quantity: 3 }] });
-  const bought = (await roomState(host)).table, receipt = bought.journal!.tradeEconomy!.receipts[0];
+  await submitCommands({
+    code: host.code,
+    token: joined.token,
+    batchId: "linked-shop-purchase",
+    commands: [
+      { id: "linked-shop-buy", kind: "buy", stockId: "reviewed-stock", purseId: "a", quantity: 3 },
+    ],
+  });
+  const bought = (await roomState(host)).table,
+    receipt = bought.journal!.tradeEconomy!.receipts[0];
   assert.ok(bought.ledger[0].purchase?.holding);
   assert.deepEqual(bought.ledger[0].trade, { receiptId: receipt.id, leg: "owner" });
-  const correction = { id: "linked-shop-correction", kind: "ledger-void" as const, target: { kind: "ledger" as const, id: bought.ledger[0].id }, before: canonicalJson(bought.ledger[0]), reason: "Wrong shop purchase" };
-  const current = await readRoom(host.code), dm = current!.seats.find(seat => seat.token === host.token)!;
+  const correction = {
+    id: "linked-shop-correction",
+    kind: "ledger-void" as const,
+    target: { kind: "ledger" as const, id: bought.ledger[0].id },
+    before: canonicalJson(bought.ledger[0]),
+    reason: "Wrong shop purchase",
+  };
+  const current = await readRoom(host.code),
+    dm = current!.seats.find((seat) => seat.token === host.token)!;
   const proposed = applyCommand(bought, dm, correction, { source: "server" });
-  await assert.rejects(submitCommands({ ...host, batchId: "legacy-partial-shop-void", commands: [{ ...tablePatch(bought, proposed), id: "legacy-void-patch" }] }), /money, goods and seasonal activity/);
+  await assert.rejects(
+    submitCommands({
+      ...host,
+      batchId: "legacy-partial-shop-void",
+      commands: [{ ...tablePatch(bought, proposed), id: "legacy-void-patch" }],
+    }),
+    /money, goods and seasonal activity/,
+  );
   assert.deepEqual(await readRoom(host.code), current);
   await submitCommands({ ...host, batchId: "typed-shop-void", commands: [correction] });
   await submitCommands({ ...host, batchId: "typed-shop-void-retry", commands: [correction] });
   const corrected = (await roomState(host)).table;
   assert.equal(corrected.ledger.length, 2);
   assert.equal(corrected.stock[0].quantity, 100);
-  assert.equal(toCopper(corrected.purses.find(p => p.id === "a")!.coins), 100000);
+  assert.equal(toCopper(corrected.purses.find((p) => p.id === "a")!.coins), 100000);
   assert.deepEqual(corrected.holdings, table.holdings);
-  await submitCommands({ ...host, batchId: "corrected-shop-season", commands: [{ id: "corrected-shop-season", kind: "trade-season-plan", before: tradeSeasonFingerprint(corrected) }] });
+  await submitCommands({
+    ...host,
+    batchId: "corrected-shop-season",
+    commands: [
+      {
+        id: "corrected-shop-season",
+        kind: "trade-season-plan",
+        before: tradeSeasonFingerprint(corrected),
+      },
+    ],
+  });
   const final = await roomState(host);
-  assert.deepEqual(final.table.journal!.tradeEconomy!.pendingSeason!.feedback, [{ exchangeId: "harbor", commodityId: "timber", bought: 3, sold: 3 }]);
+  assert.deepEqual(final.table.journal!.tradeEconomy!.pendingSeason!.feedback, [
+    { exchangeId: "harbor", commodityId: "timber", bought: 3, sold: 3 },
+  ]);
   await deleteRoom(host.code, final.revision);
 });
 
@@ -387,21 +662,58 @@ test("shared zero-copper sale corrections need no cash ledger and retain histori
   const { choosePace } = await import("./cloud.server.ts");
   const table = tradeFixture();
   table.journal!.tradeEconomy!.exchanges[0].offers[0].bidCopper = 0;
-  const lot = { id: "zero-price-lot", purseId: "a", name: "Illustrated timber", kind: "item" as const, quantity: 5, unitCopper: 41, notes: "Keep the saved description", commodityId: "timber", weight: 2, image: "data:image/webp;base64," + "P".repeat(12000), historicalMetadata: { source: "Player archive", details: ["original"] } };
+  const lot = {
+    id: "zero-price-lot",
+    purseId: "a",
+    name: "Illustrated timber",
+    kind: "item" as const,
+    quantity: 5,
+    unitCopper: 41,
+    notes: "Keep the saved description",
+    commodityId: "timber",
+    weight: 2,
+    image: "data:image/webp;base64," + "P".repeat(12000),
+    historicalMetadata: { source: "Player archive", details: ["original"] },
+  };
   table.holdings.push(lot);
-  const host = await openRoom({ name: "Zero-price DM", table }), joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
+  const host = await openRoom({ name: "Zero-price DM", table }),
+    joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
   await choosePace({ ...host, live: true });
-  const e = table.journal!.tradeEconomy!, sale = { id: "zero-sale", kind: "trade-sell", exchangeId: "harbor", commodityId: "timber", holdingId: lot.id, quantity: 4, before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]) };
-  await submitCommands({ code: host.code, token: joined.token, batchId: "zero-sale", commands: [sale] });
-  const sold = (await roomState(host)).table, receipt = sold.journal!.tradeEconomy!.receipts[0];
+  const e = table.journal!.tradeEconomy!,
+    sale = {
+      id: "zero-sale",
+      kind: "trade-sell",
+      exchangeId: "harbor",
+      commodityId: "timber",
+      holdingId: lot.id,
+      quantity: 4,
+      before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
+    };
+  await submitCommands({
+    code: host.code,
+    token: joined.token,
+    batchId: "zero-sale",
+    commands: [sale],
+  });
+  const sold = (await roomState(host)).table,
+    receipt = sold.journal!.tradeEconomy!.receipts[0];
   assert.equal(receipt.copper, 0);
   assert.deepEqual(JSON.parse(receipt.settlement!.holding), lot);
   assert.equal(sold.ledger.length, 0);
-  const correction = { id: "zero-correction", kind: "ledger-void", target: { kind: "trade", id: receipt.id }, before: canonicalJson(receipt), reason: "Correct free goods movement" };
+  const correction = {
+    id: "zero-correction",
+    kind: "ledger-void",
+    target: { kind: "trade", id: receipt.id },
+    before: canonicalJson(receipt),
+    reason: "Correct free goods movement",
+  };
   await submitCommands({ ...host, batchId: "zero-correction", commands: [correction] });
   await submitCommands({ ...host, batchId: "zero-correction-lost", commands: [correction] });
   const final = await roomState(host);
-  assert.deepEqual(final.table.holdings.find(h => h.id === lot.id), lot);
+  assert.deepEqual(
+    final.table.holdings.find((h) => h.id === lot.id),
+    lot,
+  );
   assert.equal(final.table.ledger.length, 0);
   assert.equal(final.table.journal!.tradeEconomy!.receipts.length, 2);
   assert.equal(final.table.journal!.tradeEconomy!.exchanges[0].offers[0].stock, 100);
@@ -412,23 +724,55 @@ test("large exact snapshots retain metadata and leave shared state intact when b
   const { choosePace } = await import("./cloud.server.ts");
   const table = tradeFixture();
   const image = "data:image/webp;base64," + "P".repeat(450000);
-  const lot = { id: "large-image-lot", purseId: "a", name: "Illustrated timber", kind: "item" as const, quantity: 2, unitCopper: 41, notes: "", commodityId: "timber", weight: 2, image, metadata: { preserve: true } };
+  const lot = {
+    id: "large-image-lot",
+    purseId: "a",
+    name: "Illustrated timber",
+    kind: "item" as const,
+    quantity: 2,
+    unitCopper: 41,
+    notes: "",
+    commodityId: "timber",
+    weight: 2,
+    image,
+    metadata: { preserve: true },
+  };
   table.holdings.push(lot);
   const host = await openRoom({ name: "Large receipt DM", table });
   await choosePace({ ...host, live: true });
   const e = table.journal!.tradeEconomy!;
-  const sale = { id: "large-sale", kind: "trade-sell", exchangeId: "harbor", commodityId: "timber", holdingId: lot.id, quantity: 1, before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]) };
+  const sale = {
+    id: "large-sale",
+    kind: "trade-sell",
+    exchangeId: "harbor",
+    commodityId: "timber",
+    holdingId: lot.id,
+    quantity: 1,
+    before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
+  };
   await submitCommands({ ...host, batchId: "large-sale", commands: [sale] });
-  const sold = (await roomState(host)).table, receipt = sold.journal!.tradeEconomy!.receipts[0];
+  const sold = (await roomState(host)).table,
+    receipt = sold.journal!.tradeEconomy!.receipts[0];
   assert.equal(JSON.parse(receipt.settlement!.holding).image, image);
   const before = await readRoom(host.code);
-  const oversized = Array.from({ length: 5 }, (_, index) => ({ id: "large-reversal-" + index, kind: "ledger-void", target: { kind: "trade", id: receipt.id }, before: canonicalJson(receipt), reason: "Review" }));
-  await assert.rejects(submitCommands({ ...host, batchId: "oversized-correction-batch", commands: oversized }), /batch is too large/);
+  const oversized = Array.from({ length: 5 }, (_, index) => ({
+    id: "large-reversal-" + index,
+    kind: "ledger-void",
+    target: { kind: "trade", id: receipt.id },
+    before: canonicalJson(receipt),
+    reason: "Review",
+  }));
+  await assert.rejects(
+    submitCommands({ ...host, batchId: "oversized-correction-batch", commands: oversized }),
+    /batch is too large/,
+  );
   assert.deepEqual(await readRoom(host.code), before);
   await deleteRoom(host.code, before!.revision);
 
   const nearLimit = tradeFixture();
-  nearLimit.holdings.push(...Array.from({ length: 2 }, (_, index) => ({ ...lot, id: "near-limit-" + index })));
+  nearLimit.holdings.push(
+    ...Array.from({ length: 2 }, (_, index) => ({ ...lot, id: "near-limit-" + index })),
+  );
   const bounded = await openRoom({ name: "Backing write DM", table: nearLimit });
   const saved = await readRoom(bounded.code);
   // Disposable SQLite models a backing size rejection at the actual UPDATE,
@@ -436,9 +780,18 @@ test("large exact snapshots retain metadata and leave shared state intact when b
   // The budget sits below ROOM_BODY_LIMIT (1.8 MB) so the application size guard,
   // covered in scripts/room-row-growth.test.mjs, does not refuse the write first:
   // the sale's receipt copies the 450 KB lot, taking the row from ~0.9 MB to ~1.35 MB.
-  sql.exec("CREATE TEMP TRIGGER market_test_row_budget BEFORE UPDATE ON campaign_rooms WHEN length(CAST(NEW.body AS BLOB)) > 1000000 BEGIN SELECT RAISE(ABORT, 'market test row storage budget'); END");
+  sql.exec(
+    "CREATE TEMP TRIGGER market_test_row_budget BEFORE UPDATE ON campaign_rooms WHEN length(CAST(NEW.body AS BLOB)) > 1000000 BEGIN SELECT RAISE(ABORT, 'market test row storage budget'); END",
+  );
   try {
-    await assert.rejects(submitCommands({ ...bounded, batchId: "row-budget-sale", commands: [{ ...sale, id: "row-budget-sale", holdingId: "near-limit-0" }] }), /row storage budget/);
+    await assert.rejects(
+      submitCommands({
+        ...bounded,
+        batchId: "row-budget-sale",
+        commands: [{ ...sale, id: "row-budget-sale", holdingId: "near-limit-0" }],
+      }),
+      /row storage budget/,
+    );
     assert.deepEqual(await readRoom(bounded.code), saved);
   } finally {
     sql.exec("DROP TRIGGER market_test_row_budget");
@@ -448,76 +801,241 @@ test("large exact snapshots retain metadata and leave shared state intact when b
 
 test("separate shared campaign exchanges persist authoritative seasonal rolls, trades and one-time settlement across retries", async () => {
   const { choosePace } = await import("./cloud.server.ts");
-  const host=await openRoom({name:"Economy DM",table:tradeFixture()}),other=await openRoom({name:"Separate economy",table:tradeFixture()});
-  const joined=await joinRoom({code:host.code,purseId:"a",name:"Arden"});await choosePace({...host,live:true});
-  const auth={code:host.code,token:joined.token},initial=(await roomState(auth)).table,e=initial.journal!.tradeEconomy!;
-  const command={id:"economy-buy",kind:"trade-buy",exchangeId:"harbor",commodityId:"timber",purseId:"a",quantity:10,before:exchangeQuoteKey(e,e.exchanges[0],e.commodities[0])};
-  await submitCommands({...auth,batchId:"economy-buy-first",commands:[command]});
-  await submitCommands({...auth,batchId:"economy-buy-lost-response",commands:[command]});
-  const bought=(await roomState(host)).table;assert.equal(bought.journal!.tradeEconomy!.receipts.length,1);assert.equal(bought.holdings.find(h=>h.commodityId)!.quantity,10);
-  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.receipts.length,0);
-  await assert.rejects(submitCommands({...auth,batchId:"player-mode",commands:[{id:"player-mode",kind:"trade-settings",before:e.settings,settings:{...e.settings,mode:"classic"},reason:"No permission"}]}),/Only the DM/);
-  const plan={id:"server-season",kind:"trade-season-plan",before:tradeSeasonFingerprint(bought)};
-  await assert.rejects(submitCommands({...host,batchId:"staged-roll",commands:[plan],stage:true}),/directly/);
-  await submitCommands({...host,batchId:"server-plan",commands:[plan]});
-  const prepared=(await roomState(host)).table.journal!.tradeEconomy!;assert.ok(prepared.draws.every(d=>d.source==="server"));assert.equal(prepared.draws.length,5);
-  await submitCommands({...host,batchId:"server-plan-lost",commands:[plan]});assert.deepEqual((await roomState(host)).table.journal!.tradeEconomy!.draws,prepared.draws);
-  const playerView=(await roomState(auth)).table.journal!.tradeEconomy!;assert.deepEqual(playerView.draws,[]);assert.equal(playerView.pendingSeason,undefined);
-  await submitCommands({...host,batchId:"cancel-server-preview",commands:[{id:"cancel-server-preview",kind:"trade-season-cancel",previewId:plan.id}]});
-  await submitCommands({...host,batchId:"end-season-downtime",commands:[{id:"end-season-downtime",kind:"downtime-plan",name:"Session end",days:7,advanceSeason:true}]});
-  const downtime=(await roomState(host)).table.journal!.finance!.downtime.at(-1)!;assert.deepEqual(downtime.quote.tradeSeason!.draws,prepared.draws);
-  const settle={id:"settle-economy",kind:"downtime-apply",downtimeId:downtime.id,endSession:false};
-  await submitCommands({...host,batchId:"settle-first",commands:[settle]});await submitCommands({...host,batchId:"settle-lost",commands:[settle]});
-  const final=(await roomState(host)).table;assert.equal(final.journal!.tradeEconomy!.epoch,1);assert.equal(final.journal!.tradeEconomy!.history.length,1);assert.equal(final.journal!.finance!.day,7);
-  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.epoch,0);
+  const host = await openRoom({ name: "Economy DM", table: tradeFixture() }),
+    other = await openRoom({ name: "Separate economy", table: tradeFixture() });
+  const joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
+  await choosePace({ ...host, live: true });
+  const auth = { code: host.code, token: joined.token },
+    initial = (await roomState(auth)).table,
+    e = initial.journal!.tradeEconomy!;
+  const command = {
+    id: "economy-buy",
+    kind: "trade-buy",
+    exchangeId: "harbor",
+    commodityId: "timber",
+    purseId: "a",
+    quantity: 10,
+    before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
+  };
+  await submitCommands({ ...auth, batchId: "economy-buy-first", commands: [command] });
+  await submitCommands({ ...auth, batchId: "economy-buy-lost-response", commands: [command] });
+  const bought = (await roomState(host)).table;
+  assert.equal(bought.journal!.tradeEconomy!.receipts.length, 1);
+  assert.equal(bought.holdings.find((h) => h.commodityId)!.quantity, 10);
+  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.receipts.length, 0);
+  await assert.rejects(
+    submitCommands({
+      ...auth,
+      batchId: "player-mode",
+      commands: [
+        {
+          id: "player-mode",
+          kind: "trade-settings",
+          before: e.settings,
+          settings: { ...e.settings, mode: "classic" },
+          reason: "No permission",
+        },
+      ],
+    }),
+    /Only the DM/,
+  );
+  const plan = {
+    id: "server-season",
+    kind: "trade-season-plan",
+    before: tradeSeasonFingerprint(bought),
+  };
+  await assert.rejects(
+    submitCommands({ ...host, batchId: "staged-roll", commands: [plan], stage: true }),
+    /directly/,
+  );
+  await submitCommands({ ...host, batchId: "server-plan", commands: [plan] });
+  const prepared = (await roomState(host)).table.journal!.tradeEconomy!;
+  assert.ok(prepared.draws.every((d) => d.source === "server"));
+  assert.equal(prepared.draws.length, 5);
+  await submitCommands({ ...host, batchId: "server-plan-lost", commands: [plan] });
+  assert.deepEqual((await roomState(host)).table.journal!.tradeEconomy!.draws, prepared.draws);
+  const playerView = (await roomState(auth)).table.journal!.tradeEconomy!;
+  assert.deepEqual(playerView.draws, []);
+  assert.equal(playerView.pendingSeason, undefined);
+  await submitCommands({
+    ...host,
+    batchId: "cancel-server-preview",
+    commands: [{ id: "cancel-server-preview", kind: "trade-season-cancel", previewId: plan.id }],
+  });
+  await submitCommands({
+    ...host,
+    batchId: "end-season-downtime",
+    commands: [
+      {
+        id: "end-season-downtime",
+        kind: "downtime-plan",
+        name: "Session end",
+        days: 7,
+        advanceSeason: true,
+      },
+    ],
+  });
+  const downtime = (await roomState(host)).table.journal!.finance!.downtime.at(-1)!;
+  assert.deepEqual(downtime.quote.tradeSeason!.draws, prepared.draws);
+  const settle = {
+    id: "settle-economy",
+    kind: "downtime-apply",
+    downtimeId: downtime.id,
+    endSession: false,
+  };
+  await submitCommands({ ...host, batchId: "settle-first", commands: [settle] });
+  await submitCommands({ ...host, batchId: "settle-lost", commands: [settle] });
+  const final = (await roomState(host)).table;
+  assert.equal(final.journal!.tradeEconomy!.epoch, 1);
+  assert.equal(final.journal!.tradeEconomy!.history.length, 1);
+  assert.equal(final.journal!.finance!.day, 7);
+  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.epoch, 0);
 });
 test("property purchases and deed transfers persist once across lost responses and independent player reads", async () => {
   const { choosePace } = await import("./cloud.server.ts");
   const { blankShop } = await import("./economy.ts");
-  const table = { ...emptyCloudTable(), purses: ["buyer", "recipient"].map(id => ({ id, name: id, kind: "character" as const, coins: { ...emptyCoins(), gp: id === "buyer" ? 100 : 0 } })),
+  const table = {
+    ...emptyCloudTable(),
+    purses: ["buyer", "recipient"].map((id) => ({
+      id,
+      name: id,
+      kind: "character" as const,
+      coins: { ...emptyCoins(), gp: id === "buyer" ? 100 : 0 },
+    })),
     shops: [{ ...blankShop(), id: "broker", category: "mixed" as const, buyRate: 0.5 }],
-    journal: { sessions: [], requests: [], events: [], market: { currentLocationId: "coast", locations: ["coast", "desert"].map(id => ({ id, name: id, kind: "region" as const, parentId: null, description: "" })) } },
-    listings: [{ id: "mill", name: "Mill", kind: "property" as const, copper: 5000, quantity: 1, notes: "", locationId: "coast", property: { type: "workshop" as const, features: ["Waterwheel"] } },
-      { id: "remote", name: "Remote keep", kind: "property" as const, copper: 2000, quantity: 1, notes: "", locationId: "desert" }] };
-  const host = await openRoom({ name: "DM", table }), buyer = await joinRoom({ code: host.code, purseId: "buyer", name: "Buyer" }), recipient = await joinRoom({ code: host.code, purseId: "recipient", name: "Recipient" });
+    journal: {
+      sessions: [],
+      requests: [],
+      events: [],
+      market: {
+        currentLocationId: "coast",
+        locations: ["coast", "desert"].map((id) => ({
+          id,
+          name: id,
+          kind: "region" as const,
+          parentId: null,
+          description: "",
+        })),
+      },
+    },
+    listings: [
+      {
+        id: "mill",
+        name: "Mill",
+        kind: "property" as const,
+        copper: 5000,
+        quantity: 1,
+        notes: "",
+        locationId: "coast",
+        property: { type: "workshop" as const, features: ["Waterwheel"] },
+      },
+      {
+        id: "remote",
+        name: "Remote keep",
+        kind: "property" as const,
+        copper: 2000,
+        quantity: 1,
+        notes: "",
+        locationId: "desert",
+      },
+    ],
+  };
+  const host = await openRoom({ name: "DM", table }),
+    buyer = await joinRoom({ code: host.code, purseId: "buyer", name: "Buyer" }),
+    recipient = await joinRoom({ code: host.code, purseId: "recipient", name: "Recipient" });
   await choosePace({ ...host, live: true });
-  const buyerAuth = { code: host.code, token: buyer.token }, recipientAuth = { code: host.code, token: recipient.token };
-  assert.deepEqual((await roomState(buyerAuth)).table.listings.map(l => l.id), ["mill"]);
-  const purchase = { id: "deed-purchase", kind: "listing", listingId: "mill", purseId: "buyer", quantity: 1, before: table.listings[0] };
+  const buyerAuth = { code: host.code, token: buyer.token },
+    recipientAuth = { code: host.code, token: recipient.token };
+  assert.deepEqual(
+    (await roomState(buyerAuth)).table.listings.map((l) => l.id),
+    ["mill"],
+  );
+  const purchase = {
+    id: "deed-purchase",
+    kind: "listing",
+    listingId: "mill",
+    purseId: "buyer",
+    quantity: 1,
+    before: table.listings[0],
+  };
   await submitCommands({ ...buyerAuth, batchId: "deed-buy", commands: [purchase] });
   await submitCommands({ ...buyerAuth, batchId: "deed-buy", commands: [purchase] });
   await submitCommands({ ...buyerAuth, batchId: "buy-response-lost", commands: [purchase] });
   const bought = (await roomState(buyerAuth)).table;
-  assert.equal(bought.holdings.length, 1); assert.equal(bought.ledger.length, 1); assert.equal(bought.holdings[0].deed!.totalCopper, 5000);
+  assert.equal(bought.holdings.length, 1);
+  assert.equal(bought.ledger.length, 1);
+  assert.equal(bought.holdings[0].deed!.totalCopper, 5000);
   assert.equal((await roomState(recipientAuth)).table.holdings.length, 0);
-  const transfer = { id: "deed-transfer", kind: "give", fromId: "buyer", toId: "recipient", copper: 0, holdingId: bought.holdings[0].id, quantity: 1 };
+  const transfer = {
+    id: "deed-transfer",
+    kind: "give",
+    fromId: "buyer",
+    toId: "recipient",
+    copper: 0,
+    holdingId: bought.holdings[0].id,
+    quantity: 1,
+  };
   await submitCommands({ ...buyerAuth, batchId: "transfer-first", commands: [transfer] });
   await submitCommands({ ...buyerAuth, batchId: "transfer-response-lost", commands: [transfer] });
   assert.equal((await roomState(buyerAuth)).table.holdings.length, 0);
   const received = (await roomState(recipientAuth)).table.holdings[0];
-  assert.equal(received.deed!.ownerName, "recipient"); assert.equal(received.deed!.buyerName, "buyer");
-  await submitCommands({ ...host, batchId: "travel", commands: [{ id: "travel", kind: "party-location", before: "coast", locationId: "desert" }] });
+  assert.equal(received.deed!.ownerName, "recipient");
+  assert.equal(received.deed!.buyerName, "buyer");
+  await submitCommands({
+    ...host,
+    batchId: "travel",
+    commands: [{ id: "travel", kind: "party-location", before: "coast", locationId: "desert" }],
+  });
   const traveled = await roomState(recipientAuth);
   assert.equal(traveled.table.holdings[0].locationId, "coast");
-  assert.deepEqual(traveled.table.journal!.market!.locations.map(l => l.id), ["coast", "desert"]);
-  await submitCommands({ ...recipientAuth, batchId: "sell-deed", commands: [{ id: "sell-deed", kind: "sell", holdingId: received.id, shopId: "broker", quantity: 1 }] });
+  assert.deepEqual(
+    traveled.table.journal!.market!.locations.map((l) => l.id),
+    ["coast", "desert"],
+  );
+  await submitCommands({
+    ...recipientAuth,
+    batchId: "sell-deed",
+    commands: [
+      { id: "sell-deed", kind: "sell", holdingId: received.id, shopId: "broker", quantity: 1 },
+    ],
+  });
   assert.equal((await roomState(recipientAuth)).table.holdings.length, 0);
   const final = await roomState(host);
-  assert.equal(final.table.ledger.filter(l => l.listingPurchase).length, 1);
-  assert.equal(final.table.listings.find(l => l.id === "mill")!.quantity, 0);
+  assert.equal(final.table.ledger.filter((l) => l.listingPurchase).length, 1);
+  assert.equal(final.table.listings.find((l) => l.id === "mill")!.quantity, 0);
   await deleteRoom(host.code, final.revision);
 });
 test("DM name imports persist atomically and a lost-response retry cannot duplicate shops; players cannot import", async () => {
   const { parseMarketNames, marketNameFingerprint } = await import("./market-name-import.ts");
   const { readMarketLocations } = await import("./shop-locations.ts");
   const { choosePace } = await import("./cloud.server.ts");
-  const table = { ...emptyCloudTable(), purses: [{ id: "import-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }] };
+  const table = {
+    ...emptyCloudTable(),
+    purses: [{ id: "import-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }],
+  };
   const host = await openRoom({ name: "Import DM", table });
   const player = await joinRoom({ code: host.code, purseId: "import-hero", name: "Hero" });
   await choosePace({ ...host, live: true });
-  const command = { id: "import-once", kind: "market-name-import", before: marketNameFingerprint(readMarketLocations(), []), rows: parseMarketNames("region,town,shop\nCoast,Village,Inn\nCoast,Village,Forge", "region", null) };
+  const command = {
+    id: "import-once",
+    kind: "market-name-import",
+    before: marketNameFingerprint(readMarketLocations(), []),
+    rows: parseMarketNames(
+      "region,town,shop\nCoast,Village,Inn\nCoast,Village,Forge",
+      "region",
+      null,
+    ),
+  };
   const before = await readRoom(host.code);
-  await assert.rejects(submitCommands({ code: host.code, token: player.token, batchId: "player-import", commands: [command] }), /Only the DM/);
+  await assert.rejects(
+    submitCommands({
+      code: host.code,
+      token: player.token,
+      batchId: "player-import",
+      commands: [command],
+    }),
+    /Only the DM/,
+  );
   assert.deepEqual(await readRoom(host.code), before);
   await submitCommands({ ...host, batchId: "import-first", commands: [command] });
   await submitCommands({ ...host, batchId: "import-first", commands: [command] });
@@ -525,19 +1043,58 @@ test("DM name imports persist atomically and a lost-response retry cannot duplic
   const read = await roomState(host);
   assert.equal(read.table.shops.length, 2);
   assert.equal(read.table.journal!.market!.locations.length, 2);
-  assert.ok(read.table.shops.every(shop => shop.closed));
+  assert.ok(read.table.shops.every((shop) => shop.closed));
   assert.deepEqual(read.table.purses, table.purses);
-  assert.equal(read.table.journal!.events.filter(event => event.summary.startsWith("Names imported:")).length, 1);
+  assert.equal(
+    read.table.journal!.events.filter((event) => event.summary.startsWith("Names imported:"))
+      .length,
+    1,
+  );
   await deleteRoom(host.code, read.revision);
 });
 test("independent player room reads follow DM location changes and reject hidden-shop trades without committing", async () => {
   const { blankShop } = await import("./economy.ts");
   const { choosePace } = await import("./cloud.server.ts");
-  const table = { ...emptyCloudTable(),
-    purses: [{ id: "location-hero", name: "Hero", kind: "character" as const, coins: { ...emptyCoins(), gp: 10 } }],
-    shops: [{ ...blankShop(), id: "east-shop", locationId: "east" }, { ...blankShop(), id: "west-shop", locationId: "west" }],
-    stock: ["east", "west"].map(side => ({ id: `${side}-stock`, shopId: `${side}-shop`, name: "Good", copper: 10, quantity: 3, baseCopper: 10, rarity: "common" as const, notes: "" })),
-    journal: { sessions: [], requests: [], events: [], market: { currentLocationId: "east", locations: ["east", "west"].map(side => ({ id: side, name: side, kind: "region" as const, parentId: null, description: "", image: "/art/shop-default.webp" })) } },
+  const table = {
+    ...emptyCloudTable(),
+    purses: [
+      {
+        id: "location-hero",
+        name: "Hero",
+        kind: "character" as const,
+        coins: { ...emptyCoins(), gp: 10 },
+      },
+    ],
+    shops: [
+      { ...blankShop(), id: "east-shop", locationId: "east" },
+      { ...blankShop(), id: "west-shop", locationId: "west" },
+    ],
+    stock: ["east", "west"].map((side) => ({
+      id: `${side}-stock`,
+      shopId: `${side}-shop`,
+      name: "Good",
+      copper: 10,
+      quantity: 3,
+      baseCopper: 10,
+      rarity: "common" as const,
+      notes: "",
+    })),
+    journal: {
+      sessions: [],
+      requests: [],
+      events: [],
+      market: {
+        currentLocationId: "east",
+        locations: ["east", "west"].map((side) => ({
+          id: side,
+          name: side,
+          kind: "region" as const,
+          parentId: null,
+          description: "",
+          image: "/art/shop-default.webp",
+        })),
+      },
+    },
   };
   const host = await openRoom({ name: "DM", table });
   const guest = await joinRoom({ code: host.code, purseId: "location-hero", name: "Player" });
@@ -545,13 +1102,44 @@ test("independent player room reads follow DM location changes and reject hidden
   assert.deepEqual(guest.shopIds, ["east-shop"]);
   const read = await roomState({ code: host.code, token: guest.token });
   assert.deepEqual(read.shopIds, ["east-shop"]);
-  assert.deepEqual(read.table.journal!.market!.locations.map(location => location.id), ["east"]);
+  assert.deepEqual(
+    read.table.journal!.market!.locations.map((location) => location.id),
+    ["east"],
+  );
   assert.equal(read.table.journal!.market!.locations[0].image, "/art/shop-default.webp");
   const before = await readRoom(host.code);
-  await assert.rejects(submitCommands({ code: host.code, token: guest.token, batchId: "hidden-shop", commands: [{ id: "hidden-buy", kind: "buy", stockId: "west-stock", purseId: "location-hero", quantity: 1 }] }), /not available/);
+  await assert.rejects(
+    submitCommands({
+      code: host.code,
+      token: guest.token,
+      batchId: "hidden-shop",
+      commands: [
+        {
+          id: "hidden-buy",
+          kind: "buy",
+          stockId: "west-stock",
+          purseId: "location-hero",
+          quantity: 1,
+        },
+      ],
+    }),
+    /not available/,
+  );
   assert.deepEqual(await readRoom(host.code), before);
-  await assert.rejects(submitCommands({ code: host.code, token: guest.token, batchId: "move-player", commands: [{ id: "move-player", kind: "party-location", before: "east", locationId: "west" }] }), /Only the DM/);
-  await submitCommands({ ...host, batchId: "move-host", commands: [{ id: "move-host", kind: "party-location", before: "east", locationId: "west" }] });
+  await assert.rejects(
+    submitCommands({
+      code: host.code,
+      token: guest.token,
+      batchId: "move-player",
+      commands: [{ id: "move-player", kind: "party-location", before: "east", locationId: "west" }],
+    }),
+    /Only the DM/,
+  );
+  await submitCommands({
+    ...host,
+    batchId: "move-host",
+    commands: [{ id: "move-host", kind: "party-location", before: "east", locationId: "west" }],
+  });
   const moved = await roomState({ code: host.code, token: guest.token });
   assert.deepEqual(moved.shopIds, ["west-shop"]);
   assert.equal(moved.table.stock[0].id, "west-stock");
@@ -560,7 +1148,10 @@ test("independent player room reads follow DM location changes and reject hidden
   await deleteRoom(host.code, moved.revision);
 });
 sql.exec(
-  readFileSync(new URL("../../../cloudflare/migrations/0001_campaign_rooms.sql", import.meta.url), "utf8"),
+  readFileSync(
+    new URL("../../../cloudflare/migrations/0001_campaign_rooms.sql", import.meta.url),
+    "utf8",
+  ),
 );
 sql.exec(
   readFileSync(
@@ -568,14 +1159,43 @@ sql.exec(
     "utf8",
   ),
 );
-sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0012_campaign_room_images.sql",import.meta.url),"utf8"));
-sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0013_campaign_resource_documents.sql",import.meta.url),"utf8"));
-sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0014_campaign_map_pings.sql",import.meta.url),"utf8"));
-sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0019_campaign_room_reports.sql",import.meta.url),"utf8"));
+sql.exec(
+  readFileSync(
+    new URL("../../../cloudflare/migrations/0012_campaign_room_images.sql", import.meta.url),
+    "utf8",
+  ),
+);
+sql.exec(
+  readFileSync(
+    new URL("../../../cloudflare/migrations/0013_campaign_resource_documents.sql", import.meta.url),
+    "utf8",
+  ),
+);
+sql.exec(
+  readFileSync(
+    new URL("../../../cloudflare/migrations/0014_campaign_map_pings.sql", import.meta.url),
+    "utf8",
+  ),
+);
+sql.exec(
+  readFileSync(
+    new URL("../../../cloudflare/migrations/0019_campaign_room_reports.sql", import.meta.url),
+    "utf8",
+  ),
+);
 (globalThis as any).__env__ = {
   DB: {
-    async batch(statements: {run:()=>Promise<unknown>}[]) {
-      sql.exec("BEGIN");try { const results=[];for(const statement of statements)results.push(await statement.run());sql.exec("COMMIT");return results; } catch(error) { sql.exec("ROLLBACK");throw error; }
+    async batch(statements: { run: () => Promise<unknown> }[]) {
+      sql.exec("BEGIN");
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        sql.exec("COMMIT");
+        return results;
+      } catch (error) {
+        sql.exec("ROLLBACK");
+        throw error;
+      }
     },
     prepare(query: string) {
       let values: any[] = [];
@@ -622,11 +1242,29 @@ test("durable shared rooms reject stale writes and survive independent reads", a
 });
 test("unchanged reads retain seat checks and fresh encounter policy without hydrating private media", async () => {
   const { readJournal } = await import("./journal.ts");
-  const table = { ...emptyCloudTable(), purses: [{ id: "poll-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }],
-    journal: readJournal({ world: { maps: [{ id: "poll-map", name: "Map", image: "data:image/png;base64," + "A".repeat(120000), locationId: null, visible: true, anchors: [], markers: [] }] } }) };
+  const table = {
+    ...emptyCloudTable(),
+    purses: [{ id: "poll-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }],
+    journal: readJournal({
+      world: {
+        maps: [
+          {
+            id: "poll-map",
+            name: "Map",
+            image: "data:image/png;base64," + "A".repeat(120000),
+            locationId: null,
+            visible: true,
+            anchors: [],
+            markers: [],
+          },
+        ],
+      },
+    }),
+  };
   const host = await openRoom({ name: "Poll DM", table });
   const guest = await joinRoom({ code: host.code, purseId: "poll-hero", name: "Poll guest" });
-  const auth = { code: host.code, token: guest.token }, first = await roomState(auth);
+  const auth = { code: host.code, token: guest.token },
+    first = await roomState(auth);
   const known = { ...auth, knownRevision: first.revision, knownSeatId: guest.seatId };
   const access = await readRoomAccess(host.code);
   assert.equal(access!.revision, first.revision);
@@ -638,26 +1276,51 @@ test("unchanged reads retain seat checks and fresh encounter policy without hydr
   assert.equal(unchanged.encounterActive, false);
   sql.exec("CREATE TABLE IF NOT EXISTS user(id TEXT PRIMARY KEY)");
   sql.prepare("INSERT OR IGNORE INTO user(id) VALUES (?)").run("synthetic-owner");
-  sql.prepare("INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',0,1,1)")
-    .run("poll-encounter", "synthetic-owner", host.code, JSON.stringify({ name: "Private enemy name" }));
+  sql
+    .prepare(
+      "INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',0,1,1)",
+    )
+    .run(
+      "poll-encounter",
+      "synthetic-owner",
+      host.code,
+      JSON.stringify({ name: "Private enemy name" }),
+    );
   unchanged = await pollRoom(known);
   assert.equal(unchanged.encounterActive, true);
   assert.ok(!JSON.stringify(unchanged).includes("Private enemy name"));
-  assert.ok("table" in await pollRoom({ ...known, knownSeatId: "another-seat" }));
+  assert.ok("table" in (await pollRoom({ ...known, knownSeatId: "another-seat" })));
   await assert.rejects(pollRoom({ ...known, token: "invalid-token" }), /not seated/);
   // If referenced media becomes unreadable, the unchanged path still does no media read.
   sql.prepare("DELETE FROM campaign_room_images WHERE code=?").run(host.code);
-  assert.equal("unchanged" in await pollRoom(known), true);
+  assert.equal("unchanged" in (await pollRoom(known)), true);
   await assert.rejects(roomState(auth), /image is missing/);
-  const body = JSON.parse(sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code)!.body as string);
-  body.closed = true;body.revision++;
-  sql.prepare("UPDATE campaign_rooms SET revision=?,body=? WHERE code=?").run(body.revision, JSON.stringify(body), host.code);
+  const body = JSON.parse(
+    sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code)!.body as string,
+  );
+  body.closed = true;
+  body.revision++;
+  sql
+    .prepare("UPDATE campaign_rooms SET revision=?,body=? WHERE code=?")
+    .run(body.revision, JSON.stringify(body), host.code);
   await assert.rejects(pollRoom(known), /closed/);
 });
 test("changed revisions force complete reads with current drafts and acknowledgements", async () => {
-  const host = await openRoom({ name: "Changed poll DM", table: { ...emptyCloudTable(), purses: [{ id: "poll-next", name: "Next", kind: "character" as const, coins: emptyCoins() }] } });
-  const first = await roomState(host), known = { ...host, knownRevision: first.revision, knownSeatId: first.seatId };
-  const command = { id: "poll-staged", kind: "portrait", purseId: "poll-next", portrait: "/art/player.webp" };
+  const host = await openRoom({
+    name: "Changed poll DM",
+    table: {
+      ...emptyCloudTable(),
+      purses: [{ id: "poll-next", name: "Next", kind: "character" as const, coins: emptyCoins() }],
+    },
+  });
+  const first = await roomState(host),
+    known = { ...host, knownRevision: first.revision, knownSeatId: first.seatId };
+  const command = {
+    id: "poll-staged",
+    kind: "portrait",
+    purseId: "poll-next",
+    portrait: "/art/player.webp",
+  };
   await submitCommands({ ...host, batchId: "poll-stage", commands: [command], stage: true });
   const staged = await pollRoom(known);
   assert.ok("table" in staged);
@@ -668,16 +1331,31 @@ test("changed revisions force complete reads with current drafts and acknowledge
   assert.deepEqual((committed as typeof first).acknowledged, [command.id]);
 });
 test("one atomic command batch deduplicates repeated action IDs before applying financial changes", async () => {
-  const host = await openRoom({ name:"Batch DM",table:{...emptyCloudTable(),purses:[
-    {id:"batch-a",name:"A",kind:"character",coins:fromCopper(500)},
-    {id:"batch-b",name:"B",kind:"character",coins:fromCopper(0)},
-  ]} });
-  const command={id:"batch-duplicate",kind:"give",fromId:"batch-a",toId:"batch-b",copper:100,holdingId:null,quantity:0};
-  const request={...host,batchId:"batch-duplicate-receipt",commands:[command,command]};
-  const saved=await submitCommands(request);
-  assert.equal(toCopper(saved.table.purses[0].coins),400);assert.equal(toCopper(saved.table.purses[1].coins),100);
-  assert.equal(saved.table.ledger.length,2);
-  assert.deepEqual((await submitCommands(request)).table,saved.table);
+  const host = await openRoom({
+    name: "Batch DM",
+    table: {
+      ...emptyCloudTable(),
+      purses: [
+        { id: "batch-a", name: "A", kind: "character", coins: fromCopper(500) },
+        { id: "batch-b", name: "B", kind: "character", coins: fromCopper(0) },
+      ],
+    },
+  });
+  const command = {
+    id: "batch-duplicate",
+    kind: "give",
+    fromId: "batch-a",
+    toId: "batch-b",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  };
+  const request = { ...host, batchId: "batch-duplicate-receipt", commands: [command, command] };
+  const saved = await submitCommands(request);
+  assert.equal(toCopper(saved.table.purses[0].coins), 400);
+  assert.equal(toCopper(saved.table.purses[1].coins), 100);
+  assert.equal(saved.table.ledger.length, 2);
+  assert.deepEqual((await submitCommands(request)).table, saved.table);
 });
 test("a cloudflare worker without D1 does not fall back to a local file", async () => {
   const previous = (globalThis as { __env__?: unknown }).__env__;
@@ -981,76 +1659,334 @@ test("players receive only their own finance agreements in persisted room projec
   const host = await openRoom({ name: "Finance DM", table });
   const pc = await joinRoom({ code: host.code, purseId: "finance-pc", name: "PC" });
   assert.equal((await roomState(host)).table.journal?.finance?.loans[0].principal, 500);
-  const projected=(await roomState({code:host.code,token:pc.token})).table.journal!.finance!;
-  assert.equal(projected.loans.length,1);
-  assert.equal(projected.loans[0].principal,500);
-  assert.deepEqual(projected.downtime,[]);
+  const projected = (await roomState({ code: host.code, token: pc.token })).table.journal!.finance!;
+  assert.equal(projected.loans.length, 1);
+  assert.equal(projected.loans[0].principal, 500);
+  assert.deepEqual(projected.downtime, []);
 });
 
-test("maps, NPC barter, vendor toggles and session time remain authoritative and retry-safe across independent seats",async()=>{
-  const {choosePace}=await import("./cloud.server.ts"),{readJournal}=await import("./journal.ts"),{canonicalJson}=await import("./canonical-json.ts"),{sessionTimeFingerprint}=await import("./session-time.ts");
-  const table={...emptyCloudTable(),purses:["world-a","world-b"].map(id=>({id,name:id,kind:"character" as const,coins:{...emptyCoins(),gp:100}})),holdings:[{id:"world-lot",name:"Sword",kind:"item" as const,purseId:"world-a",quantity:2,unitCopper:500,notes:""}],journal:readJournal({market:{currentLocationId:"world-city",locations:[{id:"world-region",name:"Realm",kind:"region",parentId:null,description:""},{id:"world-city",name:"City",kind:"city",parentId:"world-region",description:""}]},sessions:[{id:"world-session",name:"Travel",startedAt:1}]})};
-  const host=await openRoom({name:"World DM",table}),a=await joinRoom({code:host.code,purseId:"world-a",name:"A"}),b=await joinRoom({code:host.code,purseId:"world-b",name:"B"});await choosePace({...host,live:true});const aAuth={code:host.code,token:a.token},bAuth={code:host.code,token:b.token};
-  const map={id:"world-map",name:"City map",image:"data:image/png;base64,AAAA",locationId:"world-city",visible:true,anchors:[{locationId:"world-city",x:.5,y:.5}],markers:[]};
-  await assert.rejects(submitCommands({...aAuth,batchId:"forged-map",commands:[{id:"forged-map",kind:"map-save",mapId:map.id,before:null,map}]}),/Only the DM/);
-  const save={id:"world-map-save",kind:"map-save",mapId:map.id,before:null,map};await submitCommands({...host,batchId:"map-save",commands:[save]});await submitCommands({...host,batchId:"map-lost-response",commands:[save]});assert.equal((await roomState(aAuth)).table.journal!.world!.maps.length,1);
-  const marker={id:"world-marker",label:"Live landmark",description:"Public",visibility:"party",x:.2,y:.3};await submitCommands({...host,batchId:"marker-add",commands:[{id:"world-marker-add",kind:"map-marker",mapId:map.id,markerId:marker.id,before:null,marker}]});assert.equal((await roomState(bAuth)).table.journal!.world!.maps[0].markers[0].label,"Live landmark");await submitCommands({...host,batchId:"marker-remove",commands:[{id:"world-marker-remove",kind:"map-marker",mapId:map.id,markerId:marker.id,before:marker,marker:null}]});assert.equal((await roomState(aAuth)).table.journal!.world!.maps[0].markers.length,0);
-  const create={id:"world-npc-create",kind:"npc-create",npc:{id:"world-npc",name:"Broker",description:"Near",locationId:"world-city",visible:true,barterAllowed:true,controllerPurseId:null},copper:500,inventory:[{name:"Gem",quantity:1,unitCopper:500,notes:""}]};await submitCommands({...host,batchId:"npc-create",commands:[create]});await submitCommands({...host,batchId:"npc-retry",commands:[create]});assert.equal((await roomState(aAuth)).table.journal!.world!.npcs.length,1);
-  const offer={id:"world-offer",kind:"trade-offer",tradeId:"world-trade",revision:null,actorId:"world-a",left:{purseId:"world-a",copper:100,items:[{holdingId:"world-lot",quantity:1,before:canonicalJson(table.holdings[0])}]},right:{purseId:"world-b",copper:0,items:[]},note:"Sword"};await submitCommands({...aAuth,batchId:"offer",commands:[offer]});const decision={id:"world-accept",kind:"trade-decision",tradeId:"world-trade",revision:0,actorId:"world-b",decision:"accepted"};await assert.rejects(submitCommands({...aAuth,batchId:"forged-accept",commands:[decision]}),/participant/);await submitCommands({...bAuth,batchId:"accept",commands:[decision]});await submitCommands({...bAuth,batchId:"accept-retry",commands:[decision]});assert.equal((await roomState(bAuth)).table.holdings.find(h=>h.name==="Sword")!.quantity,1);assert.equal((await roomState(host)).table.ledger.filter(l=>l.summary.startsWith("Barter")).length,2);
-  const before=(await roomState(host)).table,time={id:"world-time",kind:"session-time",before:sessionTimeFingerprint(before),hours:24,rest:"none",purseIds:[],allowDowntime:false,note:"Travel"};await submitCommands({...host,batchId:"time",commands:[time]});await submitCommands({...host,batchId:"time-retry",commands:[time]});const final=await roomState(host);assert.equal(final.table.journal!.finance!.day,1);assert.equal(final.table.journal!.world!.timeHistory.length,1);await deleteRoom(host.code,final.revision);
+test("maps, NPC barter, vendor toggles and session time remain authoritative and retry-safe across independent seats", async () => {
+  const { choosePace } = await import("./cloud.server.ts"),
+    { readJournal } = await import("./journal.ts"),
+    { canonicalJson } = await import("./canonical-json.ts"),
+    { sessionTimeFingerprint } = await import("./session-time.ts");
+  const table = {
+    ...emptyCloudTable(),
+    purses: ["world-a", "world-b"].map((id) => ({
+      id,
+      name: id,
+      kind: "character" as const,
+      coins: { ...emptyCoins(), gp: 100 },
+    })),
+    holdings: [
+      {
+        id: "world-lot",
+        name: "Sword",
+        kind: "item" as const,
+        purseId: "world-a",
+        quantity: 2,
+        unitCopper: 500,
+        notes: "",
+      },
+    ],
+    journal: readJournal({
+      market: {
+        currentLocationId: "world-city",
+        locations: [
+          { id: "world-region", name: "Realm", kind: "region", parentId: null, description: "" },
+          {
+            id: "world-city",
+            name: "City",
+            kind: "city",
+            parentId: "world-region",
+            description: "",
+          },
+        ],
+      },
+      sessions: [{ id: "world-session", name: "Travel", startedAt: 1 }],
+    }),
+  };
+  const host = await openRoom({ name: "World DM", table }),
+    a = await joinRoom({ code: host.code, purseId: "world-a", name: "A" }),
+    b = await joinRoom({ code: host.code, purseId: "world-b", name: "B" });
+  await choosePace({ ...host, live: true });
+  const aAuth = { code: host.code, token: a.token },
+    bAuth = { code: host.code, token: b.token };
+  const map = {
+    id: "world-map",
+    name: "City map",
+    image: "data:image/png;base64,AAAA",
+    locationId: "world-city",
+    visible: true,
+    anchors: [{ locationId: "world-city", x: 0.5, y: 0.5 }],
+    markers: [],
+  };
+  await assert.rejects(
+    submitCommands({
+      ...aAuth,
+      batchId: "forged-map",
+      commands: [{ id: "forged-map", kind: "map-save", mapId: map.id, before: null, map }],
+    }),
+    /Only the DM/,
+  );
+  const save = { id: "world-map-save", kind: "map-save", mapId: map.id, before: null, map };
+  await submitCommands({ ...host, batchId: "map-save", commands: [save] });
+  await submitCommands({ ...host, batchId: "map-lost-response", commands: [save] });
+  assert.equal((await roomState(aAuth)).table.journal!.world!.maps.length, 1);
+  const marker = {
+    id: "world-marker",
+    label: "Live landmark",
+    description: "Public",
+    visibility: "party",
+    x: 0.2,
+    y: 0.3,
+  };
+  await submitCommands({
+    ...host,
+    batchId: "marker-add",
+    commands: [
+      {
+        id: "world-marker-add",
+        kind: "map-marker",
+        mapId: map.id,
+        markerId: marker.id,
+        before: null,
+        marker,
+      },
+    ],
+  });
+  assert.equal(
+    (await roomState(bAuth)).table.journal!.world!.maps[0].markers[0].label,
+    "Live landmark",
+  );
+  await submitCommands({
+    ...host,
+    batchId: "marker-remove",
+    commands: [
+      {
+        id: "world-marker-remove",
+        kind: "map-marker",
+        mapId: map.id,
+        markerId: marker.id,
+        before: marker,
+        marker: null,
+      },
+    ],
+  });
+  assert.equal((await roomState(aAuth)).table.journal!.world!.maps[0].markers.length, 0);
+  const create = {
+    id: "world-npc-create",
+    kind: "npc-create",
+    npc: {
+      id: "world-npc",
+      name: "Broker",
+      description: "Near",
+      locationId: "world-city",
+      visible: true,
+      barterAllowed: true,
+      controllerPurseId: null,
+    },
+    copper: 500,
+    inventory: [{ name: "Gem", quantity: 1, unitCopper: 500, notes: "" }],
+  };
+  await submitCommands({ ...host, batchId: "npc-create", commands: [create] });
+  await submitCommands({ ...host, batchId: "npc-retry", commands: [create] });
+  assert.equal((await roomState(aAuth)).table.journal!.world!.npcs.length, 1);
+  const offer = {
+    id: "world-offer",
+    kind: "trade-offer",
+    tradeId: "world-trade",
+    revision: null,
+    actorId: "world-a",
+    left: {
+      purseId: "world-a",
+      copper: 100,
+      items: [{ holdingId: "world-lot", quantity: 1, before: canonicalJson(table.holdings[0]) }],
+    },
+    right: { purseId: "world-b", copper: 0, items: [] },
+    note: "Sword",
+  };
+  await submitCommands({ ...aAuth, batchId: "offer", commands: [offer] });
+  const decision = {
+    id: "world-accept",
+    kind: "trade-decision",
+    tradeId: "world-trade",
+    revision: 0,
+    actorId: "world-b",
+    decision: "accepted",
+  };
+  await assert.rejects(
+    submitCommands({ ...aAuth, batchId: "forged-accept", commands: [decision] }),
+    /participant/,
+  );
+  await submitCommands({ ...bAuth, batchId: "accept", commands: [decision] });
+  await submitCommands({ ...bAuth, batchId: "accept-retry", commands: [decision] });
+  assert.equal(
+    (await roomState(bAuth)).table.holdings.find((h) => h.name === "Sword")!.quantity,
+    1,
+  );
+  assert.equal(
+    (await roomState(host)).table.ledger.filter((l) => l.summary.startsWith("Barter")).length,
+    2,
+  );
+  const before = (await roomState(host)).table,
+    time = {
+      id: "world-time",
+      kind: "session-time",
+      before: sessionTimeFingerprint(before),
+      hours: 24,
+      rest: "none",
+      purseIds: [],
+      allowDowntime: false,
+      note: "Travel",
+    };
+  await submitCommands({ ...host, batchId: "time", commands: [time] });
+  await submitCommands({ ...host, batchId: "time-retry", commands: [time] });
+  const final = await roomState(host);
+  assert.equal(final.table.journal!.finance!.day, 1);
+  assert.equal(final.table.journal!.world!.timeHistory.length, 1);
+  await deleteRoom(host.code, final.revision);
 });
 
-
-test("multiple large maps persist outside the D1 room row and hydrate exact archive bytes with campaign isolation",async()=>{
-  const {readJournal}=await import("./journal.ts"),{hydrateRoomImages}=await import("../../../cloudflare/room-images.mjs"),{database}=await import("./room-store.server.ts");
-  const maps=Array.from({length:6},(_,i)=>({id:`large-${i}`,name:`Map ${i}`,image:"data:image/png;base64,"+String.fromCharCode(65+i).repeat(480000),locationId:null,visible:true,anchors:[],markers:[]}));
-  const table={...emptyCloudTable(),purses:[{id:"map-hero",name:"Hero",kind:"character" as const,coins:emptyCoins()}],journal:readJournal({world:{maps}})};
-  const snapshot=JSON.stringify(table,null,2);table.journal.reports=[{id:"map-report",name:"Original bytes",at:1,snapshot}];
-  const host=await openRoom({name:"Maps DM",table});const raw=sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as {body:string};assert.ok(raw.body.length<10000);assert.ok(!raw.body.includes(maps[0].image));assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
-  const hydrated=await readRoom(host.code);assert.deepEqual(hydrated!.table.journal!.world!.maps,maps);assert.equal(hydrated!.table.journal!.reports![0].snapshot,snapshot);
-  await updateRoom({...hydrated!,revision:hydrated!.revision+1},hydrated!.revision);assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
-  await assert.rejects(hydrateRoomImages(database()!,"another-campaign",JSON.parse(raw.body)),/missing/);
-  const direct = JSON.parse((sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as {body:string}).body);
-  direct.table.purses[0].portrait=maps[0].image;
-  const directBody=JSON.stringify(direct);
-  sql.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").run(directBody,host.code);
-  const latest=await readRoom(host.code),stale=structuredClone(latest!);
-  const {roomStorageBody}=await import("./room-store.server.ts"),{encodeRoomImages}=await import("../../../cloudflare/room-images.mjs");
-  assert.equal(latest!.table.purses[0].portrait,maps[0].image);
-  assert.equal(roomStorageBody(latest!),directBody);
-  assert.notEqual((await encodeRoomImages(latest!)).body,directBody);
-  assert.ok(!Object.keys(latest!).some(key=>key.includes("stored")));stale.revision++;stale.table.journal!.world!.maps[0].image="data:image/png;base64,"+"Z".repeat(480000);
-  await assert.rejects(updateRoom(stale,latest!.revision-1),/changed/);assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
-  assert.deepEqual((await readRoom(host.code))!.table.journal!.world!.maps,maps);await deleteRoom(host.code,latest!.revision);
+test("multiple large maps persist outside the D1 room row and hydrate exact archive bytes with campaign isolation", async () => {
+  const { readJournal } = await import("./journal.ts"),
+    { hydrateRoomImages } = await import("../../../cloudflare/room-images.mjs"),
+    { database } = await import("./room-store.server.ts");
+  const maps = Array.from({ length: 6 }, (_, i) => ({
+    id: `large-${i}`,
+    name: `Map ${i}`,
+    image: "data:image/png;base64," + String.fromCharCode(65 + i).repeat(480000),
+    locationId: null,
+    visible: true,
+    anchors: [],
+    markers: [],
+  }));
+  const table = {
+    ...emptyCloudTable(),
+    purses: [{ id: "map-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }],
+    journal: readJournal({ world: { maps } }),
+  };
+  const snapshot = JSON.stringify(table, null, 2);
+  table.journal.reports = [{ id: "map-report", name: "Original bytes", at: 1, snapshot }];
+  const host = await openRoom({ name: "Maps DM", table });
+  const raw = sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as {
+    body: string;
+  };
+  assert.ok(raw.body.length < 10000);
+  assert.ok(!raw.body.includes(maps[0].image));
+  assert.equal(
+    sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,
+    6,
+  );
+  const hydrated = await readRoom(host.code);
+  assert.deepEqual(hydrated!.table.journal!.world!.maps, maps);
+  assert.equal(hydrated!.table.journal!.reports![0].snapshot, snapshot);
+  await updateRoom({ ...hydrated!, revision: hydrated!.revision + 1 }, hydrated!.revision);
+  assert.equal(
+    sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,
+    6,
+  );
+  await assert.rejects(
+    hydrateRoomImages(database()!, "another-campaign", JSON.parse(raw.body)),
+    /missing/,
+  );
+  const direct = JSON.parse(
+    (sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as { body: string })
+      .body,
+  );
+  direct.table.purses[0].portrait = maps[0].image;
+  const directBody = JSON.stringify(direct);
+  sql.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").run(directBody, host.code);
+  const latest = await readRoom(host.code),
+    stale = structuredClone(latest!);
+  const { roomStorageBody } = await import("./room-store.server.ts"),
+    { encodeRoomImages } = await import("../../../cloudflare/room-images.mjs");
+  assert.equal(latest!.table.purses[0].portrait, maps[0].image);
+  assert.equal(roomStorageBody(latest!), directBody);
+  assert.notEqual((await encodeRoomImages(latest!)).body, directBody);
+  assert.ok(!Object.keys(latest!).some((key) => key.includes("stored")));
+  stale.revision++;
+  stale.table.journal!.world!.maps[0].image = "data:image/png;base64," + "Z".repeat(480000);
+  await assert.rejects(updateRoom(stale, latest!.revision - 1), /changed/);
+  assert.equal(
+    sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,
+    6,
+  );
+  assert.deepEqual((await readRoom(host.code))!.table.journal!.world!.maps, maps);
+  await deleteRoom(host.code, latest!.revision);
 });
 
 test("map storage leaves raw character portraits and non-map inventory recovery bytes intact", async () => {
-  const {encodeRoomImages} = await import("../../../cloudflare/room-images.mjs");
+  const { encodeRoomImages } = await import("../../../cloudflare/room-images.mjs");
   const portrait = "data:image/webp;base64," + "P".repeat(12000);
   const mapImage = "data:image/webp;base64," + "M".repeat(12000);
   const table = emptyCloudTable();
-  table.journal=(await import("./journal.ts")).readJournal(undefined);
-  table.purses=[{id:"portrait-holder",name:"Portrait holder",kind:"character",coins:{cp:0,sp:0,ep:0,gp:0,pp:0},portrait}];
-  table.holdings=[{id:"illustrated-item",purseId:"portrait-holder",name:"Illustrated item",kind:"item",quantity:1,unitCopper:1,notes:"",image:portrait}];
-  const makeMap=(id:string,image:string)=>({id,name:id,image,locationId:null,visible:true,anchors:[],markers:[]});
-  table.journal!.world={characterPositions:[],maps:[makeMap("map",mapImage),makeMap("portrait-map",portrait)],npcs:[],trades:[],conversations:[],blackMarketActive:false,timeHistory:[]};
-  const snapshot = JSON.stringify(table,null,2);
-  table.journal!.reports=[{id:"portrait-report",name:"Portrait record",at:1,snapshot}];
-  const encoded=await encodeRoomImages({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}});
-  assert.equal(encoded.assets.length,1);
-  const raw=JSON.parse(encoded.body);
-  assert.equal(raw.table.purses[0].portrait,portrait);
-  assert.equal(raw.table.holdings[0].image,portrait);
+  table.journal = (await import("./journal.ts")).readJournal(undefined);
+  table.purses = [
+    {
+      id: "portrait-holder",
+      name: "Portrait holder",
+      kind: "character",
+      coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+      portrait,
+    },
+  ];
+  table.holdings = [
+    {
+      id: "illustrated-item",
+      purseId: "portrait-holder",
+      name: "Illustrated item",
+      kind: "item",
+      quantity: 1,
+      unitCopper: 1,
+      notes: "",
+      image: portrait,
+    },
+  ];
+  const makeMap = (id: string, image: string) => ({
+    id,
+    name: id,
+    image,
+    locationId: null,
+    visible: true,
+    anchors: [],
+    markers: [],
+  });
+  table.journal!.world = {
+    characterPositions: [],
+    maps: [makeMap("map", mapImage), makeMap("portrait-map", portrait)],
+    npcs: [],
+    trades: [],
+    conversations: [],
+    blackMarketActive: false,
+    timeHistory: [],
+  };
+  const snapshot = JSON.stringify(table, null, 2);
+  table.journal!.reports = [{ id: "portrait-report", name: "Portrait record", at: 1, snapshot }];
+  const encoded = await encodeRoomImages({
+    table,
+    drafts: { dm: [{ kind: "map-save", map: makeMap("queued", mapImage), before: null }] },
+  });
+  assert.equal(encoded.assets.length, 1);
+  const raw = JSON.parse(encoded.body);
+  assert.equal(raw.table.purses[0].portrait, portrait);
+  assert.equal(raw.table.holdings[0].image, portrait);
   // Archived snapshots are stored beside the room row (room-reports.mjs), byte for byte.
-  assert.equal(raw.table.journal.reports[0].snapshot,undefined);
-  assert.equal(encoded.reports.length,1);
-  assert.equal(raw.table.journal.reports[0].snapshotReference,encoded.reports[0].reference);
+  assert.equal(raw.table.journal.reports[0].snapshot, undefined);
+  assert.equal(encoded.reports.length, 1);
+  assert.equal(raw.table.journal.reports[0].snapshotReference, encoded.reports[0].reference);
   assert.ok(encoded.reports[0].body.includes(portrait));
-  assert.equal(raw.table.journal.world.maps[1].image,portrait);
-  assert.equal(raw.drafts.dm[0].map.image,encoded.assets[0].reference);
-  const {snapshotReference:_reference,...report}=raw.table.journal.reports[0];
-  raw.table.journal.reports[0]={...report,snapshot:encoded.reports[0].body};
-  assert.equal(JSON.stringify(raw).split(encoded.assets[0].reference).join(encoded.assets[0].image),JSON.stringify({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}}));
+  assert.equal(raw.table.journal.world.maps[1].image, portrait);
+  assert.equal(raw.drafts.dm[0].map.image, encoded.assets[0].reference);
+  const { snapshotReference: _reference, ...report } = raw.table.journal.reports[0];
+  raw.table.journal.reports[0] = { ...report, snapshot: encoded.reports[0].body };
+  assert.equal(
+    JSON.stringify(raw).split(encoded.assets[0].reference).join(encoded.assets[0].image),
+    JSON.stringify({
+      table,
+      drafts: { dm: [{ kind: "map-save", map: makeMap("queued", mapImage), before: null }] },
+    }),
+  );
 });
 
 test("large resource packs deduplicate across archives, hydrate complete bytes and remain campaign-scoped and CAS-atomic", async () => {
@@ -1127,47 +2063,96 @@ test("large resource packs deduplicate across archives, hydrate complete bytes a
   await deleteRoom(room.code, 2);
 });
 
-
 test("map pings cross seats outside turns without changing campaigns; expiry, map privacy and revoked sessions are enforced", async () => {
-  const {mapSignals} = await import("./map-signals.server.ts");
-  const {choosePace,closeRoom,manageRoom} = await import("./cloud.server.ts");
+  const { mapSignals } = await import("./map-signals.server.ts");
+  const { choosePace, closeRoom, manageRoom } = await import("./cloud.server.ts");
   const table = emptyCloudTable();
-  table.purses = [{id:"ping-hero",name:"Ping hero",kind:"character",coins:emptyCoins()}];
-  const map = {id:"public-map",name:"Shared map",image:"data:image/webp;base64,fixture",locationId:null,visible:true,anchors:[],markers:[]};
-  table.journal = {sessions:[],events:[],requests:[],world:{characterPositions:[],maps:[map,{...map,id:"secret-map",visible:false}],npcs:[],trades:[],timeHistory:[],conversations:[],blackMarketActive:false}};
-  const host = await openRoom({name:"Pings DM",table});
-  const guest = await joinRoom({code:host.code,purseId:"ping-hero",name:"Player"});
-  const player = {code:host.code,token:guest.token,mapId:map.id};
-  const dm = {...host,mapId:map.id};
-  const before = await readRoom(host.code), originalNow = Date.now;
-  let now = originalNow(); Date.now = () => now;
-  const ping = {id:crypto.randomUUID(),mapId:map.id,x:.2,y:.8,color:"red"};
+  table.purses = [{ id: "ping-hero", name: "Ping hero", kind: "character", coins: emptyCoins() }];
+  const map = {
+    id: "public-map",
+    name: "Shared map",
+    image: "data:image/webp;base64,fixture",
+    locationId: null,
+    visible: true,
+    anchors: [],
+    markers: [],
+  };
+  table.journal = {
+    sessions: [],
+    events: [],
+    requests: [],
+    world: {
+      characterPositions: [],
+      maps: [map, { ...map, id: "secret-map", visible: false }],
+      npcs: [],
+      trades: [],
+      timeHistory: [],
+      conversations: [],
+      blackMarketActive: false,
+    },
+  };
+  const host = await openRoom({ name: "Pings DM", table });
+  const guest = await joinRoom({ code: host.code, purseId: "ping-hero", name: "Player" });
+  const player = { code: host.code, token: guest.token, mapId: map.id };
+  const dm = { ...host, mapId: map.id };
+  const before = await readRoom(host.code),
+    originalNow = Date.now;
+  let now = originalNow();
+  Date.now = () => now;
+  const ping = { id: crypto.randomUUID(), mapId: map.id, x: 0.2, y: 0.8, color: "red" };
   try {
-    await mapSignals({...player,ping});
-    assert.equal((await mapSignals(dm)).pings[0].color,"red");
-    assert.deepEqual(await readRoom(host.code),before,"signals do not alter room revisions, campaign data, drafts or ledger");
-    await assert.rejects(mapSignals({...player,ping:{...ping,id:crypto.randomUUID()}}),/Wait/);
-    await assert.rejects(mapSignals({...player,ping:{...ping,x:1.2}}));
-    await assert.rejects(mapSignals({...player,ping:{...ping,color:"javascript"}}));
-    await assert.rejects(mapSignals({...player,token:"forged"}),/not seated/);
-    await assert.rejects(mapSignals({...player,mapId:"secret-map"}),/unavailable/);
-    await mapSignals({...host,mapId:"secret-map",ping:{...ping,id:crypto.randomUUID(),mapId:"secret-map"}});
-    assert.equal((await mapSignals(player)).pings.length,1,"secret map pings never cross the player map response");
+    await mapSignals({ ...player, ping });
+    assert.equal((await mapSignals(dm)).pings[0].color, "red");
+    assert.deepEqual(
+      await readRoom(host.code),
+      before,
+      "signals do not alter room revisions, campaign data, drafts or ledger",
+    );
+    await assert.rejects(
+      mapSignals({ ...player, ping: { ...ping, id: crypto.randomUUID() } }),
+      /Wait/,
+    );
+    await assert.rejects(mapSignals({ ...player, ping: { ...ping, x: 1.2 } }));
+    await assert.rejects(mapSignals({ ...player, ping: { ...ping, color: "javascript" } }));
+    await assert.rejects(mapSignals({ ...player, token: "forged" }), /not seated/);
+    await assert.rejects(mapSignals({ ...player, mapId: "secret-map" }), /unavailable/);
+    await mapSignals({
+      ...host,
+      mapId: "secret-map",
+      ping: { ...ping, id: crypto.randomUUID(), mapId: "secret-map" },
+    });
+    assert.equal(
+      (await mapSignals(player)).pings.length,
+      1,
+      "secret map pings never cross the player map response",
+    );
     now += 5001;
-    assert.deepEqual((await mapSignals(dm)).pings,[]);
-    assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_map_pings WHERE code=?").get(host.code)!.n,0);
-    await choosePace({...host,live:true});
-    await mapSignals({...dm,ping:{...ping,id:crypto.randomUUID(),color:"blue"}});
-    assert.equal((await mapSignals(player)).pings[0].color,"blue");
-    await closeRoom({...host,keepOnline:true});
-    await assert.rejects(mapSignals({...player,ping:{...ping,id:crypto.randomUUID()}}),/Resume play/);
-    await choosePace({...host,live:false});
-    sql.exec("CREATE TABLE IF NOT EXISTS library_members(user_id TEXT, code TEXT, seat_id TEXT, token TEXT)");
-    await manageRoom({...host,action:"kick",seatId:guest.seatId});
-    await assert.rejects(mapSignals(player),/not seated/);
+    assert.deepEqual((await mapSignals(dm)).pings, []);
+    assert.equal(
+      sql.prepare("SELECT count(*) AS n FROM campaign_map_pings WHERE code=?").get(host.code)!.n,
+      0,
+    );
+    await choosePace({ ...host, live: true });
+    await mapSignals({ ...dm, ping: { ...ping, id: crypto.randomUUID(), color: "blue" } });
+    assert.equal((await mapSignals(player)).pings[0].color, "blue");
+    await closeRoom({ ...host, keepOnline: true });
+    await assert.rejects(
+      mapSignals({ ...player, ping: { ...ping, id: crypto.randomUUID() } }),
+      /Resume play/,
+    );
+    await choosePace({ ...host, live: false });
+    sql.exec(
+      "CREATE TABLE IF NOT EXISTS library_members(user_id TEXT, code TEXT, seat_id TEXT, token TEXT)",
+    );
+    await manageRoom({ ...host, action: "kick", seatId: guest.seatId });
+    await assert.rejects(mapSignals(player), /not seated/);
     await closeRoom(host);
-    await assert.rejects(mapSignals(dm),/unavailable/);
-  } finally {Date.now = originalNow; const last=await readRoom(host.code); if(last) await deleteRoom(host.code,last.revision);}
+    await assert.rejects(mapSignals(dm), /unavailable/);
+  } finally {
+    Date.now = originalNow;
+    const last = await readRoom(host.code);
+    if (last) await deleteRoom(host.code, last.revision);
+  }
 });
 
 test("shared map tiles and travel placement preserve privacy, reject forged moves and commit once", async () => {
@@ -1302,33 +2287,144 @@ test("connected combat presentation rechecks seats, campaign, fog and scene perm
   const { campaignMapSchema } = await import("./world-schema.ts");
   const { readJournal } = await import("./journal.ts");
   const { mapTabletopSchema } = await import("./tabletop-schema.ts");
-  const battle = campaignMapSchema.parse({ id: "hud-battle", name: "Shared battle", image: "data:image/png;base64,YQ==", visible: true, locationId: null, anchors: [], markers: [],
-    grid: { columns: 10, rows: 10, feetPerTile: 5, diagonal: "equal", x: 0, y: 0, width: 1, height: 1 },
-    tokens: [{ id: "known-token", label: "Known scout", kind: "creature", encounterId: "hud-encounter", combatantId: "known", column: 1, row: 1, visibility: "party" },
-      { id: "secret-token", label: "Secret dragon", kind: "creature", encounterId: "hud-encounter", combatantId: "secret", column: 2, row: 2, visibility: "dm" }],
+  const battle = campaignMapSchema.parse({
+    id: "hud-battle",
+    name: "Shared battle",
+    image: "data:image/png;base64,YQ==",
+    visible: true,
+    locationId: null,
+    anchors: [],
+    markers: [],
+    grid: {
+      columns: 10,
+      rows: 10,
+      feetPerTile: 5,
+      diagonal: "equal",
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+    },
+    tokens: [
+      {
+        id: "known-token",
+        label: "Known scout",
+        kind: "creature",
+        encounterId: "hud-encounter",
+        combatantId: "known",
+        column: 1,
+        row: 1,
+        visibility: "party",
+      },
+      {
+        id: "secret-token",
+        label: "Secret dragon",
+        kind: "creature",
+        encounterId: "hud-encounter",
+        combatantId: "secret",
+        column: 2,
+        row: 2,
+        visibility: "dm",
+      },
+    ],
   });
-  const table = { ...emptyCloudTable(), purses: [{ id: "hud-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }], journal: readJournal({ world: { maps: [battle] } }) };
-  const host = await openRoom({ name: "HUD DM", table }), guest = await joinRoom({ code: host.code, purseId: "hud-hero", name: "HUD player" });
+  const table = {
+    ...emptyCloudTable(),
+    purses: [{ id: "hud-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }],
+    journal: readJournal({ world: { maps: [battle] } }),
+  };
+  const host = await openRoom({ name: "HUD DM", table }),
+    guest = await joinRoom({ code: host.code, purseId: "hud-hero", name: "HUD player" });
   await choosePace({ ...host, live: true });
-  const binding = { id: "hud-transition", encounterId: "hud-encounter", encounterRevision: 0, mapId: battle.id, returnMapId: battle.id, returnCamera: { x: .5, y: .5, zoom: 1 }, mode: "theatre", phase: "active", scaleConfirmed: false, showPlayers: true };
-  const command = { id: "hud-activate", kind: "map-combat-transition", before: null, binding, beforeSession: null };
-  await assert.rejects(submitCommands({ code: host.code, token: guest.token, batchId: "hud-forged", commands: [command] }), /Only the DM/);
+  const binding = {
+    id: "hud-transition",
+    encounterId: "hud-encounter",
+    encounterRevision: 0,
+    mapId: battle.id,
+    returnMapId: battle.id,
+    returnCamera: { x: 0.5, y: 0.5, zoom: 1 },
+    mode: "theatre",
+    phase: "active",
+    scaleConfirmed: false,
+    showPlayers: true,
+  };
+  const command = {
+    id: "hud-activate",
+    kind: "map-combat-transition",
+    before: null,
+    binding,
+    beforeSession: null,
+  };
+  await assert.rejects(
+    submitCommands({
+      code: host.code,
+      token: guest.token,
+      batchId: "hud-forged",
+      commands: [command],
+    }),
+    /Only the DM/,
+  );
   await submitCommands({ ...host, batchId: "hud-start", commands: [command] });
   await submitCommands({ ...host, batchId: "hud-retry", commands: [command] });
-  const privateBody = { name: "Private encounter name", round: 3, activeId: "known", notes: "Secret tactics", combatants: [{ id: "known", hp: 27 }], loot: "Secret treasure" };
+  const privateBody = {
+    name: "Private encounter name",
+    round: 3,
+    activeId: "known",
+    notes: "Secret tactics",
+    combatants: [{ id: "known", hp: 27 }],
+    loot: "Secret treasure",
+  };
   sql.exec("CREATE TABLE IF NOT EXISTS user(id TEXT PRIMARY KEY)");
   sql.prepare("INSERT OR IGNORE INTO user(id) VALUES (?)").run("synthetic-owner");
-  sql.prepare("INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',1,1,1)").run("hud-encounter", "synthetic-owner", host.code, JSON.stringify(privateBody));
+  sql
+    .prepare(
+      "INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',1,1,1)",
+    )
+    .run("hud-encounter", "synthetic-owner", host.code, JSON.stringify(privateBody));
   const auth = { code: host.code, token: guest.token, mapId: battle.id };
-  assert.deepEqual(await mapCombatPresentation(auth), { mapId: battle.id, status: "active", round: 3, activeTokenId: "known-token" });
+  assert.deepEqual(await mapCombatPresentation(auth), {
+    mapId: battle.id,
+    status: "active",
+    round: 3,
+    activeTokenId: "known-token",
+  });
   privateBody.activeId = "secret";
-  sql.prepare("UPDATE dm_encounters SET body=? WHERE id=?").run(JSON.stringify(privateBody), "hud-encounter");
-  assert.deepEqual(await mapCombatPresentation(auth), { mapId: battle.id, status: "active", round: 3 });
+  sql
+    .prepare("UPDATE dm_encounters SET body=? WHERE id=?")
+    .run(JSON.stringify(privateBody), "hud-encounter");
+  assert.deepEqual(await mapCombatPresentation(auth), {
+    mapId: battle.id,
+    status: "active",
+    round: 3,
+  });
   privateBody.activeId = "known";
-  sql.prepare("UPDATE dm_encounters SET body=? WHERE id=?").run(JSON.stringify(privateBody), "hud-encounter");
+  sql
+    .prepare("UPDATE dm_encounters SET body=? WHERE id=?")
+    .run(JSON.stringify(privateBody), "hud-encounter");
   const before = (await roomState(host)).table.journal!.world!.maps[0];
-  await submitCommands({ ...host, batchId: "hud-fog", commands: [{ id: "hud-fog", kind: "map-save", mapId: battle.id, before, map: { ...before, tabletop: mapTabletopSchema.parse({ fog: { enabled: true, base: "concealed", shapes: [] } }) } }] });
-  assert.deepEqual(await mapCombatPresentation(auth), { mapId: battle.id, status: "active", round: 3 });
+  await submitCommands({
+    ...host,
+    batchId: "hud-fog",
+    commands: [
+      {
+        id: "hud-fog",
+        kind: "map-save",
+        mapId: battle.id,
+        before,
+        map: {
+          ...before,
+          tabletop: mapTabletopSchema.parse({
+            fog: { enabled: true, base: "concealed", shapes: [] },
+          }),
+        },
+      },
+    ],
+  });
+  assert.deepEqual(await mapCombatPresentation(auth), {
+    mapId: battle.id,
+    status: "active",
+    round: 3,
+  });
   assert.equal(await mapCombatPresentation({ ...auth, mapId: "other-map" }), null);
   sql.prepare("UPDATE dm_encounters SET code=? WHERE id=?").run("FOREIGN", "hud-encounter");
   assert.equal(await mapCombatPresentation(auth), null);
@@ -1342,4 +2438,65 @@ test("connected combat presentation rechecks seats, campaign, fog and scene perm
   const saved = (await roomState(host)).table;
   assert.deepEqual(saved.ledger, []);
   assert.deepEqual(saved.holdings, []);
+});
+
+test("market location and other journal artwork is stored beside the room row; shared portraits stay inline", async () => {
+  const { readJournal } = await import("./journal.ts");
+  const { encodeRoomImages } = await import("../../../cloudflare/room-images.mjs");
+  const art = (letter: string) => "data:image/webp;base64," + letter.repeat(90000);
+  const portrait = art("P");
+  const locations = Array.from({ length: 24 }, (_, i) => ({
+    id: `loc-${i}`,
+    name: `Place ${i}`,
+    kind: "region",
+    parentId: null,
+    description: "",
+    image: art(String.fromCharCode(97 + i)),
+  }));
+  const table = {
+    ...emptyCloudTable(),
+    purses: [
+      { id: "art-hero", name: "Hero", kind: "character" as const, coins: emptyCoins(), portrait },
+    ],
+    journal: readJournal({ market: { locations, currentLocationId: null } }),
+  };
+  // An NPC record that mirrors the purse portrait keeps the inline copy SQL reads rely on.
+  (table.journal as any).market.locations[0].image = portrait;
+  const before = JSON.stringify(table);
+  assert.ok(before.length > 1_800_000, "the old inline form is over the room budget");
+  const encoded = await encodeRoomImages({
+    table,
+    drafts: {
+      dm: [
+        {
+          kind: "patch",
+          changes: [
+            { store: "journal", id: 'journal:["market"]', before: null, after: { locations } },
+          ],
+        },
+      ],
+    },
+  });
+  assert.ok(encoded.body.length < 300_000, `encoded body is ${encoded.body.length} characters`);
+  assert.equal(encoded.assets.length, 24); // 23 table images plus the draft-only original of loc-0
+  const raw = JSON.parse(encoded.body);
+  assert.equal(raw.table.purses[0].portrait, portrait);
+  assert.equal(raw.table.journal.market.locations[0].image, portrait);
+  assert.match(
+    raw.table.journal.market.locations[1].image,
+    /^\/art\/room-image-[a-f0-9]{64}\.webp$/,
+  );
+  assert.match(raw.drafts.dm[0].changes[0].after.locations[2].image, /^\/art\/room-image-/);
+  let restored = encoded.body;
+  for (const asset of encoded.assets) restored = restored.split(asset.reference).join(asset.image);
+  assert.deepEqual(JSON.parse(restored).table, JSON.parse(before));
+  // Through D1: the room opens under the budget and every image hydrates exactly.
+  const host = await openRoom({ name: "Artwork DM", table });
+  assert.ok(
+    (sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as { body: string })
+      .body.length < 300_000,
+  );
+  const read = await readRoom(host.code);
+  assert.deepEqual(read!.table.journal!.market!.locations, table.journal.market!.locations);
+  await deleteRoom(host.code, read!.revision);
 });
