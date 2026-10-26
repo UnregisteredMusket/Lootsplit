@@ -151,7 +151,8 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await openApplication(page, origin + "/account");
+    // My account shows one section at a time (#310); the owner's monitor is the Field monitor tab (#314).
+    await openApplication(page, origin + "/account#field-monitor");
     const field = page.locator(".owner-monitor");
     await field.getByText("Worker Monitor Audit", { exact: true }).waitFor();
     await field.getByText(owner.overall.label, { exact: true }).waitFor();
