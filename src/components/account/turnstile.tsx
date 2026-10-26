@@ -61,6 +61,7 @@ export const HumanCheck = forwardRef<HumanCheckHandle, { action: "signin" | "sig
     const widget = useRef("");
     const [token, setToken] = useState("");
     const [required, setRequired] = useState(false);
+    const [siteKey, setSiteKey] = useState("");
     const [problem, setProblem] = useState("");
 
     useImperativeHandle(
@@ -76,13 +77,27 @@ export const HumanCheck = forwardRef<HumanCheckHandle, { action: "signin" | "sig
       [token, required],
     );
 
+    // Ask the server once whether the check is on. Rendering the widget waits for the next
+    // effect: the box only exists after React has drawn it, and when the script and the config
+    // are already cached (switching between sign-in, sign-up and recovery) both resolve before
+    // that, which used to leave the form with no widget and no way to pass the check.
     useEffect(() => {
       let alive = true;
-      void captchaConfig().then(async ({ required: needed, siteKey }) => {
+      void captchaConfig().then(({ required: needed, siteKey: key }) => {
         if (!alive || !needed) return;
+        setSiteKey(key);
         setRequired(true);
-        try {
-          const api = await loadTurnstile();
+      });
+      return () => {
+        alive = false;
+      };
+    }, []);
+
+    useEffect(() => {
+      if (!required || !siteKey) return;
+      let alive = true;
+      void loadTurnstile()
+        .then((api) => {
           if (!alive || !box.current) return;
           widget.current = api.render(box.current, {
             sitekey: siteKey,
@@ -102,16 +117,16 @@ export const HumanCheck = forwardRef<HumanCheckHandle, { action: "signin" | "sig
               return true;
             },
           });
-        } catch {
+        })
+        .catch(() => {
           if (alive) setProblem("The human check could not load. Check your connection and reload the page.");
-        }
-      });
+        });
       return () => {
         alive = false;
         if (widget.current) window.turnstile?.remove(widget.current);
         widget.current = "";
       };
-    }, [action]);
+    }, [required, siteKey, action]);
 
     if (!required) return null;
     return (

@@ -1,0 +1,7 @@
+{
+  "title": "Human check after a password reset",
+  "summary": "The human check now appears on the sign-in form after you reset your password with a recovery key.",
+  "items": [
+    "After a recovery-key password reset, the sign-in form showed no human check, so signing in failed with \"Complete the human check\" until the page was reloaded. The check now loads every time the form switches between sign in, create account and recovery."
+  ]
+}
