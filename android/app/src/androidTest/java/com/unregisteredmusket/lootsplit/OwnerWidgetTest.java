@@ -1725,14 +1725,16 @@ public class OwnerWidgetTest {
                 // 4×4 face, its smallest placement and wider ones.
                 for(int[] size:new int[][]{{250,260},{250,480},{368,392},{448,480}}){
                     View face=laidOut(scaled,OwnerWidgetProvider.views(scaled,state,true,-1),size[0],size[1]);
-                    bounds(face);readable(face,scaled,10,"4x4 "+size[0]+"x"+size[1]+" "+tag);
+                    try{bounds(face);}catch(AssertionError error){throw new AssertionError("4x4 "+size[0]+"x"+size[1]+" "+tag+": "+error.getMessage(),error);}
+                    readable(face,scaled,10,"4x4 "+size[0]+"x"+size[1]+" "+tag);
                     assertEquals(View.VISIBLE,face.findViewById(R.id.monitor_since).getVisibility());
                     if(size[0]==368)capture(face,"legibility-4x4-"+tag);
                 }
                 // 4×2 face with and without tiles. At a large scale the "since" line and pace note give way.
                 for(boolean tiles:new boolean[]{true,false})for(int width:new int[]{250,368}){
                     View face=laidOut(scaled,OwnerWidgetProvider.medium(scaled,state,-1,tiles),width,tiles?184:110);
-                    bounds(face);readable(face,scaled,10,"4x2 "+(tiles?"tiles ":"")+width+" "+tag);
+                    try{bounds(face);}catch(AssertionError error){throw new AssertionError("4x2 "+(tiles?"tiles ":"")+width+" "+tag+": "+error.getMessage(),error);}
+                    readable(face,scaled,10,"4x2 "+(tiles?"tiles ":"")+width+" "+tag);
                     assertEquals(scale>1.05f?View.GONE:View.VISIBLE,face.findViewById(R.id.monitor_since).getVisibility());
                     assertEquals("FAILURE",text(face,R.id.monitor_health));
                     assertEquals("✕1",text(face,R.id.monitor_count_crit));
@@ -1749,8 +1751,14 @@ public class OwnerWidgetTest {
                         JSONObject row=rows.getJSONObject(i);
                         View item=laidOut(scaled,OwnerWidgetService.rowView(scaled,row,-1,expanded),226,0);
                         String name=row.optString("kind")+" "+row.optString("id")+" "+tag;
-                        bounds(item);readable(item,scaled,10,name);
-                        if(row.optString("kind").equals("item"))readable(item.findViewById(R.id.item_title),scaled,12,name);
+                        try{bounds(item);}catch(AssertionError error){throw new AssertionError(name+": "+error.getMessage(),error);}
+                        readable(item,scaled,10,name);
+                        if(row.optString("kind").equals("item")){
+                            readable(item.findViewById(R.id.item_title),scaled,12,name);
+                            // At a large scale the expanded item keeps DIAGNOSTICS and HISTORY; REPORT gives way.
+                            if(expanded!=java.util.Collections.<String>emptySet()&&expanded.contains(row.optString("id"))&&row.optJSONArray("buttons")!=null&&row.optJSONArray("buttons").length()>2)
+                                assertEquals(name,scale>1.05f?View.GONE:View.VISIBLE,item.findViewById(R.id.item_button3).getVisibility());
+                        }
                         if(row.optString("kind").equals("tiles")&&row.optString("id").contains("usage")){
                             // Gauge labels, tracks and values stay aligned row by row and none is pushed out.
                             for(String slot:new String[]{"a","b"}){
@@ -1770,7 +1778,8 @@ public class OwnerWidgetTest {
                 // The 4×1 companion, narrow and wide.
                 for(int width:new int[]{250,368}){
                     View face=laidOut(scaled,CompanionWidgetProvider.views(scaled,state,CompanionSettings.preset("Status + charts"),-1,width),width,56);
-                    bounds(face);readable(face,scaled,10,"companion "+width+" "+tag);
+                    try{bounds(face);}catch(AssertionError error){throw new AssertionError("companion "+width+" "+tag+": "+error.getMessage(),error);}
+                    readable(face,scaled,10,"companion "+width+" "+tag);
                 }
             }catch(Throwable error){failure.set(error);}});
             if(failure.get()!=null)throw new AssertionError(tag,failure.get());

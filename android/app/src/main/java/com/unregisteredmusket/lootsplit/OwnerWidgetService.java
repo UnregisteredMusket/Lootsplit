@@ -120,8 +120,11 @@ public class OwnerWidgetService extends RemoteViewsService {
         }
         JSONArray buttons = row.optJSONArray("buttons");
         int[] ids = {R.id.item_button1, R.id.item_button2, R.id.item_button3};
+        // Above the default font scale three buttons no longer fit one row; the third (REPORT) gives way
+        // rather than text shrinking or clipping (design plan M5). The daily report stays in the strip and More.
+        int shown = OwnerWidgetProvider.largeFont(context) ? 2 : ids.length;
         for (int i = 0; i < ids.length; i++) {
-            JSONArray button = buttons == null ? null : buttons.optJSONArray(i);
+            JSONArray button = buttons == null || i >= shown ? null : buttons.optJSONArray(i);
             view.setViewVisibility(ids[i], button == null ? View.GONE : View.VISIBLE);
             if (button == null) continue;
             String action = WidgetActions.rowAction(button.optString(1));
