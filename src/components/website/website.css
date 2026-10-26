@@ -1380,6 +1380,134 @@
 .ls-entry-details[open] summary {
   margin-bottom: 12px;
 }
+/* Folded older releases and the version jump list (W-7). */
+.ls-jump {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 22px 0 6px;
+}
+.ls-jump .ls-sc {
+  font-size: 14px;
+}
+.ls-jump-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ls-site .ls-jump-list a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  color: var(--paper-link);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ls-site .ls-jump-list a:hover {
+  border-color: var(--paper-link);
+}
+.ls-jump-web summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--paper-link);
+  font-weight: 600;
+}
+.ls-jump-web ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 16px;
+}
+.ls-entry.ls-entry-folded {
+  display: block;
+  padding: 0;
+}
+.ls-fold > summary {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 40px;
+  align-items: baseline;
+  padding: 18px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.ls-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.ls-fold-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-right: 24px;
+  text-align: right;
+  color: var(--paper-ink);
+  font-weight: 700;
+}
+.ls-fold-meta .ls-sc {
+  font-size: 13px;
+  font-weight: 400;
+}
+.ls-fold-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ls-fold-title h2 {
+  font-size: clamp(22px, 0.8vw + 18px, 26px);
+  line-height: 1.15;
+}
+.ls-fold-title h2::after {
+  content: " \25B8";
+  color: var(--paper-link);
+  font-size: 0.7em;
+}
+.ls-fold[open] .ls-fold-title h2::after {
+  content: " \25BE";
+}
+.ls-fold-line {
+  color: var(--paper-muted-2);
+  font-size: 16px;
+}
+.ls-fold:not([open]) .ls-fold-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ls-fold-body {
+  margin: 0 0 28px calc(170px + 40px);
+}
+@media (max-width: 860px) {
+  .ls-fold > summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .ls-fold-meta {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    padding-right: 0;
+    text-align: left;
+  }
+  .ls-fold-body {
+    margin-left: 0;
+  }
+}
 .ls-entries-end {
   border-top: 3px double var(--rule);
   padding-top: 20px;

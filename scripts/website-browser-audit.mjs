@@ -348,10 +348,37 @@ try {
         assert.equal(await androidEntries.first().isVisible(), false);
         await all.click();
         assert.equal(await androidEntries.first().isVisible(), true);
-        // Older Android releases stay available behind a disclosure.
-        const older = androidEntries.nth(1);
-        await older.getByText(/^Show changes/).click();
+        // W-7: the newest two releases (and the latest Android download) are in full; older
+        // ones fold to their summary line and keep their content and anchors.
+        const changelog = JSON.parse(readFileSync("src/lib/website/changelog.json", "utf8"));
+        const versions = changelog
+          .map((entry) => entry.version)
+          .filter((v) => v.localeCompare(release.version, undefined, { numeric: true }) <= 0);
+        assert.equal(await androidEntries.count(), versions.length, "every Android release is listed");
+        const entriesAll = page.locator("article.ls-release");
+        const folded = page.locator("article.ls-entry-folded");
+        assert.ok((await folded.count()) >= (await entriesAll.count()) - 3, "older releases fold");
+        assert.equal(await entriesAll.nth(0).locator("details.ls-fold").count(), 0, "newest release in full");
+        assert.equal(await entriesAll.nth(1).locator("details.ls-fold").count(), 0, "second release in full");
+        const older = folded.first();
+        assert.equal(await older.locator("details.ls-fold").evaluate((d) => d.open), false);
+        await older.locator("summary").click();
+        assert.equal(await older.locator("details.ls-fold").evaluate((d) => d.open), true);
         assert.ok((await older.locator("li").count()) > 0);
+        // The jump list links every Android version; opening an anchor expands its release.
+        const jump = page.getByRole("navigation", { name: "Jump to a release" });
+        assert.equal(await jump.locator('a[href^="#android-"]').count(), versions.length);
+        const oldest = versions.at(-1);
+        await jump.getByRole("link", { name: oldest, exact: true }).click();
+        const target = page.locator(`#android-${oldest.replaceAll(".", "\\.")}`);
+        await page.waitForFunction((id) => document.getElementById(id)?.querySelector("details.ls-fold")?.open === true, `android-${oldest}`);
+        assert.equal(await target.isVisible(), true);
+        await page.goto(`${origin}/updates#android-${versions[2] ?? oldest}`, { waitUntil: "networkidle" });
+        await page.waitForFunction((id) => {
+          const el = document.getElementById(id);
+          return el && !el.hidden && (!el.querySelector("details.ls-fold") || el.querySelector("details.ls-fold").open);
+        }, `android-${versions[2] ?? oldest}`);
+        await page.goto(`${origin}/updates`, { waitUntil: "networkidle" });
       }
       if (path === "downloads") {
         // Technical details are folded for players (W8); the summary opens them.
