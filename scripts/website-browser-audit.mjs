@@ -333,9 +333,10 @@ try {
         // Website and backend history runs from October 7 with no gap (owner rule 2026-10-23);
         // every entry names its deployed commit and its verification and live checks.
         assert.ok((await webEntries.count()) >= 14);
+        // Older releases are folded (W-7), so count the links whether or not they are open.
         for (const label of ["Complete main verification", "Publication and live checks"])
           assert.equal(
-            await webEntries.getByRole("link", { name: label, exact: true }).count(),
+            await webEntries.locator("a").filter({ hasText: new RegExp(`^${label}$`) }).count(),
             await webEntries.count(),
           );
         await android.click();
