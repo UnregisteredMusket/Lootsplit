@@ -3,6 +3,7 @@
   "summary": "A very large shared campaign can now be deleted with its complete recovery copy, which you can later download or restore.",
   "items": [
     "Deleting a shared campaign whose recovery copy was too large to save used to be refused; the copy is now saved in parts and checked when it is read back.",
+    "A campaign's recovery copy counts toward your account's backup storage. If it would not fit, the campaign is not deleted and you are asked to remove an older backup first; nothing is removed for you.",
     "Map pings and site statistics read less of very large campaigns, so they stay quick as campaigns grow."
   ]
 }

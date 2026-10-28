@@ -16,6 +16,8 @@ import {
 } from "./hosted-campaigns.mjs";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
 import {
+  ACCOUNT_BACKUP_BYTES,
+  accountBackupBytesSql,
   BACKUP_MAX_BYTES,
   BACKUP_PARTS_KEY,
   backupPartStatements,
@@ -198,6 +200,17 @@ export async function campaignAction(db, userId, body, actor) {
       409,
     );
   const partStatements = chunked ? backupPartStatements(db, backupId, userId, chunked.parts) : [];
+  // The recovery copy counts toward the account's backup storage, like any backup (step 3 review:
+  // repeated delete/restore must not grow the database without bound). Nothing is removed to make
+  // room: the deletion is refused and the campaign and every backup stay as they are.
+  const partChars = chunked ? chunked.parts.reduce((sum, part) => sum + part.length, 0) : 0;
+  const stored = await db.prepare(`SELECT ${accountBackupBytesSql} AS n`).bind(userId, userId).first();
+  const backupFull = () =>
+    fail(
+      `Your account backup storage is full (up to ${ACCOUNT_BACKUP_BYTES / 1_000_000} MB, including recovery copies of deleted campaigns). Deleting this campaign needs room for its recovery copy. Download and remove an older backup in My account → Backups, then delete again. Your campaign was not deleted.`,
+      413,
+    );
+  if (Number(stored?.n ?? 0) + (chunked ? partChars : payloadText.length) > ACCOUNT_BACKUP_BYTES) backupFull();
   // The room must still be exactly as read (no write since) for the backup and the delete.
   const unchanged = roomVersionSql(row.version);
   let results;
@@ -209,6 +222,7 @@ export async function campaignAction(db, userId, body, actor) {
          WITH snapshot(body) AS (SELECT json_set(?, '$.campaignRecovery', ${deletionRecoverySql}))
          SELECT ?,?,?,snapshot.body,? FROM snapshot
          WHERE length(CAST(snapshot.body AS BLOB))<=1900000
+         AND ${accountBackupBytesSql}+length(snapshot.body)+?<=?
          AND ${unchanged.sql}
          AND ${recoveryAccountGuardSql}
          AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
@@ -220,6 +234,10 @@ export async function campaignAction(db, userId, body, actor) {
           userId,
           member.name + " (before deletion)",
           Date.now(),
+          userId,
+          userId,
+          partChars,
+          ACCOUNT_BACKUP_BYTES,
           ...unchanged.args,
           ...accountGuardArgs,
           userId,
@@ -262,11 +280,15 @@ export async function campaignAction(db, userId, body, actor) {
       409,
     );
   }
-  if (results[0].meta.changes !== 1)
+  if (results[0].meta.changes !== 1) {
+    // A concurrent backup filled the storage between the check above and this transaction.
+    const now = await db.prepare(`SELECT ${accountBackupBytesSql} AS n`).bind(userId, userId).first();
+    if (Number(now?.n ?? 0) + (chunked ? partChars : payloadText.length) > ACCOUNT_BACKUP_BYTES) backupFull();
     fail(
       "Campaign access changed or its complete recovery copy exceeds the supported cloud size. Your campaign was not deleted. Refresh or download your backups.",
       409,
     );
+  }
   if (results[2 + partStatements.length].meta.changes !== 1) fail("The campaign changed. Refresh before deleting it.", 409);
   return { ok: true, backupId };
 }

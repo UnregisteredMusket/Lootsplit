@@ -14,6 +14,11 @@ export const BACKUP_PARTS_KEY = "$backupParts";
 /** Campaign JSON above this many bytes is stored in parts (the row keeps room for recovery records). */
 export const BACKUP_INLINE_BYTES = 1_500_000;
 export const BACKUP_PART_BYTES = 1_000_000;
+/**
+ * An account's backup storage (account backups and deletion backups, parts included): the
+ * account library limit (accounts.mjs `LIBRARY_LIMITS.backupBytes`).
+ */
+export const ACCOUNT_BACKUP_BYTES = 60_000_000;
 /** The largest backup stored in parts: 32 parts. */
 export const BACKUP_MAX_BYTES = 32_000_000;
 
