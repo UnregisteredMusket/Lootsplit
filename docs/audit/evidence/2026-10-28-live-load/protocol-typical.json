@@ -1,0 +1,372 @@
+{
+  "kind": "lootsplit.live-load-audit.v1",
+  "authorization": "owner-2026-10-28",
+  "startedAt": "2026-10-28T12:36:37.913Z",
+  "finishedAt": "2026-10-28T12:42:57.440Z",
+  "scenario": "typical",
+  "stageSeconds": 60,
+  "simulatedD1Ms": 4,
+  "pollMs": 2000,
+  "node": "v22.22.0",
+  "stages": [
+    {
+      "users": 1,
+      "roomBytesBefore": 211904,
+      "roomBytesAfter": 217821,
+      "receiptBytes": 3628,
+      "receiptBatches": 10,
+      "pullsBeforeAction": {
+        "count": 10,
+        "p50": 148.1,
+        "bytes": 451184
+      },
+      "polls": 29,
+      "pollsFull": 1,
+      "pollMs": {
+        "p50": 10.4,
+        "p95": 26.1,
+        "max": 76
+      },
+      "unchangedPollMs": 10.4,
+      "fullPollMs": {
+        "p50": 76,
+        "p95": 76
+      },
+      "fullPollBytes": 449901,
+      "d1BytesReadPerUnchangedPoll": 232,
+      "d1BytesReadPerFullPoll": 487105,
+      "submits": 10,
+      "submitErrors": [],
+      "submitMs": {
+        "p50": 266.3,
+        "p95": 440.9,
+        "max": 440.9
+      },
+      "submitQueries": 7,
+      "d1BytesWrittenPerSubmit": 215592,
+      "conflictsRetried": 0,
+      "burst": {
+        "submits": 1,
+        "failed": [],
+        "conflicts": 0,
+        "maxMs": 440.9
+      },
+      "propagationMs": {
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "signals": {
+        "count": 59,
+        "p50": 17.5,
+        "p95": 42.2,
+        "d1BytesRead": 252317,
+        "queries": 3,
+        "errors": []
+      },
+      "requestsPerMinute": 105,
+      "d1QueriesPerMinute": 333,
+      "d1BytesReadPerMinute": 25160916
+    },
+    {
+      "users": 2,
+      "roomBytesBefore": 217964,
+      "roomBytesAfter": 228314,
+      "receiptBytes": 10196,
+      "receiptBatches": 28,
+      "pullsBeforeAction": {
+        "count": 18,
+        "p50": 99.7,
+        "bytes": 452498
+      },
+      "polls": 59,
+      "pollsFull": 18,
+      "pollMs": {
+        "p50": 9.9,
+        "p95": 130.9,
+        "max": 184
+      },
+      "unchangedPollMs": 9.7,
+      "fullPollMs": {
+        "p50": 88.2,
+        "p95": 184
+      },
+      "fullPollBytes": 452248,
+      "d1BytesReadPerUnchangedPoll": 396,
+      "d1BytesReadPerFullPoll": 499256,
+      "submits": 18,
+      "submitErrors": [],
+      "submitMs": {
+        "p50": 163.6,
+        "p95": 497.5,
+        "max": 497.5
+      },
+      "submitQueries": 7,
+      "d1BytesWrittenPerSubmit": 223497,
+      "conflictsRetried": 1,
+      "burst": {
+        "submits": 2,
+        "failed": [],
+        "conflicts": 1,
+        "maxMs": 314.9
+      },
+      "propagationMs": {
+        "p50": 495.7,
+        "p95": 1594.7,
+        "max": 1594.7
+      },
+      "signals": {
+        "count": 117,
+        "p50": 17.4,
+        "p95": 42.4,
+        "d1BytesRead": 260302,
+        "queries": 3,
+        "errors": []
+      },
+      "requestsPerMinute": 207,
+      "d1QueriesPerMinute": 693,
+      "d1BytesReadPerMinute": 58414407
+    },
+    {
+      "users": 3,
+      "roomBytesBefore": 228457,
+      "roomBytesAfter": 243590,
+      "receiptBytes": 19692,
+      "receiptBatches": 54,
+      "pullsBeforeAction": {
+        "count": 26,
+        "p50": 64.1,
+        "bytes": 49578
+      },
+      "polls": 90,
+      "pollsFull": 45,
+      "pollMs": {
+        "p50": 63.4,
+        "p95": 93,
+        "max": 122.8
+      },
+      "unchangedPollMs": 9.8,
+      "fullPollMs": {
+        "p50": 71.1,
+        "p95": 99.7
+      },
+      "fullPollBytes": 48683,
+      "d1BytesReadPerUnchangedPoll": 559,
+      "d1BytesReadPerFullPoll": 512987,
+      "submits": 26,
+      "submitErrors": [],
+      "submitMs": {
+        "p50": 111.7,
+        "p95": 377.1,
+        "max": 481.9
+      },
+      "submitQueries": 7,
+      "d1BytesWrittenPerSubmit": 236515,
+      "conflictsRetried": 3,
+      "burst": {
+        "submits": 3,
+        "failed": [],
+        "conflicts": 3,
+        "maxMs": 481.9
+      },
+      "propagationMs": {
+        "p50": 879.2,
+        "p95": 1615.1,
+        "max": 3411.6
+      },
+      "signals": {
+        "count": 177,
+        "p50": 16.8,
+        "p95": 53.9,
+        "d1BytesRead": 272991,
+        "queries": 3,
+        "errors": []
+      },
+      "requestsPerMinute": 311,
+      "d1QueriesPerMinute": 1085,
+      "d1BytesReadPerMinute": 100188726
+    },
+    {
+      "users": 4,
+      "roomBytesBefore": 243735,
+      "roomBytesAfter": 264174,
+      "receiptBytes": 32488,
+      "receiptBatches": 89,
+      "pullsBeforeAction": {
+        "count": 35,
+        "p50": 65.9,
+        "bytes": 56157
+      },
+      "polls": 119,
+      "pollsFull": 69,
+      "pollMs": {
+        "p50": 65.4,
+        "p95": 92.1,
+        "max": 163.5
+      },
+      "unchangedPollMs": 9.8,
+      "fullPollMs": {
+        "p50": 70.8,
+        "p95": 100.5
+      },
+      "fullPollBytes": 54586,
+      "d1BytesReadPerUnchangedPoll": 724,
+      "d1BytesReadPerFullPoll": 531136,
+      "submits": 35,
+      "submitErrors": [],
+      "submitMs": {
+        "p50": 116,
+        "p95": 733,
+        "max": 833.9
+      },
+      "submitQueries": 7,
+      "d1BytesWrittenPerSubmit": 254026,
+      "conflictsRetried": 6,
+      "burst": {
+        "submits": 4,
+        "failed": [],
+        "conflicts": 6,
+        "maxMs": 833.9
+      },
+      "propagationMs": {
+        "p50": 899.1,
+        "p95": 1985.2,
+        "max": 6262.2
+      },
+      "signals": {
+        "count": 234,
+        "p50": 16.9,
+        "p95": 32.5,
+        "d1BytesRead": 291876,
+        "queries": 3,
+        "errors": []
+      },
+      "requestsPerMinute": 412,
+      "d1QueriesPerMinute": 1467,
+      "d1BytesReadPerMinute": 146112978
+    },
+    {
+      "users": 5,
+      "roomBytesBefore": 264321,
+      "roomBytesAfter": 287968,
+      "receiptBytes": 47496,
+      "receiptBatches": 130,
+      "pullsBeforeAction": {
+        "count": 41,
+        "p50": 66.4,
+        "bytes": 63663
+      },
+      "polls": 148,
+      "pollsFull": 104,
+      "pollMs": {
+        "p50": 69.6,
+        "p95": 99.2,
+        "max": 214.1
+      },
+      "unchangedPollMs": 9.7,
+      "fullPollMs": {
+        "p50": 72.6,
+        "p95": 144
+      },
+      "fullPollBytes": 63071,
+      "d1BytesReadPerUnchangedPoll": 892,
+      "d1BytesReadPerFullPoll": 555903,
+      "submits": 41,
+      "submitErrors": [],
+      "submitMs": {
+        "p50": 122,
+        "p95": 927.5,
+        "max": 1204
+      },
+      "submitQueries": 7,
+      "d1BytesWrittenPerSubmit": 276363,
+      "conflictsRetried": 10,
+      "burst": {
+        "submits": 5,
+        "failed": [],
+        "conflicts": 10,
+        "maxMs": 1204
+      },
+      "propagationMs": {
+        "p50": 915,
+        "p95": 1760.9,
+        "max": 2154.2
+      },
+      "signals": {
+        "count": 292,
+        "p50": 17.5,
+        "p95": 48.5,
+        "d1BytesRead": 316970,
+        "queries": 3,
+        "errors": []
+      },
+      "requestsPerMinute": 508,
+      "d1QueriesPerMinute": 1851,
+      "d1BytesReadPerMinute": 202129710
+    },
+    {
+      "users": 6,
+      "roomBytesBefore": 288113,
+      "roomBytesAfter": 317325,
+      "receiptBytes": 65776,
+      "receiptBatches": 180,
+      "pullsBeforeAction": {
+        "count": 51,
+        "p50": 67.9,
+        "bytes": 72242
+      },
+      "polls": 178,
+      "pollsFull": 119,
+      "pollMs": {
+        "p50": 69.9,
+        "p95": 105.7,
+        "max": 263.2
+      },
+      "unchangedPollMs": 9.8,
+      "fullPollMs": {
+        "p50": 74.2,
+        "p95": 134
+      },
+      "fullPollBytes": 71243,
+      "d1BytesReadPerUnchangedPoll": 1057,
+      "d1BytesReadPerFullPoll": 585382,
+      "submits": 51,
+      "submitErrors": [
+        "submit:give: The table changed. Refresh before sending your turn."
+      ],
+      "submitMs": {
+        "p50": 129.7,
+        "p95": 1526.3,
+        "max": 1691.7
+      },
+      "submitQueries": 7,
+      "d1BytesWrittenPerSubmit": 303507,
+      "conflictsRetried": 15,
+      "burst": {
+        "submits": 6,
+        "failed": [
+          "The table changed. Refresh before sending your turn."
+        ],
+        "conflicts": 15,
+        "maxMs": 1691.7
+      },
+      "propagationMs": {
+        "p50": 955.8,
+        "p95": 1845.7,
+        "max": 4960.3
+      },
+      "signals": {
+        "count": 350,
+        "p50": 18,
+        "p95": 57.7,
+        "d1BytesRead": 346284,
+        "queries": 3,
+        "errors": []
+      },
+      "requestsPerMinute": 613,
+      "d1QueriesPerMinute": 2223,
+      "d1BytesReadPerMinute": 259105815
+    }
+  ],
+  "otherErrors": []
+}
