@@ -173,6 +173,8 @@ try {
         await page.getByRole("button", { name: "Send", exact: true }).click();
         await expect(history.getByText(`Onboarding check ${i}:`, { exact: false })).toBeVisible();
       }
+      // Once every message is confirmed, no incoming update scrolls the history back down.
+      await expect(history.locator(".chat-time").filter({ hasText: "Sent" })).toHaveCount(8);
       await history.evaluate((el) => el.scrollTo({ top: 0 }));
       const jump = page.getByRole("button", { name: "Jump to latest ↓", exact: true });
       await expect(jump).toBeVisible();
