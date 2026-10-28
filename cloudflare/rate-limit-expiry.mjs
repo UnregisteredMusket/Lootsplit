@@ -2,8 +2,9 @@
 // state, not history: each one only matters inside its own short window, and a row that is
 // gone behaves exactly like a fresh counter. Campaign and monitoring history are untouched.
 //
-// - library_limits: per-IP account request counter (accounts.mjs rateLimit), keyed by a hashed
-//   IP with `window` = the current minute number. Only the current minute is ever read.
+// - library_limits: account request counters (accounts.mjs rateLimit), keyed by a hashed IP,
+//   a hashed account id or a hashed signed-in IP, with `window` = the current minute number.
+//   Only the current minute is ever read.
 // - rateLimit: Better Auth's own per-IP counter (storage "database", 60 s window), with
 //   `lastRequest` in milliseconds.
 // - signin_throttle: per-email failed sign-in counter (signin-throttle.mjs), keyed by a hashed
