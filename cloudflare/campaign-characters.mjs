@@ -44,8 +44,7 @@ export async function hydrateStoredCampaignCharacters(db, room, version) {
   if (!changed) return { room, version };
   const base = room.revision++;
   const write = roomWriteStatements(db, room, { expect: { revision: base } });
-  const saved = await write.statements[0].run();
-  if (!saved.meta.changes)
+  if (!write.changed(await db.batch(write.statements), write.statements))
     throw Object.assign(Error("Campaign changed while upgrading characters. Refresh and retry."), {
       status: 409,
     });

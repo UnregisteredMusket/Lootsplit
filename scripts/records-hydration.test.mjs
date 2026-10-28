@@ -1,4 +1,5 @@
 import test from "node:test";
+import { readStoredRoom } from "../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import "fake-indexeddb/auto";
 import { emptyCloudTable, readCloudTable } from "../src/lib/quire/cloud.ts";
@@ -46,7 +47,7 @@ test("damaged stored archives do not block shared messages, money, journal edits
     seats:[{id:"dm",token:"dm-token",name:"DM",role:"dm",purseIds:[]}],seen:{gifts:[],sales:[]}};
   const {hydrateRoomReports}=await import("../cloudflare/room-reports.mjs");
   // Archived snapshots move to campaign_room_reports on the next write; restore them byte for byte.
-  const read=async()=>hydrateRoomReports(db,room.code,JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(room.code).first()).body));
+  const read=async()=>hydrateRoomReports(db,room.code,(await readStoredRoom(db,room.code)).room);
   const send=commands=>submitCommands({code:room.code,token:"dm-token",batchId:crypto.randomUUID(),commands});
   try {
     await db.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)").bind(room.code,JSON.stringify(room)).run();

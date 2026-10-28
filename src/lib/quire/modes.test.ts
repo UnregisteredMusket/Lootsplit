@@ -27,6 +27,9 @@ sql.exec(
   readFileSync(new URL("../../../cloudflare/migrations/0024_campaign_room_receipts.sql", import.meta.url), "utf8"),
 );
 sql.exec(
+  readFileSync(new URL("../../../cloudflare/migrations/0026_campaign_room_sections.sql", import.meta.url), "utf8"),
+);
+sql.exec(
   readFileSync(new URL("../../../cloudflare/migrations/0019_campaign_room_reports.sql", import.meta.url), "utf8"),
 );
 (globalThis as any).__env__ = {

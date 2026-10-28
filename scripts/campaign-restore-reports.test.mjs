@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readStoredRoom } from "../cloudflare/room-storage.mjs";
 import test from "node:test";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { openRoom, roomState } from "../src/lib/quire/cloud.server.ts";
@@ -91,7 +92,9 @@ function expectedTable(payload) {
 
 async function restore(backupId, requestKey = crypto.randomUUID()) {
   const membership = await restoreDeletedCampaign(db, userId, { id: backupId, requestKey }, actor);
-  const row = await db.prepare("SELECT body,revision FROM campaign_rooms WHERE code=?").bind(membership.code).first();
+  // The stored room through the storage API (assembled when sectioned).
+  const stored = await readStoredRoom(db, membership.code);
+  const row = { body: stored.body, revision: stored.version.revision };
   return { membership, row, requestKey };
 }
 

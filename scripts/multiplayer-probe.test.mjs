@@ -2,6 +2,7 @@
 // isolated namespace excluded from every total and listing, no leftovers, bounded failures and
 // timeouts, no concurrent duplicates, and a real (required) Multiplayer diagnostic with history.
 import test from "node:test";
+import { readStoredRoom } from "../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { INTERVAL } from "../cloudflare/monitor-model.mjs";
@@ -34,12 +35,14 @@ function freshDb() {
   globalThis.__env__ = { DB };
   return DB;
 }
-/** Every row in any table keyed by a room code, so leftovers anywhere are caught. */
-async function probeRows(DB) {
+/** Every row in any table keyed by a room code, so leftovers anywhere are caught (`except`:
+ * tables left out, such as a live room's own stored sections). */
+async function probeRows(DB, except = []) {
   const tables = (await DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all())
     .results;
   let count = 0;
   for (const { name } of tables) {
+    if (except.includes(name)) continue;
     const columns = (await DB.prepare(`PRAGMA table_info("${name}")`).all()).results;
     for (const { name: column } of columns)
       if (["code", "room_code", "campaign_code"].includes(column))
@@ -131,9 +134,7 @@ test("probe rooms are excluded from counts, analytics, owner overview, preview a
       },
       { monitorProbe: true, code },
     );
-    const stored = JSON.parse(
-      (await syncFirst(DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code))).body,
-    );
+    const stored = (await readStoredRoom(DB, code)).room;
     assert.equal(stored.monitorProbe, true);
     assert.equal((await siteGameAnalytics(DB)).sharedCampaigns, 1, "analytics/gold totals");
     const health = await serverMonitor({ DB }, "owner");
@@ -199,7 +200,11 @@ test("leftovers from an interrupted earlier run are swept; the current slot's ro
     );
     result = await runMultiplayerProbe({ DB }, slot);
     assert.equal(result.outcome, "skipped");
-    assert.equal(await probeRows(DB), 1, "the owning run's room is left to that run");
+    assert.equal(
+      await probeRows(DB, ["campaign_room_sections"]),
+      1,
+      "the owning run's room is left to that run",
+    );
     assert.ok(await realStore.readRoomAccess("REALROOM"));
   } finally {
     DB.close();

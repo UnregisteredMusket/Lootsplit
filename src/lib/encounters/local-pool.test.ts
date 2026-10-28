@@ -3,6 +3,7 @@
 // same pooled holdings, ledger lines, events and chat note, exactly once; a failure rolls back
 // everything; older awards and drafts without pool fields read and display unchanged.
 import "../quire/commands.ts";
+import { readStoredRoom } from "../../../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import "fake-indexeddb/auto";
@@ -84,7 +85,7 @@ async function shared(options: { fail?: boolean; fund?: boolean } = {}) {
   } catch (e) {
     error = e;
   }
-  const body = JSON.parse(((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("POOLS").first()) as { body: string }).body);
+  const body = (await readStoredRoom(db as never, "POOLS"))!.room;
   const awards = ((await db.prepare("SELECT COUNT(*) AS n FROM dm_encounter_awards").first()) as { n: number }).n;
   const status = (await call<{ status: string }>("/detail", { id })).status;
   db.close();

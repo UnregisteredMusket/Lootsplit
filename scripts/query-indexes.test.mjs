@@ -46,3 +46,24 @@ test("0024 and 0025 serve the per-poll room queries from indexes (load audit F1,
   assert.doesNotMatch(recent, /TEMP B-TREE/);
   db.close();
 });
+
+test("0026 room sections are read and cleaned up through their primary key", () => {
+  assertAdditiveSql("0026_campaign_room_sections.sql", readFileSync(`${directory}/0026_campaign_room_sections.sql`, "utf8"));
+  const db = schema();
+  // cloudflare/room-storage.mjs: parts of the hashes a manifest names, per room.
+  const parts = plan(db, "SELECT hash,part,body FROM campaign_room_sections WHERE code=? AND hash IN (SELECT value FROM json_each(?))");
+  assert.match(parts, /USING INDEX sqlite_autoindex_campaign_room_sections_1/);
+  assert.doesNotMatch(parts, /SCAN campaign_room_sections/);
+  // The single-statement room read: the row, then its manifest's sections.
+  const room = plan(db, `SELECT r.code,r.body,NULL AS hash FROM campaign_rooms r WHERE r.code=? UNION ALL SELECT s.code,s.body,s.hash FROM campaign_room_sections s WHERE s.code=? AND s.hash IN (SELECT json_extract(m.value,'$.hash') FROM campaign_rooms r,json_each(r.body,'$."$sections"') m WHERE r.code=?)`);
+  assert.match(room, /SEARCH s USING INDEX sqlite_autoindex_campaign_room_sections_1 \(code=\? AND hash=\?\)/);
+  assert.doesNotMatch(room, /SCAN (r|s)\b/);
+  // Cleanup after a write, the stored-hash listing and deletion with the room.
+  for (const sql of [
+    "DELETE FROM campaign_room_sections WHERE code = ? AND hash NOT IN (SELECT value FROM json_each(?))",
+    "SELECT hash,COUNT(*) AS parts FROM campaign_room_sections WHERE code=? GROUP BY hash",
+    "DELETE FROM campaign_room_sections WHERE code = ? AND NOT EXISTS (SELECT 1 FROM campaign_rooms WHERE code = ?)",
+  ])
+    assert.match(plan(db, sql), /USING (COVERING )?INDEX sqlite_autoindex_campaign_room_sections_1/, sql);
+  db.close();
+});

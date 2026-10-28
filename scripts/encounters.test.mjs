@@ -1,4 +1,5 @@
 import test from "node:test";
+import { readStoredRoom, roomWriteStatements } from "../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import { handleEncounters } from "../cloudflare/encounters.mjs";
 import { closeRoom } from "../src/lib/quire/cloud.server.ts";
@@ -235,24 +236,18 @@ test("loot tables resolve once, review precedes atomic award, and retries cannot
     assert.equal(review.status, "review");
     assert.equal(review.body.loot.length, 2);
     assert.equal(review.body.loot[1].sourceTableId, "table");
-    const before = JSON.parse(
-      (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("BATTLE").first())
-        .body,
-    );
+    const before = (await readStoredRoom(db, "BATTLE")).room;
     assert.equal(before.table.holdings.length, 0);
     const award = await call("dm", "/award", { id, revision: 3 });
     const retry = await call("dm", "/award", { id, revision: 3 });
     assert.equal(award.award.receiptId, retry.award.receiptId);
     assert.equal(retry.duplicate, true);
-    const after = await db
-      .prepare("SELECT * FROM campaign_rooms WHERE code=?")
-      .bind("BATTLE")
-      .first();
-    const room = JSON.parse(after.body);
+    const after = await readStoredRoom(db, "BATTLE");
+    const room = after.room;
     assert.equal(room.table.purses[0].coins.gp, 35);
     assert.equal(room.table.holdings.length, 2);
     assert.equal(room.table.ledger.length, 3);
-    assert.equal(after.revision, 2);
+    assert.equal(after.version.revision, 2);
     assert.equal(room.revision, 2);
     await assert.rejects(
       call("dm", "/save", { id, revision: 4, encounter: e }),
@@ -318,11 +313,7 @@ test("atomic receipt predicate rejects a concurrent room change and does not lea
     await assert.rejects(call("dm", "/award", { id, revision: 2 }), (e) => e.status === 409);
     assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM dm_encounter_awards").first()).n, 0);
     assert.equal((await call("dm", "/detail", { id })).status, "review");
-    const r = await db
-      .prepare("SELECT body FROM campaign_rooms WHERE code=?")
-      .bind("BATTLE")
-      .first();
-    assert.equal(JSON.parse(r.body).table.purses[0].coins.gp, 10);
+    assert.equal((await readStoredRoom(db, "BATTLE")).room.table.purses[0].coins.gp, 10);
   } finally {
     db.close();
   }
@@ -420,7 +411,7 @@ test("closed campaign encounters remain readable but reject every write and roll
     await assert.rejects(call("dm","/create",{id:crypto.randomUUID(),code:room.code}),error=>error.status===403);
     assert.equal(await db.prepare("SELECT * FROM dm_encounter_awards WHERE encounter_id=?").bind(id).first(),null);
     assert.equal((await call("dm","/log",{id})).rolls.length,0);
-    const after=JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(room.code).first()).body);
+    const after=(await readStoredRoom(db,room.code)).room;
     assert.equal(after.table.purses.find(p=>p.id==="hero").coins.gp,0);
     const privateId=crypto.randomUUID();await call("dm","/create",{id:privateId,code:"personal"});
     assert.equal((await call("dm","/roll",{id:privateId,revision:0,formula:"1d20",manual:true,total:10,requestKey:crypto.randomUUID()})).total,10);
@@ -451,8 +442,8 @@ test("lost normal and weighted roll responses recover receipts after newer saves
 
 async function splitFixture() {
   const f = await fixture();
-  const row = await f.db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("BATTLE").first();
-  const room = JSON.parse(row.body);
+  const stored = await readStoredRoom(f.db, "BATTLE");
+  const room = stored.room;
   const character = (id, name, coins = {}) => ({
     id,
     name,
@@ -460,7 +451,7 @@ async function splitFixture() {
     coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0, ...coins },
   });
   room.table.purses.push(character("aria", "Aria"), character("bram", "Bram", { pp: 1, ep: 2 }), character("cass", "Cass"));
-  await f.db.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").bind(JSON.stringify(room), "BATTLE").run();
+  await f.db.batch(roomWriteStatements(f.db, room, { expect: stored.version }).statements);
   return f;
 }
 const splitDraft = (purseIds = ["hero", "aria", "bram", "cass"], remainderRule = "party-fund") => {
@@ -470,8 +461,7 @@ const splitDraft = (purseIds = ["hero", "aria", "bram", "cass"], remainderRule =
   e.loot = [{ ...blankLoot(), name: "Potion", purseId: "party" }];
   return e;
 };
-const roomBody = async (db) =>
-  JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("BATTLE").first()).body);
+const roomBody = async (db) => (await readStoredRoom(db, "BATTLE")).room;
 
 test("split encounter coins: shares paid exactly once across a retry, leftover to the party fund, receipt recorded", async () => {
   const { db, call, id } = await splitFixture();

@@ -2,6 +2,7 @@
 // carry the same `award` tag (receipt ID and reviewed value) on the device path
 // (src/lib/encounters/local.ts) and the shared Worker path (cloudflare/encounters.mjs), once.
 import "../quire/commands.ts";
+import { readStoredRoom } from "../../../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import "fake-indexeddb/auto";
@@ -73,7 +74,7 @@ async function shared(remainderRule: unknown) {
   await call("/save", { id, revision: 0, encounter: draft(remainderRule) });
   await call("/conclude", { id, revision: 1 });
   const first = await call<Award>("/award", { id, revision: 2 });
-  const body = JSON.parse(((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("AWARDS").first()) as { body: string }).body);
+  const body = (await readStoredRoom(db as never, "AWARDS"))!.room;
   db.close();
   return { first, table: body.table as CloudTable };
 }

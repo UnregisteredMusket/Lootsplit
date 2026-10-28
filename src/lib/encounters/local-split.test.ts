@@ -1,6 +1,7 @@
 // Encounter coin split on the device path (src/lib/encounters/local.ts) gives the same purses and
 // ledger lines as the shared Worker path (cloudflare/encounters.mjs), and awards exactly once.
 import "../quire/commands.ts";
+import { readStoredRoom } from "../../../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import "fake-indexeddb/auto";
@@ -69,7 +70,7 @@ async function shared(remainderRule: "party-fund" | "rotate") {
   await call("/save", { id, revision: 0, encounter: draft(remainderRule) });
   await call("/conclude", { id, revision: 1 });
   const first = await call<Award>("/award", { id, revision: 2 });
-  const body = JSON.parse(((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("SPLITS").first()) as { body: string }).body);
+  const body = (await readStoredRoom(db as never, "SPLITS"))!.room;
   db.close();
   return { first, table: body.table as CloudTable };
 }

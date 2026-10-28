@@ -1,4 +1,5 @@
 import test from "node:test";
+import { readStoredRoom, roomWriteStatements } from "../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
@@ -439,9 +440,8 @@ test("owner Test mode rejects other accounts, excludes analytics, and resets onl
       },
       session.session.id,
     );
-    let room = JSON.parse(
-      (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(m.code).first()).body,
-    );
+    const stored = await readStoredRoom(db, m.code);
+    let room = stored.room;
     assert.equal(room.table.purses.length, 2);
     assert.equal(room.testMode, true);
     room.table.ledger.push({
@@ -454,10 +454,7 @@ test("owner Test mode rejects other accounts, excludes analytics, and resets onl
       transactionType: "purchase",
     });
     room.revision++;
-    await db
-      .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=?")
-      .bind(JSON.stringify(room), room.revision, room.code)
-      .run();
+    await db.batch(roomWriteStatements(db, room, { expect: stored.version }).statements);
     assert.equal((await siteGameAnalytics(db)).sharedCampaigns, 0);
     assert.equal((await siteGameAnalytics(db)).metrics.spentCopper, 0);
     await ownerTestMode(
@@ -466,9 +463,7 @@ test("owner Test mode rejects other accounts, excludes analytics, and resets onl
       { action: "reset", code: m.code, revision: room.revision },
       session.session.id,
     );
-    room = JSON.parse(
-      (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(m.code).first()).body,
-    );
+    room = (await readStoredRoom(db, m.code)).room;
     assert.equal(room.table.ledger.length, 0);
     assert.equal(room.table.purses[0].coins.gp, 20);
   } finally {
