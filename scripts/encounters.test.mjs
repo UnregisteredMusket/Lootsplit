@@ -61,7 +61,7 @@ async function fixture() {
     seen: { gifts: [], sales: [] },
   };
   await db
-    .prepare("INSERT INTO campaign_rooms VALUES (?,1,?)")
+    .prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)")
     .bind("BATTLE", JSON.stringify(room))
     .run();
   for (const u of ["dm", "player"])
@@ -386,7 +386,7 @@ test('encounter listing uses bounded queries and preserves seat authorization ac
   const { db, room } = await fixture();
   for (let i=0;i<20;i++) {
     const code = `ROOM${i}`;
-    await db.prepare('INSERT INTO campaign_rooms VALUES (?,1,?)').bind(code,JSON.stringify({...room,code})).run();
+    await db.prepare('INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)').bind(code,JSON.stringify({...room,code})).run();
     await db.prepare('INSERT INTO library_members VALUES (?,?,?,?,?,0,0)').bind('dm',code,'dmseat',i===19?'revoked-token':'dm-token',code).run();
   }
   const prepare = db.prepare.bind(db);

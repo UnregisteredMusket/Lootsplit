@@ -135,8 +135,12 @@ export async function ownerTestMode(db, user, body, sessionId) {
     fail("The Test room changed. Refresh before resetting.", 409);
   room.table = structuredClone(room.testTemplate);
   room.revision++;
-  room.commands = [];
-  room.batches = [];
+  // Receipts restart with the template (rooms written before migration 0024 kept them here;
+  // later ones keep them in campaign_room_receipts, cleared in the batch below).
+  delete room.commands;
+  delete room.commandHashes;
+  delete room.batches;
+  delete room.batchHashes;
   room.drafts = {};
   room.departed = [];
   room.invitations = {};
@@ -157,6 +161,11 @@ export async function ownerTestMode(db, user, body, sessionId) {
     db
       .prepare(
         "DELETE FROM dm_encounters WHERE code=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
+      )
+      .bind(room.code, room.code, next),
+    db
+      .prepare(
+        "DELETE FROM campaign_room_receipts WHERE code=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
       )
       .bind(room.code, room.code, next),
   ]);

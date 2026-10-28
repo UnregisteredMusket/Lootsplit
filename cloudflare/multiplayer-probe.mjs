@@ -59,12 +59,19 @@ function probeTable() {
  * may belong to a concurrent run). Real campaigns cannot match: their codes contain no "-".
  */
 async function sweep(db, slot) {
-  const result = await db
-    .prepare(
-      "DELETE FROM campaign_rooms WHERE code GLOB 'MONITOR-PROBE-*' AND CAST(substr(code,15) AS INTEGER)<?",
-    )
-    .bind(slot)
-    .run();
+  const [result] = await db.batch([
+    db
+      .prepare(
+        "DELETE FROM campaign_rooms WHERE code GLOB 'MONITOR-PROBE-*' AND CAST(substr(code,15) AS INTEGER)<?",
+      )
+      .bind(slot),
+    // Their action receipts (campaign_room_receipts, migration 0024) go with them.
+    db
+      .prepare(
+        "DELETE FROM campaign_room_receipts WHERE code GLOB 'MONITOR-PROBE-*' AND CAST(substr(code,15) AS INTEGER)<?",
+      )
+      .bind(slot),
+  ]);
   return result.meta?.changes ?? 0;
 }
 
@@ -262,7 +269,10 @@ export async function runMultiplayerProbe(
 async function finalCleanup(db, code, pending) {
   if (!pending) return "complete";
   try {
-    await db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code).run();
+    await db.batch([
+      db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code),
+      db.prepare("DELETE FROM campaign_room_receipts WHERE code=?").bind(code),
+    ]);
     return "deleted-after-failure";
   } catch {
     return "failed";

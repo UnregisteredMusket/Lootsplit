@@ -106,7 +106,7 @@ try {
     seen: { gifts: [], sales: [] },
   };
   await db
-    .prepare("INSERT INTO campaign_rooms VALUES (?,1,?)")
+    .prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)")
     .bind(code, JSON.stringify(room))
     .run();
   for (const [a, s, t] of [

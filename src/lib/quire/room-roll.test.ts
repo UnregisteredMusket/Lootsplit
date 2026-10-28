@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 const sql = new DatabaseSync(":memory:");
 sql.exec("CREATE TABLE IF NOT EXISTS user(id TEXT PRIMARY KEY)");
 for (const name of [
-  "0001_campaign_rooms.sql",
+  "0001_campaign_rooms.sql", "0024_campaign_room_receipts.sql",
   "0007_character_play.sql",
   "0012_campaign_room_images.sql",
   "0013_campaign_resource_documents.sql",
