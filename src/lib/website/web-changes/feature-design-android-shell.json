@@ -1,0 +1,9 @@
+{
+  "title": "Android Back button and status bar (next app release)",
+  "summary": "The Android app's Back button now closes what is on top before leaving a screen, and asks for a second press before closing the app mid-campaign. This ships with the next signed Android release.",
+  "items": [
+    "Back closes an open picker, ⋯ menu, sheet or dialog first, then a map panel, and only then goes to the previous screen.",
+    "On the first screen with a campaign open, Back shows \"Press back again to exit\"; a second press within 2 seconds closes the app.",
+    "The status-bar icons turn dark on the light themes, so the clock and battery stay readable."
+  ]
+}

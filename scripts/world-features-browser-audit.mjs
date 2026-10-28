@@ -14,8 +14,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import {
   openApplication,
   reloadApplication,
-  navigateApplication,
-} from "./title-screen-navigation.mjs";
+  navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 import { FANTASY_LOOKS, themeVars } from "../src/lib/quire/theme.ts";
 import { answerThemedDialog } from "./themed-dialogs.mjs";
@@ -857,6 +856,7 @@ try {
     await guest.getByRole("button", { name: "Find characters", exact: true }).click();
     await guest.getByPlaceholder("What should the party call you?").fill("Map guest");
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
+    await afterJoining(guest);
     await expect(guest.locator(".room-code")).toBeVisible();
     await navigateApplication(guest, origin + "/maps");
     await selectWorkspaceMap(guest, sharedMap.id);

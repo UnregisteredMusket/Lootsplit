@@ -17,7 +17,7 @@ import {
   endSession,
   waitForDmCampaign,
 } from "./account-fixtures.mjs";
-import { continueIntoApp, prepareDmFixture } from "../title-screen-navigation.mjs";
+import { continueIntoApp, prepareDmFixture, afterJoining } from "../title-screen-navigation.mjs";
 import { answerThemedDialog, autoAnswerThemedDialogs } from "../themed-dialogs.mjs";
 
 test("network-boundary", async ({ devices, baseURL: origin }) => {
@@ -184,6 +184,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
   await guest.getByPlaceholder("What should the party call you?").fill("Guest adventurer");
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(guest);
   await expect(guest.locator(".room-code")).toHaveText(code);
   expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
   phase("guest joined");
@@ -486,6 +487,7 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
   await player.getByRole("button", { name: "Find characters", exact: true }).click();
   await player.getByPlaceholder("What should the party call you?").fill("Invitation player");
   await player.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(player);
   await expect(player.locator(".room-code")).toHaveText(previous);
 
   // Same-document navigation must update invitation state, including browser back/forward.
@@ -543,6 +545,7 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
     }),
   ).toHaveValue(invite.searchParams.get("character"));
   await player.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(player);
   await expect(player.locator(".room-code")).toHaveText(target);
   await expect(dm.locator(".room-code")).toHaveText(target);
   await expect(otherDm.locator(".room-code")).toHaveText(previous);
@@ -944,6 +947,7 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
   await guest.getByPlaceholder("What should the party call you?").fill("Guest adventurer");
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(guest);
   await expect(guest.locator(".room-code")).toHaveText(code);
   expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
   phase("guest joined");
@@ -966,7 +970,8 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
   await Promise.all([
     (async () => {
       await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
-      await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+      // The join link looks up its characters by itself (plan Q15); the expired session is
+      // reported once, without a Find characters tap.
       await expect(
         guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
       ).toBeVisible();
@@ -997,6 +1002,7 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
   await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(guest);
   await expect(guest.locator(".room-code")).toHaveText(code);
   phase("returning joined");
   await visitPage(secondPlayer, origin, "/account");

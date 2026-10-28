@@ -7,8 +7,7 @@ import {
   openApplication,
   reloadApplication,
   navigateApplication,
-  continueIntoApp,
-} from "./title-screen-navigation.mjs";
+  continueIntoApp, afterJoining } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -330,6 +329,7 @@ try {
     await guest.getByRole("button", { name: "Find characters", exact: true }).click();
     await guest.getByPlaceholder("What should the party call you?").fill("Ship guest");
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
+    await afterJoining(guest);
     await expect(guest.locator(".room-code")).toBeVisible();
     await navigateApplication(guest, origin + "/features/properties");
     const guestShip = guest.locator("#property-ship");

@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import { mkdir } from "node:fs/promises";
 import { smithFixture } from "../src/lib/quire/test-fixtures/blacksmith.ts";
-import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication, navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { createRoom } from "./browser/account-fixtures.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -158,6 +158,7 @@ try {
   await guest.page.getByLabel("Your name", { exact: true }).fill("Guest player");
   await guest.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("hero");
   await guest.page.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(guest.page);
   await guest.page.getByText("You joined as a player", { exact: true }).waitFor();
   await openChat(guest.page);
   await openChat(dm.page);
@@ -216,6 +217,7 @@ try {
   await member.page.getByLabel("Your name", { exact: true }).fill("Signed-in player");
   await member.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("other");
   await member.page.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(member.page);
   await member.page.getByText("You joined as a player", { exact: true }).waitFor();
   await openChat(member.page);
   await sendAndExpect("signed-in player party message", member.page, [dm.page, guest.page], "Member check: I keep watch.", "click");

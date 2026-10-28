@@ -4,6 +4,11 @@
 // - the join card names the campaign ("Joining The Wayfarers"), and after joining the header
 //   switcher, the room card and the tab title ("Mira · The Wayfarers") show the DM's name,
 //   never the device default "Party overview";
+// - the join link finds its characters by itself, the support panels fold into one group until
+//   joining, an empty name is refused inline, "Your name" is remembered, and the player lands on
+//   Home with "You're playing <character>" and a dismissible Sheet · Inventory & coins · Chat strip;
+// - on Campaign, players read the room mode ("The DM runs this room in Live mode") and no
+//   DM invite instructions;
 // - no screen scrolls sideways.
 // Never targets a real campaign.
 import assert from "node:assert/strict";
@@ -96,15 +101,45 @@ try {
 
   for (const player of players) {
     const { context, page } = await device(`player ${player.width}`, player.width);
-    await openApplication(page, `${origin}/share?join=${room.code}&session=${room.sessionId}`);
-    await page.getByRole("button", { name: "Find characters", exact: true }).click();
+    const joinLink = `${origin}/share?join=${room.code}&session=${room.sessionId}`;
+    await openApplication(page, joinLink);
+    // The link looks up the room's characters by itself (Q15): no "Find characters" tap.
     await expect(page.getByRole("heading", { name: `Joining ${CAMPAIGN}`, exact: true })).toBeVisible();
+    const picker = page.getByRole("combobox", { name: "Choose your character", exact: true });
+    await expect(picker).toBeVisible();
+    // Recovery, backups and manual sharing fold into one group until the player has joined (P3).
+    const support = page.getByText("Recovery, backups & manual sharing", { exact: true });
+    await expect(support).toBeVisible();
+    await expect(page.getByText("Manual sharing & files", { exact: true })).toBeHidden();
+    // Inline validation instead of the browser's bubble.
+    await page.getByLabel("Your name", { exact: true }).fill("");
+    await page.getByRole("button", { name: "Join room", exact: true }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Enter the name the party should call you." })).toBeVisible();
+    await expect(page.getByLabel("Your name", { exact: true })).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByLabel("Your name", { exact: true })).toBeFocused();
     await page.getByLabel("Your name", { exact: true }).fill(`Audit player ${player.width}`);
-    await page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption(player.id);
+    await picker.selectOption(player.id);
     await fits(page, `join ${player.width}`);
     await page.screenshot({ path: `${output}/join-${player.width}.png`, fullPage: true });
     await page.getByRole("button", { name: "Join room", exact: true }).click();
+    // Players land on Home with a toast and the three-tip strip (Q16).
+    await page.waitForURL((u) => u.pathname === "/" && u.searchParams.get("view") === "home");
+    await expect(page.getByText(`You're playing ${player.name}`, { exact: true })).toBeVisible();
+    const tips = page.getByRole("region", { name: "Getting started", exact: true });
+    await expect(tips.getByRole("link")).toHaveText(["Sheet", "Inventory & coins", "Chat"]);
+    await fits(page, `home tips ${player.width}`);
+    await page.screenshot({ path: `${output}/joined-home-${player.width}.png`, fullPage: true });
+    await expect(page).toHaveTitle(`${player.name} · ${CAMPAIGN}`);
+    if (player.width === 390) {
+      await tips.getByRole("button", { name: "Dismiss getting started tips", exact: true }).click();
+      await expect(tips).toHaveCount(0);
+    }
+    await navigateApplication(page, origin + "/share");
     await page.getByText("You joined as a player", { exact: true }).waitFor();
+    // Players read the room's mode; only the DM's seat has the switch.
+    await expect(page.locator("[data-room-mode]")).toHaveText("The DM runs this room in Live mode.");
+    await expect(page.getByRole("group", { name: "Session mode", exact: true })).toHaveCount(0);
+    await expect(page.getByText(/to invite players/)).toHaveCount(0);
 
     // The DM's name everywhere a player looks for it; never the device default.
     const switcher = page.getByRole("button", { name: `Select campaign: ${CAMPAIGN}`, exact: true });
@@ -121,11 +156,21 @@ try {
     await page.keyboard.press("Escape");
     await fits(page, `home ${player.width}`);
     await page.screenshot({ path: `${output}/home-${player.width}.png`, fullPage: true });
+    if (player.width === 1280) {
+      // "Your name" is remembered on this device for the next join.
+      await navigateApplication(page, origin + "/share");
+      await page.getByRole("button", { name: "Leave room", exact: true }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Leave room", exact: true }).click();
+      await page.getByRole("button", { name: "Join a room", exact: true }).waitFor();
+      await openApplication(page, joinLink);
+      await expect(page.getByRole("heading", { name: `Joining ${CAMPAIGN}`, exact: true })).toBeVisible();
+      await expect(page.getByLabel("Your name", { exact: true })).toHaveValue(`Audit player ${player.width}`);
+    }
     await context.close();
   }
   await dm.context.close();
   assert.deepEqual(errors, []);
-  console.log("PASS: player onboarding: campaign name on the join card, header, room card and tab title at 1280/390/320.");
+  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips and read-only room mode at 1280/390/320.");
 } finally {
   await browser.close();
 }

@@ -1,4 +1,6 @@
+import { SavedTick, useSavedTick } from "@/components/saved-tick";
 import { SearchSelect } from "@/components/search-select";
+import { copyName, shelfCopy, shopSettingsCopy } from "@/lib/quire/duplicate";
 import { useSeatGroups } from "@/lib/quire/use-seat-groups";
 import { MapRecordStrip } from "./map-record-strip";
 import { BlacksmithServices } from "@/components/blacksmith-services";
@@ -30,6 +32,9 @@ import {
 import { charismaScore } from "@/lib/quire/sheet";
 import { useDollarText, useShowDollars } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
+import { getSeat } from "@/lib/quire/table";
+import { resultToast } from "@/lib/quire/result-toast";
+import { showActionReceipt } from "@/lib/quire/action-receipt";
 import { downloadShopPdf } from "@/lib/quire/shop-pdf";
 import type { Holding, Shop, StockLine } from "@/lib/quire/types";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
@@ -73,6 +78,7 @@ export function ShopContent({
   // Only the row being edited shows its cost and afterward-balance sentence.
   const [activeRow, setActiveRow] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const characters = spendable.filter((purse) => purse.kind === "character");
   const choices = sellTo && characters.length ? characters : spendable;
 
@@ -128,6 +134,41 @@ export function ShopContent({
   const region = shop.locationId
     ? locationLabel(readMarketLocations(economy.journal.market), shop.locationId)
     : "";
+  /** Duplicate (design Q9): a new shop with the same settings and stock, via the shop composer's
+   * create path; trade-exchange links and the restock schedule stay with the original. */
+  async function duplicate() {
+    if (!shop || duplicating) return;
+    setDuplicating(true);
+    try {
+      const name = copyName(shop.name);
+      const result = await economy.openShelfOutcome({
+        ...(shop.locationId ? { locationId: shop.locationId } : {}),
+        ...(shop.image ? { image: shop.image } : {}),
+        name,
+        keeper: shop.keeper,
+        place: shop.place,
+        notes: shop.notes,
+        sellRate: shop.sellRate,
+        buyRate: shop.buyRate,
+        wealth: shop.wealth,
+        category: shop.category,
+        priceScale: shop.priceScale,
+        lines: shelfCopy(lines),
+      });
+      // The remaining settings (accepted categories, black market, open/closed) as saved.
+      await economy.updateShop(shopSettingsCopy(shop, result.id, name));
+      toast.success(
+        result.status === "pending"
+          ? "Copy accepted as pending. Submit your turn or check sync before repeating it."
+          : `${name} created with ${lines.length} stock ${lines.length === 1 ? "line" : "lines"}.`,
+      );
+      void navigate({ to: "/shop/$shopId", params: { shopId: result.id } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The shop could not be duplicated.");
+    } finally {
+      setDuplicating(false);
+    }
+  }
   const pdf = (
     <Button
       variant="secondary"
@@ -296,6 +337,17 @@ export function ShopContent({
         </div>
       ) : null}
       {viewing === "edit" ? (
+        <Button
+          variant="secondary"
+          className="mt-8"
+          disabled={duplicating || editDirty}
+          title={editDirty ? "Save the shop first: the copy is made from the saved shop." : undefined}
+          onClick={() => void duplicate()}
+        >
+          {duplicating ? "Duplicating…" : "Duplicate shop"}
+        </Button>
+      ) : null}
+      {viewing === "edit" ? (
         <button
           type="button"
           onClick={() => setConfirming(true)}
@@ -413,7 +465,8 @@ function StockRow({
   charisma: number | null;
   locked?: boolean;
 }) {
-  const { buy, updateStock, deleteStock, purses } = useEconomy();
+  const { buy, updateStock, deleteStock, purses, undoPurchase } = useEconomy();
+  const stockSaved = useSavedTick();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
   const oneTap = !!sellToName;
@@ -454,11 +507,19 @@ function StockRow({
       setNotice("");
       let settle = 0;
       try {
-        const outcome = await buy(line.id, purseId, asked, { commandId: action.commandId });
+        const commandId = action.commandId;
+        const outcome = await buy(line.id, purseId, asked, { commandId });
         action.renew();
-        setNotice(
-          mutationNotice(outcome, oneTap ? `Sold 1 to ${sellToName}.` : "Purchase recorded."),
-        );
+        const done = mutationNotice(outcome, oneTap ? `Sold 1 to ${sellToName}.` : "Purchase recorded.");
+        setNotice(done);
+        // Result toast (design D9): the receipt, and Undo for the DM while the ledger void applies.
+        resultToast(done, {
+          receipt: () =>
+            showActionReceipt({ title: "Purchase receipt", commandId, holdingId: commandId + "-item" }),
+          ...(outcome.status === "committed" && getSeat().role === "dm"
+            ? { undo: () => void undoPurchase(commandId) }
+            : {}),
+        });
         // One-tap selling: an accidental double tap is one sale, so the row rests briefly.
         if (oneTap) settle = 700;
       } catch (e) {
@@ -531,7 +592,7 @@ function StockRow({
         defaultValue={line.name}
         onBlur={(event) => {
           const name = event.target.value.trim();
-          if (name && name !== line.name) void updateStock({ ...line, name });
+          if (name && name !== line.name) stockSaved.track(updateStock({ ...line, name }));
         }}
       />
       <div className="grid grid-cols-2 gap-2">
@@ -541,7 +602,8 @@ function StockRow({
             defaultValue={formatCopper(line.copper)}
             onBlur={(event) => {
               const copper = parsePrice(event.target.value);
-              if (copper !== null && copper !== line.copper) void updateStock({ ...line, copper });
+              if (copper !== null && copper !== line.copper)
+                stockSaved.track(updateStock({ ...line, copper }));
             }}
           />
         </Field>
@@ -553,11 +615,12 @@ function StockRow({
               const raw = event.target.value.trim();
               const quantity = raw === "" ? null : Math.max(0, Math.floor(Number(raw)));
               if (raw !== "" && Number.isNaN(quantity)) return;
-              if (quantity !== line.quantity) void updateStock({ ...line, quantity });
+              if (quantity !== line.quantity) stockSaved.track(updateStock({ ...line, quantity }));
             }}
           />
         </Field>
       </div>
+      <SavedTick saved={stockSaved.saved} />
       <RemoveButton
         className="self-start"
         label="Remove item"
@@ -702,9 +765,15 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
         setError("");
         setNotice("");
         try {
-          const result = await sell(holding.id, shopId, asked, { commandId: action.commandId });
+          const commandId = action.commandId;
+          const result = await sell(holding.id, shopId, asked, { commandId });
           action.renew();
-          setNotice(mutationNotice(result, "Sale recorded."));
+          const done = mutationNotice(result, "Sale recorded.");
+          setNotice(done);
+          // No Undo: a shop sale has no goods-return receipt for the ledger void to reverse.
+          resultToast(done, {
+            receipt: () => showActionReceipt({ title: "Sale receipt", commandId }),
+          });
         } catch (e) {
           setError(e instanceof Error ? e.message : "Sale failed.");
         } finally {

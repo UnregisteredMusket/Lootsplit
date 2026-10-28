@@ -144,3 +144,15 @@ One name per thing in the interface, Help and audits. Renames keep every route, 
 | Review Inbox, with a count | Pending reviews | `/features/review`, Desk readout and tab badge |
 | Party & inventory (players) / Party (DM) | Inventory | `/party` |
 | The campaign's real name, or "Shared campaign · CODE" | Party overview | Campaign switcher |
+
+## Design tokens: breakpoints, type scale, colours (2026-10-26)
+
+- **Breakpoints:** `--bp-phone` 430px, `--bp-tablet` 650px (and `--bp-tablet-up` 651px), `--bp-wide` 1024px (and `--bp-wide-down` 1023.98px), and phone landscape `(orientation: landscape) and (max-height: theme(--bp-landscape-height))` (500px). They are defined in the `@theme` block of `src/styles.css`.
+  - In `src/styles.css`, write `@media (max-width: theme(--bp-phone))`; Tailwind resolves it in dev and in builds.
+  - Component CSS files are not compiled with the theme, so they repeat the px value.
+- **Type scale:** 12 / 14 / 16 / 20 / 24 / 32 px, as `--text-caption`, `--text-small`, `--text-body`, `--text-heading`, `--text-title` and `--text-display`. Each is usable as a utility (`text-caption`) or as `var(--text-caption)`.
+- **Ratchet:** `scripts/design-tokens.mjs`, run by `npm test` through `scripts/design-tokens.test.mjs`. It fails a change that adds either of these to a file:
+  - a raw hex colour outside `src/lib/quire/theme.ts`;
+  - a media width or height that is not a breakpoint token.
+  - Existing ones are listed per file in `scripts/design-tokens-baseline.json`, and a file may only lower its count. Lower the baseline with `node scripts/design-tokens.mjs --write-baseline` after removing violations. Raise it only with a reason in the PR.
+- **Still to do:** the map chrome's 650/651 rules move to the tokens with the map controls work.

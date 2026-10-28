@@ -11,7 +11,9 @@ import {
   confirmContextChange,
 } from "@/lib/quire/use-draft-guard";
 import { dismissDialog } from "@/lib/quire/confirm-store";
-import { runBackHandlers } from "@/lib/mobile/back-handlers";
+import { rootBack } from "@/lib/mobile/back-handlers";
+import { androidBackStep } from "@/lib/mobile/back-chain";
+import { toast } from "sonner";
 import { rememberScreen } from "@/lib/quire/map-navigation";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { useReviewCount } from "@/lib/quire/use-review-count";
@@ -41,6 +43,7 @@ import { useLibrary } from "@/lib/quire/library";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
 import { setSeat } from "@/lib/quire/table";
 import { BillReceipt } from "@/components/bill-receipt";
+import { ActionReceipt } from "@/components/action-receipt";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { SeatSwitch } from "@/components/seat-switch";
 import { Confirm, Modal } from "@/components/ui";
@@ -49,6 +52,10 @@ import { loadSeatLock } from "@/lib/quire/lock";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 import { watchCrashes } from "@/lib/quire/reports";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
+import { LANDSCAPE_QUERY, headerHiddenAfterScroll } from "@/lib/mobile/landscape";
+import { noteCampaignOpened } from "@/lib/quire/campaign-recents";
+import { useEconomy } from "@/lib/quire/economy-context";
+import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 
 type Dest =
   | "/maps"
@@ -65,6 +72,9 @@ type Dest =
   | "/books"
   | "/share"
   | "/settings";
+
+/** Screens outside any campaign: Back at the root exits without "Press back again". */
+const NON_CAMPAIGN_ROUTES = new Set(["/welcome", "/downloads", "/account"]);
 
 type ShellProps = {
   children: ReactNode;
@@ -103,7 +113,42 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
   const campaignName = useCampaignDisplayName();
   const overlayRef = useRef(false);
   overlayRef.current = management || campaignOpen;
+  // Back at the app root warns before exiting only while a campaign is open (design M3).
+  const campaignOpenRef = useRef(false);
+  campaignOpenRef.current = seatKnown && !NON_CAMPAIGN_ROUTES.has(pathname);
   const [blocked, setBlocked] = useState<string | null>(null);
+  // Phone landscape (design M2): the header slides away while scrolling down, except on Maps.
+  const [headerAway, setHeaderAway] = useState(false);
+  const scrollAway = !splitOn && pathname !== "/maps";
+  useEffect(() => {
+    setHeaderAway(false);
+    if (!scrollAway || typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia(LANDSCAPE_QUERY);
+    let state = { hidden: false, lastY: window.scrollY };
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const y = window.scrollY;
+      const header = document.querySelector<HTMLElement>(".loot-header")?.offsetHeight ?? 64;
+      const hidden = query.matches && headerHiddenAfterScroll({ ...state, header }, y);
+      state = { hidden, lastY: y };
+      setHeaderAway(hidden);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    const onChange = () => {
+      state = { hidden: false, lastY: window.scrollY };
+      setHeaderAway(false);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    query.addEventListener?.("change", onChange);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      query.removeEventListener?.("change", onChange);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [scrollAway, pathname]);
 
   const destinationHash = useRouterState({ select: (state) => state.location.hash });
   useEffect(() => {
@@ -114,26 +159,34 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
     if (import.meta.env.VITE_MOBILE !== "true") return;
     let remove = () => {};
     let live = true;
+    let exitPress: number | null = null;
     void import("@capacitor/app").then(({ App }) => {
       void App.addListener("backButton", ({ canGoBack }) => {
         if (dismissDialog()) return; // A themed confirmation or prompt cancels first.
-        if (overlayRef.current) {
-          setManagement(false);
-          setCampaignOpen(false);
+        // Overlays, the shell's panels, the top dialog, floating menus, then the screen.
+        if (
+          androidBackStep(() => {
+            if (!overlayRef.current) return false;
+            setManagement(false);
+            setCampaignOpen(false);
+            return true;
+          })
+        )
           return;
-        }
-        const close = document.querySelector<HTMLButtonElement>(
-          '[role="dialog"] button[aria-label="Close"]',
-        );
-        if (close) {
-          close.click();
-          return;
-        }
-        // A screen's own interceptor (the map: panel, then parent map, then close the map).
-        if (runBackHandlers()) return;
         const back = () => {
-          if (canGoBack) window.history.back();
-          else void App.exitApp();
+          if (canGoBack) {
+            window.history.back();
+            return;
+          }
+          // At the root, a second press within 2 s exits while a campaign is open (design M3).
+          const now = Date.now();
+          const step = rootBack({ campaignOpen: campaignOpenRef.current, lastPress: exitPress }, now);
+          if (step === "exit") {
+            void App.exitApp();
+            return;
+          }
+          exitPress = now;
+          toast("Press back again to exit", { id: "back-exit", duration: 2000 });
         };
         if (allowContextChange(back)) back();
       }).then((handle) => {
@@ -277,7 +330,11 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
         </aside>
         )}
         <div className="app-column min-w-0">
-          <header className="sticky top-0 z-20 border-b border-lead/50 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-sm">
+          <header
+            className="loot-header sticky top-0 z-20 border-b border-lead/50 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-sm"
+            data-scrolled-away={headerAway || undefined}
+            onFocusCapture={() => setHeaderAway(false)}
+          >
             <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-8">
               <button
                 className="campaign-switcher"
@@ -395,13 +452,15 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
         campaign={campaignName}
       />
       <nav
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-lead/40 bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
+        className="loot-tabbar fixed inset-x-0 bottom-0 z-20 border-t border-lead/40 bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
         aria-label="Sections"
       >
         <div className="mx-auto grid max-w-3xl grid-cols-6">{navLinks("tab")}</div>
       </nav>
       <BillReceipt />
+      <CampaignRecentRecorder name={campaignName} />
       <SeatSwitch open={switching} onOpenChange={setSwitching} seat={seat} />
+      <ActionReceipt />
       <Confirm
         open={leaving}
         onOpenChange={setLeaving}
@@ -506,6 +565,26 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
     );
   }
 
+}
+
+/**
+ * Notes this campaign as opened now, with its session number ("Session N" counts recorded
+ * sessions; the next one is N + 1 until it starts, as on the Desk). Feeds the title prompt and
+ * the Campaigns dialog's recent list. Guest campaigns stay in memory and are not recorded.
+ */
+function CampaignRecentRecorder({ name }: { name: string }) {
+  const { ready, journal } = useEconomy();
+  const id = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns).activeId;
+  const sessions = journal.sessions;
+  const open = sessions.find((x) => !x.endedAt);
+  // A campaign that never ran a session shows no number yet.
+  const session =
+    ready && sessions.length ? (open ? sessions.indexOf(open) + 1 : sessions.length + 1) : undefined;
+  useEffect(() => {
+    if (isEphemeralCampaign()) return;
+    noteCampaignOpened(id, { name, session });
+  }, [id, name, session]);
+  return null;
 }
 
 export function KeptByDm() {
@@ -690,7 +769,7 @@ function NavLink({
           )
         ) : null}
       </span>
-      {layout === "compact" ? null : label}
+      {layout === "compact" ? null : <span className="loot-nav-label">{label}</span>}
     </Link>
     {/* Outside the link so its name stays "Desk"; a hidden element still describes it. */}
     {described ? (

@@ -1,4 +1,4 @@
-import { prepareDmFixture } from "./title-screen-navigation.mjs";
+import { prepareDmFixture, TITLE_SCREEN } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
@@ -29,8 +29,8 @@ try {
     page.on("pageerror", (e) => errors.push(e.message));
     await prepareDmFixture(page, origin); // Real account setup before the navigation assertions.
     await page.goto(origin);
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).waitFor();
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
+    await page.getByRole("button", { name: TITLE_SCREEN }).waitFor();
+    await page.getByRole("button", { name: TITLE_SCREEN }).click();
     await page.locator(".information-strip").waitFor();
     await page.locator(".settings-trigger").click();
     await page.getByRole("dialog").getByRole("button", { name: "Dashboard", exact: true }).click();
@@ -215,11 +215,11 @@ try {
     assert.equal(await page.locator(".loot-opening").count(), 0);
     // Fresh document loads must restore the title, even with a legacy dismissal flag.
     await page.goto(origin + "/library");
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
+    await page.getByRole("button", { name: TITLE_SCREEN }).click();
     await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
     assert.equal(await page.locator(".loot-opening").count(), 0);
     await page.reload();
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
+    await page.getByRole("button", { name: TITLE_SCREEN }).click();
     await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
     assert.equal(await page.locator(".loot-opening").count(), 0);
     assert.deepEqual(errors, []);

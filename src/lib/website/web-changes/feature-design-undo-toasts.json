@@ -1,0 +1,9 @@
+{
+  "title": "View receipt and Undo after money actions",
+  "summary": "Purchases, sales, transfers, Add loot and encounter awards now confirm with a View receipt button, and a DM's shop purchase can be undone straight from the confirmation.",
+  "items": [
+    "View receipt shows the lines the action recorded and the item it created, with a link to it in the inventory.",
+    "A DM's shop purchase offers Undo while the message is on screen. It uses the existing ledger void, so the coins, shop stock and items come back exactly once, and it refuses if the items have since moved.",
+    "Fields that save when you leave them (account names, stock names, prices and quantities, catalog prices) show a Saved tick."
+  ]
+}
