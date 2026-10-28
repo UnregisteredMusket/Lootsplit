@@ -1,3 +1,4 @@
+import { roomCommittedSql } from "./room-storage.mjs";
 /** Immutable, private campaign documents. Complete exports hydrate the original records. */
 const refPattern = /^resource-pack:[a-f0-9]{64}$/;
 /** @param {any} value @param {(pack:any)=>any} transform @param {number} depth @returns {Promise<any>} */
@@ -84,8 +85,10 @@ export async function hydrateRoomResources(db, code, value) {
 }
 /** @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
  * @param {{code:string;revision:number}} room
- * @param {{body:string;documents?:{reference:string;body:string}[]}} encoded */
-export async function roomResourceStatements(db, room, encoded) {
+ * @param {{body:string;documents?:{reference:string;body:string}[]}} encoded
+ * @param {string} writeId the room write (room-storage.mjs) these rows depend on */
+export async function roomResourceStatements(db, room, encoded, writeId) {
+  const committed = roomCommittedSql(room.code, writeId);
   if (!encoded.documents?.length) return [];
   const present = await db
     .prepare("SELECT reference FROM campaign_resource_documents WHERE code=?")
@@ -97,8 +100,8 @@ export async function roomResourceStatements(db, room, encoded) {
     .map((doc) =>
       db
         .prepare(
-          "INSERT INTO campaign_resource_documents(code,reference,body) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=? AND body=?) ON CONFLICT(code,reference) DO NOTHING",
+          `INSERT INTO campaign_resource_documents(code,reference,body) SELECT ?,?,? WHERE ${committed.sql} ON CONFLICT(code,reference) DO NOTHING`,
         )
-        .bind(room.code, doc.reference, doc.body, room.code, room.revision, encoded.body),
+        .bind(room.code, doc.reference, doc.body, ...committed.args),
     );
 }

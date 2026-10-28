@@ -4,6 +4,7 @@ import { canonicalJson } from "../src/lib/quire/canonical-json.ts";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
 import { readArchivedSnapshot } from "../src/lib/quire/journal.ts";
 import { hydrateRoomImages } from "./room-images.mjs";
+import { readMemberRooms } from "./room-storage.mjs";
 
 export function backupMapReferences(payload) {
   const refs = [];
@@ -51,13 +52,9 @@ export async function accountMapAsset(db, userId, body) {
   if (body.record) {
     if (!["manifest", "read"].includes(request.action))
       throw Object.assign(Error("Archived maps are read only."), { status: 403 });
-    const row = await db
-      .prepare(
-        "SELECT m.seat_id,m.token,r.body FROM library_members m JOIN campaign_rooms r ON r.code=m.code WHERE m.user_id=? AND m.code=?",
-      )
-      .bind(userId, body.record.code)
-      .first();
-    const room = row ? await hydrateRoomImages(db, body.record.code, JSON.parse(row.body)) : null;
+    const [joined] = await readMemberRooms(db, userId, { code: body.record.code });
+    const row = joined?.member;
+    const room = joined ? await hydrateRoomImages(db, body.record.code, joined.stored.room) : null;
     const seat = [...(room?.seats ?? []), ...(room?.departed ?? [])].find(
       (seat) => seat.id === row?.seat_id && seat.token === row?.token,
     );

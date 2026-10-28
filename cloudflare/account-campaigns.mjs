@@ -15,6 +15,13 @@ import {
   hostedCampaignLimitError,
 } from "./hosted-campaigns.mjs";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
+import {
+  readRoomCore,
+  readStoredRoom,
+  roomDeleteStatement,
+  roomVersionSql,
+  roomWriteStatements,
+} from "./room-storage.mjs";
 
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
@@ -26,11 +33,8 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
     .bind(userId, body.code)
     .first();
   if (!member) fail("Campaign not found.", 404);
-  const row = await db
-    .prepare("SELECT body,revision FROM campaign_rooms WHERE code=?")
-    .bind(member.code)
-    .first();
-  const room = row ? JSON.parse(row.body) : null;
+  const row = await readStoredRoom(db, member.code);
+  const room = row ? row.room : null;
   // Ownership is the saved account membership plus the current server seat, never a client role.
   const seat = room?.seats.find((s) => s.id === member.seat_id && s.token === member.token);
   if (!seat || (room.closed && seat.role !== "dm"))
@@ -39,7 +43,7 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
   if (room.closed) {
     if (body.reopen !== true)
       fail("This session has ended. Use Reopen as DM in My campaigns to continue it.", 409);
-    if (body.revision !== row.revision)
+    if (body.revision !== row.version.revision)
       fail("The campaign changed. Refresh My campaigns before reopening it.", 409);
     if (Object.values(room.drafts || {}).some((draft) => draft.length))
       fail("This campaign has pending turns. Resolve them before reopening it.", 409);
@@ -50,7 +54,7 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
     next.ownerId = userId;
     next.sessionId = crypto.randomUUID();
     next.invitations = {};
-    next.revision = row.revision + 1;
+    next.revision = row.version.revision + 1;
     const players = next.seats.filter((s) => s.role === "player");
     // Closing ended these player sessions. Reopening must not silently restore revoked access.
     next.departed = [
@@ -59,25 +63,16 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
     ];
     next.seats = next.seats.filter((s) => s.role === "dm");
     next.turn = next.seats.findIndex((s) => s.id === seat.id);
-    const saved = await db
-      .prepare(
-        `UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND revision=? AND ${hostedCampaignGuardSql}`,
-      )
-      .bind(
-        JSON.stringify(next),
-        next.revision,
-        member.code,
-        row.revision,
-        ...hostedCampaignGuardArgs(userId, limit),
-      )
-      .run();
+    // Revision-only guard, as before (the reopen request names the revision it saw).
+    const saved = await roomWriteStatements(db, next, {
+      expect: { revision: row.version.revision },
+      extraWhere: hostedCampaignGuardSql,
+      extraArgs: hostedCampaignGuardArgs(userId, limit),
+    }).statements[0].run();
     if (saved.meta.changes !== 1) {
       await assertCanHost(db, userId, "reopen", limit);
-      const current = await db
-        .prepare("SELECT revision FROM campaign_rooms WHERE code=?")
-        .bind(member.code)
-        .first();
-      if (current?.revision === row.revision) throw hostedCampaignLimitError(limit);
+      const current = await readRoomCore(db, member.code);
+      if (current?.revision === row.version.revision) throw hostedCampaignLimitError(limit);
       fail("The campaign changed. Refresh My campaigns before reopening it.", 409);
     }
     reopened = true;
@@ -117,18 +112,15 @@ export async function campaignAction(db, userId, body, actor) {
   }
   if (body.confirm !== body.code) fail("Type the campaign code to confirm deletion.");
   const accountGuardArgs = recoveryAccountGuardArgs(actor, userId);
-  const row = await db
-    .prepare("SELECT body,revision FROM campaign_rooms WHERE code=?")
-    .bind(body.code)
-    .first();
+  const row = await readStoredRoom(db, body.code);
   if (!row) fail("This campaign is already closed.", 404);
-  const room = JSON.parse(row.body),
+  const room = row.room,
     seat = room.seats.find((s) => s.id === member.seat_id && s.token === member.token);
   if (seat?.role !== "dm")
     fail("Only the linked dungeon master can delete a shared campaign.", 403);
   if (Object.values(room.drafts || {}).some((d) => d.length))
     fail("Submit or discard pending turns in the campaign before deleting it.", 409);
-  if (body.revision !== row.revision)
+  if (body.revision !== row.version.revision)
     fail("The campaign changed. Refresh your library before deleting it.", 409);
   let projected;
   try {
@@ -183,6 +175,8 @@ export async function campaignAction(db, userId, body, actor) {
     articles: [],
   };
   const backupId = crypto.randomUUID();
+  // The room must still be exactly as read (no write since) for the backup and the delete.
+  const unchanged = roomVersionSql(row.version);
   let results;
   try {
     results = await db.batch([
@@ -192,7 +186,7 @@ export async function campaignAction(db, userId, body, actor) {
          WITH snapshot(body) AS (SELECT json_set(?, '$.campaignRecovery', ${deletionRecoverySql}))
          SELECT ?,?,?,snapshot.body,? FROM snapshot
          WHERE length(CAST(snapshot.body AS BLOB))<=1900000
-         AND EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND revision=? AND body=?)
+         AND ${unchanged.sql}
          AND ${recoveryAccountGuardSql}
          AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
         )
@@ -203,9 +197,7 @@ export async function campaignAction(db, userId, body, actor) {
           userId,
           member.name + " (before deletion)",
           Date.now(),
-          body.code,
-          row.revision,
-          row.body,
+          ...unchanged.args,
           ...accountGuardArgs,
           userId,
           room.code,
@@ -217,11 +209,11 @@ export async function campaignAction(db, userId, body, actor) {
           "INSERT INTO campaign_deletion_backups(backup_id,user_id,source_code) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?)",
         )
         .bind(backupId, userId, body.code, backupId, userId),
-      db
-        .prepare(
-          "DELETE FROM campaign_rooms WHERE code=? AND revision=? AND body=? AND EXISTS(SELECT 1 FROM campaign_deletion_backups WHERE backup_id=? AND user_id=?)",
-        )
-        .bind(body.code, row.revision, row.body, backupId, userId),
+      roomDeleteStatement(db, body.code, {
+        expect: row.version,
+        extraWhere: "EXISTS(SELECT 1 FROM campaign_deletion_backups WHERE backup_id=? AND user_id=?)",
+        extraArgs: [backupId, userId],
+      }),
       db
         .prepare(
           "DELETE FROM library_members WHERE code=? AND NOT EXISTS (SELECT 1 FROM campaign_rooms WHERE code=?)",

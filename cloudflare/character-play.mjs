@@ -1,5 +1,11 @@
 import { canReadCharacter } from "../src/lib/quire/character-position.ts";
-import { hydrateCampaignCharacters, campaignBody } from "./campaign-characters.mjs";
+import { hydrateStoredCampaignCharacters, campaignBody } from "./campaign-characters.mjs";
+import {
+  readStoredRoom,
+  roomVersionSql,
+  roomWriteStatements,
+  sameRoomVersion,
+} from "./room-storage.mjs";
 import { statsOnly, editCharacter } from "../src/lib/characters/campaign-sheet.mjs";
 import { sheetSchema, rollSpec, parseDice, throwDice } from "../src/lib/characters/model.mjs";
 const fail = (m, status = 400) => {
@@ -14,12 +20,14 @@ async function membership(db, user, code) {
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
     .bind(user, code)
     .first();
-  const row = await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first();
-  const room = row ? JSON.parse(row.body) : null;
+  const stored = await readStoredRoom(db, code);
+  const room = stored ? stored.room : null;
   const seat = room?.seats.find((s) => s.id === m?.seat_id && s.token === m?.token);
   if (!seat || room.closed) fail("Save an active campaign membership in My account first.", 403);
-  await hydrateCampaignCharacters(db, room);
-  return { room, seat, raw: JSON.stringify(room) };
+  // `version` identifies this exact read (after any character upgrade write); guards compare it
+  // instead of the whole body (room-storage.mjs).
+  const { version } = await hydrateStoredCampaignCharacters(db, room, stored.version);
+  return { room, seat, version };
 }
 async function character(db, user, id, own = false) {
   if (typeof id === "string" && id.startsWith("campaign:")) {
@@ -123,9 +131,9 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     if (body.decision === "denied") {
       const result = await db
         .prepare(
-          "UPDATE character_imports SET status='denied',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
+          `UPDATE character_imports SET status='denied',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND ${roomVersionSql(reviewer.version).sql}`,
         )
-        .bind(Date.now(), user, request.id, request.code, reviewer.raw)
+        .bind(Date.now(), user, request.id, ...roomVersionSql(reviewer.version).args)
         .run();
       if (!result.meta.changes) fail("Campaign or request changed. Refresh before reviewing.", 409);
       return { ok: true, status: "denied" };
@@ -141,7 +149,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         revision: request.source_revision,
       },
       url,
-      { ...request, reviewer: user, reviewerRaw: reviewer.raw },
+      { ...request, reviewer: user, reviewerVersion: reviewer.version },
     );
   }
   if (path === "sheets") {
@@ -206,7 +214,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     if (body.id) {
       const existing = await character(db, user, id, true);
       if (existing.campaign_code) {
-        const { room, seat, raw } = await membership(db, user, existing.campaign_code);
+        const { room, seat, version } = await membership(db, user, existing.campaign_code);
         if (room.viewOnly && seat.role === "player")
           fail("The session has ended. This room is view-only until the DM resumes play.", 403);
         const p = room.table.purses.find((p) => p.id === existing.purse_id);
@@ -240,10 +248,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
           npc.portrait = p.portrait;
         }
         room.revision++;
-        const saved = await db
-          .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=?")
-          .bind(JSON.stringify(room), room.revision, room.code, raw)
-          .run();
+        const saved = await roomWriteStatements(db, room, { expect: version }).statements[0].run();
         if (!saved.meta.changes) fail("Campaign changed. Reload and retry.", 409);
         return { id };
       }
@@ -378,7 +383,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       }
       if (approval) {
         if (
-          target.raw !== approval.reviewerRaw ||
+          !sameRoomVersion(target.version, approval.reviewerVersion) ||
           seat.id !== approval.seat_id ||
           seat.token !== approval.seat_token ||
           (room.sessionId || "") !== approval.session_id ||
@@ -424,9 +429,11 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       }
     }
     try {
+      // The character update needs each room it touches unchanged since this request read it.
+      const roomGuards = [target, detached].filter(Boolean).map((m) => roomVersionSql(m.version));
       const update = db
         .prepare(
-          "UPDATE play_characters SET body=?,campaign_code=?,purse_id=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=? AND (?='' OR EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)) AND (?='' OR EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)) AND (?='' OR EXISTS(SELECT 1 FROM character_imports WHERE id=? AND status='pending'))",
+          `UPDATE play_characters SET body=?,campaign_code=?,purse_id=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=?${roomGuards.map((g) => ` AND ${g.sql}`).join("")} AND (?='' OR EXISTS(SELECT 1 FROM character_imports WHERE id=? AND status='pending'))`,
         )
         .bind(
           JSON.stringify({
@@ -440,55 +447,35 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
           r.id,
           user,
           body.revision,
-          code,
-          code,
-          target?.raw || "",
-          detached?.room.code || "",
-          detached?.room.code || "",
-          detached?.raw || "",
+          ...roomGuards.flatMap((g) => g.args),
           approval?.id || "",
           approval?.id || "",
         );
       const statements = [update];
-      if (target)
-        statements.push(
-          db
-            .prepare(
-              "UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=? AND EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?)",
-            )
-            .bind(
-              JSON.stringify(target.room),
-              target.room.revision,
-              code,
-              target.raw,
-              r.id,
-              code,
-              purse,
-              body.revision + 1,
-            ),
-        );
+      const assigned =
+        "EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?)";
+      let targetWrite = null;
+      if (target) {
+        targetWrite = roomWriteStatements(db, target.room, {
+          expect: target.version,
+          extraWhere: assigned,
+          extraArgs: [r.id, code, purse, body.revision + 1],
+        });
+        statements.push(...targetWrite.statements);
+      }
       if (detached)
         statements.push(
-          db
-            .prepare(
-              "UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=? AND EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?)",
-            )
-            .bind(
-              JSON.stringify(detached.room),
-              detached.room.revision,
-              detached.room.code,
-              detached.raw,
-              r.id,
-              code,
-              code ? purse : "",
-              body.revision + 1,
-            ),
+          ...roomWriteStatements(db, detached.room, {
+            expect: detached.version,
+            extraWhere: assigned,
+            extraArgs: [r.id, code, code ? purse : "", body.revision + 1],
+          }).statements,
         );
-      if (approval)
+      if (approval && targetWrite)
         statements.push(
           db
             .prepare(
-              "UPDATE character_imports SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?) AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
+              `UPDATE character_imports SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?) AND ${targetWrite.committed.sql}`,
             )
             .bind(
               Date.now(),
@@ -498,8 +485,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
               code,
               purse,
               body.revision + 1,
-              code,
-              JSON.stringify(target.room),
+              ...targetWrite.committed.args,
             ),
         );
       const result = await db.batch(statements);
@@ -648,9 +634,10 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       ...result,
     };
     // Persist a single receipt; campaign policy and membership snapshot must still be current.
+    const memberGuard = r.campaign_code && member ? roomVersionSql(member.version) : null;
     const saved = await db
       .prepare(
-        `INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) SELECT ?,?,?,?,?,?,? WHERE (?='' OR EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)) AND (?=0 OR ?='' OR EXISTS(SELECT 1 FROM play_policies WHERE code=? AND manual_allowed=1)) ON CONFLICT(user_id,request_key) DO NOTHING`,
+        `INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) SELECT ?,?,?,?,?,?,? WHERE ${memberGuard ? memberGuard.sql : "1"} AND (?=0 OR ?='' OR EXISTS(SELECT 1 FROM play_policies WHERE code=? AND manual_allowed=1)) ON CONFLICT(user_id,request_key) DO NOTHING`,
       )
       .bind(
         roll.id,
@@ -660,9 +647,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         key,
         JSON.stringify(roll),
         Date.now(),
-        r.campaign_code,
-        r.campaign_code,
-        member?.raw || "",
+        ...(memberGuard ? memberGuard.args : []),
         manual ? 1 : 0,
         r.campaign_code,
         r.campaign_code,

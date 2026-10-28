@@ -1,5 +1,6 @@
 import { roleOf, staffCommitGuard } from "./members.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
+import { readStoredRoom, roomWriteStatements } from "./room-storage.mjs";
 const fail = (m, status = 400) => {
   throw Object.assign(Error(m), { status });
 };
@@ -99,15 +100,18 @@ export async function ownerTestMode(db, user, body, sessionId) {
       seen: { gifts: [], sales: [] },
     };
     const guard = await staffCommitGuard(db, user, sessionId, ["owner"]);
+    const write = roomWriteStatements(db, room, {
+      create: true,
+      extraWhere: guard.sql,
+      extraArgs: guard.binds,
+    });
     const results = await db.batch([
-      db
-        .prepare(`INSERT INTO campaign_rooms(code,revision,body) SELECT ?,1,? WHERE ${guard.sql}`)
-        .bind(code, JSON.stringify(room), ...guard.binds),
+      ...write.statements,
       db
         .prepare(
-          "INSERT INTO library_members(user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
+          `INSERT INTO library_members(user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE ${write.committed.sql}`,
         )
-        .bind(user, code, seatId, token, "Test mode", Date.now(), code, JSON.stringify(room)),
+        .bind(user, code, seatId, token, "Test mode", Date.now(), ...write.committed.args),
     ]);
     if (!results[0].meta.changes)
       fail("Owner access changed. Sign in again before creating a Test room.", 409);
@@ -118,11 +122,8 @@ export async function ownerTestMode(db, user, body, sessionId) {
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
     .bind(user, body.code)
     .first();
-  const row = await db
-    .prepare("SELECT body FROM campaign_rooms WHERE code=?")
-    .bind(body.code)
-    .first();
-  const room = row ? JSON.parse(row.body) : null;
+  const row = await readStoredRoom(db, body.code);
+  const room = row ? row.room : null;
   if (
     !room?.testMode ||
     room.closed ||
@@ -145,29 +146,25 @@ export async function ownerTestMode(db, user, body, sessionId) {
   room.departed = [];
   room.invitations = {};
   room.blockedUsers = {};
-  const next = JSON.stringify(room);
   const guard = await staffCommitGuard(db, user, sessionId, ["owner"]);
+  const write = roomWriteStatements(db, room, {
+    expect: row.version,
+    extraWhere: guard.sql,
+    extraArgs: guard.binds,
+  });
+  // Rolls, encounters and receipts are cleared only if the reset itself committed.
+  const committed = write.committed;
   const results = await db.batch([
+    ...write.statements,
     db
-      .prepare(
-        `UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=? AND ${guard.sql}`,
-      )
-      .bind(next, room.revision, room.code, row.body, ...guard.binds),
+      .prepare(`DELETE FROM play_rolls WHERE code=? AND ${committed.sql}`)
+      .bind(room.code, ...committed.args),
     db
-      .prepare(
-        "DELETE FROM play_rolls WHERE code=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
-      )
-      .bind(room.code, room.code, next),
+      .prepare(`DELETE FROM dm_encounters WHERE code=? AND ${committed.sql}`)
+      .bind(room.code, ...committed.args),
     db
-      .prepare(
-        "DELETE FROM dm_encounters WHERE code=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
-      )
-      .bind(room.code, room.code, next),
-    db
-      .prepare(
-        "DELETE FROM campaign_room_receipts WHERE code=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
-      )
-      .bind(room.code, room.code, next),
+      .prepare(`DELETE FROM campaign_room_receipts WHERE code=? AND ${committed.sql}`)
+      .bind(room.code, ...committed.args),
   ]);
   if (!results[0].meta.changes) fail("The Test room changed. Retry the reset.", 409);
   return { ok: true };

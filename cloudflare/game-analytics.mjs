@@ -8,6 +8,7 @@ import {
 } from "../src/lib/quire/analytics.ts";
 import { roleOf } from "./members.mjs";
 import { hydrateRoomReports } from "./room-reports.mjs";
+import { roomJsonSql } from "./room-storage.mjs";
 
 // Bound repeated homepage reads per database/isolate; failures are never cached as zero.
 const snapshots = new WeakMap();
@@ -33,10 +34,10 @@ async function collect(db) {
     const { results } = await db
       .prepare(
         `SELECT code,
-      json_extract(body, '$.table.ledger') AS ledger,
-      json_extract(body, '$.table.purses') AS purses,
-      json_extract(body, '$.table.holdings') AS holdings,
-      json_extract(body, '$.table.journal') AS journal
+      ${roomJsonSql("campaign_rooms", "$.table.ledger")} AS ledger,
+      ${roomJsonSql("campaign_rooms", "$.table.purses")} AS purses,
+      ${roomJsonSql("campaign_rooms", "$.table.holdings")} AS holdings,
+      ${roomJsonSql("campaign_rooms", "$.table.journal")} AS journal
       FROM campaign_rooms WHERE code > ? AND COALESCE(json_extract(body, '$.testMode'), 0) = 0 AND ${notProbeRoom()} ORDER BY code LIMIT 100`,
       )
       .bind(after)

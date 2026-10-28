@@ -1,9 +1,20 @@
 import { statsOnly, characterSheet } from "../src/lib/characters/campaign-sheet.mjs";
+import { roomWriteStatements } from "./room-storage.mjs";
 /** Upgrade only explicit existing assignments. Never match names or import wealth.
  * @param {any} db @param {import("../src/lib/quire/cloud.ts").CloudRoom} room */
 export async function hydrateCampaignCharacters(db, room) {
-  if (room.closed) return room;
-  if (!room.table.purses.some((p) => p.kind === "character" && !p.sheet)) return room;
+  return (await hydrateStoredCampaignCharacters(db, room, null)).room;
+}
+/**
+ * `hydrateCampaignCharacters` for a stored read: also returns the room's version after the
+ * upgrade (`version` unchanged when nothing was upgraded).
+ * @template V
+ * @param {any} db @param {import("../src/lib/quire/cloud.ts").CloudRoom} room @param {V} version
+ * @returns {Promise<{ room: import("../src/lib/quire/cloud.ts").CloudRoom; version: V | import("./room-storage.mjs").RoomVersion }>}
+ */
+export async function hydrateStoredCampaignCharacters(db, room, version) {
+  if (room.closed) return { room, version };
+  if (!room.table.purses.some((p) => p.kind === "character" && !p.sheet)) return { room, version };
   const rows = await db
     .prepare("SELECT id,body,purse_id,user_id FROM play_characters WHERE campaign_code=?")
     .bind(room.code)
@@ -30,17 +41,15 @@ export async function hydrateCampaignCharacters(db, room) {
     p.sheetRevision = 0;
     changed = true;
   }
-  if (!changed) return room;
+  if (!changed) return { room, version };
   const base = room.revision++;
-  const saved = await db
-    .prepare("UPDATE campaign_rooms SET revision=?,body=? WHERE code=? AND revision=?")
-    .bind(room.revision, JSON.stringify(room), room.code, base)
-    .run();
+  const write = roomWriteStatements(db, room, { expect: { revision: base } });
+  const saved = await write.statements[0].run();
   if (!saved.meta.changes)
     throw Object.assign(Error("Campaign changed while upgrading characters. Refresh and retry."), {
       status: 409,
     });
-  return room;
+  return { room, version: write.version };
 }
 /** @param {import("../src/lib/quire/cloud.ts").CloudRoom} room @param {string} purseId */
 export function campaignBody(room, purseId) {
