@@ -75,6 +75,17 @@
 }
 
 @layer base {
+  /*
+   * Native checkboxes and radios default to 13 px. Design plan M1/A7 (WCAG 2.5.8): 24 px unless a
+   * component sizes them; :where() keeps this weaker than any component or utility rule.
+   */
+  :where(input[type="checkbox"], input[type="radio"]) {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    accent-color: var(--color-lead);
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -4860,3 +4871,10 @@ button.quest-chip { min-height: 44px; }
 .quest-map-tools { display:grid; gap:.6rem; padding-top:.6rem; border-top:1px solid var(--color-border); }
 .quest-map-item { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
 .quest-map-add, .quest-map-area { display:grid; gap:.4rem; padding:.6rem; border:1px dashed var(--color-border); border-radius:8px; }
+
+/* Inline links padded to a 24 px target (WCAG 2.5.8) without changing how they wrap. */
+.tap-link { display: inline-block; min-width: 1.5rem; min-height: 1.5rem; padding-block: .125rem; }
+
+/* Sonner's toast close button is 20 px: show 24 px and extend the hit area to 44 px. */
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button] { width: 1.5rem; height: 1.5rem; }
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]::after { content: ""; position: absolute; inset: -.625rem; }

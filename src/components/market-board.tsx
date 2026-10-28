@@ -184,7 +184,10 @@ function BuyListing({
       {error && <p role="alert">{error}</p>}
       {notice && (
         <p role="status">
-          {notice} <AppLink href="/party?section=funds">Open inventory & ledger</AppLink>
+          {notice}{" "}
+          <AppLink className="tap-link" href="/party?section=funds">
+            Open inventory & ledger
+          </AppLink>
         </p>
       )}
       {percent > 0 ? (

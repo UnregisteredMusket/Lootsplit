@@ -1,7 +1,7 @@
 import { SavedTick, useSavedTick } from "@/components/saved-tick";
 import { CharacterPlacement } from "@/components/character-placement";
 import { inParty } from "@/lib/quire/character-position";
-import { CharacterPermissions } from "@/components/character-permissions";
+import { CharacterPermissionsSheet } from "@/components/character-permissions";
 import { toast } from "sonner";
 import { Open5eBrowser } from "@/components/open5e-browser";
 import { AppLink } from "@/components/app-link";
@@ -28,7 +28,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { characterControl, type Purse } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
 import { CharacterSheetPanel } from "@/components/character-sheet";
-import { Button, Field, Modal, Segmented, TextInput } from "@/components/ui";
+import { Button, Checkbox, Field, Modal, Segmented, TextInput } from "@/components/ui";
 import { Disclosure } from "@/components/disclosure";
 import { FeatureHeader } from "@/components/feature-header";
 import { RemoveButton } from "@/components/quire-ui";
@@ -282,24 +282,22 @@ function PartyPage() {
                     >
                       Manage placement & downtime
                     </Button>
-                    <label className="flex min-h-11 items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={p.editingAllowed === true}
-                        disabled={readOnly}
-                        onChange={(e) =>
-                          void economy
-                            .command({
-                              kind: "character-editing",
-                              purseId: p.id,
-                              allowed: e.target.checked,
-                            })
-                            .catch((error) => toast.error(error.message))
-                        }
-                      />
-                      Allow character editing
-                    </label>
-                    <CharacterPermissions purse={p} />
+                    <Checkbox
+                      className="text-sm"
+                      label="Allow character editing"
+                      checked={p.editingAllowed === true}
+                      disabled={readOnly}
+                      onChange={(allowed) =>
+                        void economy
+                          .command({
+                            kind: "character-editing",
+                            purseId: p.id,
+                            allowed,
+                          })
+                          .catch((error) => toast.error(error.message))
+                      }
+                    />
+                    <CharacterPermissionsSheet purse={p} />
                     <p>
                       {live && p.sheet
                         ? `Level ${live.body.level}${live.body.classes ? ` · ${live.body.classes}` : ""}`

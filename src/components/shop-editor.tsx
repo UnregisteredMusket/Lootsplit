@@ -10,7 +10,7 @@ import { readMarketLocations } from "@/lib/quire/shop-locations";
 import { SHOP_KINDS, WEALTHS } from "@/lib/quire/labels";
 import { realmNote, scarcityNote } from "@/lib/quire/scale";
 import type { Shop, Wealth } from "@/lib/quire/types";
-import { Button, Field, Fold, Slider, TextInput } from "@/components/ui";
+import { Button, Checkbox, Field, Fold, Slider, TextInput } from "@/components/ui";
 
 type PartResult = { part: string; ok: boolean; message: string };
 
@@ -282,32 +282,26 @@ function ShelfTuning({ shop }: { shop: Shop }) {
           ))}
         </SearchSelect>
       </Field>
-      <label className="flex min-h-11 items-center gap-2">
-        <input
-          type="checkbox"
-          className="size-5"
-          checked={shop.acceptAnyCategory === true}
-          onChange={(e) => void updateShop({ ...shop, acceptAnyCategory: e.target.checked })}
-        />
-        DM exception: buy all item categories
-      </label>
+      <Checkbox
+        label="DM exception: buy all item categories"
+        checked={shop.acceptAnyCategory === true}
+        onChange={(checked) => void updateShop({ ...shop, acceptAnyCategory: checked })}
+      />
       <fieldset>
         <legend className="text-sm font-medium">Additional categories this merchant buys</legend>
         {SHOP_KINDS.filter((o) => o.value !== "mixed").map((o) => (
-          <label key={o.value} className="mr-3 inline-flex min-h-11 items-center gap-2">
-            <input
-              type="checkbox"
-              className="size-5"
-              checked={(shop.acceptedCategories || [shop.category]).includes(o.value)}
-              onChange={(e) => {
-                const categories = new Set(shop.acceptedCategories || [shop.category]);
-                if (e.target.checked) categories.add(o.value);
-                else categories.delete(o.value);
-                void updateShop({ ...shop, acceptedCategories: [...categories] });
-              }}
-            />
-            {o.label}
-          </label>
+          <Checkbox
+            key={o.value}
+            className="mr-3 inline-flex"
+            label={o.label}
+            checked={(shop.acceptedCategories || [shop.category]).includes(o.value)}
+            onChange={(checked) => {
+              const categories = new Set(shop.acceptedCategories || [shop.category]);
+              if (checked) categories.add(o.value);
+              else categories.delete(o.value);
+              void updateShop({ ...shop, acceptedCategories: [...categories] });
+            }}
+          />
         ))}
       </fieldset>
       <WealthGroup>
