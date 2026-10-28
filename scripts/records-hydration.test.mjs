@@ -17,7 +17,7 @@ test("room state with an unreadable archive hydrates without altering stored arc
   const room={code:"REPORT",revision:1,live:true,turn:0,table,
     seats:[{id:"dm",token:"dm-token",name:"DM",role:"dm",purseIds:[]}],seen:{gifts:[],sales:[]}};
   try {
-    await db.prepare("INSERT INTO campaign_rooms VALUES (?,1,?)").bind(room.code,JSON.stringify(room)).run();
+    await db.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)").bind(room.code,JSON.stringify(room)).run();
     Object.assign(globalThis,{__env__:{DB:db}});
     const view=await roomState({code:room.code,token:"dm-token"});
     const readable=readCloudTable(view.table);
@@ -49,7 +49,7 @@ test("damaged stored archives do not block shared messages, money, journal edits
   const read=async()=>hydrateRoomReports(db,room.code,JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(room.code).first()).body));
   const send=commands=>submitCommands({code:room.code,token:"dm-token",batchId:crypto.randomUUID(),commands});
   try {
-    await db.prepare("INSERT INTO campaign_rooms VALUES (?,1,?)").bind(room.code,JSON.stringify(room)).run();
+    await db.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)").bind(room.code,JSON.stringify(room)).run();
     Object.assign(globalThis,{__env__:{DB:db}});
     assert.equal(readCloudTableForImport(table),null,"An untrusted new room cannot import damaged archive data");
     await assert.rejects(openRoom({name:"Import",table}));

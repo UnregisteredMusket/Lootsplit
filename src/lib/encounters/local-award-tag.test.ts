@@ -65,7 +65,7 @@ async function shared(remainderRule: unknown) {
     table: { ...campaign(), journal: { coinSplit: { rotation: { lastPurseId: "aria" } } } },
     drafts: {},
   };
-  await db.prepare("INSERT INTO campaign_rooms VALUES (?,1,?)").bind("AWARDS", JSON.stringify(room)).run();
+  await db.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)").bind("AWARDS", JSON.stringify(room)).run();
   await db.prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)").bind("dm", "AWARDS", "dmseat", "dm-token", "Splits").run();
   const call = <T,>(path: string, body: Record<string, unknown>) => handleEncounters(db, "dm", "encounters" + path, body) as Promise<T>;
   const id = crypto.randomUUID();

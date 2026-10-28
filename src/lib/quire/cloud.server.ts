@@ -13,6 +13,9 @@ import {
   roomStorageBody,
   keepStoredBody,
   roomImageSources,
+  lookupReceipts,
+  recentAcknowledged,
+  type RoomReceipt,
 } from "./room-store.server.ts";
 import { syncTimer } from "./sync-timing.server.ts";
 import {
@@ -562,7 +565,12 @@ async function must(
   if (room.closed) throw new Error("This room is closed.");
   // Older clients may have staged a delayed copy of a committed action. Such a
   // receipt is never pending work and must not block session/turn transitions.
-  const acknowledged = new Set(room.commands ?? []);
+  const draftKeys = Object.entries(room.drafts ?? {}).flatMap(([seatId, commands]) =>
+    commands.map((command) => seatId + ":" + command.id),
+  );
+  const acknowledged = draftKeys.length
+    ? new Set((await lookupReceipts(room, "command", draftKeys)).keys())
+    : new Set<string>();
   return keepStoredBody(room, {
     ...room,
     drafts: Object.fromEntries(
@@ -636,9 +644,8 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
       pending: room.drafts?.[item.id]?.length ?? 0,
       allowParty: room.table.purses.some((p) => p.kind === "party" && item.purseIds.includes(p.id)),
     })),
-    acknowledged: (room.commands ?? [])
-      .filter((id) => id.startsWith(seat.id + ":"))
-      .map((id) => id.slice(seat.id.length + 1)),
+    // The seat's latest action IDs (bounded; a device holds at most 100 pending actions).
+    acknowledged: await recentAcknowledged(read, seat.id),
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
     table,
   });
@@ -851,8 +858,16 @@ export async function submitCommands(input: {
       refuseOldClientGroupActions(room.table, commands);
     }
     const key = seat.id + ":" + input.batchId;
+    // Receipts for this batch, its actions and the seat's staged actions (room-store.server.ts).
+    const commandReceipts = await lookupReceipts(room, "command", [
+      ...new Set([
+        ...commands.map((c) => seat.id + ":" + c.id),
+        ...(room.drafts?.[seat.id] ?? []).map((c) => seat.id + ":" + c.id),
+      ]),
+    ]);
+    const batchReceipt = await lookupReceipts(room, "batch", [key]);
     for (const command of commands) {
-      const previous = room.commandHashes?.[seat.id + ":" + command.id];
+      const previous = commandReceipts.get(seat.id + ":" + command.id);
       // Unversioned receipts retain their original validated JSON algorithm;
       // only new receipts use canonical semantics and an explicit version.
       if (
@@ -870,13 +885,13 @@ export async function submitCommands(input: {
           "Another device saved different changes for this action. Export your pending actions before retrying.",
         );
     }
-    if (room.batches?.includes(key)) {
-      const previous = room.batchHashes?.[key];
+    if (batchReceipt.has(key)) {
+      const previous = batchReceipt.get(key);
       if (
         (previous &&
           previous !== batchHash &&
           (previous.startsWith("v2:") || previous !== (await digest(JSON.stringify(commands))))) ||
-        commands.some((c) => !(room.commands ?? []).includes(seat.id + ":" + c.id))
+        commands.some((c) => !commandReceipts.has(seat.id + ":" + c.id))
       )
         throw Error(
           "This batch ID was already used for different actions. Export your pending actions before retrying.",
@@ -891,7 +906,7 @@ export async function submitCommands(input: {
       commands.every((c) => c.kind === "message" || c.kind === "loot-claim" || c.kind.startsWith("quest-"));
     if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
-    const seen = new Set(room.commands ?? []);
+    const seen = new Set(commandReceipts.keys());
     // Per-seat flood protection, messages included (room-submit-limit.ts). Message text is
     // counted once: staged or already committed messages do not count again.
     const alreadyStaged = new Set((room.drafts?.[seat.id] ?? []).map((c) => c.id));
@@ -921,7 +936,7 @@ export async function submitCommands(input: {
       drafts[seat.id] = pending;
     }
     let table = room.table;
-    const commandHashes = { ...(room.commandHashes ?? {}) };
+    const receipts: RoomReceipt[] = [];
     // Validate the entire merged draft against the authoritative table. Two
     // individually valid device queues may overspend when combined.
     const selected = new Set(seen);
@@ -943,8 +958,9 @@ export async function submitCommands(input: {
     for (const command of unapplied) {
       const key = seat.id + ":" + command.id;
       seen.add(key);
-      if (!input.stage) commandHashes[key] = hashes.get(command.id)!;
+      if (!input.stage) receipts.push({ kind: "command", key, hash: hashes.get(command.id)! });
     }
+    if (!input.stage) receipts.push({ kind: "batch", key, hash: batchHash });
     for (const report of table.journal?.reports || [])
       if (!room.table.journal?.reports?.some((r) => r.id === report.id))
         report.seatIds = room.seats.map((s) => s.id);
@@ -971,19 +987,13 @@ export async function submitCommands(input: {
         [seat.id]: allowance,
       },
       revision: room.revision + 1,
-      commands: input.stage ? room.commands : [...seen],
-      commandHashes: input.stage ? room.commandHashes : commandHashes,
-      batches: input.stage ? room.batches : [...(room.batches ?? []), key],
-      batchHashes: input.stage
-        ? room.batchHashes
-        : { ...(room.batchHashes ?? {}), [key]: batchHash },
       turn:
         !input.stage && input.endTurn && !room.live
           ? (room.turn + 1) % room.seats.length
           : room.turn,
     };
     try {
-      await updateRoom(next, room.revision);
+      await updateRoom(next, room.revision, { receipts });
       if (!input.stage) {
         const fresh = next.table.notes.filter(
           (note) => !room.table.notes.some((old) => old.id === note.id),

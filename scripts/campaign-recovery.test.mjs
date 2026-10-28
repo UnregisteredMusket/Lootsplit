@@ -128,7 +128,7 @@ async function setup(kind) {
       table,
       seen: { gifts: ["old-gift-receipt"], sales: ["old-sale-receipt"] },
     };
-  await DB.prepare("INSERT INTO campaign_rooms VALUES (?,1,?)")
+  await DB.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)")
     .bind(code, JSON.stringify(room))
     .run();
   for (const [user, seat] of [

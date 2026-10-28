@@ -563,6 +563,9 @@ sql.exec(
   readFileSync(new URL("../../../cloudflare/migrations/0001_campaign_rooms.sql", import.meta.url), "utf8"),
 );
 sql.exec(
+  readFileSync(new URL("../../../cloudflare/migrations/0024_campaign_room_receipts.sql", import.meta.url), "utf8"),
+);
+sql.exec(
   readFileSync(
     new URL("../../../cloudflare/migrations/0002_web_push.sql", import.meta.url),
     "utf8",

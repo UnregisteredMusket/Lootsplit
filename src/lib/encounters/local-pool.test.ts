@@ -66,7 +66,7 @@ async function shared(options: { fail?: boolean; fund?: boolean } = {}) {
     table: { ...campaign(options.fund ?? true), journal: {} },
     drafts: {},
   };
-  await db.prepare("INSERT INTO campaign_rooms VALUES (?,1,?)").bind("POOLS", JSON.stringify(room)).run();
+  await db.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)").bind("POOLS", JSON.stringify(room)).run();
   await db.prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)").bind("dm", "POOLS", "dmseat", "dm-token", "Pools").run();
   const call = <T,>(path: string, body: Record<string, unknown>) => handleEncounters(db, "dm", "encounters" + path, body) as Promise<T>;
   const id = crypto.randomUUID();

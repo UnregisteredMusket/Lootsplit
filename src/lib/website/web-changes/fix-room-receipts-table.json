@@ -1,0 +1,9 @@
+{
+  "title": "Long-running campaigns keep saving",
+  "summary": "Shared campaigns no longer slowly fill up with the server's record of past actions, so they can't reach the online size limit just by being played for a long time.",
+  "items": [
+    "The record that stops a retried action counting twice is now stored beside the campaign instead of inside it, and it is kept for the life of the campaign.",
+    "A campaign that had already reached the limit this way saves again on its next change, and the DM can end the session as usual.",
+    "Nothing is deleted: every past action stays protected against being applied twice."
+  ]
+}
