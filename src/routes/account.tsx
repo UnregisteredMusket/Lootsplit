@@ -1,4 +1,5 @@
 import { filterAccountCampaigns } from "@/lib/account/campaign-library";
+import { membershipDisplayName } from "@/lib/quire/campaign-name";
 import { confirmContextChange, useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { roomLifecycleLabels } from "@/lib/quire/room-state";
 import { BackupPreview } from "@/components/account/backup-preview";
@@ -528,7 +529,7 @@ function Account() {
                         <span className="portal-eyebrow">
                           {m.archived ? "ARCHIVED" : "SHARED CAMPAIGN"} · {m.code}
                         </span>
-                        <h3>{m.name}</h3>
+                        <h3>{membershipDisplayName(m)}</h3>
                         <p className="account-room-state">
                           {roomLifecycleLabels(m).mode} · {roomLifecycleLabels(m).play}
                         </p>

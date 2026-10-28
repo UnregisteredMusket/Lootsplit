@@ -1,0 +1,9 @@
+{
+  "title": "Phones turned sideways, and a title screen that knows your campaign",
+  "summary": "On a phone in landscape the app gives most of the screen to the page, and the title screen offers to continue the campaign you last opened.",
+  "items": [
+    "In phone landscape the section tabs become a 56 px icon rail on the left, and the header slides away while you scroll down and comes back when you scroll up.",
+    "The title screen says \"Tap to continue\" on touch screens and shows \"Continue · <campaign> · Session N\" for the campaign you last opened on this device.",
+    "The Campaigns dialog lists your other campaigns by when you last opened them, with the time and session."
+  ]
+}

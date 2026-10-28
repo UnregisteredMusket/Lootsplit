@@ -1,4 +1,6 @@
 import { activeCampaignId } from "./campaign-context.ts";
+import { roomCampaignName } from "./campaign-name.ts";
+import { getCampaigns } from "./campaigns.ts";
 import type { EconomyMutationOutcome } from "./mutation-outcome.ts";
 import { captureDeviceMutationScope, type DeviceMutationScope } from "./mutation-scope.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
@@ -11,6 +13,7 @@ import {
   joinCloudTable,
   openCloudTable,
   previewCloudTable,
+  nameCloudRoom,
   pullCloudTable,
   pollCloudTable,
   setCloudPace,
@@ -79,6 +82,8 @@ const initialView = {
   departed: [] as NonNullable<RoomView["departed"]>,
   testMode: false,
   viewOnly: false,
+  /** The DM's name for the shared campaign ("" when unnamed); campaign-name.ts shows it. */
+  campaignName: "",
   encounterActive: undefined as boolean | undefined,
   revision: 0,
   seatId: "",
@@ -574,6 +579,8 @@ async function accept(value: RoomView, committed = false) {
       departed: remote.departed || [],
       testMode: remote.testMode === true,
       viewOnly: remote.viewOnly === true,
+      // The server stores a cleaned name (campaign-name.ts); absent means unnamed.
+      campaignName: typeof remote.campaignName === "string" ? remote.campaignName : "",
       encounterActive: remote.encounterActive,
       seatId: remote.seatId,
       revision: remote.revision,
@@ -722,9 +729,40 @@ export function captureDeviceBackup() {
     return snapshot();
   });
 }
+/** The campaign name the DM's device would send to this room (undefined: a device default). */
+function deviceCampaignName(): string | undefined {
+  const { campaigns, activeId } = getCampaigns();
+  return roomCampaignName(campaigns.find((c) => c.id === activeId)?.name);
+}
+let namingRoom = "";
+/**
+ * Rooms opened before names travelled, or a campaign renamed while in Local Mode, get the DM
+ * device's current name once the DM's seat has read the room (shell effect). One try per name
+ * and room in this tab; naming is cosmetic, so a failure leaves the "Shared campaign · CODE"
+ * fallback and is not surfaced.
+ */
+export function syncRoomCampaignName() {
+  const s = session();
+  if (!s || s.role !== "dm" || !view.joined || view.code !== s.code || !view.lastSync) return;
+  const wanted = deviceCampaignName();
+  if (!wanted || wanted === view.campaignName) return;
+  const attempt = `${s.code}:${wanted}`;
+  if (namingRoom === attempt) return;
+  namingRoom = attempt;
+  void serial(async () => {
+    const current = session();
+    if (!current || current.role !== "dm" || current.code !== s.code) return;
+    await accept(
+      await nameCloudRoom({
+        data: { tabletopProtocol: 10, code: current.code, token: current.token, campaignName: wanted },
+      }),
+    );
+  }).catch(() => {});
+}
 export async function openTable(name: string) {
+  const campaignName = deviceCampaignName();
   const opened = await openCloudTable({
-    data: { name, table: await economySnapshot() },
+    data: { name, table: await economySnapshot(), ...(campaignName ? { campaignName } : {}) },
   });
   remember({
     ...opened,

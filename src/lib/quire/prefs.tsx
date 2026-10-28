@@ -4,6 +4,7 @@ import { useEconomy } from "./economy-context.tsx";
 import { formatDollars } from "./money.ts";
 import { useSeat } from "./seat.tsx";
 import { dollarsChoiceFrom, dollarsShown, markDollarsChoice, modernDollarText } from "./dollar-prefs.ts";
+import { syncStatusBar } from "../mobile/status-bar.ts";
 import { applyTheme, DEFAULT_ACCENT, DEFAULT_GROUND, type Appearance } from "./theme.ts";
 import type { Wealth } from "./types.ts";
 
@@ -168,6 +169,7 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     applyTheme(prefs.appearance, prefs.accent, prefs.ground);
+    syncStatusBar(prefs.appearance); // Android: dark icons on light themes (design M3).
   }, [prefs.appearance, prefs.accent, prefs.ground]);
 
   useEffect(() => {

@@ -170,7 +170,7 @@ function DmDeskContents() {
     <div className="dm-control-panel swipe-dm-desk">
       <div className="desk-readouts">
         <div className="panel-heading">
-          <h1>Campaign control</h1>
+          <h1>Desk</h1>
           <Guide />
         </div>
         <DeskGroupsGlance />

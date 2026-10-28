@@ -11,6 +11,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useNumberDraft } from "@/lib/quire/use-number-draft";
+import { CopperField } from "./finance-input";
 import { mutationNotice, type EconomyMutationOutcome } from "@/lib/quire/mutation-outcome";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { formatCopper } from "@/lib/quire/money";
@@ -1029,7 +1030,7 @@ function StaffContractEditor({ contract: before }: { contract: Estate["staff"][n
             onChange={(e) => patch({ role: e.target.value })}
           />
         </Field>
-        <NumberField
+        <CopperField
           label="Contract wage (copper)"
           value={contract.wageCopper}
           set={(wageCopper) => patch({ wageCopper })}
@@ -1062,7 +1063,7 @@ function StaffContractEditor({ contract: before }: { contract: Estate["staff"][n
             ),
           )}
         </div>
-        <NumberField
+        <CopperField
           label="Manager spending cap (copper)"
           value={contract.budgetCopper}
           set={(budgetCopper) => patch({ budgetCopper })}
@@ -1182,7 +1183,7 @@ function Staff({ holding: h, state }: { holding: Holding; state: Estate }) {
         <Field label="Staff role">
           <TextInput required value={role} onChange={(e) => setRole(e.target.value)} />
         </Field>
-        <NumberField label="Wage (copper per period)" value={wage} set={setWage} />
+        <CopperField label="Wage (copper per period)" value={wage} set={setWage} />
         <NumberField
           label="Wage period (campaign days)"
           value={period}
@@ -1219,7 +1220,7 @@ function Staff({ holding: h, state }: { holding: Holding; state: Estate }) {
                 />
               ))}
             </div>
-            <NumberField label="Manager spending cap (copper)" value={budget} set={setBudget} />
+            <CopperField label="Manager spending cap (copper)" value={budget} set={setBudget} />
             <NumberField
               label="Spending cap period (campaign days)"
               value={budgetPeriod}
@@ -1288,12 +1289,12 @@ function Rental({
         checked={rent.active}
         set={(active) => patch({ active })}
       />
-      <NumberField
+      <CopperField
         label="Rent income (copper)"
         value={rent.incomeCopper}
         set={(incomeCopper) => patch({ incomeCopper })}
       />
-      <NumberField
+      <CopperField
         label="Separate upkeep (copper)"
         value={rent.upkeepCopper}
         set={(upkeepCopper) => patch({ upkeepCopper })}
@@ -1360,7 +1361,7 @@ function SupplierTerms({ supplier }: { supplier: Estate["suppliers"][number] }) 
           max={3650}
           set={(deliveryDays) => setDraft({ ...draft, deliveryDays })}
         />
-        <NumberField
+        <CopperField
           label="Delivery fee (copper per shipment)"
           value={draft.deliveryCopper}
           set={(deliveryCopper) => setDraft({ ...draft, deliveryCopper })}
@@ -1488,7 +1489,7 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
               max={3650}
               set={setDays}
             />
-            <NumberField label="Delivery fee (copper per shipment)" value={fee} set={setFee} />
+            <CopperField label="Delivery fee (copper per shipment)" value={fee} set={setFee} />
             <NumberField
               label="Authoritative weight per item"
               value={weight}
@@ -1743,7 +1744,7 @@ function OrderFields({
             max={100000}
             set={(quantity) => set({ ...value, quantity })}
           />
-          <NumberField
+          <CopperField
             label={
               value.direction === "buy"
                 ? "Maximum purchase price per unit (cp)"
@@ -1850,7 +1851,7 @@ function Correspondence({ holding: h, state }: { holding: Holding; state: Estate
           </SearchSelect>
         </Field>
         <OrderFields holding={h} state={state} value={order} set={setOrder} />
-        <NumberField label="Maximum order spend (copper)" value={budget} set={setBudget} />
+        <CopperField label="Maximum order spend (copper)" value={budget} set={setBudget} />
       </ActionForm>
       {state.standingOrders
         .filter((o) => o.propertyId === h.id)
@@ -1910,7 +1911,7 @@ function Correspondence({ holding: h, state }: { holding: Holding; state: Estate
             </SearchSelect>
           </Field>
           <OrderFields holding={h} state={state} value={order} set={setOrder} />
-          <NumberField label="Order spending cap (copper)" value={budget} set={setBudget} />
+          <CopperField label="Order spending cap (copper)" value={budget} set={setBudget} />
           <NumberField
             label="Repeat interval (campaign days)"
             value={period}
@@ -2276,7 +2277,7 @@ export function TemplateWorkshop({
                 })
               }
             />
-            <NumberField
+            <CopperField
               label={`${r.role}: default wage (copper)`}
               value={r.wageCopper}
               set={(wageCopper) =>
@@ -2405,7 +2406,7 @@ function RecipeBuilder({ template, state }: { template: EstateTemplate; state: E
         <TextInput required value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
       <NumberField label="Required full labor days" value={days} min={1} max={1e9} set={setDays} />
-      <NumberField label="Full contractor labor cost (copper)" value={cost} set={setCost} />
+      <CopperField label="Full contractor labor cost (copper)" value={cost} set={setCost} />
       <Field label="Completed building / upgrade template">
         <SearchSelect value={result} onValueChange={(selectedValue) => setResult(selectedValue)}>
           <option value="">No attached building result</option>
@@ -2445,7 +2446,7 @@ function RecipeBuilder({ template, state }: { template: EstateTemplate; state: E
             max={1e9}
             set={setOutputQuantity}
           />
-          <NumberField
+          <CopperField
             label="Produced item value (copper each)"
             value={outputValue}
             set={setOutputValue}
@@ -2484,7 +2485,7 @@ function PostalSettings({ state }: { state: Estate }) {
         title="Postal rules"
         command={() => ({ kind: "estate-postal", before: state.postal, postal })}
       >
-        <NumberField
+        <CopperField
           label="Postage per letter (copper)"
           value={postal.feeCopper}
           set={(feeCopper) => setPostal((p) => ({ ...p, feeCopper }))}

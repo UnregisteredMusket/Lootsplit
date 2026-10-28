@@ -206,7 +206,7 @@ export async function waitForDmCampaign(page) {
   // The legitimate first-use guide appears after a short animation delay. Wait
   // for the resumed desk, then answer the actual offer before querying roles
   // hidden by the modal. Do not race an immediate isVisible() check.
-  await expect(page.getByText("Campaign control", { exact: true })).toBeAttached();
+  await expect(page.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toBeAttached();
   if (await page.evaluate(() => !localStorage.getItem("quire.guide.offer.v3"))) {
     await page.getByRole("button", { name: "Not now", exact: true }).click();
   }

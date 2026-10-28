@@ -154,6 +154,19 @@ try {
     await coinPrincipal.fill("10 gp");
     assert.equal(await principal.inputValue(), "1000");
     await principal.fill("1100");
+    // Design plan D8: the copper field echoes the amount in gold as it is typed.
+    await principal
+      .locator("..")
+      .locator("..")
+      .getByText("= 11 gp", { exact: true })
+      .waitFor();
+    await principal.fill("2500000");
+    await principal
+      .locator("..")
+      .locator("..")
+      .getByText("= 25,000 gp", { exact: true })
+      .waitFor();
+    await principal.fill("1100");
     assert.equal(
       await page.getByLabel("Principal (cp) with coin denominations", { exact: true }).inputValue(),
       "",

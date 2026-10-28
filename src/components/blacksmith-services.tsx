@@ -26,6 +26,7 @@ import type { CloudTable } from "@/lib/quire/cloud";
 import { CommandForm, CommandButton } from "./world-tools";
 import { SearchSelect } from "./search-select";
 import { Button, Fold } from "./ui";
+import { CopperField } from "./finance-input";
 import { AppLink } from "./app-link";
 
 export function BlacksmithServices({ shop, purseId }: { shop: Shop; purseId: string }) {
@@ -311,19 +312,23 @@ function SmithEditor({
           ["engravingCopper", "Engraving price (cp)"],
           ["engravingDays", "Engraving work days"],
         ] as const
-      ).map(([key, label]) => (
-        <label key={key}>
-          {label}
-          <input
-            type="number"
-            min={key === "timeMultiplier" ? 0.01 : 0}
-            step={key.endsWith("Multiplier") ? 0.01 : 1}
-            aria-label={label}
-            value={draft[key]}
-            onChange={(e) => change({ [key]: Number(e.target.value) })}
-          />
-        </label>
-      ))}
+      ).map(([key, label]) =>
+        key === "engravingCopper" ? (
+          <CopperField key={key} label={label} value={draft[key]} set={(n) => change({ [key]: n })} />
+        ) : (
+          <label key={key}>
+            {label}
+            <input
+              type="number"
+              min={key === "timeMultiplier" ? 0.01 : 0}
+              step={key.endsWith("Multiplier") ? 0.01 : 1}
+              aria-label={label}
+              value={draft[key]}
+              onChange={(e) => change({ [key]: Number(e.target.value) })}
+            />
+          </label>
+        ),
+      )}
       <label>
         Craftsmanship description
         <textarea
@@ -379,16 +384,11 @@ function SmithEditor({
                 onChange={(e) => update({ rarityMultiplier: Number(e.target.value) })}
               />
             </label>
-            <label>
-              {m.name} base unit value (cp)
-              <input
-                type="number"
-                min={0}
-                aria-label={`${m.name} base unit value (cp)`}
-                value={m.unitCopper}
-                onChange={(e) => update({ unitCopper: Number(e.target.value) })}
-              />
-            </label>
+            <CopperField
+              label={`${m.name} base unit value (cp)`}
+              value={m.unitCopper}
+              set={(unitCopper) => update({ unitCopper })}
+            />
             <label>
               <input
                 type="checkbox"
@@ -453,18 +453,27 @@ function SmithEditor({
                 ["valueCopper", "added item value (cp)"],
                 ["days", "work days"],
               ] as const
-            ).map(([key, label]) => (
-              <label key={key}>
-                {e.name} {label}
-                <input
-                  type="number"
-                  min={0}
-                  aria-label={`${e.name} ${label}`}
+            ).map(([key, label]) =>
+              key === "days" ? (
+                <label key={key}>
+                  {e.name} {label}
+                  <input
+                    type="number"
+                    min={0}
+                    aria-label={`${e.name} ${label}`}
+                    value={e[key]}
+                    onChange={(v) => update({ [key]: Number(v.target.value) })}
+                  />
+                </label>
+              ) : (
+                <CopperField
+                  key={key}
+                  label={`${e.name} ${label}`}
                   value={e[key]}
-                  onChange={(v) => update({ [key]: Number(v.target.value) })}
+                  set={(n) => update({ [key]: n })}
                 />
-              </label>
-            ))}
+              ),
+            )}
             <label>
               {e.name} effect description
               <textarea

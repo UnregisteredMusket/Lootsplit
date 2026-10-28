@@ -1,5 +1,5 @@
 export const shortcutDestinations = [
-  ...[["bank","Bank","coins"],["finances","My Finances","coins"],["properties","Properties","store"],["downtime","Downtime","scroll"],["financial","Financial Settings","coins"],["reports","Review Reports","book"],["review","Review Inbox","gift"],["journal","Journal","scroll"],["shops","Shop Management","store"]].map(([id,label,icon])=>({id,label,icon,href:`/features/${id}`})),
+  ...[["bank","Bank","coins"],["finances","My Finances","coins"],["properties","Properties","store"],["downtime","Time & downtime","scroll"],["financial","Financial Settings","coins"],["reports","Review Reports","book"],["review","Review Inbox","gift"],["journal","Journal","scroll"],["shops","Shop schedules","store"]].map(([id,label,icon])=>({id,label,icon,href:`/features/${id}`})),
   {id:"character",label:"Character Sheet",href:"/?view=sheet",icon:"users"},
   {
     id: "encounter",

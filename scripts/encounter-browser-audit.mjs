@@ -160,7 +160,7 @@ try {
     .click();
   await p.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(p);
-  await p.getByText("Campaign control", { exact: true }).waitFor();
+  await p.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   await openApplication(p, origin + "/encounters");
   await chooseOption(p.getByLabel("Save in", { exact: true }), code);
   await p.getByRole("button", { name: "New encounter", exact: true }).click();
@@ -419,7 +419,7 @@ try {
   const warningsBefore = (await p.evaluate(() => window.__themedDialogs?.log ?? [])).length;
   // The campaign's ordinary session card also reaches this exact entry.
   await p.getByRole("link", { name: "Return to Desk", exact: true }).click();
-  await p.getByText("Campaign control", { exact: true }).waitFor();
+  await p.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   const draftWarnings = (await p.evaluate(() => window.__themedDialogs?.log ?? [])).slice(
     warningsBefore,
   );

@@ -21,6 +21,7 @@ import { characterPosition } from "@/lib/quire/character-position";
 import { formatCopper } from "@/lib/quire/money";
 import type { Holding } from "@/lib/quire/types";
 import { ActionForm, NumberField, useEstateTable } from "./property-operations";
+import { CopperField } from "./finance-input";
 import { ReviewCard, useReviewStubs, type ReviewDecision, type SavedReasons } from "./review-card";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { Button, Field, Fold, Select, TextArea, TextInput } from "./ui";
@@ -267,15 +268,24 @@ function ShipSettings({ holding: h, before }: { holding: Holding; before: Vessel
           ["repairCopperPerHp", "Full contractor repair cost per HP (cp)"],
           ["repairHpPerDay", "HP repaired per full worker day"],
         ] as const
-      ).map(([key, label]) => (
-        <NumberField
-          key={key}
-          label={label}
-          value={draft[key]}
-          min={key === "repairHpPerDay" ? 1 : 0}
-          set={(n) => set((d) => ({ ...d, [key]: n }))}
-        />
-      ))}
+      ).map(([key, label]) =>
+        key === "repairHpPerDay" ? (
+          <NumberField
+            key={key}
+            label={label}
+            value={draft[key]}
+            min={1}
+            set={(n) => set((d) => ({ ...d, [key]: n }))}
+          />
+        ) : (
+          <CopperField
+            key={key}
+            label={label}
+            value={draft[key]}
+            set={(n) => set((d) => ({ ...d, [key]: n }))}
+          />
+        ),
+      )}
       <Field label="Defenses">
         <TextArea
           value={draft.stats.defenses}
@@ -859,7 +869,7 @@ function VoyageForm({ holding: h, vessel: s }: { holding: Holding; vessel: Vesse
           />
         </>
       )}
-      <NumberField label="Maximum travel budget (cp)" value={budget} set={setBudget} />
+      <CopperField label="Maximum travel budget (cp)" value={budget} set={setBudget} />
       <Field label="Voyage payer">
         <SearchSelect aria-label="Voyage payer" value={payerId} onValueChange={setPayer}>
           {mine.map((p) => (
@@ -1142,7 +1152,7 @@ function FacilityEditor({ before }: { before: ShipFacility | null }) {
           ["yardCopper", "Shipyard storage per day (cp)"],
         ] as const
       ).map(([key, label]) => (
-        <NumberField
+        <CopperField
           key={key}
           label={label}
           value={draft[key]}

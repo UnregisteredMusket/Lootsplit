@@ -212,6 +212,8 @@ function PlayerInitiative({ map }: { map: CampaignMap }) {
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const [state, setState] = useState<{ order: MapCombatOrder | null; error?: string }>();
   useEffect(() => {
+    // A different map: never show the previous map's order while the next one loads.
+    setState(undefined);
     if (!cloud.joined) return;
     let cancelled = false,
       timer: ReturnType<typeof setTimeout>;

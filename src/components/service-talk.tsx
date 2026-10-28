@@ -755,14 +755,14 @@ export function useServiceTalk({
           await send({ kind: "service-cancel", orderId: w.id, before: w }, `${w.id}-cancel`, () => undefined);
         },
       });
-    // Trainer: open lessons are logged in Downtime & NPC training.
+    // Trainer: open lessons are logged in Time & downtime.
     for (const l of services.orders.filter(
       (o) => o.providerId === provider.id && o.terms.lessons?.pupilId === purseId && o.status === "active",
     ))
       replies.push({
         tag: <>Log a session · {l.terms.lessons!.topic} ↗</>,
         text: "When can we start?",
-        sub: "Opens Downtime & NPC training with these lessons selected.",
+        sub: "Opens Time & downtime with these lessons selected.",
         href: `/features/downtime?lesson=${encodeURIComponent(l.id)}#paid-lessons`,
       });
     const lock = providerLock(table, provider, purseId);
@@ -908,7 +908,7 @@ export function useServiceTalk({
       sub: coach
         ? "Appears in the DM's Review Inbox as a journey request with a coach fare line."
         : lessons
-        ? "Adds the lessons to Downtime & NPC training. Log sessions there after the DM approves downtime."
+        ? "Adds the lessons to Time & downtime. Log sessions there after the DM approves downtime."
         : letter && !review
           ? "One payment. The letter travels only with DM-approved downtime."
         : review

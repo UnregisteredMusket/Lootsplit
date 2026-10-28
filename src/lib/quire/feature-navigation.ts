@@ -5,7 +5,8 @@ export const featureScreens = {
   time: { title: "Session Time", dm: true },
   bank: { title: "Bank", dm: false },
   finances: { title: "My Finances", dm: false },
-  downtime: { title: "Downtime", dm: false },
+  /** Glossary (design plan): "Time & downtime" (was "Downtime"); the route stays /features/downtime. */
+  downtime: { title: "Time & downtime", dm: false },
   financial: { title: "Financial Settings", dm: true },
   properties: { title: "Property Management", dm: false },
   reports: { title: "Review Reports", dm: true },
@@ -13,7 +14,8 @@ export const featureScreens = {
   journal: { title: "Journal", dm: false },
   /** Owner decision D1: "Quests" for the DM, "Quest log" for players. */
   quests: { title: "Quests", playerTitle: "Quest log", dm: false },
-  shops: { title: "Shop Management", dm: true },
+  /** Glossary: "Shop schedules" (was "Shop Management"; shops themselves are run from Market). */
+  shops: { title: "Shop schedules", dm: true },
   music: { title: "Music & Ambience", dm: true },
 };
 export type Feature = keyof typeof featureScreens;

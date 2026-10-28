@@ -10,8 +10,7 @@ import { SEASON_NAMES } from "../src/lib/quire/scale.ts";
 import {
   openApplication,
   reloadApplication,
-  navigateApplication,
-} from "./title-screen-navigation.mjs";
+  navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { readFileSync } from "node:fs";
@@ -591,6 +590,7 @@ async function reversalAndPlayerViews(page, width) {
     .getByRole("combobox", { name: "Choose your character", exact: true })
     .selectOption("a");
   await player.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(player);
   await player.getByText("You joined as a player", { exact: true }).waitFor();
   await navigateApplication(player, origin + "/features/economy");
   const playerExchange = player.getByRole("region", { name: "Harbor Exchange", exact: true });

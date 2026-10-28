@@ -1,3 +1,4 @@
+import { roomCampaignName } from "../quire/campaign-name";
 import { reloadCampaignContext } from "../quire/navigation-launch.ts";
 import { getCampaigns, createCampaign } from "../quire/campaigns";
 import { getSeat } from "../quire/table";
@@ -49,10 +50,12 @@ export async function saveAccountBackup() {
 export async function linkCurrentCampaign() {
   const credentials = await prepareAccountMembership();
   const state = getCampaigns();
-  await accountRequest("link", {
-    ...credentials,
-    name: state.campaigns.find((c) => c.id === state.activeId)?.name || "Campaign",
-  });
+  const cloud = getCloudTable();
+  const deviceName = state.campaigns.find((c) => c.id === state.activeId)?.name || "Campaign";
+  // A player's library entry takes the DM's campaign name when the room has one; otherwise
+  // (and for the DM) the device campaign's name, as before.
+  const roomName = cloud.joined && cloud.role === "player" ? roomCampaignName(cloud.campaignName) : undefined;
+  await accountRequest("link", { ...credentials, name: roomName ?? deviceName });
 }
 export async function restoreAccountBackup(id: string, name: string) {
   if (getCloudTable().joined || hasPendingChanges() || getSeat().role !== "dm")

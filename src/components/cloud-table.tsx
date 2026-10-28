@@ -1,6 +1,6 @@
 import { activeCampaignId } from "../lib/quire/campaign-context.ts";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { Copy, Crown, DoorOpen, Radio, Users, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
@@ -37,10 +37,15 @@ import { Button, TextInput, Confirm, Field, Fold } from "@/components/ui";
 import { rememberSave } from "@/lib/quire/saves";
 import { loadSeatLock } from "@/lib/quire/lock";
 import { roomStatusLabels } from "@/lib/quire/room-state";
+import { offerJoinTips, recalledJoinName, rememberJoinName } from "@/lib/quire/join-memory";
+import { roomCampaignName, sharedCampaignFallback } from "@/lib/quire/campaign-name";
+import { useCampaignDisplayName } from "@/lib/quire/use-campaign-name";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 import { requestConfirm, requestPrompt } from "@/lib/quire/confirm-store";
 
 type Mode = "local" | "turns" | "live";
+
+const validCode = (value: string) => /^[A-Z0-9]{4,12}(\.[a-f0-9-]{36})?$/i.test(value);
 
 export function CloudTable() {
   const router = useRouter();
@@ -54,8 +59,16 @@ export function CloudTable() {
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
   const [code, setCode] = useState("");
+  // "Your name" is remembered on this device between joins (a per-viewer convenience).
   const [name, setName] = useState("");
+  useEffect(() => setName((current) => current || recalledJoinName()), []);
   const [characters, setCharacters] = useState<{ id: string; name: string }[]>([]);
+  // The DM's campaign name from the lookup (not private): "Joining The Wayfarers".
+  const [joinCampaign, setJoinCampaign] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const nameFieldId = useId();
+  const codeFieldId = useId();
   const [purseId, setPurseId] = useState("");
   const [busy, setBusy] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -73,6 +86,7 @@ export function CloudTable() {
   const [leaving, setLeaving] = useState(false);
   const [keepOnline, setKeepOnline] = useState(false);
   const host = cloud.joined && cloud.role === "dm";
+  const campaignName = useCampaignDisplayName();
   // Restored credentials arrive before the authoritative session mode/invitation.
   const unavailable = busy || !online || (cloud.joined && cloud.lastSync === 0);
   const savedRooms = hostAccount?.members.filter((m) => !m.archived && m.role) || [];
@@ -126,6 +140,34 @@ export function CloudTable() {
       setHosting(false);
     }
   }, [invitation, invitedCharacter, invitationToken, invitationSession, cloud.joined]);
+
+  async function findCharacters(target: string) {
+    const requestedSearch = window.location.search;
+    const found = await lookupTable(target, target === invitation ? invitationSession : undefined);
+    if (window.location.search !== requestedSearch) return;
+    if (!found || !Array.isArray(found.characters))
+      throw new Error("Could not load this room. Try again.");
+    const preferred = target === invitation ? invitedCharacter : "";
+    if (preferred && !found.characters.some((c) => c.id === preferred))
+      throw new Error("The invited character is unavailable. Ask the DM to release it or send a new invitation.");
+    setCharacters(found.characters);
+    setJoinCampaign(
+      roomCampaignName(found.campaignName) ?? sharedCampaignFallback(target.split(".")[0]!.toUpperCase()),
+    );
+    setPurseId(preferred || found.characters[0]?.id || "");
+    setLookedUp(true);
+  }
+
+  // A join link looks up its characters at once (plan Q15): no extra "Find characters" tap.
+  const autoLookup = joining && !!invitation && code === invitation && !lookedUp && !cloud.joined && online;
+  const [looked, setLooked] = useState("");
+  useEffect(() => {
+    const key = `${invitation}|${invitationSession}|${invitedCharacter}`;
+    if (!autoLookup || looked === key || busy) return;
+    setLooked(key);
+    run(() => findCharacters(invitation));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per invitation link
+  }, [autoLookup, busy, invitation, invitationSession, invitedCharacter]);
 
   function dismissInvitation() {
     const next = router.options.parseSearch!(window.location.search);
@@ -451,80 +493,43 @@ export function CloudTable() {
                 <ArrowLeft size={16} />
                 Back
               </Button>
-              <h2 className="mt-3 text-3xl">Join your party</h2>
-              <p className="mt-2 text-sm text-muted">Enter code → Choose character → Join</p>
-              <form
-                className="mt-5 space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  run(async () => {
-                    const requestedSearch = window.location.search;
-                    const found = await lookupTable(code, code === invitation ? invitationSession : undefined);
-                    if (window.location.search !== requestedSearch) return;
-                    if (!found || !Array.isArray(found.characters))
-                      throw new Error("Could not load this room. Try again.");
-                    const preferred = code === invitation ? invitedCharacter : "";
-                    if (preferred && !found.characters.some((c) => c.id === preferred))
-                      throw new Error("The invited character is unavailable. Ask the DM to release it or send a new invitation.");
-                    setCharacters(found.characters);
-                    setPurseId(preferred || found.characters[0]?.id || "");
-                    setLookedUp(true);
-                  });
-                }}
-              >
-                <Field label="Room code">
-                  <TextInput
-                    disabled={busy}
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={code}
-                    maxLength={64}
-                    onChange={(event) => {
-                      setCode(event.target.value.replace(/[^a-zA-Z0-9.-]/g, ""));
-                      setCharacters([]);
-                      setLookedUp(false);
-                    }}
-                    placeholder="Enter your code"
-                  />
-                </Field>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  variant="secondary"
-                  disabled={unavailable || !/^[A-Z0-9]{4,12}(\.[a-f0-9-]{36})?$/i.test(code)}
-                >
-                  {busy ? "Please wait…" : "Find characters"}
-                </Button>
-              </form>
-              {lookedUp && characters.length === 0 ? (
-                <p className="mt-4 text-muted" role="status">
-                  No characters are available. Ask the host to add a character or release one
-                  already assigned.
-                </p>
-              ) : null}
+              <h2 className="mt-3 text-3xl">
+                {lookedUp && joinCampaign ? `Joining ${joinCampaign}` : "Join your party"}
+              </h2>
+              <p className="mt-2 text-sm text-muted">
+                {lookedUp && characters.length
+                  ? "Choose your character, then join."
+                  : invitation && busy
+                    ? "Finding the characters in this room…"
+                    : "Enter code → Choose character → Join"}
+              </p>
               {characters.length > 0 ? (
                 <form
-                  className="mt-5 space-y-4 border-t border-lead/25 pt-5"
+                  className="mt-5 space-y-4"
+                  noValidate
+                  aria-label="Join room"
                   onSubmit={(event) => {
                     event.preventDefault();
+                    if (!name.trim()) {
+                      setNameError("Enter the name the party should call you.");
+                      document.getElementById(nameFieldId)?.focus();
+                      return;
+                    }
+                    if (!purseId) return;
+                    const character = characters.find((c) => c.id === purseId)?.name || "your character";
                     run(async () => {
                       const requestedSearch = window.location.search;
-                      await joinTable(code, purseId, name, code === invitation ? invitationToken || undefined : undefined, code === invitation ? invitationSession : undefined);
+                      await joinTable(code, purseId, name.trim(), code === invitation ? invitationToken || undefined : undefined, code === invitation ? invitationSession : undefined);
+                      rememberJoinName(name.trim());
                       setJoining(false);
-                      if (window.location.search === requestedSearch) await dismissInvitation();
-                    }, `You joined room ${code}.`);
+                      // Land on Home with a short tip strip (plan P3, Q16); the Room tab stays one tap away.
+                      offerJoinTips();
+                      toast.success(`You're playing ${character}`);
+                      if (window.location.search === requestedSearch)
+                        await router.navigate({ to: "/", search: { view: "home" }, replace: true });
+                    });
                   }}
                 >
-                  <Field label="Your name">
-                    <TextInput
-                      disabled={busy}
-                      value={name}
-                      maxLength={80}
-                      onChange={(event) => setName(event.target.value)}
-                      placeholder="What should the party call you?"
-                    />
-                  </Field>
                   <Field label="Choose your character">
                     <select
                       aria-label="Choose your character"
@@ -540,18 +545,92 @@ export function CloudTable() {
                       ))}
                     </select>
                   </Field>
-                  <p className="text-sm text-muted">
-                    Guest campaign data stays in memory. Refreshing can reconnect while the room stays open. Ending play can leave viewing access; closing the room revokes access. An existing DM device campaign is preserved separately.
-                  </p>
+                  <Field label="Your name">
+                    <TextInput
+                      id={nameFieldId}
+                      disabled={busy}
+                      value={name}
+                      maxLength={80}
+                      autoComplete="nickname"
+                      aria-invalid={nameError ? true : undefined}
+                      aria-describedby={nameError ? `${nameFieldId}-error` : undefined}
+                      onChange={(event) => {
+                        setName(event.target.value);
+                        if (event.target.value.trim()) setNameError("");
+                      }}
+                      placeholder="What should the party call you?"
+                    />
+                  </Field>
+                  {nameError ? (
+                    <p id={`${nameFieldId}-error`} className="field-error text-sm text-negative" role="alert">
+                      {nameError}
+                    </p>
+                  ) : null}
                   <Button
                     type="submit"
                     className="w-full min-h-12"
-                    disabled={unavailable || !purseId || !name.trim()}
+                    disabled={unavailable || !purseId}
                   >
                     {busy ? "Joining…" : "Join room"}
                   </Button>
+                  <p className="text-sm text-muted">
+                    Guest campaign data stays in memory. Refreshing can reconnect while the room stays open. Ending play can leave viewing access; closing the room revokes access. An existing DM device campaign is preserved separately.
+                  </p>
                 </form>
               ) : null}
+              {lookedUp && characters.length === 0 ? (
+                <p className="mt-4 text-muted" role="status">
+                  No characters are available. Ask the host to add a character or release one
+                  already assigned.
+                </p>
+              ) : null}
+              <form
+                className={characters.length > 0 ? "join-code-row mt-5 space-y-3 border-t border-lead/25 pt-5" : "mt-5 space-y-3"}
+                noValidate
+                aria-label="Room code"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!validCode(code)) {
+                    setCodeError(
+                      code.trim()
+                        ? "Room codes have 4 to 12 letters and numbers, as the DM sent them."
+                        : "Enter the room code from your DM.",
+                    );
+                    document.getElementById(codeFieldId)?.focus();
+                    return;
+                  }
+                  run(() => findCharacters(code));
+                }}
+              >
+                <Field label="Room code">
+                  <TextInput
+                    id={codeFieldId}
+                    disabled={busy}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={code}
+                    maxLength={64}
+                    aria-invalid={codeError ? true : undefined}
+                    aria-describedby={codeError ? `${codeFieldId}-error` : undefined}
+                    onChange={(event) => {
+                      setCode(event.target.value.replace(/[^a-zA-Z0-9.-]/g, ""));
+                      setCharacters([]);
+                      setLookedUp(false);
+                      setCodeError("");
+                    }}
+                    placeholder="Enter your code"
+                  />
+                </Field>
+                {codeError ? (
+                  <p id={`${codeFieldId}-error`} className="field-error text-sm text-negative" role="alert">
+                    {codeError}
+                  </p>
+                ) : null}
+                <Button type="submit" className="w-full" variant="secondary" disabled={unavailable}>
+                  {busy && !characters.length ? "Please wait…" : "Find characters"}
+                </Button>
+              </form>
             </section>
           ) : null}
         </>
@@ -560,12 +639,19 @@ export function CloudTable() {
           <section className="ledger-card room-card">
             <p className="eyebrow">Your shared campaign</p>
             <h2>{host ? "Your party’s room" : "Adventure together"}</h2>
+            <p className="font-display text-xl" data-campaign-name>
+              {campaignName}
+            </p>
             <p className="text-muted">{host ? "You are the host" : "You joined as a player"}</p>
             <p className="mt-5 text-xs tracking-widest uppercase text-muted">Campaign ID</p>
             <p className="room-code" aria-label={`Campaign ID ${cloud.code}`}>
               {cloud.code}
             </p>
-            <p className="mb-3 text-sm text-muted">Use Copy session code or Share join link to invite players. The campaign ID alone does not grant access.</p>
+            <p className="mb-3 text-sm text-muted">
+              {host
+                ? "Use Copy session code or Share join link to invite players. The campaign ID alone does not grant access."
+                : "Your DM invites players to this room. Share the link only with someone your DM expects; the campaign ID alone does not grant access."}
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <Button
                 disabled={unavailable}
@@ -581,27 +667,35 @@ export function CloudTable() {
             </div>
           </section>
           {!host && <PlayerCharacterImport key={cloud.code} code={cloud.code} />}
-          <div className="mode-switch mt-5" role="group" aria-label="Session mode">
-            <button
-              aria-pressed={cloud.live}
-              disabled={!host || unavailable}
-              onClick={() => {
-                if (!cloud.live) setNextMode("live");
-              }}
-            >
-              <Radio size={16} />
-              Live
-            </button>
-            <button
-              aria-pressed={!cloud.live}
-              disabled={!host || unavailable}
-              onClick={() => {
-                if (cloud.live) setNextMode("turns");
-              }}
-            >
-              Turn-based
-            </button>
-          </div>
+          {host ? (
+            <div className="mode-switch mt-5" role="group" aria-label="Session mode">
+              <button
+                aria-pressed={cloud.live}
+                disabled={!host || unavailable}
+                onClick={() => {
+                  if (!cloud.live) setNextMode("live");
+                }}
+              >
+                <Radio size={16} />
+                Live
+              </button>
+              <button
+                aria-pressed={!cloud.live}
+                disabled={!host || unavailable}
+                onClick={() => {
+                  if (cloud.live) setNextMode("turns");
+                }}
+              >
+                Turn-based
+              </button>
+            </div>
+          ) : (
+            // Players read the mode; only the DM changes it (owner decision 3, plan P3).
+            <p className="room-mode-readout mt-5 text-center" data-room-mode>
+              <Radio size={16} aria-hidden className="mr-1 inline" />
+              The DM runs this room in {cloud.live ? "Live" : "Turn-based"} mode.
+            </p>
+          )}
           <p className="mt-3 text-center text-sm text-muted">
             {cloud.viewOnly
               ? "Session ended. Players can view their sheets and campaign information."
@@ -610,7 +704,6 @@ export function CloudTable() {
               : cloud.mine
                 ? "Your turn. Submit your changes when you’re done."
                 : `Waiting for ${cloud.who}.`}
-            {!host ? " The host controls the mode." : ""}
           </p>
           {!cloud.live ? (
             <div className="mt-3">

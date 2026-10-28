@@ -13,6 +13,7 @@ import {
   switchCampaign,
 } from "@/lib/quire/campaigns";
 import { useSeat } from "@/lib/quire/seat";
+import { byRecent, lastOpenedLabel, readCampaignRecents } from "@/lib/quire/campaign-recents";
 import { Button, Confirm, Fold, TextInput } from "@/components/ui";
 
 /** Device campaigns. `heading={false}` where the surrounding dialog or card already names it. */
@@ -29,6 +30,8 @@ export function Campaigns({ heading = true }: { heading?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [nextName, setNextName] = useState("");
   const [removing, setRemoving] = useState<string | null>(null);
+  // Last-opened times on this device (design D10); read when the list renders.
+  const [recents] = useState(readCampaignRecents);
   if (!active) return null;
 
   if (seat.role === "player") {
@@ -65,25 +68,46 @@ export function Campaigns({ heading = true }: { heading?: boolean }) {
             setDraft(null);
           }}
         />
+        <span className="mt-1 block text-xs">
+          Players in shared rooms see this name. Rename it in Local play; a room you host takes
+          the new name the next time you open it.
+        </span>
       </label>
       {campaigns.length > 1 ? (
-        <ul className="mt-3 divide-y divide-border border-y border-border">
-          {campaigns
-            .filter((campaign) => campaign.id !== active.id)
-            .map((campaign) => (
-              <li key={campaign.id} className="flex items-center justify-between gap-3 py-2">
-                <span className="min-w-0 truncate">{campaign.name}</span>
-                <span className="flex shrink-0 gap-2">
-                  <Button variant="secondary" onClick={() => switchCampaign(campaign.id)}>
-                    Open
-                  </Button>
-                  <Button variant="danger" onClick={() => setRemoving(campaign.id)}>
-                    Remove
-                  </Button>
-                </span>
-              </li>
-            ))}
-        </ul>
+        <>
+          <h3 className="mt-4 text-sm font-semibold text-muted">Recent campaigns</h3>
+          <ul
+            className="campaign-recents mt-1 divide-y divide-border border-y border-border"
+            aria-label="Recent campaigns"
+          >
+            {byRecent(
+              campaigns.filter((campaign) => campaign.id !== active.id),
+              recents,
+            ).map((campaign) => {
+              const opened = lastOpenedLabel(recents.campaigns[campaign.id]?.openedAt);
+              const session = recents.campaigns[campaign.id]?.session;
+              return (
+                <li key={campaign.id} className="flex items-center justify-between gap-3 py-2">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{campaign.name}</span>
+                    <small className="text-xs text-muted">
+                      {opened ?? "Not opened on this device yet"}
+                      {opened && session ? ` · Session ${session}` : ""}
+                    </small>
+                  </span>
+                  <span className="flex shrink-0 gap-2">
+                    <Button variant="secondary" onClick={() => switchCampaign(campaign.id)}>
+                      Open
+                    </Button>
+                    <Button variant="danger" onClick={() => setRemoving(campaign.id)}>
+                      Remove
+                    </Button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
@@ -100,8 +124,8 @@ export function Campaigns({ heading = true }: { heading?: boolean }) {
         </p>
       ) : campaignDeletionFailed() ? (
         <p role="alert" className="mt-3 text-muted">
-          An earlier campaign deletion could not finish. It will retry when Lootsplitter is reloaded.
-          Close other Lootsplitter tabs first if it keeps failing.
+          An earlier campaign deletion could not finish. It will retry when Lootsplitter is
+          reloaded. Close other Lootsplitter tabs first if it keeps failing.
         </p>
       ) : null}
       <form
@@ -150,7 +174,9 @@ export function Campaigns({ heading = true }: { heading?: boolean }) {
           if (!open) setRemoving(null);
         }}
         title={
-          removing === active.id ? `Delete ${active.name} from this device?` : "Remove this campaign?"
+          removing === active.id
+            ? `Delete ${active.name} from this device?`
+            : "Remove this campaign?"
         }
         body="Delete this campaign’s shops, money, catalog and PDFs from this device? Export a copy first if you want to keep it. Device backups and other campaigns remain. This does not delete a hosted room or another player’s data. Deleting the last campaign opens a new campaign."
         confirmLabel={removing === active.id ? "Delete campaign" : "Remove campaign"}

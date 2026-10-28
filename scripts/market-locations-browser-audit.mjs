@@ -6,8 +6,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import {
   openApplication,
   reloadApplication,
-  navigateApplication,
-} from "./title-screen-navigation.mjs";
+  navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(
@@ -442,6 +441,7 @@ try {
     await player.getByRole("button", { name: "Find characters", exact: true }).click();
     await player.getByLabel("Your name", { exact: true }).fill("Location audit player");
     await player.getByRole("button", { name: "Join room", exact: true }).click();
+    await afterJoining(player);
     await player.getByText("You joined as a player", { exact: true }).waitFor();
     await navigateApplication(player, origin + "/market");
     await expect(

@@ -22,6 +22,7 @@ function SharePage() {
   const [tab, setTab] = useState("room");
   const tabsId = useId();
   const locationSearch = useRouterState({ select: (s) => s.location.searchStr });
+  const locationHash = useRouterState({ select: (s) => s.location.hash });
   useEffect(() => {
     const params = new URLSearchParams(locationSearch);
     const chat = !params.has("join") && params.get("chat") === "1";
@@ -36,6 +37,8 @@ function SharePage() {
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const seat = useSeat();
   const { count } = useChatUnread();
+  const beforeJoining =
+    !room.joined && (seat.role !== "dm" || new URLSearchParams(locationSearch).has("join"));
   return (
     <Shell width="prose">
       <div className="multiplayer-heading">
@@ -137,37 +140,60 @@ function SharePage() {
         </Fold>
       </div>
       <div className="campaign-support">
-        <Fold
-          anchorId="connection-recovery"
-          title="Connection & recovery"
-          hint="Pending changes, retry, and recovery files."
-        >
-          <SyncStatus />
-          <p className="text-sm text-muted">
-            Shared changes are saved when the server accepts them. Offline changes stay pending
-            until you reconnect.
-          </p>
-        </Fold>
-        <Link to="/settings" className="quick-action mt-4">
-          Device backups — view, export & restore →
-        </Link>
-        <Fold
-          title="Manual sharing & files"
-          hint="An alternative for playing without an online room."
-        >
-          <p className="mb-4 text-sm text-muted">
-            Online rooms sync automatically. Use these tools for exchanging campaign files in Local
-            Mode.
-          </p>
-          {seat.role === "dm" ? <TableShare /> : null}
-          {!room.joined ? (
-            <Fold title="Offline messages">
-              <ManualChat />
-            </Fold>
-          ) : null}
-          <TableDesk />
-        </Fold>
+        {beforeJoining ? (
+          // A player who has not joined yet sees one folded group instead of three panels
+          // (plan P3); every tool stays inside it and opens in full after joining.
+          <Fold
+            reveal={locationHash === "connection-recovery"}
+            title="Recovery, backups & manual sharing"
+            hint="Connection recovery, device backups and file sharing. Most players need these only after joining."
+          >
+            <SupportTools />
+          </Fold>
+        ) : (
+          <SupportTools />
+        )}
       </div>
     </Shell>
+  );
+}
+
+/** Connection & recovery, device backups and manual sharing (the Campaign screen's support tools). */
+function SupportTools() {
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const seat = useSeat();
+  return (
+    <>
+          <Fold
+            anchorId="connection-recovery"
+            title="Connection & recovery"
+            hint="Pending changes, retry, and recovery files."
+          >
+            <SyncStatus />
+            <p className="text-sm text-muted">
+              Shared changes are saved when the server accepts them. Offline changes stay pending
+              until you reconnect.
+            </p>
+          </Fold>
+          <Link to="/settings" className="quick-action mt-4">
+            Device backups — view, export & restore →
+          </Link>
+          <Fold
+            title="Manual sharing & files"
+            hint="An alternative for playing without an online room."
+          >
+            <p className="mb-4 text-sm text-muted">
+              Online rooms sync automatically. Use these tools for exchanging campaign files in Local
+              Mode.
+            </p>
+            {seat.role === "dm" ? <TableShare /> : null}
+            {!room.joined ? (
+              <Fold title="Offline messages">
+                <ManualChat />
+              </Fold>
+            ) : null}
+            <TableDesk />
+          </Fold>
+    </>
   );
 }
