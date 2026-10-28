@@ -379,6 +379,7 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 - Pinned local Tesseract.js OCR supports scanned pages and statblock pictures; recognition assets load only when needed. All PDF pages are considered. Image imports require source review; numeric validation rejects unreadable required creature fields. OCR confidence is not a correctness guarantee.
 - Downtime is offered when starting a session. An explicit zero-day choice persists per campaign and disables subsequent reminders; campaign finance controls can re-enable it. Positive downtime still uses the existing preview and explicit approval before any money/time changes.
 - Session notes appear as a book with contents, dated reading/writing pages and mobile layout. Existing party collaboration, DM-private/player-private visibility and session report attachments remain intact.
+- Result toasts (design D9, 2026-10-26): Buy, Sell, Give, Add loot and encounter awards confirm with View receipt (the action's ledger lines by command ID, any void of them, and the created item with Show in inventory; read from the viewer's own projection). A DM's shop purchase also offers Undo while the toast is shown: the existing `ledger-void` on the purchase line with command ID `<purchase>-undo` (repeats apply once; refused once the items or stock changed). No other action gains an undo. Fields that save on blur show a Saved tick.
 
 ## Filled character PDF fidelity
 

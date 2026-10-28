@@ -3,6 +3,7 @@ import { LogoLoading } from "./route-loading";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { OpeningLandscape } from "./opening-landscape";
 import { LootLoader } from "./loot-loader";
+import { readCampaignRecents, titlePrompt } from "@/lib/quire/campaign-recents";
 
 // Dismiss only for this running document, never for a restored browser tab.
 // The root gate survives SPA navigation; a fresh app load gets its opening back.
@@ -21,6 +22,9 @@ export function OpeningDawn({
   settle?: boolean;
 }) {
   const [on, setOn] = useState<boolean | null>(null);
+  // "Tap" on touch screens, and the campaign to continue (design D10 / dm #27).
+  const [touch, setTouch] = useState(false);
+  const [prompt, setPrompt] = useState<string | null>(null);
   const screen = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!settle) return;
@@ -32,6 +36,12 @@ export function OpeningDawn({
       try { dismissedInDocument = consumeNavigationResume(sessionStorage, location.pathname); } catch { /* Storage may be blocked. */ }
     }
     setOn(!dismissedInDocument);
+    try {
+      setTouch(matchMedia("(pointer: coarse)").matches);
+    } catch {
+      /* Older browsers: keep "click". */
+    }
+    setPrompt(titlePrompt(readCampaignRecents()));
   }, []);
   useEffect(() => {
     if (on && !bypass) screen.current?.focus({ preventScroll: true });
@@ -41,6 +51,7 @@ export function OpeningDawn({
     setOn(false);
   }
   if (bypass || on === false) return <>{children}</>;
+  const verb = touch ? "Tap" : "Click";
   // Wait for hydration before showing the interactive opening.
   if (on === null) return <LogoLoading />;
   return (
@@ -49,14 +60,15 @@ export function OpeningDawn({
       type="button"
       className="quire-dawn loot-opening"
       onClick={enter}
-      aria-label="Lootsplitter. Click to continue"
+      aria-label={`Lootsplitter. ${verb} to continue${prompt ? `. ${prompt}` : ""}`}
     >
       <span className="quire-dawn-name">Lootsplitter</span>
       <span className="loot-opening-scene">
         <OpeningLandscape />
         <LootLoader />
       </span>
-      <span className="loot-opening-continue">click to continue</span>
+      {prompt ? <span className="loot-opening-prompt">{prompt}</span> : null}
+      <span className="loot-opening-continue">{verb.toLowerCase()} to continue</span>
     </button>
   );
 }

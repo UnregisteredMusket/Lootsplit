@@ -24,6 +24,10 @@
   top: 13%;
   font-size: clamp(2.3rem, 10vw, 3.9rem);
   animation: pane-in 1.8s ease-out both;
+}
+/* Ink on the parchment opening: the campaign name and the Continue prompt share it. */
+.loot-opening .quire-dawn-name,
+.loot-opening-prompt {
   color: #392719;
   text-shadow: 0 1px 0 #fff7df80;
 }
@@ -187,6 +191,28 @@
   color: #49321e;
   font-size: 1rem;
   letter-spacing: 0.12em;
+}
+/* "Continue · <campaign> · Session N" above the tap/click hint (design D10 / dm #27). */
+.loot-opening-prompt {
+  position: absolute;
+  bottom: calc(max(3rem, env(safe-area-inset-bottom)) + 1.9rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .loot-opening-continue {
+    bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .loot-opening-prompt {
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 1.7rem);
+  }
 }
 .loot-opening:focus-visible {
   outline: none;

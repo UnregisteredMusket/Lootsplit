@@ -7,8 +7,7 @@ import { blankSheet } from "../src/lib/characters/model.mjs";
 import {
   openApplication,
   reloadApplication,
-  navigateApplication,
-} from "./title-screen-navigation.mjs";
+  navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -218,6 +217,7 @@ try {
       .selectOption("hero");
     await guest.getByPlaceholder("What should the party call you?").fill("Training guest");
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
+    await afterJoining(guest);
     await expect(guest.locator(".room-code")).toBeVisible();
     await navigateApplication(guest, origin + "/?view=home");
     const marker = crypto.randomUUID();
