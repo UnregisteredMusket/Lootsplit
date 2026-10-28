@@ -301,8 +301,9 @@ test("a signal read costs one light query and no write, even in a megabyte room"
   const stored = (await readStoredRoom(storageDb(), host.code))!;
   const body = Buffer.byteLength(stored.body);
   assert.ok(body > 1_000_000);
-  // The light read is the inline path; a sectioned room (only when suites force the sectioning
-  // threshold to 0) falls back to the full storage read, which this budget does not cover.
+  // The light read is the inline path; a sectioned room (when suites force the sectioning
+  // threshold to 0) reads the same projections from only the sections holding them (step 3):
+  // the row and section statements, still within the byte budget.
   const sectioned = stored.version.sections !== null;
   await mapSignals({ ...host, mapId: "fog-map", ping: { id: crypto.randomUUID(), mapId: "fog-map", x: 0.1, y: 0.1, color: "red" } });
   for (const seat of [host, { code: host.code, token: hero.token }]) {
@@ -312,8 +313,7 @@ test("a signal read costs one light query and no write, even in a megabyte room"
     const result = await mapSignals({ code: host.code, token: seat.token, mapId: "fog-map" });
     meter.on = false;
     assert.equal(result.pings.length, 1);
-    if (sectioned) continue;
-    assert.equal(meter.queries.length, 2, "authorization read plus the ping read");
+    assert.equal(meter.queries.length, sectioned ? 4 : 2, "authorization read (row, then sections) plus the ping read");
     assert.ok(!meter.queries.some((q) => /DELETE|INSERT|UPDATE/i.test(q)), "a read never writes");
     assert.ok(!meter.queries.some((q) => /SELECT\s+body\s*,\s*revision/i.test(q)), "the room body is never fetched");
     assert.ok(meter.bytes < 8_000, `a signal read returned ${meter.bytes} bytes from a ${body}-byte room`);

@@ -1,5 +1,5 @@
 import { database, readRoom } from "./room-store.server.ts";
-import { readStoredRoom } from "../../../cloudflare/room-storage.mjs";
+import { readRoomPaths, type RoomPathRead } from "../../../cloudflare/room-storage.mjs";
 import { mapPingInput, PING_DURATION, type MapPing } from "./map-signals.ts";
 import type { CloudRoom, CloudSeat, CloudTable } from "./cloud.ts";
 import type { CampaignMap } from "./world-schema.ts";
@@ -84,8 +84,62 @@ async function readSignalAccess(code: string, mapId: string): Promise<SignalAcce
   const row = await db.prepare(ACCESS_QUERY).bind(code, mapId).first<AccessRow>();
   if (!row) return null;
   // A sectioned room (above the inline threshold, room-storage.mjs) keeps its table out of the
-  // row: read it through the storage API (stored form; signals need no image hydration).
-  if (row.sectioned) return roomAccess(((await readStoredRoom(db, code))?.room ?? null) as CloudRoom | null, mapId);
+  // row: the same projections, read through the storage API from only the sections holding them.
+  if (row.sectioned) return sectionedSignalAccess(db, code, mapId);
+  return signalAccessFrom(row);
+}
+/** The light read of a sectioned room: the same fields as ACCESS_QUERY, one consistent state. */
+const SECTIONED_READS: RoomPathRead[] = [
+  { path: ["closed"] },
+  { path: ["viewOnly"] },
+  { path: ["sessionId"] },
+  { path: ["seats"] },
+  {
+    path: ["table", "journal", "world", "maps"],
+    sql: (source, at, arg) =>
+      `SELECT json_remove(m.value,'$.image','$.anchors','$.markers','$.connected') FROM json_each(${source},${at}) m WHERE json_extract(m.value,'$.id')=${arg(0)} LIMIT 1`,
+  },
+  { path: ["table", "journal", "world", "tabletop"] },
+  {
+    path: ["table", "purses"],
+    sql: (source, at) =>
+      `SELECT json_group_array(json_object('id',p.value->>'$.id','kind','character')) FROM json_each(${source},${at}) p WHERE p.value->>'$.kind'='character'`,
+  },
+  {
+    path: ["table", "journal", "world", "npcs"],
+    sql: (source, at) =>
+      `SELECT json_group_array(json_object('id',n.value->>'$.id','visible',n.value->'$.visible')) FROM json_each(${source},${at}) n`,
+  },
+  {
+    path: ["table", "journal", "world", "characterPositions"],
+    sql: (source, at) =>
+      `SELECT json_group_array(json_object('purseId',c.value->>'$.purseId','visible',c.value->'$.visible')) FROM json_each(${source},${at}) c`,
+  },
+];
+async function sectionedSignalAccess(
+  db: NonNullable<ReturnType<typeof database>>,
+  code: string,
+  mapId: string,
+): Promise<SignalAccess | null> {
+  const read = await readRoomPaths(db, code, SECTIONED_READS, [mapId]);
+  if (!read) return null;
+  const [closed, viewOnly, sessionId, seats, map, tabletop, purses, npcs, positions] = read.values;
+  const text = (value: unknown) => (value === null || value === undefined ? null : JSON.stringify(value));
+  return signalAccessFrom({
+    revision: read.version.revision,
+    sectioned: 1,
+    closed: closed === true ? 1 : null,
+    viewOnly: viewOnly === true ? 1 : null,
+    sessionId: typeof sessionId === "string" ? sessionId : null,
+    seats: text(seats),
+    map: text(map),
+    tabletop: text(tabletop),
+    purses: text(purses),
+    npcs: text(npcs),
+    positions: text(positions),
+  });
+}
+function signalAccessFrom(row: AccessRow): SignalAccess {
   const seats = list(row.seats) as CloudSeat[];
   const tabletop: unknown = row.tabletop ? JSON.parse(row.tabletop) : undefined;
   const map = row.map ? (JSON.parse(row.map) as CampaignMap) : undefined;

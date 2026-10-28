@@ -14,7 +14,8 @@ import {
   readMemberRooms,
   readRoomCore,
   readRoomSectionHashes,
-  readRoomTablePage,
+  readRoomPaths,
+  readRoomTables,
   readStoredRoom,
   readStoredRooms,
   roomDeleteStatement,
@@ -29,6 +30,12 @@ import {
 const DEFAULT_LIMITS = { threshold: ROOM_SECTION_THRESHOLD, min: ROOM_SECTION_MIN_BYTES, part: ROOM_SECTION_PART_BYTES };
 setRoomSectionLimitsForTests(DEFAULT_LIMITS);
 
+/** Every room's table fields, as site analytics iterates them. */
+async function tablePage(db, fields) {
+  const rows = [];
+  for await (const row of readRoomTables(db, fields, { pageSize: 2 })) rows.push(row);
+  return rows;
+}
 const bytes = (text) => new TextEncoder().encode(text).length;
 const sectionRows = async (db, code) =>
   (await db.prepare("SELECT hash,part,length(CAST(body AS BLOB)) AS n FROM campaign_room_sections WHERE code=? ORDER BY hash,part").bind(code).all()).results;
@@ -168,9 +175,11 @@ test("an inline room is stored and read exactly as before, and old inline rows r
   assert.deepEqual(await sectionRows(db, "SMALL"), []);
   const read = await readStoredRoom(db, "SMALL");
   assert.equal(read.version.sections, null);
-  // An inline update of an inline read is one statement too (no section cleanup).
+  // An inline update of an inline read is the row write plus the (indexed, usually empty) orphan
+  // cleanup guarded on its write_id (step 3: cleanup no longer trusts that an inline read means
+  // no section rows exist).
   const next = roomWriteStatements(db, { ...read.room, revision: 2 }, { expect: read.version });
-  assert.equal(next.statements.length, 1);
+  assert.equal(next.statements.length, 2);
   // A row written before migration 0024 (no write_id) by an older server.
   const legacy = { ...smallRoom("LEGACY"), commands: ["dm:old"], table: { purses: [{ id: "p", coins: { gp: 1 } }] } };
   await db.prepare("INSERT INTO campaign_rooms(code,revision,body) VALUES (?,?,?)").bind("LEGACY", 3, JSON.stringify(legacy)).run();
@@ -178,7 +187,7 @@ test("an inline room is stored and read exactly as before, and old inline rows r
   assert.equal(old.body, JSON.stringify(legacy));
   assert.deepEqual(old.room, legacy);
   assert.equal(old.version.writeId, null);
-  const page = await readRoomTablePage(db, ["purses", "ledger"], { after: "", limit: 10 });
+  const page = await tablePage(db, ["purses", "ledger"]);
   assert.deepEqual(page.find((r) => r.code === "LEGACY").fields, { purses: JSON.stringify(legacy.table.purses), ledger: null });
 });
 
@@ -356,7 +365,7 @@ test("multi-room and member reads assemble sectioned rooms, and re-read one repl
   assert.equal(raced, true);
   assert.deepEqual(reread.get("MANY1").room, changed);
   // Table pages for site analytics read the same parts from either form.
-  const page = await readRoomTablePage(db, ["ledger", "purses", "journal"], { after: "", limit: 10 });
+  const page = await tablePage(db, ["ledger", "purses", "journal"]);
   const many1 = page.find((r) => r.code === "MANY1");
   assert.equal(many1.fields.ledger, JSON.stringify(changed.table.ledger));
   assert.equal(many1.fields.journal, JSON.stringify(changed.table.journal));
@@ -433,4 +442,127 @@ test("delete with backup, restore and test-mode reset work on sectioned rooms", 
     setRoomSectionLimitsForTests(DEFAULT_LIMITS);
     delete globalThis.__env__;
   }
+});
+
+test("partial reads return only the requested values, from only the sections that hold them (step 3)", async () => {
+  const db = localAccountDb();
+  const room = largeRoom("PART");
+  room.table.journal.world = {
+    maps: [{ id: "m1", name: "Keep", image: "/art/room-image-" + "a".repeat(64) + ".webp", tokens: [{ id: "t" }] }, { id: "m2", name: "Road", image: "x" }],
+    npcs: [{ id: "spy", visible: false }],
+    characterPositions: [],
+    tabletop: { activeMapId: "m1" },
+    filler: text(40_000, "world"),
+  };
+  await create(db, room);
+  const manifest = JSON.parse((await rawRow(db, "PART")).body).$sections;
+  assert.ok(manifest.some((e) => e.path.join(".") === "table.journal.world"), "the world is its own section");
+  // Count what each statement returns to the Worker.
+  let received = 0;
+  const seen = new Set();
+  const counting = {
+    ...db,
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      return {
+        bind(...args) {
+          statement.bind(...args);
+          return this;
+        },
+        async first() {
+          const row = await statement.first();
+          received += bytes(JSON.stringify(row ?? null));
+          return row;
+        },
+        async all() {
+          const rows = await statement.all();
+          received += bytes(JSON.stringify(rows.results));
+          for (const row of rows.results) if (row.hash) seen.add(row.hash);
+          return rows;
+        },
+      };
+    },
+  };
+  const read = await readRoomPaths(
+    counting,
+    "PART",
+    [
+      { path: ["seats"] },
+      { path: ["table", "purses"] },
+      { path: ["table", "journal", "world", "tabletop"] },
+      {
+        path: ["table", "journal", "world"],
+        sql: (source, at, arg) =>
+          `SELECT json_remove(m.value,'$.image','$.tokens') FROM json_each(${source},${at}||'.maps') m WHERE json_extract(m.value,'$.id')=${arg(0)} LIMIT 1`,
+      },
+      { path: ["table", "missing"] },
+    ],
+    ["m1"],
+  );
+  assert.deepEqual(read.values, [room.seats, room.table.purses, { activeMapId: "m1" }, { id: "m1", name: "Keep" }, null]);
+  assert.equal(read.version.revision, 1);
+  assert.ok(received < 5_000, `a map-signal style read receives ${received} bytes of a ${bytes(JSON.stringify(room))}-byte room`);
+
+  // A value with larger parts split out below it (the journal) is assembled from just those sections.
+  received = 0;
+  const journal = await readRoomPaths(counting, "PART", [{ path: ["table", "journal"] }, { path: ["table", "ledger"] }]);
+  assert.deepEqual(journal.values, [room.table.journal, room.table.ledger]);
+  const notesHash = manifest.find((e) => e.path.join(".") === "table.notes").hash;
+  const templateHash = manifest.find((e) => e.path.join(".") === "testTemplate").hash;
+  assert.ok(!seen.has(notesHash) && !seen.has(templateHash), "the chat and test template sections are never read");
+  // Inline rooms answer the same reads in one statement.
+  await create(db, smallRoom("PSMALL"));
+  const small = await readRoomPaths(db, "PSMALL", [{ path: ["table", "notes"] }, { path: ["table", "journal", "world"] }]);
+  assert.deepEqual(small.values, [[{ id: "hi", text: "Hello" }], null]);
+  assert.equal(small.version.sections, null);
+  assert.equal(await readRoomPaths(db, "NOPE", [{ path: ["seats"] }]), null);
+  await assert.rejects(readRoomPaths(db, "PART", [{ path: ["table", "x') --"] }]), /Invalid room path/);
+});
+
+test("a partial read is consistent: a write landing in between is re-read", async () => {
+  const db = localAccountDb();
+  await create(db, largeRoom("PRACE"));
+  const current = await readStoredRoom(db, "PRACE");
+  const changed = structuredClone(current.room);
+  changed.revision = 2;
+  changed.table.ledger = changed.table.ledger.slice(5);
+  let raced = false;
+  const racing = {
+    ...db,
+    prepare(sql) {
+      if (!raced && sql.includes("UNION ALL") && sql.includes("'p'")) {
+        raced = true;
+        const write = roomWriteStatements(db, changed, { expect: current.version });
+        return { bind: (...args) => ({ all: async () => (await db.batch(write.statements), db.prepare(sql).bind(...args).all()) }) };
+      }
+      return db.prepare(sql);
+    },
+  };
+  const read = await readRoomPaths(racing, "PRACE", [{ path: ["table", "ledger"] }]);
+  assert.equal(raced, true);
+  assert.equal(read.version.revision, 2);
+  assert.deepEqual(read.values[0], changed.table.ledger);
+});
+
+test("orphaned sections are removed by the next committed write, even after an inline read", async () => {
+  const db = localAccountDb();
+  await create(db, largeRoom("ORPH"));
+  // A previous-release Worker writes the whole room inline over the sectioned one.
+  const whole = structuredClone((await readStoredRoom(db, "ORPH")).room);
+  whole.revision = 2;
+  whole.table.ledger = [];
+  whole.table.notes = [];
+  whole.testTemplate = null;
+  whole.table.journal.tradeEconomy = { exchanges: [] };
+  await db.prepare("UPDATE campaign_rooms SET revision=2,body=?,write_id='old-release' WHERE code=?").bind(JSON.stringify(whole), "ORPH").run();
+  assert.ok((await sectionRows(db, "ORPH")).length > 0, "orphans remain after the old-release write");
+  const read = await readStoredRoom(db, "ORPH");
+  assert.equal(read.version.sections, null, "the room now reads inline");
+  // A losing write (stale version) deletes nothing.
+  const stale = roomWriteStatements(db, { ...read.room, revision: 3 }, { expect: { ...read.version, writeId: "someone-else" } });
+  assert.equal(stale.changed(await db.batch(stale.statements), stale.statements), false);
+  assert.ok((await sectionRows(db, "ORPH")).length > 0);
+  const write = roomWriteStatements(db, { ...read.room, revision: 3 }, { expect: read.version });
+  assert.equal(write.changed(await db.batch(write.statements), write.statements), true);
+  assert.deepEqual(await sectionRows(db, "ORPH"), [], "the next committed inline write removed the orphans");
 });

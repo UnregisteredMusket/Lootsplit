@@ -67,3 +67,23 @@ test("0026 room sections are read and cleaned up through their primary key", () 
     assert.match(plan(db, sql), /USING (COVERING )?INDEX sqlite_autoindex_campaign_room_sections_1/, sql);
   db.close();
 });
+
+test("0027 backup parts and step 3 partial room reads use primary keys", () => {
+  assertAdditiveSql("0027_library_backup_parts.sql", readFileSync(`${directory}/0027_library_backup_parts.sql`, "utf8"));
+  const db = schema();
+  // cloudflare/backup-parts.mjs: a backup's parts in order, the completeness check and the quota.
+  const parts = plan(db, "SELECT part,body FROM library_backup_parts WHERE backup_id=? ORDER BY part");
+  assert.match(parts, /USING INDEX sqlite_autoindex_library_backup_parts_1/);
+  assert.doesNotMatch(parts, /TEMP B-TREE/);
+  assert.match(plan(db, "SELECT (SELECT COUNT(*) FROM library_backup_parts WHERE backup_id=?)=?"), /USING COVERING INDEX sqlite_autoindex_library_backup_parts_1/);
+  assert.match(
+    plan(db, "SELECT COALESCE(SUM(LENGTH(p.body)),0) FROM library_backup_parts p JOIN library_backups b ON b.id=p.backup_id WHERE b.user_id=?"),
+    /SEARCH p USING INDEX sqlite_autoindex_library_backup_parts_1/,
+  );
+  // room-storage.mjs readRoomPaths: one part of one section, by its full primary key.
+  assert.match(
+    plan(db, "SELECT s.body FROM campaign_room_sections s WHERE s.code=? AND s.hash='ab' AND s.part=0"),
+    /USING INDEX sqlite_autoindex_campaign_room_sections_1 \(code=\? AND hash=\? AND part=\?\)/,
+  );
+  db.close();
+});

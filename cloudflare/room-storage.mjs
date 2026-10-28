@@ -632,10 +632,12 @@ export function roomWriteStatements(db, room, options) {
           .bind(code, section.hash, index, part, ...committed.args),
       ),
     );
-  // Sections this write no longer references. Skipped only when the room is known to have been
-  // inline (a version read) and stays inline; a create has nothing to replace.
-  const previouslyInline = expect && "writeId" in expect && expect.sections === null;
-  if (!options.create && (sectioned || !previouslyInline))
+  // Sections this write no longer references, on every update (step 3): a version read that saw
+  // an inline row does not prove the room has no section rows (a previous-release Worker may have
+  // written an inline body over a sectioned room), so orphans are always removed with the next
+  // committed write. Guarded on this write's write_id, so a write that lost its race deletes
+  // nothing, and the new manifest's hashes are never deleted. A create has nothing to replace.
+  if (!options.create)
     statements.push(
       db
         .prepare(
@@ -733,34 +735,194 @@ export function roomSectionsDeletedStatement(db, code) {
 }
 
 /**
- * Pages of stored table parts (`fields` of `room.table`, as JSON text or null) for every room
- * matching `where` (a SQL predicate on top-level fields of `campaign_rooms`, such as
- * `json_extract(body,'$.testMode')`), keyset-paginated by code. Inline rooms are projected in
- * SQL; sectioned rooms are assembled. For site-wide aggregates (game analytics).
- * @param {Database} db @param {readonly string[]} fields
- * @param {{ after: string; limit: number; where?: string; whereArgs?: unknown[] }} page
- * @returns {Promise<{ code: string; fields: Record<string, string | null> }[]>}
+ * One value a partial read returns (`readRoomPaths`): the JSON value at `path` (keys, each a
+ * plain identifier) of the assembled stored room. With `sql`, SQLite computes the result instead:
+ * `sql(source, at, arg)` returns an SQL expression yielding JSON text, where `source` is an SQL
+ * expression of JSON text containing the value, `at` the JSON path literal of the value inside it,
+ * and `arg(i)` the placeholder of the caller's `args[i]`. For example, one map without its art
+ * (map signals) or a projection of purses, so the Worker never receives the rest.
+ * @typedef {{ path: string[]; sql?: (source: string, at: string, arg: (index: number) => string) => string }} RoomPathRead
  */
-export async function readRoomTablePage(db, fields, page) {
-  for (const field of fields) if (!/^\w+$/.test(field)) throw Error("Invalid room table field.");
+const PATH_KEY = /^\w+$/;
+const HASH = /^[0-9a-f]{64}$/;
+/** @param {string[]} path */
+const jsonPathLiteral = (path) => `'$${path.map((key) => `.${key}`).join("")}'`;
+/** @param {readonly string[]} prefix @param {readonly string[]} path */
+const startsWith = (prefix, path) => prefix.length <= path.length && prefix.every((key, i) => path[i] === key);
+
+/**
+ * Partial read: only the requested values of a room, with its version, without assembling it.
+ * An inline room is read in one statement (SQLite extracts the values from the row). For a
+ * sectioned room only the sections that hold the requested values are touched: a value inside a
+ * single-part section is extracted by SQLite from that part, so the Worker never receives (or
+ * parses) the rest of it; a value whose section has several parts, or with larger parts split
+ * out below it, is assembled from just those sections. Everything comes from one consistent
+ * state: the section statement also re-reads the row's `write_id` and the read is retried if a
+ * write landed in between. Never reads seats or tokens unless asked for them.
+ * `null` when the room does not exist; a missing value is `null`.
+ * @param {Database} db @param {string} code @param {RoomPathRead[]} reads @param {unknown[]} [args]
+ * @returns {Promise<{ version: RoomVersion; values: unknown[] } | null>}
+ */
+export async function readRoomPaths(db, code, reads, args = []) {
+  for (const read of reads)
+    if (!read.path.length || !read.path.every((key) => PATH_KEY.test(key))) throw Error("Invalid room path.");
+  // ?1 is the code; caller arguments follow.
+  const arg = (/** @type {number} */ index) => `?${index + 2}`;
+  /** @param {RoomPathRead} read @param {string} source @param {string} at */
+  const expression = (read, source, at) =>
+    read.sql ? `(${read.sql(source, at, arg)})` : `json_extract(${source},${at},'$."$none"')`;
+  /** @param {RoomPathRead} read @param {unknown} result */
+  const valueOf = (read, result) => {
+    if (result === null || result === undefined) return null;
+    const parsed = JSON.parse(/** @type {string} */ (result));
+    return read.sql ? parsed : parsed[0];
+  };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // The row: version, manifest (only for sectioned rows) and every value as stored in the row
+    // (a value under a section is its `null` placeholder there; replaced below).
+    const row = /** @type {any} */ (
+      await db
+        .prepare(
+          `SELECT revision,write_id,CASE WHEN substr(body,1,${SECTIONED_PREFIX.length})='${SECTIONED_PREFIX}' THEN json_extract(body,'$."${SECTIONS_KEY}"') END AS manifest${reads
+            .map((read, i) => `,${expression(read, "body", jsonPathLiteral(read.path))} AS v${i}`)
+            .join("")} FROM campaign_rooms WHERE code=?1`,
+        )
+        .bind(code, ...args)
+        .first()
+    );
+    if (!row) return null;
+    /** @type {SectionEntry[] | null} */
+    const manifest = row.manifest ? JSON.parse(row.manifest) : null;
+    const values = reads.map((read, i) => valueOf(read, row[`v${i}`]));
+    if (!manifest) return { version: version(code, row.revision, row.write_id, null), values };
+    for (const entry of manifest)
+      if (!HASH.test(entry.hash) || !entry.path.every((key) => PATH_KEY.test(key)))
+        throw Error("A shared campaign's storage manifest is unreadable. The campaign was not changed.");
+    /** Per read: the deepest section holding it, and the sections split out below it. */
+    const plans = reads.map((read) => {
+      const covering = manifest.filter((e) => startsWith(e.path, read.path)).sort((a, b) => b.path.length - a.path.length)[0];
+      const below = manifest.filter((e) => e.path.length > read.path.length && startsWith(read.path, e.path));
+      return { covering, below, extract: !!covering && covering.parts === 1 && !below.length };
+    });
+    /** Hashes whose whole text is needed (assembled in the Worker). */
+    const whole = new Set(
+      plans.flatMap((plan) => (plan.covering && !plan.extract ? [plan.covering, ...plan.below] : [])).map((e) => e.hash),
+    );
+    const selects = [`SELECT 'v' AS k,NULL AS i,NULL AS hash,NULL AS part,write_id AS body FROM campaign_rooms WHERE code=?1`];
+    plans.forEach((plan, i) => {
+      if (!plan.extract || !plan.covering) return;
+      const at = jsonPathLiteral(reads[i].path.slice(plan.covering.path.length));
+      selects.push(
+        `SELECT 'x',${i},s.hash,s.part,${expression(reads[i], "s.body", at)} FROM campaign_room_sections s WHERE s.code=?1 AND s.hash='${plan.covering.hash}' AND s.part=0`,
+      );
+    });
+    if (whole.size)
+      selects.push(
+        `SELECT 'p',NULL,s.hash,s.part,s.body FROM campaign_room_sections s WHERE s.code=?1 AND s.hash IN (${[...whole].map((h) => `'${h}'`).join(",")})`,
+      );
+    const rows = /** @type {any[]} */ ((await db.prepare(selects.join("\nUNION ALL\n")).bind(code, ...args).all()).results);
+    const current = rows.find((r) => r.k === "v");
+    if (!current) return null; // deleted in between
+    if (current.body !== row.write_id) continue;
+    const parts = partsFrom(rows.filter((r) => r.k === "p"));
+    /** @param {SectionEntry} entry */
+    const textOf = (entry) => {
+      const stored = parts.get(entry.hash);
+      const list = [];
+      for (let index = 0; index < entry.parts; index++) {
+        const part = stored?.get(index);
+        if (part === undefined) return undefined;
+        list.push(part);
+      }
+      return list.join("");
+    };
+    let complete = true;
+    for (const [i, plan] of plans.entries()) {
+      if (!plan.covering) continue;
+      if (plan.extract) {
+        const found = rows.find((r) => r.k === "x" && r.i === i);
+        if (!found) complete = false;
+        else values[i] = valueOf(reads[i], found.body);
+        continue;
+      }
+      // Assemble just this value: its section, walked down to the value, with the sections
+      // below it put back into their placeholders (shallower first).
+      const text = textOf(plan.covering);
+      if (text === undefined) {
+        complete = false;
+        continue;
+      }
+      const holder = { value: JSON.parse(text) };
+      let value = holder.value;
+      for (const key of reads[i].path.slice(plan.covering.path.length)) value = value?.[key];
+      const target = { value };
+      for (const entry of [...plan.below].sort((a, b) => a.path.length - b.path.length)) {
+        const below = textOf(entry);
+        if (below === undefined) {
+          complete = false;
+          break;
+        }
+        /** @type {any} */
+        let parent = target;
+        const rest = ["value", ...entry.path.slice(reads[i].path.length)];
+        for (const key of rest.slice(0, -1)) parent = parent?.[key];
+        if (parent && typeof parent === "object") parent[/** @type {string} */ (rest.at(-1))] = JSON.parse(below);
+      }
+      if (!complete) continue;
+      if (target.value === undefined) values[i] = null;
+      else if (reads[i].sql) {
+        // The caller's projection, computed by SQLite on just this assembled value.
+        const projected = /** @type {any} */ (
+          await db.prepare(`SELECT ${expression(reads[i], "?1", "'$'")} AS v`).bind(JSON.stringify(target.value), ...args).first()
+        );
+        values[i] = valueOf(reads[i], projected?.v);
+      } else values[i] = target.value;
+    }
+    if (complete) return { version: version(code, row.revision, row.write_id, Object.freeze(manifest)), values };
+  }
+  throw missingSection();
+}
+
+/**
+ * Stored table parts (`fields` of `room.table`, as JSON text or null) of every room matching
+ * `where` (a SQL predicate on top-level fields of `campaign_rooms`, such as
+ * `json_extract(body,'$.testMode')`), one room at a time, keyset-paginated by code. Inline rooms
+ * are projected in SQL, a page at a time; a sectioned room is read with `readRoomPaths`, only the
+ * sections holding those fields, and only when the caller asks for it, so at most one sectioned
+ * room's fields are in memory. Seats, tokens and chat are never read. For site-wide aggregates
+ * (game analytics).
+ * @param {Database} db @param {readonly string[]} fields
+ * @param {{ where?: string; whereArgs?: unknown[]; pageSize?: number }} [options]
+ * @returns {AsyncGenerator<{ code: string; fields: Record<string, string | null> }>}
+ */
+export async function* readRoomTables(db, fields, options = {}) {
+  for (const field of fields) if (!PATH_KEY.test(field)) throw Error("Invalid room table field.");
+  const limit = options.pageSize ?? 100;
   const columns = fields
     .map((field, index) => `CASE WHEN sectioned THEN NULL ELSE json_extract(body,'$.table.${field}') END AS f${index}`)
     .join(",");
-  const rows = await db
-    .prepare(
-      `SELECT code,sectioned,${columns} FROM (SELECT code,body,json_type(body,'$."${SECTIONS_KEY}"') IS NOT NULL AS sectioned FROM campaign_rooms WHERE code > ?${page.where ? ` AND (${page.where})` : ""} ORDER BY code LIMIT ?) ORDER BY code`,
-    )
-    .bind(page.after, ...(page.whereArgs ?? []), page.limit)
-    .all();
-  return Promise.all(
-    rows.results.map(async (/** @type {any} */ row) => {
+  for (let after = ""; ; ) {
+    const rows = await db
+      .prepare(
+        `SELECT code,sectioned,${columns} FROM (SELECT code,body,json_type(body,'$."${SECTIONS_KEY}"') IS NOT NULL AS sectioned FROM campaign_rooms WHERE code > ?${options.where ? ` AND (${options.where})` : ""} ORDER BY code LIMIT ?) ORDER BY code`,
+      )
+      .bind(after, ...(options.whereArgs ?? []), limit)
+      .all();
+    for (const row of /** @type {any[]} */ (rows.results)) {
       /** @type {Record<string, string | null>} */
       const values = {};
       if (row.sectioned) {
-        const table = (await readStoredRoom(db, row.code))?.room.table ?? {};
-        for (const field of fields) values[field] = table[field] == null ? null : JSON.stringify(table[field]);
+        const read = await readRoomPaths(db, row.code, fields.map((field) => ({ path: ["table", field] })));
+        if (read)
+          fields.forEach((field, index) => {
+            const value = read.values[index];
+            values[field] = value === null || value === undefined ? null : JSON.stringify(value);
+          });
+        else for (const field of fields) values[field] = null;
       } else fields.forEach((field, index) => (values[field] = row[`f${index}`] ?? null));
-      return { code: row.code, fields: values };
-    }),
-  );
+      yield { code: row.code, fields: values };
+      after = row.code;
+    }
+    if (rows.results.length < limit) return;
+  }
 }

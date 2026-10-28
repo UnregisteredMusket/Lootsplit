@@ -16,6 +16,13 @@ import {
 } from "./hosted-campaigns.mjs";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
 import {
+  BACKUP_MAX_BYTES,
+  BACKUP_PARTS_KEY,
+  backupPartStatements,
+  backupParts,
+  backupPartsCompleteSql,
+} from "./backup-parts.mjs";
+import {
   readRoomCore,
   readStoredRoom,
   roomDeleteStatement,
@@ -181,6 +188,16 @@ export async function campaignAction(db, userId, body, actor) {
     articles: [],
   };
   const backupId = crypto.randomUUID();
+  // A campaign too large for one backup row is stored in parts (backup-parts.mjs, migration
+  // 0027); the row then holds the parts marker and the recovery records.
+  const payloadText = JSON.stringify(payload);
+  const chunked = backupParts(payloadText);
+  if (chunked && chunked.marker.bytes > BACKUP_MAX_BYTES)
+    fail(
+      "Campaign access changed or its complete recovery copy exceeds the supported cloud size. Your campaign was not deleted. Refresh or download your backups.",
+      409,
+    );
+  const partStatements = chunked ? backupPartStatements(db, backupId, userId, chunked.parts) : [];
   // The room must still be exactly as read (no write since) for the backup and the delete.
   const unchanged = roomVersionSql(row.version);
   let results;
@@ -197,7 +214,7 @@ export async function campaignAction(db, userId, body, actor) {
          AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
         )
         .bind(
-          JSON.stringify(payload),
+          chunked ? JSON.stringify({ [BACKUP_PARTS_KEY]: chunked.marker }) : payloadText,
           ...deletionRecoveryArgs(recoveryRoom, seat, member.name, userId),
           backupId,
           userId,
@@ -210,11 +227,13 @@ export async function campaignAction(db, userId, body, actor) {
           member.seat_id,
           member.token,
         ),
+      ...partStatements,
+      // The deletion backup exists only once the whole copy (every part) is stored.
       db
         .prepare(
-          "INSERT INTO campaign_deletion_backups(backup_id,user_id,source_code) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?)",
+          `INSERT INTO campaign_deletion_backups(backup_id,user_id,source_code) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?) AND ${backupPartsCompleteSql}`,
         )
-        .bind(backupId, userId, body.code, backupId, userId),
+        .bind(backupId, userId, body.code, backupId, userId, backupId, partStatements.length),
       roomDeleteStatement(db, body.code, {
         expect: row.version,
         extraWhere: "EXISTS(SELECT 1 FROM campaign_deletion_backups WHERE backup_id=? AND user_id=?)",
@@ -248,6 +267,6 @@ export async function campaignAction(db, userId, body, actor) {
       "Campaign access changed or its complete recovery copy exceeds the supported cloud size. Your campaign was not deleted. Refresh or download your backups.",
       409,
     );
-  if (results[2].meta.changes !== 1) fail("The campaign changed. Refresh before deleting it.", 409);
+  if (results[2 + partStatements.length].meta.changes !== 1) fail("The campaign changed. Refresh before deleting it.", 409);
   return { ok: true, backupId };
 }
