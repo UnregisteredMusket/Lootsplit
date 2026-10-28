@@ -49,6 +49,17 @@ Android version code **21**, same package and permanent signing certificate. Ins
 
 - Website-only changes (home page joining steps and area carousel, promo video poster, phone screenshots, changelog folding, Find a group empty state, the 404 page and direct My account links: #277, #284, #286, #287, #289, #292, #307) and CI/audit-only changes (#272–#275, #302, #305, #308, #330) do not affect the app.
 
+
+## Release verification
+
+Published October 28, 2026 by `android-release.yml` (run 40707361833, started by the owner) from main `055851e`, after the full preservation checks, the API 24 and API 35 widget and picker checks, and the signed-APK upgrade gate passed.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `5d01de7f31e1bd259bd04b98dc8f490d6e852e3abdb9be61869687c6f5dde752` (32,888,166 bytes), matching SHA256SUMS.txt and the GitHub asset digest.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.13.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.14.0 and versionCode 21.
+- The bundled app contains the owner widget's own session (`owner/monitor/widget-session`) and the native `sessionToken` method (#334).
+
 ---
 
 # Lootsplitter 1.13.0
