@@ -27,6 +27,9 @@ export const shortcutDestinations = [
     icon: "scroll",
   },
   { id: "roll", label: "Roll dice", href: "/characters#dice", icon: "dice" },
+  // Pin to Desk (design Q8): every feature screen header can be pinned. Older clients that do not
+  // know these IDs fall back to the default button for that slot, as for any unknown ID.
+  ...[["quests","Quests","scroll"],["npcs","People & NPCs","users"],["trading","Trading & Barter","coins"],["economy","Trade Exchanges","store"],["time","Session Time","scroll"],["music","Music & Ambience","book"]].map(([id,label,icon])=>({id,label,icon,href:`/features/${id}`})),
   { id: "party", label: "Party sheets", href: "/party", icon: "users" },
   { id: "chat", label: "Party chat", href: "/share?chat=1", icon: "message" },
   { id: "library", label: "Library", href: "/library", icon: "book" },
@@ -55,7 +58,7 @@ export const shortcutIcons = [
   "save",
 ];
 export function destinationsFor(role = "dm") {
-  return shortcutDestinations.filter(x=>role === "dm" || !["encounter","loot","funds","downtime","financial","reports","review","shops","backup"].includes(x.id))
+  return shortcutDestinations.filter(x=>role === "dm" || !["encounter","loot","funds","downtime","financial","reports","review","shops","backup","time","music"].includes(x.id))
     .map(x => role === "dm" && x.id === "character" ? { ...x, href: "/characters" } : x);
 }
 /** @param {unknown} raw */
@@ -73,4 +76,34 @@ export function normalizeShortcuts(raw, role = "dm") {
       icon: shortcutIcons.includes(x.icon) ? x.icon : target.icon,
     };
   });
+}
+
+/**
+ * Pin to Desk (design Q8): the six account buttons stay six. Pinning puts the destination first
+ * and drops the last button; pinning one already there changes nothing.
+ * @param {{destination:string,label:string,icon:string}[]} items
+ * @param {string} destination
+ */
+export function pinShortcut(items, destination, role = "dm") {
+  const target = destinationsFor(role).find((d) => d.id === destination);
+  if (!target) throw Error("This screen cannot be pinned.");
+  if (items.some((x) => x.destination === destination)) return items;
+  return normalizeShortcuts(
+    [{ destination: target.id, label: target.label, icon: target.icon }, ...items].slice(0, 6),
+    role,
+  );
+}
+/**
+ * Unpin: the button is replaced by the first default destination not already pinned.
+ * @param {{destination:string,label:string,icon:string}[]} items
+ * @param {string} destination
+ */
+export function unpinShortcut(items, destination, role = "dm") {
+  const index = items.findIndex((x) => x.destination === destination);
+  if (index < 0) return items;
+  const fallback = [...normalizeShortcuts(null, role), ...destinationsFor(role).map((d) => ({ destination: d.id, label: d.label, icon: d.icon }))].find(
+    (x) => !items.some((y) => y.destination === x.destination),
+  );
+  const rest = items.filter((_, i) => i !== index);
+  return normalizeShortcuts(fallback ? [...rest, fallback] : rest, role);
 }

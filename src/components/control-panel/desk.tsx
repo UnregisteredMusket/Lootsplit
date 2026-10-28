@@ -29,6 +29,9 @@ import { lootReviewEncounters, lootReviewHref } from "@/lib/encounters/loot-revi
 import { DeskLootReviews } from "./desk-loot-review";
 import { reviewItems } from "@/lib/quire/review-inbox";
 import { DeskSetupChecklist } from "./setup-checklist";
+import { DeskSinceLastSession } from "@/components/session-chip";
+import { DeskPinned } from "./pins";
+import { QuickHp } from "./quick-hp";
 type Roll = NonNullable<Purse["rolls"]>[number];
 
 export function DmDesk() {
@@ -186,9 +189,14 @@ function DmDeskContents() {
           </AppLink>
         </div>
         <DeskSetupChecklist campaign={contextKey} online={room.joined} />
+        <DeskPinned />
         <div className="readout-grid desk-pinned-readouts">
           <AppLink
-            href={encounter?.status === "review" && encounter.id ? lootReviewHref(encounter.id) : "/encounters?resume=1"}
+            href={
+              encounter?.status === "review" && encounter.id
+                ? lootReviewHref(encounter.id)
+                : "/encounters?resume=1"
+            }
             className="readout"
           >
             <FantasyIcon ui="Encounters" size={30} />
@@ -217,8 +225,12 @@ function DmDeskContents() {
                 {room.joined && imports === null
                   ? pending + propertyPending + poolPending + lootPending + otherPending ||
                     (importError ? "Nothing else waiting" : "Checking imports…")
-                  : pending + (imports ?? 0) + propertyPending + poolPending + lootPending + otherPending ||
-                    "All caught up"}
+                  : pending +
+                      (imports ?? 0) +
+                      propertyPending +
+                      poolPending +
+                      lootPending +
+                      otherPending || "All caught up"}
               </strong>
               <small>
                 {/* Only what waits is listed (dm #16): no "0 financial · 0 property" rows. */}
@@ -244,6 +256,7 @@ function DmDeskContents() {
           </AppLink>
         </div>
         <DeskLootReviews rows={lootReviews} />
+        <DeskSinceLastSession />
       </div>
       <InformationStrip
         resetKey={contextKey}
@@ -296,32 +309,44 @@ function DmDeskContents() {
                     const live = profiles.find((x) => x.purse_id === p.id),
                       old = sheets.find((s) => s.purseId === p.id);
                     return (
-                      <AppLink
-                        key={p.id}
-                        href={
-                          live
-                            ? `/characters?id=${encodeURIComponent(live.id)}`
-                            : `/party#purse-${p.id}`
-                        }
-                      >
-                        <LedgerArt
-                          kind="portrait"
-                          src={live?.body.portrait || p.portrait}
-                          className="round"
-                        />
-                        <span>
-                          <strong>{p.name}</strong>
-                          {!!live?.body.maxHp && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
-                        </span>
-                        <small>
-                          {live?.body.maxHp
-                            ? `${live.body.hp}/${live.body.maxHp} HP`
-                            : old?.hitPoints
-                              ? `${old.hitPoints} HP`
-                              : "HP —"}
-                          {!!live?.body.ac && <span>AC {live.body.ac}</span>}
-                        </small>
-                      </AppLink>
+                      <div key={p.id} className="information-party-row">
+                        <AppLink
+                          href={
+                            live
+                              ? `/characters?id=${encodeURIComponent(live.id)}`
+                              : `/party#purse-${p.id}`
+                          }
+                        >
+                          <LedgerArt
+                            kind="portrait"
+                            src={live?.body.portrait || p.portrait}
+                            className="round"
+                          />
+                          <span>
+                            <strong>{p.name}</strong>
+                            {!!live?.body.maxHp && (
+                              <HpBar hp={live.body.hp} max={live.body.maxHp} />
+                            )}
+                          </span>
+                          <small>
+                            {live?.body.maxHp
+                              ? `${live.body.hp}/${live.body.maxHp} HP`
+                              : old?.hitPoints
+                                ? `${old.hitPoints} HP`
+                                : "HP —"}
+                            {!!live?.body.ac && <span>AC {live.body.ac}</span>}
+                          </small>
+                        </AppLink>
+                        {/* Quick HP ± while an encounter runs (design Q11). */}
+                        {encounter?.status === "active" && !!live?.body.maxHp && (
+                          <QuickHp
+                            purseId={p.id}
+                            name={p.name}
+                            hp={live.body.hp}
+                            max={live.body.maxHp}
+                          />
+                        )}
+                      </div>
                     );
                   })}
                 </div>
