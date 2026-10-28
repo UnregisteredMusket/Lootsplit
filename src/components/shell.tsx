@@ -2,6 +2,7 @@ import { ShellMapActions } from "./shell-map-actions";
 import { FeatureCards } from "./feature-navigation";
 import { WorkspaceWindows } from "./workspace-windows";
 import { CommandPaletteButton } from "./command-palette";
+import { SessionChip } from "./session-chip";
 import { SubmenuBackdrop } from "./submenu-backdrop";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
@@ -357,6 +358,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
                 {seatKnown ? (dm ? "DM" : "Player") : "…"}
                 {testRoom.testMode && <span className="ml-2 text-negative">Test mode</span>}
               </button>
+              <SessionChip />
               {/* A healthy room is one pill; Campaign and Maps show their own full status. */}
               {pathname !== "/share" && pathname !== "/maps" ? <RoomPill /> : null}
               <div className="header-actions">

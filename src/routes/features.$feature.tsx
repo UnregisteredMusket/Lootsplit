@@ -1,6 +1,7 @@
 import { LocationNpcs } from "@/components/location-npcs";
 import { CampaignTrading } from "@/components/campaign-trading";
 import { SessionTime } from "@/components/session-time";
+import { PinToDesk } from "@/components/control-panel/pins";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { CampaignReports } from "@/components/campaign-reports";
 import { createFileRoute } from "@tanstack/react-router";
@@ -106,6 +107,7 @@ function FeaturePage() {
         <FeatureHeader
           eyebrow={screen ? FEATURE_EYEBROWS[feature as Feature] : undefined}
           title={screen ? featureTitle(feature as Feature, dm) : "Feature unavailable"}
+          primary={screen && dm ? <PinToDesk feature={feature} /> : undefined}
         />
         {!screen || (screen.dm && !dm) ? (
           <p>This screen is available to the campaign DM.</p>

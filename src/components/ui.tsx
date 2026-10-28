@@ -591,3 +591,5 @@ export function Slider({
     </label>
   );
 }
+
+export { Checkbox } from "./checkbox";

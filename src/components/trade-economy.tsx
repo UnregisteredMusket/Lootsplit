@@ -205,8 +205,14 @@ export function TradeEconomyPanel() {
         ))}
       </details>
       <div className="world-toolbar commodity-tools">
-        <AppLink href="/features/properties">Property stores & managers →</AppLink>
-        {dm && <AppLink href="/features/downtime">Review end-of-session downtime →</AppLink>}
+        <AppLink className="tap-link" href="/features/properties">
+          Property stores & managers →
+        </AppLink>
+        {dm && (
+          <AppLink className="tap-link" href="/features/downtime">
+            Review end-of-session downtime →
+          </AppLink>
+        )}
       </div>
       <p className="commodity-caption">
         Prices stay fixed during a season. Purchases and sales feed the next season when the DM
