@@ -39,12 +39,14 @@ async function accountRequestCore<T>(
   signal?: AbortSignal,
   captcha?: string,
 ): Promise<T> {
+  // A widget connected before 2026-10-28 borrowed the app's token, which this sign-out or sign-in
+  // invalidates; a widget with its own session (expectedToken mismatch) stays connected.
   if (
     native() &&
     body !== undefined &&
     ["auth/sign-out", "auth/sign-in/email", "auth/sign-up/email"].includes(path)
   )
-    await disconnectOwnerWidget();
+    await disconnectOwnerWidget(localStorage.getItem(TOKEN) || "");
   const headers = new Headers();
   headers.set("accept", "application/json");
   headers.set("x-lootsplit-tabletop", "10");

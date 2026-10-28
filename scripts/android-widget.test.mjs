@@ -71,7 +71,8 @@ test("native account changes clear widget state before requests and scope late f
       return new Response("{}", { headers: { "content-type": "application/json" } });
     };
     await accountRequest("auth/sign-out", {});
-    assert.deepEqual(events.slice(0, 2), [["clear", undefined], ["fetch"]]);
+    // The sign-out clears only a legacy widget still holding this app token (the widget has its own session).
+    assert.deepEqual(events.slice(0, 2), [["clear", "first-session"], ["fetch"]]);
     assert.equal(storage.has("lootsplit.account.token.v1"), false);
 
     storage.set("lootsplit.account.token.v1", "old-session");

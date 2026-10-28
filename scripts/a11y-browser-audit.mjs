@@ -113,7 +113,13 @@ function tabIn(context) {
 }
 
 /** Checks one screen in the tab `ready()` returns. A renderer crash (an overloaded machine, not a
- * finding) is retried once in a fresh tab; any other failure is reported as unchecked. */
+ * finding) is retried once in a fresh tab. So is a hydration wait that times out (openApplication's
+ * `page.waitForFunction` for the opening screen or `main`): on main's run at 0d19079 the player's
+ * /party?section=fairness at 1280 px timed out that way once, with no violation and every later
+ * page in the same tab fine, and the identical page passed on the next run and in every local
+ * replay (CPU-throttled, UTC, cold Vite cache); a slow runner, not a finding. Any other failure
+ * is reported as unchecked. */
+const RETRIED = /crash|page\.waitForFunction: Timeout/i;
 async function visit(ready, path, entry, marker = "") {
   for (let attempt = 1; ; attempt++) {
     const page = await ready();
@@ -124,7 +130,10 @@ async function visit(ready, path, entry, marker = "") {
       entry.error = null;
     } catch (error) {
       entry.error = message(error);
-      if (attempt === 1 && /crash/i.test(entry.error)) continue;
+      if (attempt === 1 && RETRIED.test(entry.error)) {
+        entry.retried = entry.error;
+        continue;
+      }
     }
     break;
   }
@@ -231,11 +240,15 @@ const counts = Object.fromEntries(
   IMPACTS.map((impact) => [impact, sorted.filter((r) => r.impact === impact && !r.allowed).length]),
 );
 const errors = pages.filter((p) => p.error);
+// Pages that passed on their second attempt: visible in the report, so a runner that often
+// needs the retry is noticed, but not a failure.
+const retried = pages.filter((p) => p.retried && !p.error);
 const report = {
   startedAt: new Date(started).toISOString(),
   durationMs: Date.now() - started,
   pagesChecked: pages.length,
   pageErrors: errors.map(({ path, width, error }) => ({ path, width, error })),
+  pageRetries: retried.map(({ path, width, retried }) => ({ path, width, firstAttempt: retried })),
   ruleCounts: counts,
   allowed: ALLOWED,
   rules: sorted,
@@ -261,6 +274,8 @@ if (sorted.length) {
   if (sorted.length > 40) lines.push("", `${sorted.length - 40} more rules in result.json.`);
 }
 if (errors.length) lines.push("", `Pages that could not be checked: ${errors.map((e) => `${e.path}@${e.width}`).join(", ")}.`);
+if (retried.length)
+  lines.push("", `Pages checked on a second attempt: ${retried.map((e) => `${e.path}@${e.width} (${e.retried})`).join(", ")}.`);
 const summary = lines.join("\n") + "\n";
 if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, summary);
 console.log(summary);

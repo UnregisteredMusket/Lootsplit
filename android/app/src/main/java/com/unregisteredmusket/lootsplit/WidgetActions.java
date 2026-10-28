@@ -50,7 +50,7 @@ final class WidgetActions {
         if ("settings".equals(action) && companion) return PendingIntent.getActivity(context, code,
             new Intent(context, CompanionWidgetConfigureActivity.class).setData(identity).putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, id), flags);
         if ("website".equals(action)) return PendingIntent.getActivity(context, code,
-            new Intent(Intent.ACTION_VIEW, Uri.parse("https://lootsplit.oliverstorie2017.workers.dev")), flags);
+            new Intent(Intent.ACTION_VIEW, Uri.parse("https://lootsplitter.com")), flags);
         return PendingIntent.getActivity(context, code, new Intent(context, MainActivity.class).setData(identity)
             .putExtra(OwnerWidgetProvider.OPEN, true).putExtra(DESTINATION, action)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP), flags);
