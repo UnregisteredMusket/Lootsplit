@@ -152,7 +152,7 @@ try {
     await expect(page.locator(".sync-status")).toHaveCount(0);
     const away = page.getByRole("region", { name: "Since you were away", exact: true });
     await expect(away.getByRole("link", { name: "1 item waiting for your claim →", exact: true })).toBeVisible();
-    if (player.width < 480) {
+    if (player.width <= 430) {
       const strip = await page
         .locator(".submenu-workspace[data-submenu-scene]")
         .evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).paddingTop)));

@@ -4832,13 +4832,13 @@ button.quest-chip { min-height: 44px; }
   font-size: .8rem; color: var(--color-fg); text-decoration: none; white-space: nowrap;
 }
 .room-pill:hover { background: color-mix(in srgb, var(--color-lead) 10%, transparent); }
-@media (max-width: 379px) {
-  /* Phones this narrow keep the campaign name readable: the pill is its dot (24 px target). */
+@media (max-width: theme(--bp-phone)) {
+  /* Phones keep the campaign name readable: the pill is its dot (24 px target). */
   .room-pill { border: 0; padding-inline: 0; min-width: 24px; justify-content: center; gap: 0; }
   .room-pill > span[aria-hidden="true"]:not(.status-dot) { display: none; }
 }
 /* Phones: the decorative scene shows as a 48 px strip at most (plan P4). */
-@media (max-width: 479px) {
+@media (max-width: theme(--bp-phone)) {
   .submenu-workspace[data-submenu-scene] { padding-top: 3rem; min-height: 0; }
   .submenu-scenery { height: 12rem; }
 }
