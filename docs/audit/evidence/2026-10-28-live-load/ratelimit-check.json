@@ -1,0 +1,54 @@
+{
+  "kind": "lootsplit.live-load-ratelimit.v1",
+  "at": "2026-10-28T13:05:59.636Z",
+  "encounterId": false,
+  "detailRequests": 50,
+  "detailStatuses": {
+    "400": 50
+  },
+  "otherRequests": [
+    [
+      "dm roll",
+      400
+    ],
+    [
+      "player sheet save",
+      401
+    ],
+    [
+      "dm roll",
+      400
+    ],
+    [
+      "player sheet save",
+      401
+    ],
+    [
+      "dm roll",
+      400
+    ],
+    [
+      "dm roll",
+      400
+    ],
+    [
+      "player sheet save",
+      401
+    ],
+    [
+      "dm roll",
+      400
+    ],
+    [
+      "player sheet save",
+      401
+    ],
+    [
+      "dm roll",
+      400
+    ]
+  ],
+  "refusals429": 0,
+  "firstRefusedDetailRequest": null,
+  "signInFromHouseholdAfterwards": 429
+}

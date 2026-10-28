@@ -65,5 +65,5 @@ This file is the required reading. Everything under "Read on demand" is consulte
 | Ready-to-use prompts for future work, with status | `docs/prompts/README.md` |
 | Custom-domain move (lootsplitter.com), rename to Lootsplitter, cutover checklist | `docs/audit/2026-10-22-domain-migration-audit.md`, `docs/plans/DOMAIN-READINESS.md` |
 | Monetization (free, donations only) and marketing plan | `docs/plans/MONETIZATION-AND-MARKETING.md` |
-| Past audits and evidence | `docs/audit/` (newest: `2026-10-22-domain-migration-audit.md`) |
+| Past audits and evidence | `docs/audit/` (newest: `2026-10-28-live-campaign-load-audit.md`; its load scripts need owner authorization) |
 | Historical checkpoints | `docs/archive/recovery-checkpoints-2026-10.md` |
