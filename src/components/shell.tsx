@@ -11,7 +11,9 @@ import {
   confirmContextChange,
 } from "@/lib/quire/use-draft-guard";
 import { dismissDialog } from "@/lib/quire/confirm-store";
-import { runBackHandlers } from "@/lib/mobile/back-handlers";
+import { rootBack } from "@/lib/mobile/back-handlers";
+import { androidBackStep } from "@/lib/mobile/back-chain";
+import { toast } from "sonner";
 import { rememberScreen } from "@/lib/quire/map-navigation";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { useReviewCount } from "@/lib/quire/use-review-count";
@@ -66,6 +68,9 @@ type Dest =
   | "/share"
   | "/settings";
 
+/** Screens outside any campaign: Back at the root exits without "Press back again". */
+const NON_CAMPAIGN_ROUTES = new Set(["/welcome", "/downloads", "/account"]);
+
 type ShellProps = {
   children: ReactNode;
   width?: "wide" | "prose";
@@ -103,6 +108,9 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
   const campaignName = useCampaignDisplayName();
   const overlayRef = useRef(false);
   overlayRef.current = management || campaignOpen;
+  // Back at the app root warns before exiting only while a campaign is open (design M3).
+  const campaignOpenRef = useRef(false);
+  campaignOpenRef.current = seatKnown && !NON_CAMPAIGN_ROUTES.has(pathname);
   const [blocked, setBlocked] = useState<string | null>(null);
 
   const destinationHash = useRouterState({ select: (state) => state.location.hash });
@@ -114,26 +122,34 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
     if (import.meta.env.VITE_MOBILE !== "true") return;
     let remove = () => {};
     let live = true;
+    let exitPress: number | null = null;
     void import("@capacitor/app").then(({ App }) => {
       void App.addListener("backButton", ({ canGoBack }) => {
         if (dismissDialog()) return; // A themed confirmation or prompt cancels first.
-        if (overlayRef.current) {
-          setManagement(false);
-          setCampaignOpen(false);
+        // Overlays, the shell's panels, the top dialog, floating menus, then the screen.
+        if (
+          androidBackStep(() => {
+            if (!overlayRef.current) return false;
+            setManagement(false);
+            setCampaignOpen(false);
+            return true;
+          })
+        )
           return;
-        }
-        const close = document.querySelector<HTMLButtonElement>(
-          '[role="dialog"] button[aria-label="Close"]',
-        );
-        if (close) {
-          close.click();
-          return;
-        }
-        // A screen's own interceptor (the map: panel, then parent map, then close the map).
-        if (runBackHandlers()) return;
         const back = () => {
-          if (canGoBack) window.history.back();
-          else void App.exitApp();
+          if (canGoBack) {
+            window.history.back();
+            return;
+          }
+          // At the root, a second press within 2 s exits while a campaign is open (design M3).
+          const now = Date.now();
+          const step = rootBack({ campaignOpen: campaignOpenRef.current, lastPress: exitPress }, now);
+          if (step === "exit") {
+            void App.exitApp();
+            return;
+          }
+          exitPress = now;
+          toast("Press back again to exit", { id: "back-exit", duration: 2000 });
         };
         if (allowContextChange(back)) back();
       }).then((handle) => {
