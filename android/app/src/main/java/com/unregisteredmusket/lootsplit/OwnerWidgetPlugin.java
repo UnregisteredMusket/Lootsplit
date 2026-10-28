@@ -73,6 +73,12 @@ public class OwnerWidgetPlugin extends Plugin {
         }
         call.resolve();
     }
+    /** The widget's own session token for the app's revoke/rotate calls ("" when disconnected). */
+    @PluginMethod public void sessionToken(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("token", WidgetStore.read(getContext()).optString("token"));
+        call.resolve(result);
+    }
     /** Random per-installation id from no-backup storage (never a credential); binds the WebView account token. */
     @PluginMethod public void installId(PluginCall call) {
         // Plugin calls already run off the UI thread; the id is one small private file.
