@@ -1,0 +1,9 @@
+{
+  "title": "Android 1.14.0 download",
+  "summary": "The website's Android download is now version 1.14.0, with the quest log, redesigned map controls and a tidier Desk.",
+  "items": [
+    "Downloads offers Android 1.14.0 with its checksum; install it over the existing app.",
+    "This update brings the quest log (with quests on the map), redesigned map controls, search everywhere, the session chip and Pin to Desk, a faster Review Inbox and loot review, and an Android Back button that closes menus and sheets first.",
+    "For the site owner: the home-screen Field monitor now keeps its own sign-in, so it keeps refreshing after you sign out of or back in to the app. Tap Reconnect owner account once after updating."
+  ]
+}
