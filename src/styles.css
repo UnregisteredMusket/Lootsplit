@@ -644,7 +644,7 @@ input,select,textarea { max-width: 100%; }
 /* Phone landscape (design M2): the six tabs become a 56 px icon rail on the left (names stay
    as accessible labels) and the header slides away while scrolling down (shell.tsx). The map
    keeps its own rails and hides this chrome (.maps-shell). */
-@media (orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px) {
+@media (orientation: landscape) and (max-height: theme(--bp-landscape-height)) and (max-width: theme(--bp-wide-down)) {
   .loot-shell .loot-tabbar {
     top: 0;
     right: auto;
@@ -703,7 +703,7 @@ input,select,textarea { max-width: 100%; }
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
   }
 }
-@media (orientation: landscape) and (max-height: 500px) and (prefers-reduced-motion: reduce) {
+@media (orientation: landscape) and (max-height: theme(--bp-landscape-height)) and (prefers-reduced-motion: reduce) {
   .loot-shell .loot-header {
     transition: none;
   }
@@ -1572,11 +1572,11 @@ input,select,textarea { max-width: 100%; }
 .encounter-turn-bar button:last-child { background: var(--color-lead); color: var(--color-bg); border-radius: .6rem; font-weight: 600; }
 .encounter-turn-round { display: flex; flex-direction: column; align-items: center; font-family: var(--font-display); font-size: 1.05rem; white-space: nowrap; }
 .encounter-turn-round small { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-sans); font-size: .75rem; color: var(--color-muted); }
-@media (max-width: 1023.98px) {
+@media (max-width: theme(--bp-wide-down)) {
   .encounter-turn-bar { bottom: calc(74px + env(safe-area-inset-bottom)); }
 }
 /* With the phone-landscape side rail (.loot-tabbar), nothing sits under the bar. */
-@media (orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px) {
+@media (orientation: landscape) and (max-height: theme(--bp-landscape-height)) and (max-width: theme(--bp-wide-down)) {
   .loot-shell:has(nav.loot-tabbar) .encounter-turn-bar { bottom: calc(8px + env(safe-area-inset-bottom)); }
 }
 @media (max-width: 360px) {
@@ -4815,5 +4815,5 @@ button.quest-chip { min-height: 44px; }
 .join-tips li a { font-weight: 600; min-height: 2.75rem; display: inline-flex; align-items: center; }
 .join-tips li a::before { content: counter(tip) "."; margin-right: .35rem; color: var(--color-muted); }
 .join-tips li span { font-size: .875rem; color: var(--color-muted); overflow-wrap: anywhere; }
-@media (max-width: 639px) { .join-tips li span { display: none; } .join-tips li a { line-height: 1.2; } }
+@media (max-width: theme(--bp-tablet)) { .join-tips li span { display: none; } .join-tips li a { line-height: 1.2; } }
 .room-mode-readout { font-weight: 600; }
