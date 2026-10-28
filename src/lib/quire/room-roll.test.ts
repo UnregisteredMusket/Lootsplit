@@ -15,6 +15,8 @@ for (const name of [
   "0019_campaign_room_reports.sql",
 ])
   sql.exec(readFileSync(new URL(`../../../cloudflare/migrations/${name}`, import.meta.url), "utf8"));
+// Simulates another action landing between the roll's room read and its save.
+let racer: (() => void) | undefined;
 (globalThis as { __env__?: unknown }).__env__ = {
   DB: {
     async batch(statements: { run: () => Promise<unknown> }[]) {
@@ -47,6 +49,7 @@ for (const name of [
           return sql.prepare(query).get(...(values as never[])) ?? null;
         },
         async run() {
+          if (query.startsWith("INSERT INTO play_rolls")) racer?.();
           const r = sql.prepare(query).run(...(values as never[]));
           return { meta: { changes: Number(r.changes) } };
         },
@@ -92,4 +95,32 @@ test("server rolls are recorded in rooms with map images and before any other wr
     n: number;
   };
   assert.equal(saved.n, 1);
+});
+
+test("a roll raced by a chat line is prepared again; nothing is saved twice (load audit F10)", async () => {
+  const host = await openRoom({ name: "DM", table: tradeFixture() });
+  const player = await joinRoom({ code: host.code, purseId: "a", name: "A" });
+  const bump = () =>
+    sql
+      .prepare("UPDATE campaign_rooms SET revision = revision + 1, body = json_set(body, '$.revision', revision + 1) WHERE code=?")
+      .run(host.code);
+  const roll = (requestKey: string) =>
+    characterRoll({ code: host.code, token: player.token, purseId: "a", requestKey, revision: 0, kind: "custom", formula: "1d20", label: "Check" });
+  const saved = () =>
+    (sql.prepare("SELECT COUNT(*) AS n FROM play_rolls WHERE code=?").get(host.code) as { n: number }).n;
+  // Two changes land in a row: the third attempt saves.
+  let races = 2;
+  racer = () => (races-- > 0 ? bump() : undefined);
+  const first = await roll("raced-twice-roll-key");
+  assert.ok(first.total >= 1 && first.total <= 20);
+  assert.equal(saved(), 1);
+  // A retried request with the same key returns the same roll without saving another.
+  racer = undefined;
+  assert.deepEqual(await roll("raced-twice-roll-key"), first);
+  assert.equal(saved(), 1);
+  // A room that keeps changing still refuses after three attempts, and saves nothing.
+  racer = bump;
+  await assert.rejects(roll("always-raced-roll-key"), /Campaign changed\. Reload and retry\./);
+  racer = undefined;
+  assert.equal(saved(), 1);
 });

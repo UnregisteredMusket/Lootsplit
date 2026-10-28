@@ -10,7 +10,6 @@ import {
   readRoomAccess,
   createRoom,
   updateRoom,
-  roomStorageBody,
   keepStoredBody,
   roomImageSources,
   lookupReceipts,
@@ -82,7 +81,26 @@ export async function assertReferenceLookup(input: { code: string; token: string
   if (!access.allowed) throw Error(access.reason);
 }
 
-export async function characterRoll(input: {
+/** A roll prepared from a room revision that changed before the roll was saved; nothing was saved. */
+class RollRaced extends Error {}
+/**
+ * A character roll. The roll is saved only if the campaign is still at the revision it was rolled
+ * from (seat, character and policy unchanged); if a chat line or another action lands in between,
+ * the roll is prepared again from the new revision, up to three times (load audit F10, 2026-10-28).
+ */
+export async function characterRoll(input: Parameters<typeof characterRollOnce>[0]) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await characterRollOnce(input);
+    } catch (error) {
+      if (!(error instanceof RollRaced) || attempt === 2) {
+        if (error instanceof RollRaced) throw Error("Campaign changed. Reload and retry.");
+        throw error;
+      }
+    }
+  }
+}
+async function characterRollOnce(input: {
   code: string;
   token: string;
   purseId: string;
@@ -150,7 +168,7 @@ export async function characterRoll(input: {
     };
     await db
       .prepare(
-        "INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) SELECT ?,NULL,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND (?=0 OR EXISTS(SELECT 1 FROM play_policies WHERE code=? AND manual_allowed=1)) ON CONFLICT(id) DO NOTHING",
+        "INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) SELECT ?,NULL,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=?) AND (?=0 OR EXISTS(SELECT 1 FROM play_policies WHERE code=? AND manual_allowed=1)) ON CONFLICT(id) DO NOTHING",
       )
       .bind(
         receipt,
@@ -160,7 +178,7 @@ export async function characterRoll(input: {
         JSON.stringify(roll),
         Date.now(),
         room.code,
-        roomStorageBody(room),
+        room.revision,
         input.manual ? 1 : 0,
         room.code,
       )
@@ -169,7 +187,7 @@ export async function characterRoll(input: {
       .prepare("SELECT body FROM play_rolls WHERE id=?")
       .bind(receipt)
       .first<{ body: string }>();
-    if (!saved) throw Error("Campaign changed. Reload and retry.");
+    if (!saved) throw new RollRaced();
     return JSON.parse(saved.body);
   }
   const rolls = p.rolls || [];
