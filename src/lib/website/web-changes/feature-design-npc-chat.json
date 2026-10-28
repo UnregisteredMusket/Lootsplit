@@ -1,0 +1,11 @@
+{
+  "title": "Talking to NPCs and chatting, without the scrolling",
+  "summary": "A Talk link opens that NPC's conversation first, and Campaign → Chat now fills the screen.",
+  "items": [
+    "Opening an NPC from Here, a place card or the Market shows that conversation first and moves focus to it; everyone else at the location folds into \"Other people here\".",
+    "One Find an NPC picker searches names, places and descriptions (it replaces the separate record search).",
+    "An NPC with nothing to sell no longer shows an empty Inventory heading.",
+    "Campaign → Chat shows the conversation directly: a full-height history, the message box above the bottom navigation, and Jump to latest after you scroll up.",
+    "Connection & recovery, device backups and manual sharing now appear only on the Room tab."
+  ]
+}

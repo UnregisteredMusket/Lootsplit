@@ -18,7 +18,6 @@ import { useSeat } from "@/lib/quire/seat";
 
 export const Route = createFileRoute("/share")({ component: SharePage });
 function SharePage() {
-  const [openChat, setOpenChat] = useState(false);
   const [tab, setTab] = useState("room");
   const tabsId = useId();
   const locationSearch = useRouterState({ select: (s) => s.location.searchStr });
@@ -26,7 +25,6 @@ function SharePage() {
   useEffect(() => {
     const params = new URLSearchParams(locationSearch);
     const chat = !params.has("join") && params.get("chat") === "1";
-    setOpenChat(chat);
     if (params.has("join")) setTab("room");
     else if (chat) setTab("chat");
     else {
@@ -101,14 +99,10 @@ function SharePage() {
         aria-labelledby={`${tabsId}-chat-tab`}
         hidden={tab !== "chat"}
       >
-        <Fold
-          key={String(openChat)}
-          defaultOpen={true}
-          title={count ? `Messages · ${count} unread` : "Messages"}
-          hint="Party chat and private conversations."
-        >
+        {/* Chat is the whole tab (plan P8, Q24): full-height history, composer above the nav. */}
+        <div className="share-chat-full">
           <ShareChat />
-        </Fold>
+        </div>
       </div>
       <div
         id={`${tabsId}-rolls-panel`}
@@ -139,7 +133,8 @@ function SharePage() {
           <Notices />
         </Fold>
       </div>
-      <div className="campaign-support">
+      {/* Recovery, backups and manual sharing belong to the Room tab only (plan P8). */}
+      <div className="campaign-support" hidden={tab !== "room"}>
         {beforeJoining ? (
           // A player who has not joined yet sees one folded group instead of three panels
           // (plan P3); every tool stays inside it and opens in full after joining.

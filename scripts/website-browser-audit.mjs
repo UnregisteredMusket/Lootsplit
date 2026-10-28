@@ -42,6 +42,10 @@ try {
       // at the end and must answer 200.
       if (entry.error === "net::ERR_ABORTED" && r.resourceType() === "image" && new URL(r.url()).pathname.startsWith("/product/"))
         return abortedShots.add(new URL(r.url()).pathname);
+      // Likewise the promo video, which streams in chunks and is cancelled by any navigation
+      // (live audit of 055851e, 2026-10-28). It is checked again at the end with a HEAD request.
+      if (entry.error === "net::ERR_ABORTED" && r.resourceType() === "media" && new URL(r.url()).pathname.startsWith("/media/"))
+        return abortedShots.add(new URL(r.url()).pathname);
       (r.url().startsWith(origin) ? failures : externalFailures).push(entry);
     });
     for (const [path, heading] of [
@@ -500,7 +504,8 @@ try {
     await first.close();
   }
   for (const path of abortedShots) {
-    const response = await fetch(origin + path);
+    // HEAD: a cancelled video must exist, but the audit need not download it again.
+    const response = await fetch(origin + path, { method: path.startsWith("/media/") ? "HEAD" : "GET" });
     assert.equal(response.status, 200, `${path} exists`);
   }
   assert.deepEqual(failures, []);

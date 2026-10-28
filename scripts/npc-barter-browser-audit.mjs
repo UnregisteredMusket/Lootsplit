@@ -113,6 +113,19 @@ try {
     await seed(page, fixture);
     await reloadApplication(page);
 
+    // A deep link opens that person's conversation first and focuses it; one NPC picker (P8, Q23).
+    await navigateApplication(page, origin + "/features/npcs?npc=odile");
+    const focused = page.getByRole("region", { name: "Odile Marsh, conversation", exact: true });
+    await expect(focused).toBeFocused();
+    await expect(focused).toBeInViewport();
+    await expect(page.getByRole("combobox", { name: "Find an NPC", exact: true })).toHaveCount(1);
+    await expect(page.getByLabel("Search NPC records", { exact: true })).toHaveCount(0);
+    // Odile is alone here: no "Other people here" fold and no duplicate card.
+    await expect(page.getByText(/^Other people here/)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Odile Marsh →", exact: true })).toHaveCount(0);
+    await fits(page, `${width} npc deep link`);
+    await page.screenshot({ path: `${output}/npc-deep-link-${width}.png` });
+
     // Refuse first (no earlier trade to combine with): unwanted goods count for nothing, no roll,
     // and then the same offer is locked.
     await openConversation(page, "Bram Stoneward");

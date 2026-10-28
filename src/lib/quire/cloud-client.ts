@@ -840,7 +840,7 @@ async function flush(endTurn = false) {
   const s = requireSession();
   publish({ status: "saving", error: "" });
   try {
-    const remote = await submitCloudCommands({
+    const remote = await submitRoomCommands({
       data: {
         tabletopProtocol: 10,
         code: s.code,
@@ -856,11 +856,28 @@ async function flush(endTurn = false) {
     throw error;
   }
 }
+/**
+ * One automatic retry when the room was busy (live-campaign load audit F2): the server already
+ * retried its revision conflicts, so this covers a burst of simultaneous actions that outlasted
+ * them. The same batch and action IDs are sent again, which the room applies at most once.
+ * Permission, validation and connection errors are never retried here.
+ */
+async function submitRoomCommands(request: Parameters<typeof submitCloudCommands>[0]) {
+  try {
+    return await submitCloudCommands(request);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.includes("The table changed.") && !message.startsWith("The campaign is busy."))
+      throw error;
+    await new Promise((resolve) => setTimeout(resolve, 150 + Math.random() * 250));
+    return submitCloudCommands(request);
+  }
+}
 async function stage(rethrow = false) {
   const s = requireSession();
   if (!s.pending.length) return;
   try {
-    const remote = await submitCloudCommands({
+    const remote = await submitRoomCommands({
       data: {
         tabletopProtocol: 10,
         code: s.code,
@@ -987,7 +1004,7 @@ export async function queueCommand(
       throw Error("Submit or discard your pending actions before changing quests.");
     if (input.kind === "message" || seasonalPlan || npcBarter || loot || quest) {
       // Chat is independent of transaction turns; retain a failed message in the editor.
-      const remote = await submitCloudCommands({
+      const remote = await submitRoomCommands({
         data: {
           tabletopProtocol: 10,
           code: s.code,
@@ -1074,7 +1091,7 @@ export async function queueCommandBatch(
     const commands = inputs.map((input) =>
       commandSchema.parse({ ...input, id: input.id || crypto.randomUUID() }),
     );
-    const remote = await submitCloudCommands({
+    const remote = await submitRoomCommands({
       data: { tabletopProtocol: 10, code: s.code, token: s.token, batchId, commands },
     });
     guard();
@@ -1330,7 +1347,7 @@ export async function importPending(file: File) {
 export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) {
   return serial(async () => {
     const s = requireSession();
-    const remote = await submitCloudCommands({
+    const remote = await submitRoomCommands({
       data: {
         tabletopProtocol: 10,
         code: s.code,

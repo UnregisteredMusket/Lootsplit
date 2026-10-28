@@ -10,6 +10,8 @@ import {
 import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { projectMapCombat } from "@/lib/quire/map-combat";
+import { startVisiblePoll } from "@/lib/quire/visible-poll";
+import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
 import type { CampaignMap } from "@/lib/quire/world-schema";
 import type { MapCombatHud } from "@/lib/quire/map-combat-schema";
 export function MapCombatHud({ map }: { map: CampaignMap }) {
@@ -29,39 +31,54 @@ export function MapCombatHud({ map }: { map: CampaignMap }) {
   const [state, setState] = useState<{ scope: string; hud: MapCombatHud | null; error?: string }>();
   useEffect(() => {
     if (!scope) return;
-    let cancelled = false,
-      timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
     const expected = captureMutationScope();
-    async function load() {
+    const unavailable = () => {
+      if (!cancelled)
+        setState({
+          scope: scope!,
+          hud: null,
+          error: "Combat view unavailable. Refresh or check connection status.",
+        });
+    };
+    if (!cloud.joined) {
+      if (seat.role !== "dm" || !binding) {
+        setState({ scope, hud: null });
+        return;
+      }
+      // Device campaign: the DM's own encounter, through the page's shared encounter poll.
+      const unsubscribe = encounterDetailPoller.subscribe(binding.encounterId, {
+        intervalMs: 3000,
+        onResult: (value) => {
+          try {
+            assertMutationScope(expected);
+            const row = value as { code: string; status: string; body: { round: number; activeId: string } };
+            const hud = row.code === "device" ? projectMapCombat(map, binding.encounterId, row) : null;
+            if (!cancelled) setState({ scope: scope!, hud });
+          } catch {
+            unavailable();
+          }
+        },
+        onError: unavailable,
+      });
+      return () => {
+        cancelled = true;
+        unsubscribe();
+      };
+    }
+    // Shared campaign: every 3 s while the tab is visible, catching up on return.
+    const stop = startVisiblePoll(async () => {
       try {
-        let hud: MapCombatHud | null = null;
-        if (cloud.joined) hud = await readSharedMapCombat(map.id);
-        else if (seat.role === "dm" && binding) {
-          const { encounterRequest } = await import("@/lib/encounters/client");
-          const row = await encounterRequest<{
-            code: string;
-            status: string;
-            body: { round: number; activeId: string };
-          }>("encounters/detail", { id: binding.encounterId });
-          assertMutationScope(expected);
-          if (row.code === "device") hud = projectMapCombat(map, binding.encounterId, row);
-        }
+        const hud = await readSharedMapCombat(map.id);
         assertMutationScope(expected);
         if (!cancelled) setState({ scope: scope!, hud });
       } catch {
-        if (!cancelled)
-          setState({
-            scope: scope!,
-            hud: null,
-            error: "Combat view unavailable. Refresh or check connection status.",
-          });
+        unavailable();
       }
-      if (!cancelled) timer = setTimeout(() => void load(), 3000);
-    }
-    void load();
+    }, 3000);
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      stop();
     };
   }, [scope, map, cloud.joined, seat.role, binding]);
   if (!scope) return null;

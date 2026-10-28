@@ -1,0 +1,9 @@
+{
+  "title": "Steadier dice rolls and lighter room checks",
+  "summary": "Character rolls no longer fail when someone chats at the same moment, and shared campaigns do less work on every update.",
+  "items": [
+    "If another action lands while a roll is being saved, the roll is prepared again from the new state instead of asking you to reload (up to three tries; the same roll is never saved twice).",
+    "Checking whether a campaign has an active encounter now uses an index, instead of looking through every encounter on the site on each update.",
+    "Saving a shared campaign no longer re-sends the whole campaign once per signed-in player."
+  ]
+}

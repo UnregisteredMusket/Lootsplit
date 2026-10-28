@@ -180,15 +180,48 @@ async function readBody(request, limit = 4_000_000) {
     fail("Invalid request.");
   }
 }
-async function rateLimit(env, request) {
-  const key = await digest(request.headers.get("cf-connecting-ip") || "local");
+/**
+ * Account API request allowances per minute (audit 2026-10-28 F4). Anonymous and credential
+ * requests (sign-in, sign-up, recovery, any request without a valid session) count per IP, so
+ * brute-force protection is unchanged. Signed-in requests count per account instead, because
+ * players at one table share the household's IP and a DM's encounter views alone poll about
+ * 30 times a minute; a separate, much larger per-IP ceiling for signed-in traffic still bounds
+ * many accounts flooding from one address, and never touches the anonymous allowance.
+ */
+export const ACCOUNT_RATE_LIMITS = Object.freeze({
+  anonymousPerIp: 60,
+  perAccount: 240,
+  signedInPerIp: 1500,
+});
+const limitHit = (db, key, window) =>
+  db
+    .prepare(
+      "INSERT INTO library_limits (key, window, hits) VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET window=excluded.window, hits=CASE WHEN library_limits.window=excluded.window THEN library_limits.hits+1 ELSE 1 END RETURNING hits",
+    )
+    .bind(key, window);
+const tooMany = () => fail("Too many account requests. Wait a minute and try again.", 429);
+/** Paths that take credentials or create accounts: always limited per IP, session or not. */
+const credentialPath = (path) =>
+  path === "/api/account/recover" ||
+  (path.startsWith("/api/account/auth/") && path !== "/api/account/auth/update-user");
+async function rateLimit(env, request, userId = null) {
+  const ip = request.headers.get("cf-connecting-ip") || "local";
   const window = Math.floor(Date.now() / 60000);
-  const row = await env.DB.prepare(
-    "INSERT INTO library_limits (key, window, hits) VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET window=excluded.window, hits=CASE WHEN library_limits.window=excluded.window THEN library_limits.hits+1 ELSE 1 END RETURNING hits",
+  if (!userId) {
+    // Same key as before this change, so a deploy does not reset a running window.
+    const row = await limitHit(env.DB, await digest(ip), window).first();
+    if (row.hits > ACCOUNT_RATE_LIMITS.anonymousPerIp) tooMany();
+    return;
+  }
+  const [account, household] = await Promise.all([
+    limitHit(env.DB, `account:${await digest(userId)}`, window).first(),
+    limitHit(env.DB, `signed-in-ip:${await digest(ip)}`, window).first(),
+  ]);
+  if (
+    account.hits > ACCOUNT_RATE_LIMITS.perAccount ||
+    household.hits > ACCOUNT_RATE_LIMITS.signedInPerIp
   )
-    .bind(key, window)
-    .first();
-  if (row.hits > 60) fail("Too many account requests. Wait a minute and try again.", 429);
+    tooMany();
 }
 async function roomSeat(db, code, token) {
   const row = await db.prepare("SELECT body FROM campaign_rooms WHERE code = ?").bind(code).first();
@@ -296,12 +329,18 @@ export async function handleAccounts(request, env, context = null) {
   try {
     if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
     const auth = accountAuth({ ...env, ACCOUNT_ORIGIN: authOrigin });
+    // Resolved at most once per request and shared by the rate limit and the handlers below.
+    let sessionLookup = null;
+    const getSession = () => (sessionLookup ??= auth.api.getSession({ headers: request.headers }));
     if (!["GET", "POST"].includes(request.method)) fail("Method not allowed.", 405);
     if (request.method === "POST") {
       if (!origin) fail("An origin is required.", 403);
       if (!request.headers.get("content-type")?.startsWith("application/json"))
         fail("JSON is required.", 415);
-      await rateLimit(env, request);
+      const limitedUser = credentialPath(path)
+        ? null
+        : ((await getSession().catch(() => null))?.user?.id ?? null);
+      await rateLimit(env, request, limitedUser);
       // Turnstile on sign-up, sign-in and recovery-key reset (website only; see turnstile.mjs).
       await verifyCaptcha(env, request, {
         path,
@@ -313,7 +352,7 @@ export async function handleAccounts(request, env, context = null) {
       if (request.method === "POST") {
         const body = await readBody(request, 16_000);
         if (path === "/api/account/auth/update-user") {
-          const session = await auth.api.getSession({ headers: request.headers });
+          const session = await getSession();
           if (!session) fail("Sign in to edit your profile.", 401);
           await assertActive(env.DB, session.user.id);
           return cors(json(await saveAuthProfile(env.DB, session.user.id, body)));
@@ -403,7 +442,7 @@ export async function handleAccounts(request, env, context = null) {
       if (rest.startsWith("portrait/"))
         return cors(await communityPortrait(db, viewer, rest.slice(9)));
     }
-    const session = await auth.api.getSession({ headers: request.headers });
+    const session = await getSession();
     if (!session) fail("Sign in to open your account library.", 401);
     const userId = session.user.id;
     await assertActive(db, userId);

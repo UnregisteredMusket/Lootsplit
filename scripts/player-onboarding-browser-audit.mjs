@@ -13,6 +13,8 @@
 // - the character sheet opens straight to the sheet with a Home breadcrumb, the DM lock as an
 //   icon, no save bar until an edit, quick ±HP that saves, a "Last roll" chip and the shared-room
 //   roll-log wording; the character library is folded below the sheet and opens from Sheet tools;
+// - Campaign → Chat fills the screen with no Messages fold or recovery panels, keeps its composer
+//   above the bottom navigation, and offers "Jump to latest" after scrolling up;
 // - on Campaign, players read the room mode ("The DM runs this room in Live mode") and no
 //   DM invite instructions;
 // - no screen scrolls sideways.
@@ -239,6 +241,40 @@ try {
     await page.getByRole("button", { name: "My characters · choose, create or import", exact: true }).click();
     await expect(page.locator("#character-library")).toHaveAttribute("open", "");
     await expect(page.getByLabel("Choose character", { exact: true })).toBeVisible();
+    // Campaign → Chat is the whole tab: no Messages fold, no recovery panels, a pinned composer (P8, Q24).
+    await navigateApplication(page, origin + "/share?chat=1");
+    const composer = page.locator("#chat-message");
+    await expect(composer).toBeEnabled();
+    await expect(page.getByRole("button", { name: /^Messages/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Connection & recovery/ })).toBeHidden();
+    const history = page.getByRole("log", { name: "Messages", exact: true });
+    const historyHeight = await history.evaluate((el) => el.getBoundingClientRect().height);
+    assert.ok(historyHeight >= 250, `${player.width}: chat history is ${historyHeight}px tall`);
+    if (player.width === 390) {
+      for (let i = 1; i <= 8; i++) {
+        await composer.fill(`Onboarding check ${i}: the road is long and the night is dark.`);
+        await page.getByRole("button", { name: "Send", exact: true }).click();
+        await expect(history.getByText(`Onboarding check ${i}:`, { exact: false })).toBeVisible();
+      }
+      // Once every message is confirmed, no incoming update scrolls the history back down.
+      await expect(history.locator(".chat-time").filter({ hasText: "Sent" })).toHaveCount(8);
+      await history.evaluate((el) => el.scrollTo({ top: 0 }));
+      const jump = page.getByRole("button", { name: "Jump to latest ↓", exact: true });
+      await expect(jump).toBeVisible();
+      await jump.click();
+      await expect(jump).toHaveCount(0);
+      await expect(history.getByText("Onboarding check 8:", { exact: false })).toBeInViewport();
+    }
+    // The composer sits above the bottom navigation, inside the viewport.
+    const composerBox = await page.locator(".chat-composer").boundingBox();
+    const viewport = page.viewportSize();
+    assert.ok(composerBox && composerBox.y + composerBox.height <= viewport.height + 1, `${player.width}: composer is on screen`);
+    if (player.width < 1024) {
+      const navBox = await page.locator("nav.fixed[aria-label='Sections']").boundingBox();
+      assert.ok(composerBox.y + composerBox.height <= navBox.y + 1, `${player.width}: composer clears the bottom nav`);
+    }
+    await fits(page, `chat ${player.width}`);
+    await page.screenshot({ path: `${output}/chat-${player.width}.png` });
 
     if (player.width === 1280) {
       // "Your name" is remembered on this device for the next join.
@@ -254,7 +290,7 @@ try {
   }
   await dm.context.close();
   assert.deepEqual(errors, []);
-  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips and read-only room mode, status pill, scene strip, Since you were away and the character sheet at 1280/390/320.");
+  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips and read-only room mode, status pill, scene strip, Since you were away, the character sheet and chat at 1280/390/320.");
 } finally {
   await browser.close();
 }

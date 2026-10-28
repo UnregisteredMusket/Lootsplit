@@ -1441,6 +1441,52 @@ test("connected combat presentation rechecks seats, campaign, fog and scene perm
   assert.deepEqual(saved.holdings, []);
 });
 
+test("combat HUD and initiative polls read the room once, without map rasters (audit 2026-10-28 F8)", async () => {
+  const { mapCombatOrder, mapCombatPresentation, choosePace } = await import("./cloud.server.ts");
+  const { campaignMapSchema } = await import("./world-schema.ts");
+  const { readJournal } = await import("./journal.ts");
+  const art = "data:image/webp;base64," + "Q".repeat(20000);
+  const battle = campaignMapSchema.parse({ id: "light-battle", name: "Light battle", image: art, visible: true, locationId: null, anchors: [], markers: [],
+    grid: { columns: 10, rows: 10, feetPerTile: 5, diagonal: "equal", x: 0, y: 0, width: 1, height: 1 },
+    tokens: [{ id: "light-hero-token", label: "Hero", kind: "character", entityId: "light-hero", column: 0, row: 0, visibility: "party" },
+      { id: "light-scout-token", label: "Known scout", kind: "creature", encounterId: "light-encounter", combatantId: "scout", column: 2, row: 0, visibility: "party" },
+      { id: "light-dragon-token", label: "Secret dragon", kind: "creature", encounterId: "light-encounter", combatantId: "dragon", column: 3, row: 0, visibility: "dm" }],
+  });
+  const table = { ...emptyCloudTable(), purses: [{ id: "light-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }], journal: readJournal({ world: { maps: [battle] } }) };
+  const host = await openRoom({ name: "Light DM", table }), guest = await joinRoom({ code: host.code, purseId: "light-hero", name: "Light player" });
+  await choosePace({ ...host, live: true });
+  const binding = { id: "light-transition", encounterId: "light-encounter", encounterRevision: 0, mapId: battle.id, returnMapId: battle.id, returnCamera: { x: .5, y: .5, zoom: 1 }, mode: "theatre", phase: "active", scaleConfirmed: false, showPlayers: true };
+  await submitCommands({ ...host, batchId: "light-start", commands: [{ id: "light-activate", kind: "map-combat-transition", before: null, binding, beforeSession: null }] });
+  sql.exec("CREATE TABLE IF NOT EXISTS user(id TEXT PRIMARY KEY)");
+  sql.prepare("INSERT OR IGNORE INTO user(id) VALUES (?)").run("synthetic-owner");
+  const body = { name: "Private fight", round: 4, activeId: "scout", combatants: [{ id: "dragon", initiative: 22, hp: 300 }, { id: "light-hero", initiative: 18, hp: 21, maxHp: 30 }, { id: "scout", initiative: 15, hp: 3 }] };
+  sql.prepare("INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',1,1,1)").run("light-encounter", "synthetic-owner", host.code, JSON.stringify(body));
+  const stored = sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as { body: string };
+  assert.ok(!stored.body.includes(art), "the map raster is stored beside the room row");
+  const env = (globalThis as any).__env__, prepare = env.DB.prepare;
+  const queries: string[] = [];
+  env.DB.prepare = (query: string) => (queries.push(query), prepare.call(env.DB, query));
+  try {
+    for (const [seat, read, expected] of [
+      [guest, mapCombatPresentation, { mapId: battle.id, status: "active", round: 4, activeTokenId: "light-scout-token" }],
+      [host, mapCombatPresentation, { mapId: battle.id, status: "active", round: 4, activeTokenId: "light-scout-token" }],
+      [guest, mapCombatOrder, { mapId: battle.id, status: "active", round: 4, entries: [
+        { tokenId: "light-hero-token", label: "Hero", initiative: 18, active: false, own: true, hp: 21, maxHp: 30 },
+        { tokenId: "light-scout-token", label: "Known scout", initiative: null, active: true, own: false }] }],
+    ] as const) {
+      queries.length = 0;
+      assert.deepEqual(await (read as typeof mapCombatOrder)({ code: host.code, token: seat.token, mapId: battle.id }), expected);
+      assert.equal(queries.filter((q) => /FROM campaign_rooms/.test(q)).length, 1, queries.join("\n"));
+      assert.equal(queries.filter((q) => /dm_encounters/.test(q)).length, 1, "the encounter is read in the same statement");
+      // Besides it, only the shared character-sheet lookup that every room read makes.
+      assert.equal(queries.filter((q) => !/FROM play_characters/.test(q)).length, 1, queries.join("\n"));
+      assert.ok(!queries.some((q) => /campaign_room_images|campaign_room_reports/.test(q)), "no rasters or reports");
+    }
+  } finally {
+    env.DB.prepare = prepare;
+  }
+});
+
 test("market location and other journal artwork is stored beside the room row; shared portraits stay inline", async () => {
   const { readJournal } = await import("./journal.ts");
   const { encodeRoomImages } = await import("../../../cloudflare/room-images.mjs");

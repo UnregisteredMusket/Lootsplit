@@ -175,6 +175,48 @@ export async function readRoom(code: string, options: ReadRoomOptions = {}): Pro
   if (room) ensureCityExchanges(room.table);
   return room;
 }
+export type CombatViewRead = {
+  room: CloudRoom;
+  /** The bound encounter's row in this campaign, read in the same statement as the room. */
+  encounter: { body: string; status: string } | null;
+};
+/**
+ * Read-only room for the map combat views (`mapCombatOrder`, `mapCombatPresentation`; audit
+ * 2026-10-28 F8). One statement reads the room and the encounter its combat binding names, so
+ * seats, binding, scene and encounter come from a single consistent snapshot. Archived reports
+ * are left out (the combat views never project them) and the current maps' image references stay
+ * references, so no map rasters or report snapshots are read. Never write this room back,
+ * export it or use it as a guard.
+ */
+export async function readCombatView(code: string): Promise<CombatViewRead | null> {
+  const db = database();
+  if (!db) {
+    const room = await readRoom(code);
+    return room ? { room, encounter: null } : null;
+  }
+  const row = await db
+    .prepare(
+      "SELECT r.body AS body,e.body AS encounter_body,e.status AS encounter_status FROM campaign_rooms r LEFT JOIN dm_encounters e ON e.id=json_extract(r.body,'$.table.journal.world.combat.encounterId') AND e.code=r.code WHERE r.code=?",
+    )
+    .bind(code)
+    .first<{ body: string; encounter_body: string | null; encounter_status: string | null }>();
+  if (!row) return null;
+  const parsed = JSON.parse(row.body) as CloudRoom;
+  if (parsed.table?.journal) parsed.table.journal.reports = [];
+  const { hydrateCampaignCharacters } =
+    await import("../../../cloudflare/campaign-characters.mjs");
+  const room = await hydrateRoomImages(db, parsed.code, await hydrateCampaignCharacters(db, parsed), {
+    keepMapImageReferences: true,
+  });
+  ensureCityExchanges(room.table);
+  return {
+    room,
+    encounter:
+      typeof row.encounter_body === "string" && typeof row.encounter_status === "string"
+        ? { body: row.encounter_body, status: row.encounter_status }
+        : null,
+  };
+}
 /**
  * D1 rejects rows above 2,000,000 bytes with an opaque error. Room bodies (after images, resource
  * packs and archived session snapshots move to their own tables) and each archived snapshot row are
@@ -251,16 +293,17 @@ export async function createRoom(
     if (host && hosting) await hosting.assertCanHost(db, host.userId, host.path, host.limit);
     const encoded = await encodeRoomImages(room);
     await guardRoomSize(db, room, encoded);
+    const writeId = crypto.randomUUID();
     const insert = host && hosting
       ? db
           .prepare(
-            `INSERT INTO campaign_rooms (code, revision, body) SELECT ?, ?, ? WHERE ${hosting.hostedCampaignGuardSql}`,
+            `INSERT INTO campaign_rooms (code, revision, body, write_id) SELECT ?, ?, ?, ? WHERE ${hosting.hostedCampaignGuardSql}`,
           )
-          .bind(room.code, room.revision, encoded.body, ...hosting.hostedCampaignGuardArgs(host.userId, host.limit))
+          .bind(room.code, room.revision, encoded.body, writeId, ...hosting.hostedCampaignGuardArgs(host.userId, host.limit))
       : db
-          .prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)")
-          .bind(room.code, room.revision, encoded.body);
-    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, encoded.body)];
+          .prepare("INSERT INTO campaign_rooms (code, revision, body, write_id) VALUES (?, ?, ?, ?)")
+          .bind(room.code, room.revision, encoded.body, writeId);
+    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, writeId)];
     const result = members.length ? (await db.batch([insert, ...members]))[0]! : await insert.run();
     if (host && hosting && !result.meta.changes) {
       // A concurrent open filled the last slot between the pre-check and this write.
@@ -387,7 +430,7 @@ export async function updateRoom(
       .bind(room.revision, encoded.body, writeId, room.code, baseRevision);
     const members = [
       ...await roomImageStatements(db, stored, encoded),
-      ...accountSeats(db, stored, encoded.body),
+      ...accountSeats(db, stored, writeId),
       ...(receipts.length ? [receiptStatement(db, room.code, receipts, writeId)] : []),
     ];
     const result = members.length ? (await db.batch([update, ...members]))[0]! : await update.run();
@@ -437,13 +480,18 @@ export async function deleteRoom(code: string, baseRevision: number): Promise<vo
   });
 }
 
-function accountSeats(db: Database, room: CloudRoom, body: string): Statement[] {
+/**
+ * Library membership for account seats, written only if the room write with `writeId` committed in
+ * the same batch. (It used to compare the whole room body, sending it to D1 once per account seat on
+ * every write: load audit F14, 2026-10-28.)
+ */
+function accountSeats(db: Database, room: CloudRoom, writeId: string): Statement[] {
   return room.seats
     .filter((s) => s.userId)
     .map((s) =>
       db
         .prepare(
-          "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,updated_at=excluded.updated_at WHERE library_members.seat_id<>excluded.seat_id OR library_members.token<>excluded.token",
+          "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND write_id=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,updated_at=excluded.updated_at WHERE library_members.seat_id<>excluded.seat_id OR library_members.token<>excluded.token",
         )
         .bind(
           s.userId,
@@ -453,7 +501,7 @@ function accountSeats(db: Database, room: CloudRoom, body: string): Statement[] 
           "Campaign",
           Date.now(),
           room.code,
-          body,
+          writeId,
         ),
     );
 }

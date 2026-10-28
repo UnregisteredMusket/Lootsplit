@@ -11,6 +11,9 @@ import {
   subscribeCloudTable,
 } from "@/lib/quire/cloud-client";
 import { encounterRequest } from "@/lib/encounters/client";
+import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
+import { startVisiblePoll } from "@/lib/quire/visible-poll";
+import { useWorldTable } from "@/lib/quire/use-world-table";
 import { nextTurn, previousTurn } from "@/lib/encounters/model.mjs";
 import type { MapCombatBinding, MapCombatOrder } from "@/lib/quire/map-combat-schema";
 import type { CampaignMap } from "@/lib/quire/world-schema";
@@ -95,33 +98,31 @@ function DmInitiative({
   const encounterId = binding?.mapId === map.id ? binding.encounterId : undefined;
   const [detail, setDetail] = useState<Detail>(),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [reload, setReload] = useState(0);
+    [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!encounterId) return;
-    let cancelled = false,
-      timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
     const expected = captureMutationScope();
-    const load = async () => {
-      try {
-        const row = await encounterRequest<Detail>("encounters/detail", { id: encounterId });
-        assertMutationScope(expected);
+    // Shared with the TV display controller (one request for both), every 3 s while visible.
+    return encounterDetailPoller.subscribe(encounterId, {
+      intervalMs: 3000,
+      onResult: (row) => {
+        try {
+          assertMutationScope(expected);
+        } catch {
+          cancelled = true;
+        }
         if (!cancelled) {
-          setDetail(row);
+          setDetail(row as Detail);
           setError("");
         }
-      } catch (e) {
+      },
+      onError: (e) => {
         if (!cancelled)
           setError(e instanceof Error ? e.message : "The encounter could not be read.");
-      }
-      if (!cancelled) timer = setTimeout(() => void load(), 3000);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [encounterId, reload]);
+      },
+    });
+  }, [encounterId]);
   if (!encounterId)
     return (
       <>
@@ -140,7 +141,7 @@ function DmInitiative({
         revision: detail.revision,
         encounter,
       });
-      setReload((n) => n + 1);
+      encounterDetailPoller.refresh(detail.id);
     } catch (e) {
       setError(
         e instanceof Error
@@ -210,14 +211,21 @@ function DmInitiative({
 
 function PlayerInitiative({ map }: { map: CampaignMap }) {
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const presentation = useWorldTable().journal.world?.tabletop?.presentation;
+  // The server shows players the order only while the DM presents combat on this scene, so
+  // there is nothing to read (and no request) otherwise.
+  const presenting = presentation?.mapId === map.id ? presentation.id : undefined;
   const [state, setState] = useState<{ order: MapCombatOrder | null; error?: string }>();
   useEffect(() => {
     // A different map: never show the previous map's order while the next one loads.
     setState(undefined);
     if (!cloud.joined) return;
-    let cancelled = false,
-      timer: ReturnType<typeof setTimeout>;
-    const load = async () => {
+    if (!presenting) {
+      setState({ order: null });
+      return;
+    }
+    let cancelled = false;
+    const stop = startVisiblePoll(async () => {
       try {
         const order = await readSharedMapCombatOrder(map.id);
         if (!cancelled) setState({ order });
@@ -225,14 +233,12 @@ function PlayerInitiative({ map }: { map: CampaignMap }) {
         if (!cancelled)
           setState({ order: null, error: "Initiative unavailable. Check the connection status." });
       }
-      if (!cancelled) timer = setTimeout(() => void load(), 3000);
-    };
-    void load();
+    }, 3000);
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      stop();
     };
-  }, [cloud.joined, map.id]);
+  }, [cloud.joined, map.id, presenting]);
   const order = state?.order;
   if (!cloud.joined) return <p>Initiative is shown in a shared campaign while the DM runs combat.</p>;
   if (state?.error) return <p role="alert">{state.error}</p>;

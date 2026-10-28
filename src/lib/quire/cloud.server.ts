@@ -8,9 +8,9 @@ import {
 import {
   readRoom,
   readRoomAccess,
+  readCombatView,
   createRoom,
   updateRoom,
-  roomStorageBody,
   keepStoredBody,
   roomImageSources,
   lookupReceipts,
@@ -18,6 +18,7 @@ import {
   type RoomReceipt,
 } from "./room-store.server.ts";
 import { syncTimer } from "./sync-timing.server.ts";
+import { retryRoomWrite } from "./room-write-retry.ts";
 import {
   claimSeat,
   readCloudTableForImport,
@@ -82,7 +83,26 @@ export async function assertReferenceLookup(input: { code: string; token: string
   if (!access.allowed) throw Error(access.reason);
 }
 
-export async function characterRoll(input: {
+/** A roll prepared from a room revision that changed before the roll was saved; nothing was saved. */
+class RollRaced extends Error {}
+/**
+ * A character roll. The roll is saved only if the campaign is still at the revision it was rolled
+ * from (seat, character and policy unchanged); if a chat line or another action lands in between,
+ * the roll is prepared again from the new revision, up to three times (load audit F10, 2026-10-28).
+ */
+export async function characterRoll(input: Parameters<typeof characterRollOnce>[0]) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await characterRollOnce(input);
+    } catch (error) {
+      if (!(error instanceof RollRaced) || attempt === 2) {
+        if (error instanceof RollRaced) throw Error("Campaign changed. Reload and retry.");
+        throw error;
+      }
+    }
+  }
+}
+async function characterRollOnce(input: {
   code: string;
   token: string;
   purseId: string;
@@ -150,7 +170,7 @@ export async function characterRoll(input: {
     };
     await db
       .prepare(
-        "INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) SELECT ?,NULL,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND (?=0 OR EXISTS(SELECT 1 FROM play_policies WHERE code=? AND manual_allowed=1)) ON CONFLICT(id) DO NOTHING",
+        "INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) SELECT ?,NULL,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=?) AND (?=0 OR EXISTS(SELECT 1 FROM play_policies WHERE code=? AND manual_allowed=1)) ON CONFLICT(id) DO NOTHING",
       )
       .bind(
         receipt,
@@ -160,7 +180,7 @@ export async function characterRoll(input: {
         JSON.stringify(roll),
         Date.now(),
         room.code,
-        roomStorageBody(room),
+        room.revision,
         input.manual ? 1 : 0,
         room.code,
       )
@@ -169,7 +189,7 @@ export async function characterRoll(input: {
       .prepare("SELECT body FROM play_rolls WHERE id=?")
       .bind(receipt)
       .first<{ body: string }>();
-    if (!saved) throw Error("Campaign changed. Reload and retry.");
+    if (!saved) throw new RollRaced();
     return JSON.parse(saved.body);
   }
   const rolls = p.rolls || [];
@@ -293,53 +313,55 @@ export async function joinRoom(input: {
   shopIds: string[];
   userId?: string;
 }> {
-  const room = await must(input.code);
-  refuseProbeRoom(room, probe);
-  if (room.testMode) throw Error("Test rooms are private to the owner.");
-  requireInvitationSession(room, input.sessionId);
-  const existing =
-    input.userId && room.seats.find((s) => s.userId === input.userId && s.role === "player");
-  if (existing)
+  return retryRoomWrite(async () => {
+    const room = await must(input.code);
+    refuseProbeRoom(room, probe);
+    if (room.testMode) throw Error("Test rooms are private to the owner.");
+    requireInvitationSession(room, input.sessionId);
+    const existing =
+      input.userId && room.seats.find((s) => s.userId === input.userId && s.role === "player");
+    if (existing)
+      return {
+        token: existing.token,
+        seatId: existing.id,
+        revision: room.revision,
+        purseIds: existing.purseIds,
+        shopIds: projectRecord(room.table, existing).shops.map((s) => s.id),
+        userId: existing.userId,
+      };
+    const blocked = input.userId && room.blockedUsers?.[input.userId];
+    if (blocked === "banned") throw Error("You are banned from this campaign.");
+    const restriction = room.departed?.find(
+      (s) => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"),
+    );
+    if (restriction?.status === "banned")
+      throw Error("This character is blocked from joining. Ask the DM.");
+    if (
+      (blocked === "kicked" || restriction) &&
+      (!input.invitation || room.invitations?.[input.purseId] !== input.invitation)
+    )
+      throw Error("A fresh invitation from the DM is required.");
+    const previous =
+      input.userId &&
+      room.departed?.find((s) => s.userId === input.userId && s.status === "dismissed");
+    const claimed = claimSeat(room, input.purseId, input.name);
+    claimed.seat.userId = input.userId;
+    if (previous) claimed.seat.id = previous.id;
+    if (input.invitation && room.invitations?.[input.purseId] !== input.invitation)
+      throw Error("This invitation has expired.");
+    if (input.userId && claimed.room.blockedUsers) delete claimed.room.blockedUsers[input.userId];
+    if (claimed.room.invitations) delete claimed.room.invitations[input.purseId];
+    const next = { ...claimed.room, revision: claimed.room.revision + 1 };
+    await updateRoom(next, room.revision);
     return {
-      token: existing.token,
-      seatId: existing.id,
-      revision: room.revision,
-      purseIds: existing.purseIds,
-      shopIds: projectRecord(room.table, existing).shops.map((s) => s.id),
-      userId: existing.userId,
+      token: claimed.seat.token,
+      seatId: claimed.seat.id,
+      revision: next.revision,
+      purseIds: claimed.seat.purseIds,
+      shopIds: projectRecord(claimed.room.table, claimed.seat).shops.map((shop) => shop.id),
+      userId: claimed.seat.userId,
     };
-  const blocked = input.userId && room.blockedUsers?.[input.userId];
-  if (blocked === "banned") throw Error("You are banned from this campaign.");
-  const restriction = room.departed?.find(
-    (s) => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"),
-  );
-  if (restriction?.status === "banned")
-    throw Error("This character is blocked from joining. Ask the DM.");
-  if (
-    (blocked === "kicked" || restriction) &&
-    (!input.invitation || room.invitations?.[input.purseId] !== input.invitation)
-  )
-    throw Error("A fresh invitation from the DM is required.");
-  const previous =
-    input.userId &&
-    room.departed?.find((s) => s.userId === input.userId && s.status === "dismissed");
-  const claimed = claimSeat(room, input.purseId, input.name);
-  claimed.seat.userId = input.userId;
-  if (previous) claimed.seat.id = previous.id;
-  if (input.invitation && room.invitations?.[input.purseId] !== input.invitation)
-    throw Error("This invitation has expired.");
-  if (input.userId && claimed.room.blockedUsers) delete claimed.room.blockedUsers[input.userId];
-  if (claimed.room.invitations) delete claimed.room.invitations[input.purseId];
-  const next = { ...claimed.room, revision: claimed.room.revision + 1 };
-  await updateRoom(next, room.revision);
-  return {
-    token: claimed.seat.token,
-    seatId: claimed.seat.id,
-    revision: next.revision,
-    purseIds: claimed.seat.purseIds,
-    shopIds: projectRecord(claimed.room.table, claimed.seat).shops.map((shop) => shop.id),
-    userId: claimed.seat.userId,
-  };
+  });
 }
 
 export async function roomState(input: {
@@ -433,20 +455,22 @@ export async function choosePace(input: {
   token: string;
   live: boolean;
 }): Promise<RoomView> {
-  const room = await must(input.code);
-  if (Object.values(room.drafts ?? {}).some((c) => c.length))
-    throw new Error("Submit or discard all pending turns before changing modes.");
-  const paced = setRoomLive(room, input.token, input.live);
-  const next = {
-    ...paced,
-    viewOnly: false,
-    revision:
-      room.viewOnly && paced.revision === room.revision ? room.revision + 1 : paced.revision,
-  };
-  await updateRoom(next, room.revision);
-  const seat = next.seats.find((item) => item.token === input.token);
-  if (!seat) throw new Error("This browser is not seated at that table.");
-  return view(next, seat, room);
+  return retryRoomWrite(async () => {
+    const room = await must(input.code);
+    if (Object.values(room.drafts ?? {}).some((c) => c.length))
+      throw new Error("Submit or discard all pending turns before changing modes.");
+    const paced = setRoomLive(room, input.token, input.live);
+    const next = {
+      ...paced,
+      viewOnly: false,
+      revision:
+        room.viewOnly && paced.revision === room.revision ? room.revision + 1 : paced.revision,
+    };
+    await updateRoom(next, room.revision);
+    const seat = next.seats.find((item) => item.token === input.token);
+    if (!seat) throw new Error("This browser is not seated at that table.");
+    return view(next, seat, room);
+  });
 }
 
 /**
@@ -458,17 +482,19 @@ export async function nameRoom(input: {
   token: string;
   campaignName: unknown;
 }): Promise<RoomView> {
-  const room = await must(input.code);
-  const seat = room.seats.find((item) => item.token === input.token);
-  if (!seat) throw new Error("This browser is not seated at that table.");
-  if (seat.role !== "dm") throw new Error("Only the DM can name the campaign.");
-  const campaignName = roomCampaignName(input.campaignName);
-  if ((room.campaignName ?? undefined) === campaignName) return view(room, seat);
-  const next: CloudRoom = { ...room, revision: room.revision + 1 };
-  if (campaignName) next.campaignName = campaignName;
-  else delete next.campaignName;
-  await updateRoom(next, room.revision);
-  return view(next, seat, room);
+  return retryRoomWrite(async () => {
+    const room = await must(input.code);
+    const seat = room.seats.find((item) => item.token === input.token);
+    if (!seat) throw new Error("This browser is not seated at that table.");
+    if (seat.role !== "dm") throw new Error("Only the DM can name the campaign.");
+    const campaignName = roomCampaignName(input.campaignName);
+    if ((room.campaignName ?? undefined) === campaignName) return view(room, seat);
+    const next: CloudRoom = { ...room, revision: room.revision + 1 };
+    if (campaignName) next.campaignName = campaignName;
+    else delete next.campaignName;
+    await updateRoom(next, room.revision);
+    return view(next, seat, room);
+  });
 }
 
 export async function closeRoom(input: {
@@ -476,49 +502,60 @@ export async function closeRoom(input: {
   token: string;
   keepOnline?: boolean;
 }): Promise<void> {
-  const room = await must(input.code);
-  const seat = room.seats.find((item) => item.token === input.token);
-  if (!seat || seat.role !== "dm")
-    throw new Error("Only the dungeon master can return to Local Mode.");
-  if (Object.values(room.drafts ?? {}).some((c) => c.length))
-    throw new Error("Submit or discard pending turns before closing the campaign.");
-  const keepOnline = input.keepOnline === true;
-  if (room.viewOnly && keepOnline) return;
-  const next = structuredClone(room);
-  const active = next.table.journal?.sessions.find((s) => !s.endedAt);
-  if (active) {
-    active.endedAt = Date.now();
-    active.endLedgerIds = next.table.ledger.map((l) => l.id);
-  }
-  if (!room.viewOnly || active)
-    archiveSession(
-      next.table,
-      active?.id || crypto.randomUUID(),
-      active?.name || (keepOnline ? "Session ended" : "Room closed"),
-    );
-  for (const report of next.table.journal?.reports || [])
-    if (!report.seatIds) report.seatIds = room.seats.map((s) => s.id);
-  next.closed = !keepOnline;
-  next.viewOnly = keepOnline;
-  next.revision++;
-  for (const p of next.table.purses) {
-    p.editingAllowed = false;
-    delete p.editBaseline;
-  }
-  await updateRoom(next, room.revision);
+  return retryRoomWrite(async () => {
+    const room = await must(input.code);
+    const seat = room.seats.find((item) => item.token === input.token);
+    if (!seat || seat.role !== "dm")
+      throw new Error("Only the dungeon master can return to Local Mode.");
+    if (Object.values(room.drafts ?? {}).some((c) => c.length))
+      throw new Error("Submit or discard pending turns before closing the campaign.");
+    const keepOnline = input.keepOnline === true;
+    if (room.viewOnly && keepOnline) return;
+    const next = structuredClone(room);
+    const active = next.table.journal?.sessions.find((s) => !s.endedAt);
+    if (active) {
+      active.endedAt = Date.now();
+      active.endLedgerIds = next.table.ledger.map((l) => l.id);
+    }
+    if (!room.viewOnly || active)
+      archiveSession(
+        next.table,
+        active?.id || crypto.randomUUID(),
+        active?.name || (keepOnline ? "Session ended" : "Room closed"),
+      );
+    for (const report of next.table.journal?.reports || [])
+      if (!report.seatIds) report.seatIds = room.seats.map((s) => s.id);
+    next.closed = !keepOnline;
+    next.viewOnly = keepOnline;
+    next.revision++;
+    for (const p of next.table.purses) {
+      p.editingAllowed = false;
+      delete p.editBaseline;
+    }
+    await updateRoom(next, room.revision);
+  });
 }
 
 export async function passTurn(input: { code: string; token: string }): Promise<RoomView> {
-  const room = await must(input.code);
-  if (room.drafts?.[room.seats[room.turn]?.id]?.length)
-    throw new Error(
-      "This participant has pending changes. Submit or discard them before skipping.",
-    );
-  const next = skipTurn(room, input.token);
-  await updateRoom(next, room.revision);
-  const seat = next.seats.find((item) => item.token === input.token);
-  if (!seat) throw new Error("This browser is not seated at that table.");
-  return view(next, seat, room);
+  // The DM skips the participant whose turn it was when they pressed Skip. A retry after a
+  // conflict must not skip a second participant if another write already moved the turn on.
+  let skipping: string | undefined;
+  return retryRoomWrite(async (attempt) => {
+    const room = await must(input.code);
+    const current = room.seats[room.turn]?.id;
+    if (attempt === 0) skipping = current;
+    else if (current !== skipping)
+      throw new Error("The turn already moved on. Check whose turn it is before skipping again.");
+    if (room.drafts?.[room.seats[room.turn]?.id]?.length)
+      throw new Error(
+        "This participant has pending changes. Submit or discard them before skipping.",
+      );
+    const next = skipTurn(room, input.token);
+    await updateRoom(next, room.revision);
+    const seat = next.seats.find((item) => item.token === input.token);
+    if (!seat) throw new Error("This browser is not seated at that table.");
+    return view(next, seat, room);
+  });
 }
 
 export type RoomView = {
@@ -843,7 +880,9 @@ export async function submitCommands(input: {
     hashes.set(command.id, hash);
   }
   const batchHash = "v2:" + (await digest(canonicalJson(commands)));
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // Revision conflicts re-run everything below on a fresh read, after a jittered pause
+  // (room-write-retry.ts); receipts keep every action applied once however often it is retried.
+  return retryRoomWrite(async () => {
     const room = await must(input.code),
       seat = room.seats.find((s) => s.token === input.token);
     if (!seat)
@@ -992,33 +1031,28 @@ export async function submitCommands(input: {
           ? (room.turn + 1) % room.seats.length
           : room.turn,
     };
-    try {
-      await updateRoom(next, room.revision, { receipts });
-      if (!input.stage) {
-        const fresh = next.table.notes.filter(
-          (note) => !room.table.notes.some((old) => old.id === note.id),
-        );
-        if (fresh.length) {
-          // After the response on a Worker (waitUntil), so a slow push service never holds the
-          // sender's submit or tab lock (2026-10-28 load audit, F12); awaited without a context.
-          const { afterResponse } = await import("../../../cloudflare/request-context.mjs");
-          await afterResponse(async () => {
-            try {
-              const { pushMessages } = await import("./push.server.ts");
-              await pushMessages(next, seat.id, fresh);
-            } catch {
-              console.warn("Background notification failed; campaign changes remain saved.");
-            }
-          });
-        }
+    await updateRoom(next, room.revision, { receipts });
+    // Only after the successful write (a retried attempt that lost the race never notifies).
+    if (!input.stage) {
+      const fresh = next.table.notes.filter(
+        (note) => !room.table.notes.some((old) => old.id === note.id),
+      );
+      if (fresh.length) {
+        // After the response on a Worker (waitUntil), so a slow push service never holds the
+        // sender's submit or tab lock (2026-10-28 load audit, F12); awaited without a context.
+        const { afterResponse } = await import("../../../cloudflare/request-context.mjs");
+        await afterResponse(async () => {
+          try {
+            const { pushMessages } = await import("./push.server.ts");
+            await pushMessages(next, seat.id, fresh);
+          } catch {
+            console.warn("Background notification failed; campaign changes remain saved.");
+          }
+        });
       }
-      return view(next, seat, room);
-    } catch (error) {
-      if (attempt === 4 || !(error instanceof Error) || !error.message.includes("table changed"))
-        throw error;
     }
-  }
-  throw new Error("The campaign is busy. Retry your saved pending actions.");
+    return view(next, seat, room);
+  });
 }
 
 /** NPC barter quote for one seat. Players get the public quote only: no valuation or rules. */
@@ -1054,141 +1088,137 @@ export async function manageRoom(input: {
   seatId: string;
   allowParty?: boolean;
 }): Promise<RoomView> {
-  const room = await must(input.code),
-    caller = room.seats.find((s) => s.token === input.token);
-  if (!caller) throw new Error("Session not found.");
-  if (input.action !== "discard" && input.action !== "leave" && caller.role !== "dm")
-    throw new Error("Only the DM can manage participants.");
-  const target =
-    room.seats.find((s) => s.id === input.seatId) ||
-    (input.action === "invite" ? room.departed?.find((s) => s.id === input.seatId) : undefined);
-  if (!target) throw new Error("Participant not found.");
-  if (input.action === "leave" && (caller.role !== "player" || target.id !== caller.id))
-    throw Error("Only players can leave their own seat. The DM must close the room.");
-  if (input.action === "discard" && caller.role !== "dm" && target.id !== caller.id)
-    throw new Error("Only your own pending changes can be discarded.");
-  const next = structuredClone(room);
-  next.revision++;
-  if (["release", "leave", "kick", "ban"].includes(input.action)) {
-    if (target.role === "dm") throw new Error("The DM cannot be removed.");
-    if (next.drafts?.[target.id]?.length)
-      throw new Error(
-        "This player has pending changes. Export or discard them before releasing the character.",
+  return retryRoomWrite(async () => {
+    const room = await must(input.code),
+      caller = room.seats.find((s) => s.token === input.token);
+    if (!caller) throw new Error("Session not found.");
+    if (input.action !== "discard" && input.action !== "leave" && caller.role !== "dm")
+      throw new Error("Only the DM can manage participants.");
+    const target =
+      room.seats.find((s) => s.id === input.seatId) ||
+      (input.action === "invite" ? room.departed?.find((s) => s.id === input.seatId) : undefined);
+    if (!target) throw new Error("Participant not found.");
+    if (input.action === "leave" && (caller.role !== "player" || target.id !== caller.id))
+      throw Error("Only players can leave their own seat. The DM must close the room.");
+    if (input.action === "discard" && caller.role !== "dm" && target.id !== caller.id)
+      throw new Error("Only your own pending changes can be discarded.");
+    const next = structuredClone(room);
+    next.revision++;
+    if (["release", "leave", "kick", "ban"].includes(input.action)) {
+      if (target.role === "dm") throw new Error("The DM cannot be removed.");
+      if (next.drafts?.[target.id]?.length)
+        throw new Error(
+          "This player has pending changes. Export or discard them before releasing the character.",
+        );
+      const current = room.seats[room.turn]?.id;
+      const db = database();
+      const member = db
+        ? await db
+            .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=? AND token=?")
+            .bind(room.code, target.id, target.token)
+            .first<{ user_id: string }>()
+        : null;
+      // Forget removes a library listing, not the canonical account identity of
+      // an assigned seat. Keep campaign restrictions attached to that identity.
+      const userId = target.userId || member?.user_id;
+      const finalStatus =
+        input.action === "release"
+          ? "dismissed"
+          : input.action === "leave"
+            ? "left"
+            : input.action === "kick"
+              ? "kicked"
+              : "banned";
+      next.departed = [
+        ...(next.departed || []).filter((s) => s.id !== target.id),
+        { ...target, status: finalStatus as "left" | "dismissed" | "kicked" | "banned", userId },
+      ];
+      if (userId && (input.action === "kick" || input.action === "ban"))
+        (next.blockedUsers ??= {})[userId] = input.action === "ban" ? "banned" : "kicked";
+      const { applyCommand } = await import("./commands.ts");
+      for (const p of next.table.purses.filter(
+        (p) => target.purseIds.includes(p.id) && p.editingAllowed,
+      ))
+        next.table = applyCommand(
+          next.table,
+          caller.role === "dm" ? caller : room.seats.find((s) => s.role === "dm")!,
+          { id: crypto.randomUUID(), kind: "character-editing", purseId: p.id, allowed: false },
+        );
+      if (next.drafts) delete next.drafts[target.id];
+      next.seats = next.seats.filter((s) => s.id !== target.id);
+      next.turn = Math.max(
+        0,
+        next.seats.findIndex((s) => s.id === current),
       );
-    const current = room.seats[room.turn]?.id;
-    const db = database();
-    const member = db
-      ? await db
-          .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=? AND token=?")
-          .bind(room.code, target.id, target.token)
-          .first<{ user_id: string }>()
-      : null;
-    // Forget removes a library listing, not the canonical account identity of
-    // an assigned seat. Keep campaign restrictions attached to that identity.
-    const userId = target.userId || member?.user_id;
-    const finalStatus =
-      input.action === "release"
-        ? "dismissed"
-        : input.action === "leave"
-          ? "left"
-          : input.action === "kick"
-            ? "kicked"
-            : "banned";
-    next.departed = [
-      ...(next.departed || []).filter((s) => s.id !== target.id),
-      { ...target, status: finalStatus as "left" | "dismissed" | "kicked" | "banned", userId },
-    ];
-    if (userId && (input.action === "kick" || input.action === "ban"))
-      (next.blockedUsers ??= {})[userId] = input.action === "ban" ? "banned" : "kicked";
-    const { applyCommand } = await import("./commands.ts");
-    for (const p of next.table.purses.filter(
-      (p) => target.purseIds.includes(p.id) && p.editingAllowed,
-    ))
-      next.table = applyCommand(
-        next.table,
-        caller.role === "dm" ? caller : room.seats.find((s) => s.role === "dm")!,
-        { id: crypto.randomUUID(), kind: "character-editing", purseId: p.id, allowed: false },
+    } else if (input.action === "invite") {
+      if (target.role !== "player" || (target as { status?: string }).status === "banned")
+        throw Error("Banned participants cannot be invited.");
+      for (const id of target.purseIds.filter((id) =>
+        room.table.purses.some((p) => p.id === id && p.kind === "character"),
+      ))
+        (next.invitations ??= {})[id] = crypto.randomUUID();
+    } else if (input.action === "permission") {
+      if (target.role === "dm") throw new Error("The DM already controls all accounts.");
+      if (next.drafts?.[target.id]?.length)
+        throw new Error(
+          "Submit or discard this player’s pending changes before changing permissions.",
+        );
+      const parties = new Set(room.table.purses.filter((p) => p.kind === "party").map((p) => p.id));
+      next.seats = next.seats.map((s) =>
+        s.id === target.id
+          ? {
+              ...s,
+              purseIds: [
+                ...s.purseIds.filter((id) => !parties.has(id)),
+                ...(input.allowParty ? [...parties] : []),
+              ],
+            }
+          : s,
       );
-    if (next.drafts) delete next.drafts[target.id];
-    next.seats = next.seats.filter((s) => s.id !== target.id);
-    next.turn = Math.max(
-      0,
-      next.seats.findIndex((s) => s.id === current),
-    );
-  } else if (input.action === "invite") {
-    if (target.role !== "player" || (target as { status?: string }).status === "banned")
-      throw Error("Banned participants cannot be invited.");
-    for (const id of target.purseIds.filter((id) =>
-      room.table.purses.some((p) => p.id === id && p.kind === "character"),
-    ))
-      (next.invitations ??= {})[id] = crypto.randomUUID();
-  } else if (input.action === "permission") {
-    if (target.role === "dm") throw new Error("The DM already controls all accounts.");
-    if (next.drafts?.[target.id]?.length)
-      throw new Error(
-        "Submit or discard this player’s pending changes before changing permissions.",
-      );
-    const parties = new Set(room.table.purses.filter((p) => p.kind === "party").map((p) => p.id));
-    next.seats = next.seats.map((s) =>
-      s.id === target.id
-        ? {
-            ...s,
-            purseIds: [
-              ...s.purseIds.filter((id) => !parties.has(id)),
-              ...(input.allowParty ? [...parties] : []),
-            ],
-          }
-        : s,
-    );
-  } else if (input.action === "start") {
-    if (Object.values(room.drafts ?? {}).some((c) => c.length))
-      throw new Error("Submit or discard pending changes before changing the turn.");
-    next.turn = next.seats.findIndex((s) => s.id === target.id);
-  } else {
-    if (next.drafts) delete next.drafts[target.id];
-  }
-  await updateRoom(next, room.revision);
-  return view(next, next.seats.find((s) => s.id === caller.id) ?? caller, room);
+    } else if (input.action === "start") {
+      if (Object.values(room.drafts ?? {}).some((c) => c.length))
+        throw new Error("Submit or discard pending changes before changing the turn.");
+      next.turn = next.seats.findIndex((s) => s.id === target.id);
+    } else {
+      if (next.drafts) delete next.drafts[target.id];
+    }
+    await updateRoom(next, room.revision);
+    return view(next, next.seats.find((s) => s.id === caller.id) ?? caller, room);
+  });
 }
 
-/** Read-only, freshly authorized combat presentation for the map being viewed. */
 /**
- * The initiative panel for a seat (map controls PR 6). The same gates as the HUD (seated, the
- * active binding on this map, re-read after the private store read, players only while the DM
- * shows combat on this scene), then the seat's projected map and `projectMapCombatOrder`.
+ * The seat's projected combat map and the bound encounter's row, or null when this seat may not
+ * see combat on `mapId` (map controls PR 6; audit 2026-10-28 F8). Gates: seated; an active
+ * binding on this map; players only while the DM shows combat on this scene. Seats, binding,
+ * scene and encounter come from one statement (`readCombatView`), so they are always consistent
+ * with each other; map rasters and archived reports are not read.
  */
-export async function mapCombatOrder(input: {code:string;token:string;mapId:string}) {
-  const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
-  if(!initialSeat)throw Error("This browser is not seated at that table.");
-  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
-  const db=database();
-  if(!db)return null;
-  const row=await db.prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?").bind(binding.encounterId,initial.code).first<{body:string;status:string}>();
-  if(!row)return null;
-  const room=await must(input.code),seat=room.seats.find(s=>s.token===input.token),current=room.table.journal?.world?.combat;
+async function combatView(input: {code:string;token:string;mapId:string}) {
+  const code=input.code.trim().toUpperCase(), read=await readCombatView(code);
+  if(!read)throw new Error("No table uses that code.");
+  const {room,encounter}=read;
+  if(room.closed)throw new Error("This room is closed.");
+  const seat=room.seats.find(s=>s.token===input.token), binding=room.table.journal?.world?.combat;
   if(!seat)throw Error("This browser is not seated at that table.");
-  if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
-  if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
+  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
+  if(!database() || !encounter)return null;
+  if(seat.role!=="dm" && (!binding.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==binding.id))return null;
   const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
   if(!map)return null;
-  const {projectMapCombatOrder}=await import("./map-combat.ts");
-  return projectMapCombatOrder(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)},seat.role==="dm"?[]:seat.purseIds);
+  return {seat,map,encounterId:binding.encounterId,row:{status:encounter.status,body:JSON.parse(encounter.body)}};
 }
+/** The initiative panel for a seat: `projectMapCombatOrder` on the seat's projected map. */
+export async function mapCombatOrder(input: {code:string;token:string;mapId:string}) {
+  const view=await combatView(input);
+  if(!view)return null;
+  const {projectMapCombatOrder}=await import("./map-combat.ts");
+  return projectMapCombatOrder(view.map,view.encounterId,view.row,view.seat.role==="dm"?[]:view.seat.purseIds);
+}
+/** Read-only, freshly authorized combat presentation (HUD) for the map being viewed. */
 export async function mapCombatPresentation(input: {code:string;token:string;mapId:string}) {
-  const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
-  if(!initialSeat)throw Error("This browser is not seated at that table.");
-  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
-  const db=database();
-  if(!db)return null;
-  const row=await db.prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?").bind(binding.encounterId,initial.code).first<{body:string;status:string}>();
-  if(!row)return null;
-  // Recheck revocation, current scene and visibility after the private store read.
-  const room=await must(input.code),seat=room.seats.find(s=>s.token===input.token),current=room.table.journal?.world?.combat;
-  if(!seat)throw Error("This browser is not seated at that table.");
-  if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
-  if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
-  const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
-  if(!map)return null;
+  const view=await combatView(input);
+  if(!view)return null;
   const {projectMapCombat}=await import("./map-combat.ts");
-  return projectMapCombat(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)});
+  return projectMapCombat(view.map,view.encounterId,view.row);
 }

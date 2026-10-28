@@ -4899,6 +4899,28 @@ button.quest-chip { min-height: 44px; }
 .quest-map-item { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
 .quest-map-add, .quest-map-area { display:grid; gap:.4rem; padding:.6rem; border:1px dashed var(--color-border); border-radius:8px; }
 
+/* Campaign → Chat (plan P8, Q24): the conversation fills the screen and the composer stays
+   above the bottom navigation while the page scrolls. */
+.share-chat-full .live-chat { overflow: clip; }
+.share-chat-full .chat-history { height: max(16rem, calc(100dvh - 26rem)); }
+.share-chat-full .chat-composer { position: sticky; bottom: calc(4.6rem + env(safe-area-inset-bottom)); z-index: 5; }
+@media (min-width: theme(--bp-wide)) {
+  .share-chat-full .chat-history { height: max(20rem, calc(100dvh - 22rem)); }
+  .share-chat-full .chat-composer { bottom: 0; }
+}
+.chat-jump-latest {
+  display: flex; margin: -3.25rem auto .5rem; position: relative; z-index: 6;
+  min-height: 2.75rem; padding: .4rem 1rem; border-radius: 999px; align-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-lead) 50%, transparent);
+  background: var(--color-elevated); color: var(--color-fg); font-size: .85rem;
+}
+
+/* NPCs (plan P8, Q23): the chosen person first, everyone else folded. */
+.npc-focus { scroll-margin-top: 6rem; margin-top: .75rem; }
+.npc-focus:focus { outline: none; }
+.npc-focus:focus-visible { outline: 2px solid var(--color-lead); outline-offset: 4px; }
+.npc-others { margin-top: 1rem; }
+.npc-others > summary { min-height: 2.75rem; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
 /* Character sheet chrome (plan P5, Q25). */
 .sheet-breadcrumb { font-size: .9rem; color: var(--color-muted); }
 .sheet-breadcrumb a { color: var(--color-lead); display: inline-flex; align-items: center; min-height: 2.75rem; }
