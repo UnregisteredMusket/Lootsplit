@@ -618,7 +618,13 @@ test("actual account authentication clears old recovery identity before announci
 // Execute the real queue/flush/stage/accept functions while replacing only
 // storage, network, and IndexedDB boundaries. JSON session reads reproduce a
 // returning DM's persisted cache rather than sharing an in-memory object.
-function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = false } = {}) {
+function outcomeHarness({
+  live = true,
+  lostResponse = false,
+  hydrationFailure = false,
+  refusals = [] as string[],
+} = {}) {
+  const sentBatches: string[] = [];
   let serialized = JSON.stringify({
     code: "TEST",
     token: seat.token,
@@ -676,6 +682,10 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     data: { commands: Command[]; stage?: boolean; batchId: string };
   }) => {
     submissions++;
+    sentBatches.push(data.batchId);
+    // A refusal the room answers before applying anything (busy table, permission, validation).
+    const refusal = refusals.shift();
+    if (refusal) throw Error(refusal);
     const previous = batches.get(data.batchId);
     if (
       previous &&
@@ -796,6 +806,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     ...functions,
     session,
     submissions: () => submissions,
+    sentBatches: () => sentBatches,
     error: () => error,
     local: () => local,
     authoritative: () => authoritative,
@@ -857,6 +868,60 @@ test("real Live DM queue reports committed from the updated JSON cache and appli
   assert.equal(h.submissions(), 1);
   assert.equal(toCopper(h.local().purses[1]!.coins), 100);
   assert.equal(h.authoritative().ledger.length, 2);
+});
+const giveRequest = {
+  kind: "give" as const,
+  fromId: "hero",
+  toId: "other",
+  copper: 100,
+  holdingId: null,
+  quantity: 0,
+};
+test("a Live action the busy room refused is sent once more automatically, same batch, applied once (audit F2)", async () => {
+  for (const busy of [
+    "The table changed. Refresh before sending your turn.",
+    "The campaign is busy. Retry your saved pending actions.",
+  ]) {
+    const h = outcomeHarness({ refusals: [busy] });
+    assert.deepEqual(await h.queueCommand(giveRequest), { status: "committed" });
+    assert.equal(h.submissions(), 2);
+    assert.equal(h.sentBatches()[0], h.sentBatches()[1], "the retry reuses the batch ID");
+    assert.equal(h.session().pending.length, 0);
+    assert.equal(toCopper(h.authoritative().purses[1]!.coins), 100, "the coins moved once");
+    assert.equal(toCopper(h.local().purses[1]!.coins), 100);
+  }
+});
+test("a second busy refusal stops after one automatic retry and keeps the action pending", async () => {
+  const busy = "The table changed. Refresh before sending your turn.";
+  const h = outcomeHarness({ refusals: [busy, busy] });
+  assert.deepEqual(await h.queueCommand(giveRequest), { status: "pending" });
+  assert.equal(h.submissions(), 2);
+  assert.equal(h.session().pending.length, 1);
+  assert.equal(h.session().pending[0].copper, 100);
+  assert.match(h.error(), /table changed/);
+  assert.equal(toCopper(h.authoritative().purses[1]!.coins), 0);
+});
+test("permission and validation refusals are never retried automatically", async () => {
+  for (const refusal of [
+    "It is not your turn. Your pending actions have been preserved.",
+    "This session is no longer assigned. Ask the DM to release your character.",
+    "Synthetic lost response",
+  ]) {
+    const h = outcomeHarness({ refusals: [refusal] });
+    assert.deepEqual(await h.queueCommand(giveRequest), { status: "pending" });
+    assert.equal(h.submissions(), 1, refusal);
+    assert.equal(h.session().pending.length, 1);
+    assert.equal(h.error(), refusal);
+  }
+});
+test("chat sent while the room is busy is retried once with the same message ID", async () => {
+  const h = outcomeHarness({ refusals: ["The table changed. Refresh before sending your turn."] });
+  assert.deepEqual(
+    await h.queueCommand({ id: "hello-1", kind: "message", to: "party", purseId: "hero", text: "hello" }),
+    { status: "committed" },
+  );
+  assert.deepEqual(h.sentBatches(), ["hello-1", "hello-1"]);
+  assert.equal(h.authoritative().notes.filter((n: { text?: string }) => n.text === "hello").length, 1);
 });
 test("real Turn-based stage reports pending without claiming the preview was committed", async () => {
   const h = outcomeHarness({ live: false });

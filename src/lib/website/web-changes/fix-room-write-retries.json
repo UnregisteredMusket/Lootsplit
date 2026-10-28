@@ -1,0 +1,9 @@
+{
+  "title": "Busy live tables save every action",
+  "summary": "When several people act at the same moment in a shared campaign, every action now saves instead of one of them asking you to retry.",
+  "items": [
+    "If the table is busy, the server waits a moment and tries again by itself, and your app sends a busy action once more automatically. Nothing is applied twice.",
+    "Joining, naming the campaign, switching between Live and turn-based play, managing seats, skipping a turn and ending the session also wait and retry when someone else is acting at the same time.",
+    "If an action still cannot be saved, it stays pending on your device as before, ready to retry."
+  ]
+}
