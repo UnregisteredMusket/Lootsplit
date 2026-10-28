@@ -146,13 +146,12 @@ export async function afterJoining(page) {
   await page.waitForURL((u) => u.pathname === "/" && u.searchParams.get("view") === "home");
   await page.locator(".player-home").waitFor();
   // The top-centre "You're playing …" toast can sit over the header's room link, and a pointer
-  // resting on it pauses its timer, so a click there would wait forever. Close it first, the
-  // same way a player would.
-  const toasts = page.locator("[data-sonner-toast] button[data-close-button]");
-  for (let i = await toasts.count(); i > 0; i--) {
-    await toasts.first().click({ timeout: 2000 }).catch(() => undefined);
-  }
-  await page.locator("[data-sonner-toast]").first().waitFor({ state: "detached", timeout: 5000 }).catch(() => undefined);
+  // resting on it pauses its timer, so a click there would wait forever. Move the pointer clear
+  // and let it time out (4 s) rather than clicking near the header, where a close button that is
+  // already animating away can pass the click to whatever is underneath.
+  const viewport = page.viewportSize();
+  if (viewport) await page.mouse.move(1, viewport.height - 1);
+  await page.locator("[data-sonner-toast]").first().waitFor({ state: "detached", timeout: 10000 }).catch(() => undefined);
   await navigateApplication(page, new URL("/share", page.url()).href);
   await page.locator(".room-code").waitFor();
 }
