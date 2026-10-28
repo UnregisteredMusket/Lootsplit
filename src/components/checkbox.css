@@ -1,0 +1,8 @@
+/* Shared checkbox (design plan M1, A7): a 44 px row, a 24 px box, the whole row tappable. */
+.checkbox-row { display: flex; align-items: center; gap: .65rem; min-height: 2.75rem; padding-block: .25rem; cursor: pointer; }
+.checkbox-row.is-disabled { cursor: not-allowed; opacity: .7; }
+.checkbox-box { flex: none; width: 1.5rem; height: 1.5rem; margin: 0; accent-color: var(--color-lead); cursor: inherit; }
+.checkbox-box:focus-visible { outline: 2px solid var(--color-lead); outline-offset: 2px; }
+.checkbox-text { min-width: 0; overflow-wrap: anywhere; }
+.checkbox-hint { display: block; margin-top: .125rem; font-size: .875rem; color: var(--color-muted); }
+
