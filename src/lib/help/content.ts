@@ -119,7 +119,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         audience: "DM / Players",
         paragraphs: [
           "Market → People & NPCs lets DMs create non-party NPCs with location, description, portrait, inventory and funds. Players meet visible NPCs at their selected location; the DM responds by default. A configured player-character controller may speak/decide trades for that NPC without gaining configuration permissions.",
-          "NPC records start with Details & actions collapsed; expand a record to read its description, interact or configure it. Names still link to Library entries. Create non-party NPC opens its editor beside the creation button above the records; Configure NPC brings that same editor into view. Collapsing a record retains unsaved smith-permission changes.",
+          "NPC records start with Details & actions collapsed; expand a record to read its description, interact or configure it. Find an NPC searches names, places and descriptions; a chosen NPC (or a Talk link) opens its conversation first, with character placement under it, and the other NPCs fold into Other people here. Names still link to Library entries. Create non-party NPC opens its editor beside the creation button above the records; Configure NPC brings that same editor into view. Collapsing a record retains unsaved smith-permission changes.",
           "NPC JSON imports use format lootsplit.npcs, schemaVersion 1, and existing campaign location IDs. Preview before importing; every record is validated atomically. Dialogue is private to the interacting character, DM and configured NPC controller.",
           "Duplicate NPC (in an NPC's Details & actions) opens a new NPC form filled from that NPC, named \"(copy)\"; Create NPC adds it. The copy starts with no coins, items, messages or controlling character.",
         ],
@@ -571,7 +571,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "notifications",
         title: "Chat and notifications",
         paragraphs: [
-          "Campaign → Chat supports party and permitted private conversations. Shared-mode chat is independent of transaction turns. Players chat only within an open shared session. Messages and activity reports are not sent to people automatically.",
+          "Campaign → Chat supports party and permitted private conversations; the history fills the tab, the composer stays above the bottom navigation and Jump to latest returns to the newest message. Connection & recovery, device backups and manual sharing are on the Room tab. Shared-mode chat is independent of transaction turns. Players chat only within an open shared session. Messages and activity reports are not sent to people automatically.",
           "Campaign → Alerts has message, turn and room notices. Allow browser permission when requested. Supported browsers can enable separate background new-message web push for shared rooms; message text stays out of those notifications. Delivery depends on browser/device support and permissions. This is not email delivery or native Android push.",
         ],
         links: [
