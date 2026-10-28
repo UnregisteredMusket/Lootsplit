@@ -47,8 +47,8 @@ import { createHash } from "node:crypto";
 /**
  * A stored body above this many UTF-8 bytes is written sectioned. Below it a room stays one
  * inline row, as before step 2b, so nearly every room is unaffected by sectioning and stays
- * readable by the previous release. The logical size cap (`ROOM_BODY_LIMIT`, 1.8 MB, measured on
- * the assembled stored body) is unchanged in this step.
+ * readable by the previous release. The logical size cap (`ROOM_BODY_LIMIT`, 4 MB since step 3,
+ * measured on the assembled stored body) lives in src/lib/quire/room-size.ts.
  */
 export const ROOM_SECTION_THRESHOLD = 1_500_000;
 /** A section's JSON is split into parts of at most this many UTF-8 bytes (D1 row limit: 2 MB). */
