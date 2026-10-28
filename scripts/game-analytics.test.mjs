@@ -24,7 +24,7 @@ test("public analytics aggregates multiple pages and publishes only spending", a
         },
       };
       await db
-        .prepare("INSERT INTO campaign_rooms VALUES (?,1,?)")
+        .prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)")
         .bind(String(i).padStart(4, "0"), JSON.stringify(body))
         .run();
     }

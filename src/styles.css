@@ -75,6 +75,17 @@
 }
 
 @layer base {
+  /*
+   * Native checkboxes and radios default to 13 px. Design plan M1/A7 (WCAG 2.5.8): 24 px unless a
+   * component sizes them; :where() keeps this weaker than any component or utility rule.
+   */
+  :where(input[type="checkbox"], input[type="radio"]) {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    accent-color: var(--color-lead);
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -2435,9 +2446,9 @@ input,select,textarea { max-width: 100%; }
 .information-panel > .panel-heading button { min-height:44px; padding:.35rem .5rem; border:1px solid var(--edge); border-radius:6px; font-size:.8rem; }
 .information-action { display:flex; align-items:center; min-height:44px; margin-top:auto; color:var(--color-lead); font-size:.85rem; }
 .information-party { display:grid; gap:.5rem; }
-.information-party > a { display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:.55rem; align-items:center; min-height:50px; }
+.information-party > a, .information-party-row > a { display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:.55rem; align-items:center; min-height:50px; }
 .information-party .ledger-art { width:38px; height:38px; border-radius:50%; }
-.information-party > a > span { min-width:0; }
+.information-party > a > span, .information-party-row > a > span { min-width:0; }
 .information-party strong { display:block; font-size:.85rem; overflow-wrap:anywhere; }
 .information-party small { text-align:right; font-size:.72rem; color:var(--color-muted); }
 .information-party small > span { display:block; }
@@ -4829,6 +4840,33 @@ button.quest-chip { min-height: 44px; }
 @media (max-width: theme(--bp-tablet)) { .join-tips li span { display: none; } .join-tips li a { line-height: 1.2; } }
 .room-mode-readout { font-weight: 600; }
 
+/* "Since you were away" on player Home (plan P4, Q21). */
+.since-away { border: 1px solid color-mix(in srgb, var(--color-lead) 45%, transparent); border-radius: .75rem; padding: .75rem 1rem; margin: .75rem 0; }
+.since-away h2 { font-size: 1.15rem; margin: 0 0 .25rem; }
+.since-away ul { margin: 0; padding: 0; list-style: none; display: grid; }
+.since-away li a { display: flex; align-items: center; min-height: 2.75rem; overflow-wrap: anywhere; }
+
+/* Healthy shared room: a header pill instead of the status card (plan P4, Q21). */
+.room-pill {
+  display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0;
+  min-height: 36px; padding: .25rem .55rem; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-lead) 35%, transparent);
+  font-size: .8rem; color: var(--color-fg); text-decoration: none; white-space: nowrap;
+}
+.room-pill:hover { background: color-mix(in srgb, var(--color-lead) 10%, transparent); }
+@media (max-width: theme(--bp-phone)) {
+  /* Phones keep the campaign name readable: the pill is its dot (24 px target). */
+  .room-pill { border: 0; padding-inline: 0; min-width: 24px; justify-content: center; gap: 0; }
+  .room-pill > span[aria-hidden="true"]:not(.status-dot) { display: none; }
+}
+/* Phones: the decorative scene shows as a 48 px strip at most (plan P4). */
+@media (max-width: theme(--bp-phone)) {
+  /* Also caps the compact band (#325): phones never show more than this strip. */
+  .submenu-workspace[data-submenu-scene],
+  .submenu-workspace[data-submenu-scene][data-banner="compact"] { padding-top: 3rem; min-height: 0; }
+  .submenu-workspace[data-submenu-scene] > .submenu-scenery,
+  .submenu-workspace[data-banner="compact"] > .submenu-scenery { height: 12rem; }
+}
 /* Quests on the map (docs/QUESTS.md "Map"): accent diamonds and dashed accent circles. */
 .map-quest-areas { position:absolute; inset:0; pointer-events:none; overflow:visible; }
 .map-quest-areas circle { fill:color-mix(in srgb, var(--color-accent) 10%, transparent); stroke:var(--color-accent); stroke-width:2.5; stroke-dasharray:8 6; vector-effect:non-scaling-stroke; }
@@ -4883,3 +4921,24 @@ button.quest-chip { min-height: 44px; }
 .npc-focus:focus-visible { outline: 2px solid var(--color-lead); outline-offset: 4px; }
 .npc-others { margin-top: 1rem; }
 .npc-others > summary { min-height: 2.75rem; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+/* Character sheet chrome (plan P5, Q25). */
+.sheet-breadcrumb { font-size: .9rem; color: var(--color-muted); }
+.sheet-breadcrumb a { color: var(--color-lead); display: inline-flex; align-items: center; min-height: 2.75rem; }
+.character-heading.is-player { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .25rem; }
+.sheet-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.sheet-mode-row .play-mode-switch { margin: 0; }
+.sheet-lock { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 999px; color: var(--color-muted); border: 1px solid color-mix(in srgb, var(--color-lead) 30%, transparent); }
+.sheet-tools-button { margin-left: auto; }
+.play-sheet .character-savebar.is-clean, .concept-shell .play-sheet .character-savebar.is-clean { position: static; display: block; box-shadow: none; background: transparent; border: 0; padding: .25rem 0; min-height: 0; font-size: .85rem; color: var(--color-muted); }
+.play-sheet .character-savebar.is-clean strong { font-weight: 500; }
+.sheet-quick-hp { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .5rem 0; }
+.sheet-quick-hp button { min-height: 2.75rem; min-width: 4.5rem; }
+.sheet-quick-hp-note { font-size: .8rem; color: var(--color-muted); }
+.last-roll-chip { display: inline-flex; align-items: center; min-height: 2rem; padding: .2rem .65rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--color-lead) 45%, transparent); font-size: .85rem; margin-inline-start: .5rem; }
+.character-library-below { margin-top: 1.25rem; }
+/* Inline links padded to a 24 px target (WCAG 2.5.8) without changing how they wrap. */
+.tap-link { display: inline-block; min-width: 1.5rem; min-height: 1.5rem; padding-block: .125rem; }
+
+/* Sonner's toast close button is 20 px: show 24 px and extend the hit area to 44 px. */
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button] { width: 1.5rem; height: 1.5rem; }
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button]::after { content: ""; position: absolute; inset: -.625rem; }

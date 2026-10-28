@@ -281,7 +281,7 @@ export function ShopComposer() {
               >
                 <input
                   type="checkbox"
-                  className="size-5 accent-accent"
+                  className="size-6 accent-accent"
                   checked={flags[rarity.value]}
                   onChange={() =>
                     setFlags((current) => ({ ...current, [rarity.value]: !current[rarity.value] }))

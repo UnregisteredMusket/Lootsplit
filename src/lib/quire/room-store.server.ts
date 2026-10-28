@@ -283,15 +283,113 @@ export async function createRoom(
     await localSave([...rooms, room]);
   });
 }
-export async function updateRoom(room: CloudRoom, baseRevision: number): Promise<void> {
+/**
+ * An action or batch receipt: `key` is `<seatId>:<command or batch id>`. Receipts make every action
+ * idempotent for the life of the campaign, so they are never pruned. In D1 they live in
+ * `campaign_room_receipts` (migration 0024), not in the room body, so they never count toward the
+ * room budget (live-campaign load audit F1, 2026-10-28). Rooms written earlier still carry them in
+ * the body (`commands`, `commandHashes`, `batches`, `batchHashes`) until their next write moves them.
+ */
+export type RoomReceipt = { kind: "command" | "batch"; key: string; hash?: string };
+const RECEIPT_FIELDS = ["commands", "commandHashes", "batches", "batchHashes"] as const;
+/** Receipts still stored in a room body (rooms written before migration 0024, or local rooms). */
+function bodyReceipts(room: CloudRoom): RoomReceipt[] {
+  const commands = (room.commands ?? []).map((key) => ({ kind: "command" as const, key, hash: room.commandHashes?.[key] }));
+  const batches = (room.batches ?? []).map((key) => ({ kind: "batch" as const, key, hash: room.batchHashes?.[key] }));
+  return [...commands, ...batches];
+}
+/** Known receipts among `keys`, with their hash when one was recorded (absent = not committed). */
+export async function lookupReceipts(
+  room: CloudRoom,
+  kind: RoomReceipt["kind"],
+  keys: string[],
+): Promise<Map<string, string | undefined>> {
+  const found = new Map<string, string | undefined>();
+  const wanted = new Set(keys);
+  for (const r of bodyReceipts(room)) if (r.kind === kind && wanted.has(r.key)) found.set(r.key, r.hash);
+  const db = database();
+  const missing = [...wanted].filter((key) => !found.has(key));
+  // D1 binds at most 100 parameters per query: code + kind + up to 90 keys per lookup.
+  for (let i = 0; db && i < missing.length; i += 90) {
+    const chunk = missing.slice(i, i + 90);
+    const rows = await db
+      .prepare(
+        `SELECT key, hash FROM campaign_room_receipts WHERE code=? AND kind=? AND key IN (${chunk.map(() => "?").join(",")})`,
+      )
+      .bind(room.code, kind, ...chunk)
+      .all<{ key: string; hash: string | null }>();
+    for (const row of rows.results) found.set(row.key, row.hash ?? undefined);
+  }
+  return found;
+}
+/** How many of a seat's latest action IDs each view acknowledges (a device holds at most 100 pending). */
+export const ACKNOWLEDGED_LIMIT = 500;
+/** The seat's most recent committed action IDs, newest first (without the seat prefix). */
+export async function recentAcknowledged(room: CloudRoom, seatId: string): Promise<string[]> {
+  const prefix = seatId + ":";
+  const ids: string[] = [];
   const db = database();
   if (db) {
-    const encoded = await encodeRoomImages(room);
-    await guardRoomSize(db, room, encoded);
+    const rows = await db
+      .prepare(
+        "SELECT key FROM campaign_room_receipts WHERE code=? AND seat_id=? AND kind='command' ORDER BY seq DESC LIMIT ?",
+      )
+      .bind(room.code, seatId, ACKNOWLEDGED_LIMIT)
+      .all<{ key: string }>();
+    for (const row of rows.results) ids.push(row.key.slice(prefix.length));
+  }
+  // A write that just moved body receipts into the table would list them twice.
+  const seen = new Set(ids);
+  const legacy = (room.commands ?? []).filter((key) => key.startsWith(prefix));
+  for (let i = legacy.length - 1; i >= 0 && ids.length < ACKNOWLEDGED_LIMIT; i--) {
+    const id = legacy[i]!.slice(prefix.length);
+    if (!seen.has(id)) ids.push(id);
+    seen.add(id);
+  }
+  return ids;
+}
+/** The room body without receipt fields (receipts are stored in their own table in D1). */
+function withoutReceipts(room: CloudRoom): CloudRoom {
+  if (!RECEIPT_FIELDS.some((field) => field in room)) return room;
+  const next = { ...room };
+  for (const field of RECEIPT_FIELDS) delete next[field];
+  return keepStoredBody(room, next);
+}
+/** Inserts receipts only if the room write with `writeId` committed in the same batch. */
+function receiptStatement(db: Database, code: string, receipts: RoomReceipt[], writeId: string): Statement {
+  const rows = JSON.stringify(receipts.map((r) => [r.key, r.hash ?? null, r.kind]));
+  return db
+    .prepare(
+      `INSERT OR IGNORE INTO campaign_room_receipts (code, seat_id, kind, key, hash, created_at)
+       SELECT ?, substr(json_extract(j.value,'$[0]'), 1, instr(json_extract(j.value,'$[0]'), ':') - 1),
+         json_extract(j.value,'$[2]'), json_extract(j.value,'$[0]'), json_extract(j.value,'$[1]'), ?
+       FROM json_each(?) AS j
+       WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND write_id=?)
+       ORDER BY j.key`,
+    )
+    .bind(code, Date.now(), rows, code, writeId);
+}
+export async function updateRoom(
+  room: CloudRoom,
+  baseRevision: number,
+  options: { receipts?: RoomReceipt[] } = {},
+): Promise<void> {
+  const db = database();
+  if (db) {
+    // Body receipts (older rooms) move to their table with this write, oldest first, then the new ones.
+    const receipts = [...bodyReceipts(room), ...(options.receipts ?? [])];
+    const stored = withoutReceipts(room);
+    const encoded = await encodeRoomImages(stored);
+    await guardRoomSize(db, stored, encoded);
+    const writeId = crypto.randomUUID();
     const update = db
-      .prepare("UPDATE campaign_rooms SET revision = ?, body = ? WHERE code = ? AND revision = ?")
-      .bind(room.revision, encoded.body, room.code, baseRevision);
-    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, encoded.body)];
+      .prepare("UPDATE campaign_rooms SET revision = ?, body = ?, write_id = ? WHERE code = ? AND revision = ?")
+      .bind(room.revision, encoded.body, writeId, room.code, baseRevision);
+    const members = [
+      ...await roomImageStatements(db, stored, encoded),
+      ...accountSeats(db, stored, encoded.body),
+      ...(receipts.length ? [receiptStatement(db, room.code, receipts, writeId)] : []),
+    ];
     const result = members.length ? (await db.batch([update, ...members]))[0]! : await update.run();
     if (!result.meta.changes)
       throw new Error("The table changed. Refresh before sending your turn.");
@@ -302,17 +400,33 @@ export async function updateRoom(room: CloudRoom, baseRevision: number): Promise
     const current = rooms.find((item) => item.code === room.code);
     if (!current || current.revision !== baseRevision)
       throw new Error("The table changed. Refresh before sending your turn.");
-    await localSave(rooms.map((item) => (item.code === room.code ? room : item)));
+    // Local development rooms (no D1) keep receipts in the body, as before.
+    const next = { ...room };
+    for (const r of options.receipts ?? []) {
+      if (r.kind === "command") {
+        next.commands = [...(next.commands ?? []), r.key];
+        if (r.hash) next.commandHashes = { ...(next.commandHashes ?? {}), [r.key]: r.hash };
+      } else {
+        next.batches = [...(next.batches ?? []), r.key];
+        if (r.hash) next.batchHashes = { ...(next.batchHashes ?? {}), [r.key]: r.hash };
+      }
+    }
+    await localSave(rooms.map((item) => (item.code === room.code ? next : item)));
   });
 }
 export async function deleteRoom(code: string, baseRevision: number): Promise<void> {
   const db = database();
   if (db) {
-    const result = await db
-      .prepare("DELETE FROM campaign_rooms WHERE code = ? AND revision = ?")
-      .bind(code, baseRevision)
-      .run();
-    if (!result.meta.changes) throw new Error("The table changed. Refresh before closing it.");
+    // A deleted room's receipts go with it, in the same transaction (only once the room is gone).
+    const [result] = await db.batch([
+      db.prepare("DELETE FROM campaign_rooms WHERE code = ? AND revision = ?").bind(code, baseRevision),
+      db
+        .prepare(
+          "DELETE FROM campaign_room_receipts WHERE code = ? AND NOT EXISTS (SELECT 1 FROM campaign_rooms WHERE code = ?)",
+        )
+        .bind(code, code),
+    ]);
+    if (!result!.meta.changes) throw new Error("The table changed. Refresh before closing it.");
     return;
   }
   await localWrite(async () => {

@@ -1,0 +1,10 @@
+{
+  "title": "More room on every player screen",
+  "summary": "A healthy shared room now shows as a small pill in the header, and Home lists what happened while you were away.",
+  "items": [
+    "When the room is connected and everything is saved, the status card becomes a \"● Live\" pill in the header (or your turn); select it to open Campaign.",
+    "The full status card comes back as soon as the connection drops or changes need attention.",
+    "On phones, the scenery above each screen is a thin strip, so content starts higher.",
+    "Player Home has a \"Since you were away\" card: unread messages, treasure-pool items waiting for your claim, the DM's answers to your requests and journeys, and updated quests."
+  ]
+}

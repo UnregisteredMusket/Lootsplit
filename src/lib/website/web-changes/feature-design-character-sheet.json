@@ -1,0 +1,12 @@
+{
+  "title": "The character sheet comes first",
+  "summary": "Players' character sheets open straight to the sheet, with quicker HP changes and the last roll in view.",
+  "items": [
+    "Your character opens straight to the sheet, with Home › Character sheet above it; your character library and import wait below, opened from Sheet tools.",
+    "When the DM locks editing, a small lock beside Edit sheet says so instead of a banner.",
+    "The save bar appears only while you have unsaved edits, so it no longer covers the dice tray.",
+    "−1 HP and +1 HP beside your vitals save at once, and Last roll shows your latest result next to Jump to dice tray.",
+    "Import into this character moved into Sheet tools.",
+    "In a shared room, a character's roll log no longer says it is saved on this device."
+  ]
+}

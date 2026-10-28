@@ -279,6 +279,9 @@ jobs:
       - name: dev-command-palette
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-command-palette 240 node scripts/command-palette-browser-audit.mjs
+      - name: dev-session-chip
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-session-chip 240 node scripts/session-chip-browser-audit.mjs
       - name: dev-finance
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs

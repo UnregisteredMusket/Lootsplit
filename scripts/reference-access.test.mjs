@@ -45,7 +45,7 @@ test("actual encounter lifecycle restricts lookup across unchanged room revision
       )
       .run();
     await db
-      .prepare("INSERT INTO campaign_rooms VALUES (?,1,?)")
+      .prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)")
       .bind(room.code, JSON.stringify(room))
       .run();
     await db
@@ -141,7 +141,7 @@ test("editing grants never let a player switch control to another campaign chara
         .run();
     }
     await db
-      .prepare("INSERT INTO campaign_rooms VALUES (?,1,?)")
+      .prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)")
       .bind(room.code, JSON.stringify(room))
       .run();
     for (const editingAllowed of [false, true]) {

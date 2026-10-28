@@ -1,0 +1,11 @@
+{
+  "title": "Session chip, \"Since last session\" and Pin to Desk",
+  "summary": "DMs get a session chip in the header, a summary of what happened since the last session, pinned screens on the Desk and quick hit-point buttons during fights.",
+  "items": [
+    "The header shows \"Session 12 · day 42\"; tap it for End & start next, Session Time and what happened since the last session.",
+    "The Desk lists loot awarded, money in and out, requests waiting and characters away since the last session ended.",
+    "Pin to Desk at the top of a feature screen adds it to your shortcuts, which then show as a Pinned row on the Desk.",
+    "During an encounter, the Desk's party cards have − and + to adjust hit points by one.",
+    "On phones, Help and the session chip sit at the top of Settings & Management on every screen."
+  ]
+}

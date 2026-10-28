@@ -7,6 +7,12 @@
 // - the join link finds its characters by itself, the support panels fold into one group until
 //   joining, an empty name is refused inline, "Your name" is remembered, and the player lands on
 //   Home with "You're playing <character>" and a dismissible Sheet · Inventory & coins · Chat strip;
+// - a healthy room is a "● Live" header pill instead of the status card (the card returns when
+//   offline), the phone scene strip is at most 48 px, and Home shows "Since you were away" with
+//   the pooled lot waiting for the player's claim;
+// - the character sheet opens straight to the sheet with a Home breadcrumb, the DM lock as an
+//   icon, no save bar until an edit, quick ±HP that saves, a "Last roll" chip and the shared-room
+//   roll-log wording; the character library is folded below the sheet and opens from Sheet tools;
 // - Campaign → Chat fills the screen with no Messages fold or recovery panels, keeps its composer
 //   above the bottom navigation, and offers "Jump to latest" after scrolling up;
 // - on Campaign, players read the room mode ("The DM runs this room in Live mode") and no
@@ -70,12 +76,31 @@ try {
       const { applyCloudTable } = await import("/src/lib/quire/economy.ts");
       const { readJournal } = await import("/src/lib/quire/journal.ts");
       const coins = (gp) => ({ cp: 0, sp: 0, ep: 0, gp, pp: 0 });
+      const { blankSheet } = await import("/src/lib/characters/model.mjs");
       await applyCloudTable({
         purses: [
           { id: "hoard", name: "The Hoard", kind: "party", coins: coins(40) },
-          ...players.map((p) => ({ id: p.id, name: p.name, kind: "character", coins: coins(12) })),
+          ...players.map((p) => ({
+            id: p.id,
+            name: p.name,
+            kind: "character",
+            coins: coins(12),
+            sheet: { ...blankSheet(), name: p.name, hp: 10, maxHp: 12 },
+          })),
         ],
-        holdings: [],
+        // One pooled lot: "Since you were away" counts it as waiting for the player's claim.
+        holdings: [
+          {
+            id: "pooled-sword",
+            purseId: "hoard",
+            name: "+1 Longsword",
+            kind: "item",
+            quantity: 1,
+            unitCopper: 50000,
+            notes: "",
+            pool: { at: Date.now(), source: "add-loot" },
+          },
+        ],
         shops: [],
         stock: [],
         ledger: [],
@@ -132,9 +157,33 @@ try {
     await fits(page, `home tips ${player.width}`);
     await page.screenshot({ path: `${output}/joined-home-${player.width}.png`, fullPage: true });
     await expect(page).toHaveTitle(`${player.name} · ${CAMPAIGN}`);
+    // A healthy room is a header pill, not a status card (P4).
+    const pill = page.locator(".room-pill");
+    await expect(pill).toBeVisible();
+    await expect(pill).toHaveAttribute("aria-label", /^Live · Room online · Play active · Saved to room/);
+    await expect(page.locator(".sync-status")).toHaveCount(0);
+    const away = page.getByRole("region", { name: "Since you were away", exact: true });
+    await expect(away.getByRole("link", { name: "1 item waiting for your claim →", exact: true })).toBeVisible();
+    if (player.width <= 430) {
+      const strip = await page
+        .locator(".submenu-workspace[data-submenu-scene]")
+        .evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).paddingTop)));
+      assert.ok(strip.every((px) => px <= 48), `${player.width}: the scene strip is at most 48 px (${strip})`);
+    }
     if (player.width === 390) {
       await tips.getByRole("button", { name: "Dismiss getting started tips", exact: true }).click();
       await expect(tips).toHaveCount(0);
+    }
+    if (player.width === 320) {
+      // Offline: the pill gives way to the full card that says what needs attention.
+      await page.context().setOffline(true);
+      await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+      await expect(page.locator(".sync-status")).toContainText("Offline");
+      await expect(pill).toHaveCount(0);
+      await page.screenshot({ path: `${output}/offline-${player.width}.png`, fullPage: true });
+      await page.context().setOffline(false);
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await expect(pill).toBeVisible();
     }
     await navigateApplication(page, origin + "/share");
     await page.getByText("You joined as a player", { exact: true }).waitFor();
@@ -158,6 +207,40 @@ try {
     await page.keyboard.press("Escape");
     await fits(page, `home ${player.width}`);
     await page.screenshot({ path: `${output}/home-${player.width}.png`, fullPage: true });
+    // The character sheet opens straight to the sheet (P5, Q25).
+    await page.getByRole("link", { name: "Open character sheet →", exact: true }).click();
+    await page.waitForURL((u) => u.pathname === "/characters");
+    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
+    await expect(breadcrumb).toContainText("Home › Character sheet");
+    await expect(page.getByRole("heading", { name: player.name, exact: true, level: 2 })).toBeVisible();
+    // Library and import wait below the sheet, folded; the DM lock is an icon beside Edit.
+    await expect(page.locator("#character-library")).not.toHaveAttribute("open", "");
+    const sheetTop = await page.locator(".play-sheet").evaluate((el) => el.getBoundingClientRect().top);
+    const libraryTop = await page.locator("#character-library").evaluate((el) => el.getBoundingClientRect().top);
+    assert.ok(libraryTop > sheetTop, `${player.width}: the library sits below the sheet`);
+    await expect(page.getByRole("img", { name: /Character editing is locked by the DM/ })).toBeVisible();
+    await expect(page.getByText("Saved character", { exact: true })).toBeVisible();
+    await expect(page.locator(".character-savebar.is-dirty")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Save character", exact: true })).toHaveCount(0);
+    // Quick ±HP saves at once.
+    await page.getByRole("button", { name: "+1 HP", exact: true }).click();
+    await expect(page.locator(".play-vitals")).toContainText("11 / 12");
+    await expect(page.getByText("Saved character", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "−1 HP", exact: true }).click();
+    await expect(page.locator(".play-vitals")).toContainText("10 / 12");
+    await expect(page.getByText("Saved character", { exact: true })).toBeVisible();
+    // A roll shows beside the dice button, and the room log says where it is kept.
+    await page.getByRole("button", { name: /^Initiative / }).first().click();
+    await expect(page.locator(".last-roll-chip")).toContainText(/^Last roll · Initiative -?\d+$/);
+    await expect(page.getByText(/Visible to current campaign members\.|Saved with this character in the shared campaign\./)).toBeVisible();
+    await expect(page.locator(".roll-log li").first()).toContainText("Initiative");
+    await expect(page.getByText(/Saved with this character on this device\./)).toHaveCount(0);
+    await fits(page, `sheet ${player.width}`);
+    await page.screenshot({ path: `${output}/sheet-${player.width}.png`, fullPage: true });
+    await page.getByRole("button", { name: "Sheet tools", exact: true }).click();
+    await page.getByRole("button", { name: "My characters · choose, create or import", exact: true }).click();
+    await expect(page.locator("#character-library")).toHaveAttribute("open", "");
+    await expect(page.getByLabel("Choose character", { exact: true })).toBeVisible();
     // Campaign → Chat is the whole tab: no Messages fold, no recovery panels, a pinned composer (P8, Q24).
     await navigateApplication(page, origin + "/share?chat=1");
     const composer = page.locator("#chat-message");
@@ -207,7 +290,7 @@ try {
   }
   await dm.context.close();
   assert.deepEqual(errors, []);
-  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips, read-only room mode and chat at 1280/390/320.");
+  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips and read-only room mode, status pill, scene strip, Since you were away, the character sheet and chat at 1280/390/320.");
 } finally {
   await browser.close();
 }

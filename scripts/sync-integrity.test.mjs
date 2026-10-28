@@ -266,13 +266,17 @@ test("canonical nested command receipts accept reordered Zod echoes, preserve le
     await submitCommands({ ...dm, batchId: "saved", commands: [echoed] });
     await submitCommands({ ...dm, batchId: "saved", commands: [command] });
     let saved = await readRoom(dm.code);
-    assert.match(saved.commandHashes["dm:canonical-patch"], /^v2:/);
-    assert.match(saved.batchHashes["dm:saved"], /^v2:/);
+    // Receipts live in campaign_room_receipts (migration 0024), not the room body.
+    const receipt = async (kind, key) => (await db.prepare("SELECT hash FROM campaign_room_receipts WHERE code=? AND kind=? AND key=?").bind(dm.code, kind, key).first())?.hash;
+    assert.match(await receipt("command", "dm:canonical-patch"), /^v2:/);
+    assert.match(await receipt("batch", "dm:saved"), /^v2:/);
+    assert.equal(saved.commandHashes, undefined, "receipts are not stored in the room body");
     assert.equal(saved.table.purses[0].name, "Renamed");
     const digest = async value => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), byte => byte.toString(16).padStart(2, "0")).join("");
     const legacy = commandSchema.parse(command);
-    saved.commandHashes["dm:canonical-patch"] = await digest(JSON.stringify(legacy));
-    saved.batchHashes["dm:saved"] = await digest(JSON.stringify([legacy]));
+    // A room written before migration 0024 kept unversioned legacy receipts in its body.
+    await db.prepare("DELETE FROM campaign_room_receipts WHERE code=?").bind(dm.code).run();
+    saved = { ...saved, commands: ["dm:canonical-patch"], commandHashes: { "dm:canonical-patch": await digest(JSON.stringify(legacy)) }, batches: ["dm:saved"], batchHashes: { "dm:saved": await digest(JSON.stringify([legacy])) } };
     await db.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").bind(JSON.stringify(saved), dm.code).run();
     await submitCommands({ ...dm, batchId: "saved", commands: [command] });
     saved = await readRoom(dm.code);

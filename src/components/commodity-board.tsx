@@ -82,7 +82,7 @@ export function GlobalCommodityMarket() {
           {market.currentLocationId ? locationLabel(market, market.currentLocationId) : "Not set"}.
         </p>
         {dm && (
-          <AppLink href="/features/economy?from=%2Fmarket">
+          <AppLink className="tap-link" href="/features/economy?from=%2Fmarket">
             Configure commodities & exchanges →
           </AppLink>
         )}

@@ -25,7 +25,8 @@ function CampaignInventoryArt({
   );
 }
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
-import { Heart, Shield, Footprints } from "lucide-react";
+import { Heart, Shield, Footprints, Lock } from "lucide-react";
+import { AppLink } from "../app-link";
 import { HpBar } from "@/components/control-panel/readouts";
 import { useEffect, useRef, useState, useSyncExternalStore, useId, type FormEvent } from "react";
 import { NumberInput } from "@/components/number-input";
@@ -156,7 +157,8 @@ export function CharacterWorkspace({
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [reload, setReload] = useState(0),
-    [creating, setCreating] = useState(false);
+    [creating, setCreating] = useState(false),
+    [libraryOpen, setLibraryOpen] = useState(false);
   const campaignRows: Row[] = economy.purses
     .filter(
       (p) =>
@@ -361,16 +363,87 @@ export function CharacterWorkspace({
       setCreating(false);
     }
   }
+  // A player with a character open sees the sheet first (plan P5, Q25): the account library and
+  // import sit below it, opened from Sheet tools. DMs keep the library above the sheet.
+  const libraryBelow = seat.role === "player" && !!selected;
+  const library = data ? (
+    <>
+          <ImportCharacterSheet
+              label="Import a new character"
+              disabled={creating || (!data.userId && seat.role !== "dm")}
+              onImport={(sheet) => create(sheet)}
+            />
+            <details
+              className="character-library-controls"
+              id="character-library"
+              open={libraryOpen}
+              onToggle={(e) => setLibraryOpen(e.currentTarget.open)}
+            >
+              <summary>My characters · select, create or import</summary>
+              <div className="character-toolbar">
+                <label>
+                  Character
+                  <select
+                    aria-label="Choose character"
+                    value={selected}
+                    onChange={async (e) => {
+                      const id = e.target.value;
+                      if (
+                        !dirtyRef.current ||
+                        (await requestConfirm({
+                          title: "Discard unsaved changes and switch characters?",
+                          tone: "discard",
+                        }))
+                      )
+                        chooseCharacter(id);
+                    }}
+                  >
+                    <option value="">Choose a character</option>
+                    {data.characters.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.body.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button disabled={creating} onClick={() => void create()}>
+                  Create character
+                </button>
+                {data.userId && (
+                  <button disabled={creating} onClick={() => void create(blankSheet(), true)}>
+                    Create account-only character
+                  </button>
+                )}
+                <button disabled={loading} onClick={() => setReload((n) => n + 1)}>
+                  Refresh character list
+                </button>
+              </div>
+            </details>
+    </>
+  ) : null;
   return (
     <section className="character-play" aria-label="Interactive characters">
-      <header className="character-heading">
-        <div>
-          <p className="eyebrow">YOUR ADVENTURER, EVERYWHERE</p>
-          <h1>Character sheets</h1>
-          <p>Your sheet, funds and inventory — on phone or computer.</p>
-        </div>
-        <Link to="/account">My account</Link>
-      </header>
+      {seat.role === "player" ? (
+        // Players reach the sheet from Home (the nav keeps Home active): a breadcrumb back.
+        <header className="character-heading is-player">
+          <nav aria-label="Breadcrumb" className="sheet-breadcrumb">
+            <AppLink href="/?view=home">Home</AppLink>
+            <span aria-hidden="true"> › </span>
+            <span aria-current="page">Character sheet</span>
+          </nav>
+          <Link to="/account">My account</Link>
+          <h1 className="sr-only">Character sheets</h1>
+        </header>
+      ) : (
+        <header className="character-heading">
+          <div>
+            <p className="eyebrow">YOUR ADVENTURER, EVERYWHERE</p>
+            <h1>Character sheets</h1>
+            <p>Your sheet, funds and inventory — on phone or computer.</p>
+          </div>
+          <Link to="/account">My account</Link>
+        </header>
+      )}
       {error && (
         <p role="alert" className="character-error">
           {error}
@@ -387,55 +460,22 @@ export function CharacterWorkspace({
         )
       ) : (
         <>
-          <ImportCharacterSheet
-            label="Import a new character"
-            disabled={creating || (!data.userId && seat.role !== "dm")}
-            onImport={(sheet) => create(sheet)}
-          />
-          <details className="character-library-controls">
-            <summary>My characters · select, create or import</summary>
-            <div className="character-toolbar">
-              <label>
-                Character
-                <select
-                  aria-label="Choose character"
-                  value={selected}
-                  onChange={async (e) => {
-                    const id = e.target.value;
-                    if (
-                      !dirtyRef.current ||
-                      (await requestConfirm({
-                        title: "Discard unsaved changes and switch characters?",
-                        tone: "discard",
-                      }))
-                    )
-                      chooseCharacter(id);
-                  }}
-                >
-                  <option value="">Choose a character</option>
-                  {data.characters.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.body.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button disabled={creating} onClick={() => void create()}>
-                Create character
-              </button>
-              {data.userId && (
-                <button disabled={creating} onClick={() => void create(blankSheet(), true)}>
-                  Create account-only character
-                </button>
-              )}
-              <button disabled={loading} onClick={() => setReload((n) => n + 1)}>
-                Refresh character list
-              </button>
-            </div>
-          </details>
+          {!libraryBelow && library}
           {selected && (
             <CharacterEditor
               key={`${selectionContext}:${selected}`}
+              onOpenLibrary={
+                libraryBelow
+                  ? () => {
+                      setLibraryOpen(true);
+                      requestAnimationFrame(() =>
+                        document
+                          .getElementById("character-library")
+                          ?.scrollIntoView({ block: "start" }),
+                      );
+                    }
+                  : undefined
+              }
               id={selected}
               campaigns={data.campaigns}
               deviceCampaign={deviceCampaign}
@@ -445,6 +485,7 @@ export function CharacterWorkspace({
               }}
             />
           )}
+          {libraryBelow && <div className="character-library-below">{library}</div>}
           {data.campaigns.some((c) => c.role === "dm") && (
             <DmCampaigns campaigns={data.campaigns.filter((c) => c.role === "dm")} />
           )}
@@ -459,12 +500,15 @@ function CharacterEditor({
   changed,
   onDirty,
   deviceCampaign,
+  onOpenLibrary,
 }: {
   id: string;
   campaigns: Campaign[];
   changed: () => void;
   onDirty?: (dirty: boolean) => void;
   deviceCampaign?: DeviceCampaign;
+  /** Players: Sheet tools opens the character library below the sheet. */
+  onOpenLibrary?: () => void;
 }) {
   const currentSeat = useSeat();
   const playPrefix = useId(),
@@ -502,7 +546,7 @@ function CharacterEditor({
   const [sheetToolsOpen, setSheetToolsOpen] = useState(false);
   const diceTray = useRef<HTMLElement>(null);
   const [detail, setDetail] = useState<Detail | null>(null),
-    [sheet, setSheet] = useState<Sheet | null>(null),
+    [sheetState, setSheet] = useState<Sheet | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
@@ -510,7 +554,13 @@ function CharacterEditor({
     [tab, setTab] = useState("combat"),
     [code, setCode] = useState(""),
     [purse, setPurse] = useState(""),
-    [rollRefresh, setRollRefresh] = useState(0);
+    [rollRefresh, setRollRefresh] = useState(0),
+    [lastRoll, setLastRoll] = useState("");
+  const rolled = (summary?: string) => {
+    setRollRefresh((n) => n + 1);
+    if (summary) setLastRoll(summary);
+  };
+  const sheet = sheetState;
   // Only context identity changes reload the sheet; ledger refreshes must preserve drafts.
   const deviceCampaignRef = useRef(deviceCampaign);
   deviceCampaignRef.current = deviceCampaign;
@@ -595,8 +645,9 @@ function CharacterEditor({
     return () => c.abort();
   }, [liveSignature, remoteRefresh, dirty, busy, id]);
 
-  async function save(e?: FormEvent) {
+  async function save(e?: FormEvent, draft?: Sheet) {
     e?.preventDefault();
+    const sheet = draft ?? sheetState;
     if (!sheet || !detail) return;
     setBusy(true);
     setError("");
@@ -642,6 +693,20 @@ function CharacterEditor({
     } finally {
       setBusy(false);
     }
+  }
+  /** ±1 HP from the play sheet: temporary HP absorbs damage first; a clean sheet saves at once. */
+  function quickHp(delta: number) {
+    if (!sheet) return;
+    const next =
+      delta < 0
+        ? {
+            ...sheet,
+            tempHp: Math.max(0, sheet.tempHp - 1),
+            hp: sheet.tempHp > 0 ? sheet.hp : Math.max(0, sheet.hp - 1),
+          }
+        : { ...sheet, hp: Math.min(sheet.maxHp, sheet.hp + 1) };
+    setSheet(next);
+    if (!dirty) void save(undefined, next);
   }
   const importKey = useRef(crypto.randomUUID());
   async function assign() {
@@ -761,7 +826,7 @@ function CharacterEditor({
       rollKey={key}
       detail={detail}
       disabled={dirty || busy || !!detail.assignmentError}
-      onRoll={() => setRollRefresh((n) => n + 1)}
+      onRoll={rolled}
     />
   );
   const bonusFor = (a: Ability, rank = 0, extra = 0) =>
@@ -827,50 +892,42 @@ function CharacterEditor({
           </p>
         </div>
       </div>
-      <div className="play-mode-switch">
-        <button aria-pressed={playView} onClick={() => setPlayView(true)}>
-          Play sheet
-        </button>
-        <button aria-pressed={!playView} onClick={() => setPlayView(false)}>
-          Edit sheet
+      <div className="sheet-mode-row">
+        <div className="play-mode-switch">
+          <button aria-pressed={playView} onClick={() => setPlayView(true)}>
+            Play sheet
+          </button>
+          <button aria-pressed={!playView} onClick={() => setPlayView(false)}>
+            Edit sheet
+          </button>
+        </div>
+        {canPlay && !editable && (
+          // The DM lock is a small mark beside Edit, not a banner (plan P5).
+          <span
+            className="sheet-lock"
+            role="img"
+            tabIndex={0}
+            aria-label="Character editing is locked by the DM. Rolls, health, resources, equipped items and consumption remain available."
+            title="Character editing is locked by the DM. Rolls, health, resources, equipped items and consumption remain available."
+          >
+            <Lock size={16} aria-hidden="true" />
+          </span>
+        )}
+        <button
+          id={`${playPrefix}-tools`}
+          className="sheet-tools-button"
+          aria-haspopup="dialog"
+          onClick={() => setSheetToolsOpen(true)}
+        >
+          Sheet tools
         </button>
       </div>
-      <ImportCharacterSheet
-        label="Import into this character"
-        disabled={!editable || busy || dirty}
-        onImport={(imported, fields) => {
-          const next = { ...sheet };
-          for (const key of Object.keys(imported) as (keyof Sheet)[]) {
-            if (key === "version" || !canEdit(key)) continue;
-            if (!fields || fields.includes(key)) (next as any)[key] = imported[key];
-            else {
-              const parts = fields
-                .filter((field) => field.startsWith(key + "."))
-                .map((field) => field.slice(key.length + 1));
-              if (parts.length)
-                (next as any)[key] = {
-                  ...(sheet as any)[key],
-                  ...Object.fromEntries(parts.map((part) => [part, (imported as any)[key][part]])),
-                };
-            }
-          }
-          // Existing canonical item IDs are retained; imported items are new drafts.
-          if (canEdit("equipment") && (!fields || fields.includes("equipment")))
-            next.equipment = imported.equipment.map((item) => ({ ...item, id: undefined }));
-          setSheet(next);
-          setPlayView(false);
-          setNotice(
-            "Imported draft ready. Review each tab, then Save character. Restricted fields were preserved.",
-          );
-        }}
-      />
-      {canPlay && !editable && (
-        <p role="status">
-          Character editing is locked by the DM. Rolls, health, resources, equipped items and
-          consumption remain available.
-        </p>
-      )}
-      <div className="character-savebar" style={{ top: headerHeight + 8 }}>
+      {/* The save bar appears (and sticks) only while there are unsaved edits; otherwise one
+          quiet line says the sheet is saved, so nothing covers the dice tray (plan P5). */}
+      <div
+        className={dirty || busy ? "character-savebar is-dirty" : "character-savebar is-clean"}
+        style={dirty || busy ? { top: headerHeight + 8 } : undefined}
+      >
         <strong role="status">
           {dirty
             ? "Unsaved changes — save before rolling"
@@ -880,18 +937,11 @@ function CharacterEditor({
                 ? "Saved character"
                 : "DM read-only view"}
         </strong>
-        {canPlay && (
+        {canPlay && (dirty || busy) && (
           <button disabled={busy || !dirty} onClick={() => void save()}>
             {busy ? "Saving…" : "Save character"}
           </button>
         )}
-        <button
-          id={`${playPrefix}-tools`}
-          aria-haspopup="dialog"
-          onClick={() => setSheetToolsOpen(true)}
-        >
-          Sheet tools
-        </button>
       </div>
       <Modal
         open={sheetToolsOpen}
@@ -911,6 +961,46 @@ function CharacterEditor({
           >
             Export sheet / draft
           </button>
+          <ImportCharacterSheet
+            label="Import into this character"
+            disabled={!editable || busy || dirty}
+            onImport={(imported, fields) => {
+              const next = { ...sheet };
+              for (const key of Object.keys(imported) as (keyof Sheet)[]) {
+                if (key === "version" || !canEdit(key)) continue;
+                if (!fields || fields.includes(key)) (next as any)[key] = imported[key];
+                else {
+                  const parts = fields
+                    .filter((field) => field.startsWith(key + "."))
+                    .map((field) => field.slice(key.length + 1));
+                  if (parts.length)
+                    (next as any)[key] = {
+                      ...(sheet as any)[key],
+                      ...Object.fromEntries(parts.map((part) => [part, (imported as any)[key][part]])),
+                    };
+                }
+              }
+              // Existing canonical item IDs are retained; imported items are new drafts.
+              if (canEdit("equipment") && (!fields || fields.includes("equipment")))
+                next.equipment = imported.equipment.map((item) => ({ ...item, id: undefined }));
+              setSheet(next);
+              setSheetToolsOpen(false);
+              setPlayView(false);
+              setNotice(
+                "Imported draft ready. Review each tab, then Save character. Restricted fields were preserved.",
+              );
+            }}
+          />
+          {onOpenLibrary && (
+            <button
+              onClick={() => {
+                setSheetToolsOpen(false);
+                onOpenLibrary();
+              }}
+            >
+              My characters · choose, create or import
+            </button>
+          )}
           <button
             disabled={busy}
             onClick={async () => {
@@ -982,6 +1072,23 @@ function CharacterEditor({
               </span>
             </button>
           </div>
+          <div className="sheet-quick-hp" role="group" aria-label="Quick hit points">
+            <button
+              type="button"
+              disabled={!canPlay || busy || sheet.hp + sheet.tempHp <= 0}
+              onClick={() => quickHp(-1)}
+            >
+              −1 HP
+            </button>
+            <button
+              type="button"
+              disabled={!canPlay || busy || sheet.hp >= sheet.maxHp}
+              onClick={() => quickHp(1)}
+            >
+              +1 HP
+            </button>
+            {dirty ? null : <span className="sheet-quick-hp-note">Saves at once</span>}
+          </div>
           {sheet.conditions && <p className="condition-pill">{sheet.conditions}</p>}
           <CharacterTabs
             options={[
@@ -1009,6 +1116,12 @@ function CharacterEditor({
           >
             Jump to dice tray ↓
           </button>
+          {lastRoll && (
+            // The latest result stays visible by the dice button (plan Q25).
+            <output className="last-roll-chip" aria-live="polite">
+              Last roll · {lastRoll}
+            </output>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -2158,7 +2271,7 @@ function CharacterEditor({
           <DiceTray
             detail={detail}
             disabled={dirty || busy || !!detail.assignmentError}
-            onRoll={() => setRollRefresh((n) => n + 1)}
+            onRoll={rolled}
           />
         </section>
         <RollLog
@@ -2320,7 +2433,7 @@ function QuickRoll({
   rollKey: string;
   detail: Detail;
   disabled: boolean;
-  onRoll: () => void;
+  onRoll: (summary?: string) => void;
 }) {
   const { prefs } = usePrefs();
   const manual = prefs.rollMode === "manual";
@@ -2365,7 +2478,7 @@ function QuickRoll({
           : `${r.total} · ${r.dice.join(", ")} ${signed(r.modifier)} · ${r.mode}`,
       );
       retry.current = { signature: "", key: "" };
-      onRoll();
+      onRoll(`${label.replace(/\s[+−-]\d+$/, "")} ${r.total}`);
     } catch (e) {
       setResult(errorText(e));
     } finally {
@@ -2428,7 +2541,7 @@ function DiceTray({
 }: {
   detail: Detail;
   disabled: boolean;
-  onRoll: () => void;
+  onRoll: (summary?: string) => void;
 }) {
   const { prefs, setPrefs } = usePrefs();
   const manual = prefs.rollMode === "manual";
@@ -2463,7 +2576,7 @@ function DiceTray({
         `${r.label}: ${r.total} · ${r.source === "manual" ? "Manual result" : `${r.source === "device" ? "Device" : "Server"} roll [${r.dice.join(", ")}] ${signed(r.modifier)}`}`,
       );
       retry.current = { signature: "", key: "" };
-      onRoll();
+      onRoll(`${r.label} ${r.total}`);
     } catch (e) {
       setResult(errorText(e));
     } finally {
@@ -2515,6 +2628,7 @@ export function RollLog({
   code?: string;
   refresh?: number;
 }) {
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const [rolls, setRolls] = useState<Roll[]>([]),
     [more, setMore] = useState(false),
     [error, setError] = useState(""),
@@ -2566,7 +2680,10 @@ export function RollLog({
         {code
           ? "Visible to current campaign members."
           : id.startsWith("party:")
-            ? "Saved with this character on this device."
+            ? // A campaign character in a shared room logs its rolls in the room, not on this device.
+              room.joined
+              ? "Saved with this character in the shared campaign."
+              : "Saved with this character on this device."
             : "Visible only to your account."}{" "}
         Results are retained; load older rolls to review earlier sessions.
       </p>
