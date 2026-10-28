@@ -146,20 +146,18 @@ export function LocationNpcs() {
       <AppLink className="settings-link" href="/features/trading">
         Open Trading & Barter →
       </AppLink>
-      {npcs.length > 0 && (
-        <label className="block mt-3">
-          Find an NPC
-          {/* One picker: it searches names, places and descriptions (the former record search). */}
-          <SearchSelect aria-label="Find an NPC" value={selected} onValueChange={setSelected}>
-            <option value="">Choose an NPC</option>
-            {npcs.map((n) => (
-              <option key={n.id} value={n.id} data-keywords={n.description.slice(0, 400)}>
-                {n.name} · {locationLabel(market, n.locationId)}
-              </option>
-            ))}
-          </SearchSelect>
-        </label>
-      )}
+      <label className="block mt-3">
+        Find an NPC
+        {/* One picker: it searches names, places and descriptions (the former record search). */}
+        <SearchSelect aria-label="Find an NPC" value={selected} onValueChange={setSelected}>
+          <option value="">Choose an NPC</option>
+          {npcs.map((n) => (
+            <option key={n.id} value={n.id} data-keywords={n.description.slice(0, 400)}>
+              {n.name} · {locationLabel(market, n.locationId)}
+            </option>
+          ))}
+        </SearchSelect>
+      </label>
       {npc && (
         <div
           className="npc-focus"
