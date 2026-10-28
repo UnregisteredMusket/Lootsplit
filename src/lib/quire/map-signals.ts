@@ -1,5 +1,14 @@
 import { z } from "zod";
 export const PING_DURATION = 5000;
+/** Map signal polling: quick while pings are active, slower when the map is quiet (F6). */
+export const PING_POLL_ACTIVE_MS = 1000;
+export const PING_POLL_IDLE_MS = 3000;
+export const PING_ACTIVE_WINDOW_MS = 10_000;
+export function mapSignalPollDelay(lastActivity: number, now: number) {
+  return lastActivity > 0 && now - lastActivity < PING_ACTIVE_WINDOW_MS
+    ? PING_POLL_ACTIVE_MS
+    : PING_POLL_IDLE_MS;
+}
 export const pingColors = ["red", "amber", "green", "blue", "violet"] as const;
 export const mapPingInput = z
   .object({

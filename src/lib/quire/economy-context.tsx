@@ -94,7 +94,7 @@ import {
   queueCommandBatch,
   runSharedMutation,
   hasPendingChanges,
-  refreshShared,
+  refreshSharedIfChanged,
 } from "./cloud-client.ts";
 import { loadNotes } from "./chat.ts";
 import { primeNotices } from "./notify.ts";
@@ -453,7 +453,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       timer = setTimeout(() => {
         timer = undefined;
         void (async () => {
-          if (getCloudWatch().joined) await refreshShared();
+          // Conditional: focus on an unchanged room costs the light "unchanged" answer (F7).
+          if (getCloudWatch().joined) await refreshSharedIfChanged();
           await reload();
         })().catch((error) =>
           fault(error, "This window could not refresh. Your draft is retained."),

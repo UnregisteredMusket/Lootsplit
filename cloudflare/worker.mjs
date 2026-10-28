@@ -12,19 +12,24 @@ import handler from "../dist/server/index.mjs";
 import { scheduledMonitor } from "./monitor-journal.mjs";
 import { telemetryResponse } from "./monitor-telemetry.mjs";
 import { expireRateLimits, rateLimitExpiryDue } from "./rate-limit-expiry.mjs";
+import { expireMapPings } from "./map-ping-expiry.mjs";
+import { runWithRequestContext } from "./request-context.mjs";
 
 export default {
   async scheduled(controller, env) {
     // Await the durable result: rejected scheduled executions remain visible in Cloudflare.
     // Rate-limit expiry runs independently of monitoring, so one failing never skips the other.
-    const [monitor, expiry] = await Promise.allSettled([
+    // Expired map pings are reclaimed here and on ping inserts, never on the read path (F6).
+    const [monitor, expiry, pings] = await Promise.allSettled([
       scheduledMonitor(env, controller.scheduledTime),
       rateLimitExpiryDue(controller.scheduledTime)
         ? expireRateLimits(env.DB, controller.scheduledTime)
         : null,
+      env.DB ? expireMapPings(env.DB, controller.scheduledTime) : null,
     ]);
     if (monitor.status === "rejected") throw monitor.reason;
     if (expiry.status === "rejected") throw expiry.reason;
+    if (pings.status === "rejected") throw pings.reason;
   },
   async fetch(request, env, context) {
     const recovery = await recoveryGuard(request, env);
@@ -59,7 +64,10 @@ export default {
     if (accountResponse) return accountResponse;
     globalThis.__env__ = env;
     return releaseResponse(
-      await cachedPublicPage(request, env, context, () => handler.fetch(request, env, context)),
+      // The request context lets server code defer work (push notifications) with waitUntil.
+      await runWithRequestContext(context, () =>
+        cachedPublicPage(request, env, context, () => handler.fetch(request, env, context)),
+      ),
       env,
     );
   },

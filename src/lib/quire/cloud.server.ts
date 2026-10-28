@@ -1032,17 +1032,23 @@ export async function submitCommands(input: {
           : room.turn,
     };
     await updateRoom(next, room.revision, { receipts });
+    // Only after the successful write (a retried attempt that lost the race never notifies).
     if (!input.stage) {
       const fresh = next.table.notes.filter(
         (note) => !room.table.notes.some((old) => old.id === note.id),
       );
       if (fresh.length) {
-        try {
-          const { pushMessages } = await import("./push.server.ts");
-          await pushMessages(next, seat.id, fresh);
-        } catch {
-          console.warn("Background notification failed; campaign changes remain saved.");
-        }
+        // After the response on a Worker (waitUntil), so a slow push service never holds the
+        // sender's submit or tab lock (2026-10-28 load audit, F12); awaited without a context.
+        const { afterResponse } = await import("../../../cloudflare/request-context.mjs");
+        await afterResponse(async () => {
+          try {
+            const { pushMessages } = await import("./push.server.ts");
+            await pushMessages(next, seat.id, fresh);
+          } catch {
+            console.warn("Background notification failed; campaign changes remain saved.");
+          }
+        });
       }
     }
     return view(next, seat, room);

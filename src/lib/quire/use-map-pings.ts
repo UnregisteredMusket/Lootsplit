@@ -5,7 +5,13 @@ import {
   subscribeCloudTable,
   requestMapSignals,
 } from "./cloud-client";
-import { mapPingSchema, PING_DURATION, type MapPing, type MapPingInput } from "./map-signals";
+import {
+  mapPingSchema,
+  mapSignalPollDelay,
+  PING_DURATION,
+  type MapPing,
+  type MapPingInput,
+} from "./map-signals";
 export function useMapPings(mapId: string) {
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const scope = `${cloud.code}:${cloud.sessionId}:${cloud.seatId}:${mapId}`;
@@ -13,6 +19,8 @@ export function useMapPings(mapId: string) {
   current.current = scope;
   const [state, setState] = useState<{ scope: string; pings: MapPing[] }>({ scope, pings: [] });
   const [error, setError] = useState("");
+  // Last time this browser saw or sent a ping: the poll is quick only while the map is active.
+  const activity = useRef(0);
   function receive(result: { serverNow: number; pings: MapPing[] }, expected: string) {
     if (current.current !== expected) return;
     const now = Date.now();
@@ -28,13 +36,18 @@ export function useMapPings(mapId: string) {
           ]
         : [];
     });
+    if (pings.length) activity.current = now;
     setState({ scope: expected, pings });
   }
   useEffect(() => {
     let stopped = false,
+      busy = false,
       timer: ReturnType<typeof setTimeout>;
     setError("");
     const poll = async () => {
+      clearTimeout(timer);
+      if (busy) return;
+      busy = true;
       if (
         !stopped &&
         cloud.joined &&
@@ -49,11 +62,22 @@ export function useMapPings(mapId: string) {
           /* Sending reports errors; reads resume without replaying old pings. */
         }
       }
-      if (!stopped) timer = setTimeout(poll, 1000);
+      busy = false;
+      // 1 s while pings were seen or sent in the last 10 s, otherwise 3 s (2026-10-28 load
+      // audit, F6). Hidden tabs and offline devices skip the request and keep the slow cadence.
+      if (!stopped) timer = setTimeout(poll, mapSignalPollDelay(activity.current, Date.now()));
     };
-    if (cloud.joined && mapId) void poll();
+    // Returning to the tab reads at once instead of waiting out the idle interval.
+    const resume = () => {
+      if (!stopped && document.visibilityState !== "hidden") void poll();
+    };
+    if (cloud.joined && mapId) {
+      void poll();
+      document.addEventListener("visibilitychange", resume);
+    }
     return () => {
       stopped = true;
+      document.removeEventListener("visibilitychange", resume);
       clearTimeout(timer);
     };
     // Scope changes discard signals and invalidate in-flight room responses.
@@ -74,6 +98,7 @@ export function useMapPings(mapId: string) {
   async function send(point: { x: number; y: number }, color: MapPingInput["color"]) {
     const expected = scope,
       ping = { id: crypto.randomUUID(), mapId, ...point, color };
+    activity.current = Date.now();
     setError("");
     try {
       if (cloud.joined) receive(await requestMapSignals(mapId, ping), expected);

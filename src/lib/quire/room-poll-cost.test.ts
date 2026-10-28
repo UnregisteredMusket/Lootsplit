@@ -55,6 +55,7 @@ function harness() {
   };
   const counts = { pulls: 0, polls: 0, fails: 0, shown: 0, notified: 0, reloads: 0, applied: 0 };
   let serverRevision = 5;
+  const faults: { poll?: () => Error; pull?: () => Error } = {};
   const remote = () => ({
     code: "TEST",
     seatId: seat.id,
@@ -79,7 +80,7 @@ function harness() {
   const client = new Function(
     "deps",
     stripTypeScriptTypes(`
-      const {session:sessionValue,counts,remote,recovery,readRoomResponse,readUnchangedRoom,applyCommand,sameCommand}=deps;
+      const {session:sessionValue,counts,remote,recovery,readRoomResponse,readUnchangedRoom,applyCommand,sameCommand,faults}=deps;
       let acceptedPoll;
       const listeners=new Set();
       let view={joined:false,mine:true,live:false,who:"",code:"",sessionId:"",role:"dm",seats:[],departed:[],
@@ -92,8 +93,8 @@ function harness() {
         rememberRevokedRecovery=()=>{};
       const applyCloudTable=async()=>{counts.applied++;};
       const setCloudWatch=(_w,dataChanged)=>{if(dataChanged)counts.reloads++;};
-      const pullCloudTable=async()=>{counts.pulls++;return remote();};
-      const pollCloudTable=async({data})=>{counts.polls++;const r=remote();
+      const pullCloudTable=async()=>{counts.pulls++;if(faults.pull)throw faults.pull();return remote();};
+      const pollCloudTable=async({data})=>{counts.polls++;if(faults.poll)throw faults.poll();const r=remote();
         return data.knownRevision===r.revision?{unchanged:true,protocol:"lootsplit.room.unchanged.v1",
           code:r.code,seatId:r.seatId,revision:r.revision,encounterActive:false}:r;};
       ${store.replace("let seenRecovery", "var seenRecovery").replace("function publish(", "function storePublish(")}
@@ -118,11 +119,13 @@ function harness() {
     readUnchangedRoom,
     applyCommand,
     sameCommand,
+    faults,
   });
   return {
     client,
     session,
     counts,
+    faults,
     advance: () => {
       serverRevision++;
     },
@@ -234,4 +237,48 @@ test("the shipped poll loop backs off while a preview conflict is open", () => {
     loop,
     /pollFailures = previewConflictOpen\(\) \? Math\.min\(4, pollFailures \+ 1\) : 0;/,
   );
+});
+
+// 2026-10-28 load audit, F13: a failed conditional poll falls back to a full read only for an
+// older edge/client protocol, never for rate limits, server errors, outages or ended access.
+test("a failed poll is reported as is; only a protocol mismatch falls back to one full read", async () => {
+  const h = harness();
+  h.session.pending = [];
+  await h.client.refresh();
+  assert.equal(h.counts.pulls, 1);
+  for (const failure of [
+    () => Object.assign(Error("Too many requests. Wait a moment and try again."), { status: 429 }),
+    () => Error("D1_ERROR: Network connection lost."),
+    () => Error("<html><title>Worker exceeded resource limits</title></html>"),
+    () => new TypeError("Failed to fetch"),
+  ]) {
+    h.faults.poll = failure;
+    await assert.rejects(h.client.refresh(true));
+  }
+  assert.equal(h.counts.polls, 4);
+  assert.equal(h.counts.pulls, 1, "no full read doubles the load during an outage");
+  for (const failure of [
+    () => Error("Server function info not found for 6c1f"),
+    () => new SyntaxError("Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"),
+    () => Error("Not Found"),
+  ]) {
+    h.faults.poll = failure;
+    await h.client.refresh(true);
+  }
+  assert.equal(h.counts.pulls, 4, "each protocol mismatch reads the room once in full");
+  delete h.faults.poll;
+  await h.client.refresh(true);
+  assert.equal(h.counts.pulls, 4, "a working poll is conditional again");
+});
+
+// F7: pre-action and focus refreshes ask the conditional poll first.
+test("pre-action and window-focus refreshes are conditional", () => {
+  const queue = source.slice(source.indexOf("export async function queueCommand("), source.indexOf("export async function queueCommandBatch("));
+  const mutation = source.slice(source.indexOf("export function runSharedMutation("));
+  assert.match(queue, /if \(!s\.pending\.length\) await refresh\(true\);/);
+  assert.match(mutation.slice(0, 1500), /if \(!s\.pending\.length\) await refresh\(true\);/);
+  assert.match(source, /export async function refreshSharedIfChanged\(\) \{\s*return serial\(\(\) => refresh\(true\)\);/);
+  const context = readFileSync(new URL("./economy-context.tsx", import.meta.url), "utf8");
+  assert.match(context, /window\.addEventListener\("focus", refresh\)/);
+  assert.match(context, /if \(getCloudWatch\(\)\.joined\) await refreshSharedIfChanged\(\);/);
 });

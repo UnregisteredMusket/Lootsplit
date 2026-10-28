@@ -855,6 +855,25 @@ test("push subscriptions require membership and preserve stable signing keys", a
     await submitCommands({ ...opened, batchId: "push-send", commands: [cmd] });
     await submitCommands({ ...opened, batchId: "push-retry", commands: [cmd] });
     assert.equal(sends, 1);
+    // F12: on a Worker the submit answers first and the push continues under waitUntil.
+    const { runWithRequestContext } = await import("../../../cloudflare/request-context.mjs");
+    sql.prepare("UPDATE push_subscriptions SET last_sent=0").run();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    globalThis.fetch = async () => {
+      sends++;
+      await held;
+      return new Response(null, { status: 201 });
+    };
+    const deferred: Promise<unknown>[] = [];
+    const answered = await runWithRequestContext({ waitUntil: (p: Promise<unknown>) => deferred.push(p) }, () =>
+      submitCommands({ ...opened, batchId: "push-deferred", commands: [{ ...cmd, id: "push-later" }] }),
+    );
+    assert.ok(answered.revision > 0, "the submit answered while the push service was still waiting");
+    assert.equal(deferred.length, 1);
+    release();
+    await Promise.all(deferred);
+    assert.equal(sends, 2, "the deferred notification was still sent");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1158,6 +1177,9 @@ test("map pings cross seats outside turns without changing campaigns; expiry, ma
     assert.equal((await mapSignals(player)).pings.length,1,"secret map pings never cross the player map response");
     now += 5001;
     assert.deepEqual((await mapSignals(dm)).pings,[]);
+    // Reads only filter expired pings; the minute cron (and the next insert) reclaims them (F6).
+    const {expireMapPings} = await import("../../../cloudflare/map-ping-expiry.mjs");
+    await expireMapPings((globalThis as any).__env__.DB, now);
     assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_map_pings WHERE code=?").get(host.code)!.n,0);
     await choosePace({...host,live:true});
     await mapSignals({...dm,ping:{...ping,id:crypto.randomUUID(),color:"blue"}});
