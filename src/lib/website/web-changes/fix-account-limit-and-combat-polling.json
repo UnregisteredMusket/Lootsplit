@@ -1,0 +1,10 @@
+{
+  "title": "Smoother combat at a shared table",
+  "summary": "Players at one table on the same Wi-Fi are no longer locked out of signing in while the DM runs combat, and combat views use less data.",
+  "items": [
+    "Signed-in account requests now count against each account instead of the household's connection, so a DM's open encounter views no longer use up everyone's allowance. Sign-in and recovery attempts keep their existing per-connection limit.",
+    "The TV display controls and the map Initiative panel share one encounter update instead of each checking on its own.",
+    "The combat status bar and the Initiative panel pause while their tab is hidden and catch up when you return; players' Initiative panels only check while the DM shows combat on that map.",
+    "Each combat update now reads the campaign once and no longer downloads map pictures."
+  ]
+}

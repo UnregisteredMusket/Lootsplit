@@ -8,6 +8,7 @@ import {
 import {
   readRoom,
   readRoomAccess,
+  readCombatView,
   createRoom,
   updateRoom,
   roomStorageBody,
@@ -1146,44 +1147,38 @@ export async function manageRoom(input: {
   return view(next, next.seats.find((s) => s.id === caller.id) ?? caller, room);
 }
 
-/** Read-only, freshly authorized combat presentation for the map being viewed. */
 /**
- * The initiative panel for a seat (map controls PR 6). The same gates as the HUD (seated, the
- * active binding on this map, re-read after the private store read, players only while the DM
- * shows combat on this scene), then the seat's projected map and `projectMapCombatOrder`.
+ * The seat's projected combat map and the bound encounter's row, or null when this seat may not
+ * see combat on `mapId` (map controls PR 6; audit 2026-10-28 F8). Gates: seated; an active
+ * binding on this map; players only while the DM shows combat on this scene. Seats, binding,
+ * scene and encounter come from one statement (`readCombatView`), so they are always consistent
+ * with each other; map rasters and archived reports are not read.
  */
-export async function mapCombatOrder(input: {code:string;token:string;mapId:string}) {
-  const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
-  if(!initialSeat)throw Error("This browser is not seated at that table.");
-  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
-  const db=database();
-  if(!db)return null;
-  const row=await db.prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?").bind(binding.encounterId,initial.code).first<{body:string;status:string}>();
-  if(!row)return null;
-  const room=await must(input.code),seat=room.seats.find(s=>s.token===input.token),current=room.table.journal?.world?.combat;
+async function combatView(input: {code:string;token:string;mapId:string}) {
+  const code=input.code.trim().toUpperCase(), read=await readCombatView(code);
+  if(!read)throw new Error("No table uses that code.");
+  const {room,encounter}=read;
+  if(room.closed)throw new Error("This room is closed.");
+  const seat=room.seats.find(s=>s.token===input.token), binding=room.table.journal?.world?.combat;
   if(!seat)throw Error("This browser is not seated at that table.");
-  if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
-  if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
+  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
+  if(!database() || !encounter)return null;
+  if(seat.role!=="dm" && (!binding.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==binding.id))return null;
   const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
   if(!map)return null;
-  const {projectMapCombatOrder}=await import("./map-combat.ts");
-  return projectMapCombatOrder(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)},seat.role==="dm"?[]:seat.purseIds);
+  return {seat,map,encounterId:binding.encounterId,row:{status:encounter.status,body:JSON.parse(encounter.body)}};
 }
+/** The initiative panel for a seat: `projectMapCombatOrder` on the seat's projected map. */
+export async function mapCombatOrder(input: {code:string;token:string;mapId:string}) {
+  const view=await combatView(input);
+  if(!view)return null;
+  const {projectMapCombatOrder}=await import("./map-combat.ts");
+  return projectMapCombatOrder(view.map,view.encounterId,view.row,view.seat.role==="dm"?[]:view.seat.purseIds);
+}
+/** Read-only, freshly authorized combat presentation (HUD) for the map being viewed. */
 export async function mapCombatPresentation(input: {code:string;token:string;mapId:string}) {
-  const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
-  if(!initialSeat)throw Error("This browser is not seated at that table.");
-  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
-  const db=database();
-  if(!db)return null;
-  const row=await db.prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?").bind(binding.encounterId,initial.code).first<{body:string;status:string}>();
-  if(!row)return null;
-  // Recheck revocation, current scene and visibility after the private store read.
-  const room=await must(input.code),seat=room.seats.find(s=>s.token===input.token),current=room.table.journal?.world?.combat;
-  if(!seat)throw Error("This browser is not seated at that table.");
-  if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
-  if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
-  const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
-  if(!map)return null;
+  const view=await combatView(input);
+  if(!view)return null;
   const {projectMapCombat}=await import("./map-combat.ts");
-  return projectMapCombat(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)});
+  return projectMapCombat(view.map,view.encounterId,view.row);
 }

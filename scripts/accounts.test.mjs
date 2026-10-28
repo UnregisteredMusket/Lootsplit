@@ -1415,3 +1415,96 @@ test("the home-screen widget gets its own owner session that app sign-out leaves
     DB.close();
   }
 });
+
+test("a signed-in DM's encounter polling counts against the account, not the table's shared Wi-Fi (audit 2026-10-28 F4)", async () => {
+  const { DB, env, call, signup } = setup();
+  try {
+    const household = "198.51.100.7";
+    const fromHome = async (path, body, cookie = "", ip = household) => {
+      const response = await handleAccounts(
+        new Request(origin + "/api/account/" + path, {
+          method: "POST",
+          headers: {
+            origin,
+            "content-type": "application/json",
+            "cf-connecting-ip": ip,
+            ...(cookie ? { cookie } : {}),
+          },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+      return { status: response.status, data: await response.json() };
+    };
+    const dm = await signup("household-dm@example.com");
+    const player = await signup("household-player@example.com");
+    await signup("household-late@example.com");
+    const id = crypto.randomUUID();
+    assert.equal((await call("encounters/create", { id, code: "personal" }, dm.cookie)).response.status, 200);
+    // One minute at the table: the TV display controller (every 2 s) and the Initiative panel
+    // (every 3 s) on the DM's devices, plus another member's account actions, all on one IP.
+    const statuses = [];
+    for (let second = 0; second < 60; second++) {
+      if (second % 2 === 0) statuses.push((await fromHome("encounters/detail", { id }, dm.cookie)).status);
+      if (second % 3 === 0) statuses.push((await fromHome("encounters/detail", { id }, dm.cookie)).status);
+      if (second % 5 === 0)
+        statuses.push((await fromHome("shortcuts", { action: "noop" }, player.cookie)).status);
+    }
+    assert.ok(statuses.length > 60, "more signed-in requests than the old shared allowance");
+    assert.equal(statuses.filter((s) => s === 429).length, 0, JSON.stringify(statuses));
+    assert.ok(statuses.slice(0, 2).every((s) => s === 200), JSON.stringify(statuses.slice(0, 5)));
+    // Another member signs in from the same Wi-Fi afterwards.
+    const late = await fromHome("auth/sign-in/email", {
+      email: "household-late@example.com",
+      password: "a long unique test password",
+    });
+    assert.equal(late.status, 200, JSON.stringify(late.data));
+
+    // Anonymous and credential requests keep their per-IP limit, even with a session attached
+    // (recovery-key guessing here; sign-in also has Better Auth's and the per-email throttles).
+    const attacker = "203.0.113.9";
+    const attempts = [];
+    for (let i = 0; i < 61; i++)
+      attempts.push(
+        (
+          await fromHome(
+            "recover",
+            { email: "household-dm@example.com", key: `guess-${i}`, password: "a new long password" },
+            i % 2 ? dm.cookie : "",
+            attacker,
+          )
+        ).status,
+      );
+    assert.deepEqual(
+      [...new Set(attempts.slice(0, 60))],
+      [401],
+      "60 guesses per minute are answered",
+    );
+    assert.equal(attempts.at(-1), 429, "the 61st recovery attempt from one IP is refused");
+    assert.equal(
+      (
+        await fromHome(
+          "auth/sign-in/email",
+          { email: "household-dm@example.com", password: "a long unique test password" },
+          dm.cookie,
+          attacker,
+        )
+      ).status,
+      429,
+      "sign-in from that IP is refused even with a valid session cookie",
+    );
+    // The attacker's IP being limited does not lock the account out elsewhere.
+    assert.equal((await fromHome("encounters/detail", { id }, dm.cookie)).status, 200);
+
+    // One account flooding on its own is still bounded.
+    const { ACCOUNT_RATE_LIMITS } = await import("../cloudflare/accounts.mjs");
+    let refused = 0;
+    for (let i = 0; i < ACCOUNT_RATE_LIMITS.perAccount; i++)
+      if ((await fromHome("encounters/detail", { id }, dm.cookie, `192.0.2.${200 + (i % 50)}`)).status === 429)
+        refused++;
+    assert.ok(refused > 0, "the per-account allowance applies across IPs");
+    assert.equal((await fromHome("encounters/detail", { id }, player.cookie)).status === 429, false);
+  } finally {
+    DB.close();
+  }
+});

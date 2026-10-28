@@ -7,7 +7,7 @@ import { readWorld } from "@/lib/quire/world-schema";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { getCloudTable } from "@/lib/quire/cloud-client";
 import { readTabletopSession, projectTabletopMap } from "@/lib/quire/tabletop";
-import { encounterRequest } from "@/lib/encounters/client";
+import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
 import { localEncounterRequest } from "@/lib/encounters/local";
 import { accountRequest } from "@/lib/account/client";
 import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
@@ -175,52 +175,38 @@ function DisplaySession({ dm }: { dm: boolean }) {
     setDetail(null);
     setDetailError("");
     if (!enabled || !settings.encounterId) return;
-    let cancelled = false,
-      loading = false;
+    let cancelled = false;
     const id = settings.encounterId;
-    const load = async () => {
-      if (loading) return;
-      loading = true;
-      try {
-        const next = await encounterRequest<DisplayEncounter>("encounters/detail", { id });
-        if (!cancelled && activeCampaignId() === campaignId) {
-          setDetail((previous) =>
-            next.code !== code
-              ? null
-              : previous?.id === next.id &&
-                  previous.revision === next.revision &&
-                  previous.status === next.status
-                ? previous
-                : next,
-          );
-          setDetailError(next.code === code ? "" : "Choose an encounter from this campaign.");
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setDetail(null);
-          setDetailError(e instanceof Error ? e.message : "Encounter unavailable.");
-        }
-      } finally {
-        loading = false;
-      }
-    };
-    void load();
-    // Like the other pollers, do not poll for the hidden settings panel; catch up on return.
-    // A launched display (often a separate tab, which hides this one) still needs updates.
-    const timer = window.setInterval(() => {
-      if (channel.current || (open && document.visibilityState !== "hidden")) void load();
-    }, 2000);
-    const visible = () => {
-      if (document.visibilityState !== "hidden" && (channel.current || open)) void load();
-    };
-    document.addEventListener("visibilitychange", visible);
-    const unsubscribe = subscribeWorkspaceChanges(() => {
-      void load();
+    // One shared poll with the map Initiative panel (encounterDetailPoller). Like the other
+    // pollers, it does not poll for the hidden settings panel and catches up on return; a
+    // launched display (often a separate tab, which hides this one) still needs updates.
+    const unsubscribePoll = encounterDetailPoller.subscribe(id, {
+      intervalMs: 2000,
+      wanted: () => !!channel.current || (open && document.visibilityState !== "hidden"),
+      onResult: (value) => {
+        const next = value as DisplayEncounter;
+        if (cancelled || activeCampaignId() !== campaignId) return;
+        setDetail((previous) =>
+          next.code !== code
+            ? null
+            : previous?.id === next.id &&
+                previous.revision === next.revision &&
+                previous.status === next.status
+              ? previous
+              : next,
+        );
+        setDetailError(next.code === code ? "" : "Choose an encounter from this campaign.");
+      },
+      onError: (e) => {
+        if (cancelled) return;
+        setDetail(null);
+        setDetailError(e instanceof Error ? e.message : "Encounter unavailable.");
+      },
     });
+    const unsubscribe = subscribeWorkspaceChanges(() => encounterDetailPoller.refresh(id));
     return () => {
       cancelled = true;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", visible);
+      unsubscribePoll();
       unsubscribe();
     };
   }, [settings.encounterId, campaignId, code, enabled, open]);
@@ -267,6 +253,8 @@ function DisplaySession({ dm }: { dm: boolean }) {
         };
       }
       openPlayerDisplay(channelId.current, tab);
+      // The shared poll may have been idle (settings closed, no display yet): read now.
+      if (settings.encounterId) encounterDetailPoller.refresh(settings.encounterId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Display unavailable in this browser.");
     }
