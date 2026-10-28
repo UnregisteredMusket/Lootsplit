@@ -32,11 +32,30 @@ import { DowntimeActivities } from "@/components/downtime-activities";
 import { DowntimeJourneys } from "@/components/map-journeys";
 import { QuestsScreen } from "@/components/quests";
 import { ReviewInbox } from "@/components/review-inbox";
+import { FeatureHeader } from "@/components/feature-header";
 // Load exchange editors only for this screen. Downtime shares the small review
 // without pulling every market editor into startup.
 const TradeEconomyPanel = lazy(() =>
   import("@/components/trade-economy").then((m) => ({ default: m.TradeEconomyPanel })),
 );
+/** The section each feature screen belongs to, shown above its title (one FeatureHeader). */
+const FEATURE_EYEBROWS: Record<Feature, string> = {
+  economy: "Shops & trade",
+  trading: "Shops & trade",
+  shops: "Shops & trade",
+  npcs: "World",
+  quests: "World",
+  journal: "World",
+  time: "Time & downtime",
+  downtime: "Time & downtime",
+  bank: "Money",
+  finances: "Money",
+  financial: "Money",
+  properties: "Money",
+  reports: "Records",
+  review: "Records",
+  music: "Table",
+};
 export const Route = createFileRoute("/features/$feature")({
   validateSearch: (
     s: Record<string, unknown>,
@@ -84,7 +103,10 @@ function FeaturePage() {
         className="feature-screen"
         key={`${campaigns.activeId}:${room.code}:${room.sessionId}:${seat.role}:${seat.purseIds.join(",")}:${feature}`}
       >
-        <h1>{screen ? featureTitle(feature as Feature, dm) : "Feature unavailable"}</h1>
+        <FeatureHeader
+          eyebrow={screen ? FEATURE_EYEBROWS[feature as Feature] : undefined}
+          title={screen ? featureTitle(feature as Feature, dm) : "Feature unavailable"}
+        />
         {!screen || (screen.dm && !dm) ? (
           <p>This screen is available to the campaign DM.</p>
         ) : (

@@ -29,6 +29,7 @@ import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { AppLink } from "@/components/app-link";
 import { Button, Fold, Modal } from "@/components/ui";
 import { Disclosure } from "@/components/disclosure";
+import { FeatureHeader } from "@/components/feature-header";
 import type { ShopCategory } from "@/lib/quire/types";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 
@@ -114,32 +115,44 @@ function MarketPage() {
 
   return (
     <Shell>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-4xl tracking-tight">Market</h1>
-          {priceLine !== 0 ? (
-            <p className="text-sm text-lead">
+      <FeatureHeader
+        eyebrow="Shops & trade"
+        title="Market"
+        subtitle={
+          priceLine !== 0 ? (
+            <span className="text-lead">
               Prices {priceLine > 0 ? "+" : ""}
               {priceLine}% from inflation
-            </p>
-          ) : null}
-        </div>
-        {seat.role === "dm" ? (
-          <Button
-            onClick={() => {
-              void createShop({
-                wealth: prefs.defaultWealth,
-                sellRate: prefs.defaultSell,
-                buyRate: prefs.defaultBuy,
-                priceScale: prefs.defaultScale,
-                ...(market.currentLocationId ? { locationId: market.currentLocationId } : {}),
-              }).then((id) => navigate({ to: "/shop/$shopId", params: { shopId: id } }));
-            }}
-          >
-            New shop
-          </Button>
-        ) : null}
-      </div>
+            </span>
+          ) : null
+        }
+        primary={
+          seat.role === "dm" ? (
+            <Button
+              onClick={() => {
+                void createShop({
+                  wealth: prefs.defaultWealth,
+                  sellRate: prefs.defaultSell,
+                  buyRate: prefs.defaultBuy,
+                  priceScale: prefs.defaultScale,
+                  ...(market.currentLocationId ? { locationId: market.currentLocationId } : {}),
+                }).then((id) => navigate({ to: "/shop/$shopId", params: { shopId: id } }));
+              }}
+            >
+              New shop
+            </Button>
+          ) : null
+        }
+        overflow={
+          seat.role === "dm"
+            ? [
+                { label: "Trade Exchanges", href: "/features/economy?from=%2Fmarket" },
+                { label: "Shop schedules", href: "/features/shops?from=%2Fmarket" },
+              ]
+            : undefined
+        }
+        overflowLabel="More market tools"
+      />
       <h2 className="market-section-title" id="shops-here">
         Shops here
       </h2>

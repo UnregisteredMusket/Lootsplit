@@ -4,8 +4,7 @@
  * NPC strip, the Here group and the "Quest updated" toast. Every change is one DM-only `quest-*`
  * command (or a player's private `journal-note`); nothing here moves coins or items.
  */
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { toast } from "sonner";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Bell, EyeOff, Lock, Map as MapIcon, Pin, Plus, X } from "lucide-react";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
@@ -27,20 +26,21 @@ import {
   npcQuests,
   objectiveProgress,
   placeName,
-  questMapRecord,
+  questMapHref,
   questStateKey,
   questsByTab,
   questUpdated,
   readQuestState,
   revealed,
   stampLabel,
-  writeQuestState,
+  questDraft,
+  linkableMapPins,
   noteOwner,
   type QuestTab,
 } from "@/lib/quire/quest-view";
-import type { CommandRequest } from "@/lib/quire/commands";
 import type { CloudTable } from "@/lib/quire/cloud";
 import { cn } from "@/lib/cn";
+import { useQuestCommand, useQuestState } from "@/components/quest-hooks";
 import { useRouter } from "@tanstack/react-router";
 import { appLinkDestination } from "@/lib/quire/feature-navigation";
 
@@ -53,59 +53,6 @@ function useQuestTable(): Table & { ready: boolean } {
     [economy.purses, economy.journal, economy.ledger, economy.ready],
   );
 }
-/** Follow and Updated, per device (owner decision D4). */
-function useQuestState() {
-  const seat = useSeat();
-  const key = questStateKey(seat);
-  const subscribe = (fn: () => void) => {
-    window.addEventListener("quire-quest-state", fn);
-    window.addEventListener("storage", fn);
-    return () => {
-      window.removeEventListener("quire-quest-state", fn);
-      window.removeEventListener("storage", fn);
-    };
-  };
-  const snapshot = useSyncExternalStore(
-    subscribe,
-    () => JSON.stringify(readQuestState(key)),
-    () => '{"seen":{}}',
-  );
-  const state = JSON.parse(snapshot) as ReturnType<typeof readQuestState>;
-  return {
-    state,
-    follow: (id: string | undefined) => {
-      const next = { ...readQuestState(key) };
-      if (id) next.follow = id;
-      else delete next.follow;
-      writeQuestState(key, next);
-    },
-    markSeen: (q: Quest) => {
-      const current = readQuestState(key);
-      if (current.seen[q.id] === q.updatedAt) return;
-      writeQuestState(key, { ...current, seen: { ...current.seen, [q.id]: q.updatedAt } });
-    },
-  };
-}
-function useQuestCommand() {
-  const { commandOutcome } = useEconomy();
-  const [busy, setBusy] = useState(false);
-  return {
-    busy,
-    run: async (input: CommandRequest, ok: string) => {
-      setBusy(true);
-      try {
-        const outcome = await commandOutcome(input);
-        toast.success(outcome.status === "pending" ? `${ok} It is waiting to be sent.` : ok);
-        return true;
-      } catch (error) {
-        toast.error(error instanceof Error && error.message ? error.message : "The quest could not be saved.");
-        return false;
-      } finally {
-        setBusy(false);
-      }
-    },
-  };
-}
 /** Client-side navigation (never a document reload, so the title screen never replays). */
 function useGo() {
   const router = useRouter();
@@ -115,7 +62,6 @@ function useGo() {
   };
 }
 const questHref = (id?: string) => `/features/quests${id ? `?quest=${encodeURIComponent(id)}` : ""}`;
-const mapHref = (record: string) => `/maps?record=${encodeURIComponent(record)}`;
 
 function Chip({ children, tone = "plain", icon }: { children: ReactNode; tone?: "plain" | "main" | "new" | "hidden" | "done" | "failed"; icon?: ReactNode }) {
   return (
@@ -244,7 +190,8 @@ function FollowingCard({ q, t, open }: { q: Quest; t: Table; open: () => void })
   const visible = q.objectives.filter((o) => !o.hidden);
   const lastDone = [...visible].reverse().find((o) => o.state !== "open");
   const next = nextObjective(q);
-  const record = questMapRecord(t, q);
+  const seat = useSeat();
+  const showOnMap = questMapHref(t, q, seat);
   return (
     <section className="quest-following" aria-label={`Following: ${q.title}`}>
       <span className="quest-following-tag">Following</span>
@@ -262,8 +209,8 @@ function FollowingCard({ q, t, open }: { q: Quest; t: Table; open: () => void })
         ))}
       </ul>
       <div className="quest-actions">
-        {record && (
-          <AppLink className="quick-action" href={mapHref(record)}>
+        {showOnMap && (
+          <AppLink className="quick-action" href={showOnMap}>
             <MapIcon size={16} aria-hidden="true" /> Show on map
           </AppLink>
         )}
@@ -280,7 +227,7 @@ function PlayerQuestDetail({ q, t, updated, following, onFollow }: { q: Quest; t
   const giver = giverName(t, q);
   const giverNpc = t.journal?.world?.npcs.find((n) => n.id === q.giverNpcId);
   const progress = objectiveProgress(q);
-  const record = questMapRecord(t, q);
+  const showOnMap = questMapHref(t, q, seat);
   const seenBefore = useRef(readQuestState(questStateKey(seat)).seen[q.id]);
   return (
     <article className="quest-detail">
@@ -311,8 +258,8 @@ function PlayerQuestDetail({ q, t, updated, following, onFollow }: { q: Quest; t
             <Pin size={16} aria-hidden="true" /> {following ? "Following" : "Follow this quest"}
           </Button>
         )}
-        {record && (
-          <AppLink className="quick-action" href={mapHref(record)}>
+        {showOnMap && (
+          <AppLink className="quick-action" href={showOnMap}>
             <MapIcon size={16} aria-hidden="true" /> Show on map
           </AppLink>
         )}
@@ -523,44 +470,22 @@ function DmQuests({ initialQuest }: { initialQuest?: string }) {
 const questTabOf = (q: Quest): QuestTab => (q.archived ? "archived" : q.status === "completed" ? "done" : q.status === "failed" ? "failed" : revealed(q) ? "play" : "drafts");
 
 const emptyDraft = (): QuestDraft => ({ title: "", summary: "", locationIds: [], markers: [], areas: [], objectives: [] });
-function draftOf(q: Quest): QuestDraft {
-  return {
-    title: q.title,
-    ...(q.main ? { main: true } : {}),
-    summary: q.summary,
-    ...(q.giverNpcId ? { giverNpcId: q.giverNpcId } : {}),
-    locationIds: q.locationIds,
-    markers: q.markers.map((m) => ({ mapId: m.mapId, markerId: m.markerId })),
-    areas: q.areas.map((a) => ({ id: a.id, mapId: a.mapId, x: a.x, y: a.y, r: a.r, ...(a.label ? { label: a.label } : {}), ...(a.objectiveId ? { objectiveId: a.objectiveId } : {}) })),
-    objectives: q.objectives.map((o) => ({
-      id: o.id,
-      text: o.text,
-      ...(o.hidden ? { hidden: true } : {}),
-      ...(o.optional ? { optional: true } : {}),
-      ...(o.locationId ? { locationId: o.locationId } : {}),
-      ...(o.marker ? { marker: { mapId: o.marker.mapId, markerId: o.marker.markerId } } : {}),
-    })),
-    ...(q.rewardText ? { rewardText: q.rewardText } : {}),
-    ...(q.dmNotes ? { dmNotes: q.dmNotes } : {}),
-  };
-}
-
 function QuestEditor({ t, quest, onSaved, onCancel, onDeleted, giverNpcId }: { t: Table; quest?: Quest; onSaved: (id: string) => void; onCancel?: () => void; onDeleted?: () => void; giverNpcId?: string }) {
   const seat = useSeat();
-  const [draft, setDraft] = useState<QuestDraft>(() => (quest ? draftOf(quest) : { ...emptyDraft(), ...(giverNpcId ? { giverNpcId } : {}) }));
+  const [draft, setDraft] = useState<QuestDraft>(() => (quest ? questDraft(quest) : { ...emptyDraft(), ...(giverNpcId ? { giverNpcId } : {}) }));
   const [sheet, setSheet] = useState<"" | "reveal" | "close" | "receipt" | "entry" | "preview" | "delete">("");
   const { busy, run } = useQuestCommand();
   const saveKey = JSON.stringify({ draft, revision: quest?.revision ?? null });
   const { commandId: saveId, renew } = useCommandId(saveKey);
   const npcs = t.journal?.world?.npcs ?? [];
   const market = readMarketLocations(t.journal?.market);
-  const dirty = !quest || JSON.stringify(draftOf(quest)) !== JSON.stringify(draft);
+  const dirty = !quest || JSON.stringify(questDraft(quest)) !== JSON.stringify(draft);
   // A newer revision from another device: adopt it unless this form has unsaved edits.
   const lastRevision = useRef(quest?.revision);
   useEffect(() => {
     if (quest && quest.revision !== lastRevision.current) {
       lastRevision.current = quest.revision;
-      if (!dirty) setDraft(draftOf(quest));
+      if (!dirty) setDraft(questDraft(quest));
     }
   }, [quest?.revision]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<QuestDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -579,6 +504,10 @@ function QuestEditor({ t, quest, onSaved, onCancel, onDeleted, giverNpcId }: { t
   };
   const state = (id: string) => quest?.objectives.find((o) => o.id === id);
   const locationOptions = market.locations.map((l) => ({ id: l.id, label: placeName(t, l.id) }));
+  // Existing map pins (markers and record placements) a quest or objective can be tied to.
+  const pinOptions = (t.journal?.world?.maps ?? []).flatMap((m) =>
+    linkableMapPins(t, m).map((p) => ({ ...p, label: `${m.name} · ${p.label}` })),
+  );
   return (
     <article className="quest-editor" aria-label={quest ? `Edit ${quest.title}` : "New quest"}>
       <header className="quest-editor-header">
@@ -626,6 +555,25 @@ function QuestEditor({ t, quest, onSaved, onCancel, onDeleted, giverNpcId }: { t
               ))}
             </Select>
           </Field>
+          {pinOptions.length > 0 && (
+            <Field label="Map pin" hint="Its quest marker shows beside that pin. Add more pins and radius areas from the map's Quests tool.">
+              <Select
+                value={draft.markers[0] ? `${draft.markers[0].mapId}|${draft.markers[0].markerId}` : ""}
+                onChange={(e) => {
+                  const [mapId, markerId] = e.target.value.split("|");
+                  const rest = draft.markers.slice(1).filter((m) => !(m.mapId === mapId && m.markerId === markerId));
+                  set({ markers: mapId && markerId ? [{ mapId, markerId }, ...rest] : rest });
+                }}
+              >
+                <option value="">No map pin</option>
+                {pinOptions.map((p) => (
+                  <option key={`${p.mapId}|${p.markerId}`} value={`${p.mapId}|${p.markerId}`}>
+                    {p.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="What the players read">
             <TextArea value={draft.summary} maxLength={2000} onChange={(e) => set({ summary: e.target.value })} />
           </Field>
@@ -663,6 +611,23 @@ function QuestEditor({ t, quest, onSaved, onCancel, onDeleted, giverNpcId }: { t
                             <option key={l.id} value={l.id}>{l.label}</option>
                           ))}
                         </select>
+                        {pinOptions.length > 0 && (
+                          <select
+                            aria-label={`Map pin for objective ${index + 1}`}
+                            value={o.marker ? `${o.marker.mapId}|${o.marker.markerId}` : ""}
+                            onChange={(e) => {
+                              const [mapId, markerId] = e.target.value.split("|");
+                              setObjective(o.id, { marker: mapId && markerId ? { mapId, markerId } : undefined });
+                            }}
+                          >
+                            <option value="">No map pin</option>
+                            {pinOptions.map((p) => (
+                              <option key={`${p.mapId}|${p.markerId}`} value={`${p.mapId}|${p.markerId}`}>
+                                {p.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         {!known && (
                           <button type="button" className="quest-link" onClick={() => set({ objectives: draft.objectives.filter((x) => x.id !== o.id), areas: draft.areas.filter((a) => a.objectiveId !== o.id) })}>
                             Remove

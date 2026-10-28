@@ -212,12 +212,14 @@ async function checkChrome(page, { role, appearance, width, height }) {
   }
   within(facts.toolbar, "Map tools toolbar");
   within(facts.zoom, "zoom pill");
-  // Quests is a reserved slot (map controls PR 7): nothing renders until the quest stage lands.
-  assert.equal(
-    await page.getByRole("button", { name: "Quests", exact: true }).count(),
-    0,
-    `${tag}: no Quests tool before the quest log's map stage`,
-  );
+  // Quests (quest log map stage): the DM always has the tool (in the rail or its More menu, to add
+  // pins and areas); a player only when a quest they know has something on this map (none here).
+  if (role === "player")
+    assert.equal(
+      await page.locator('[aria-controls="map-quests"]').count(),
+      0,
+      `${tag}: no Quests tool for a player with no quests on this map`,
+    );
   assert.equal(facts.tabStops, 1, `${tag}: the tools toolbar is one Tab stop (roving tabindex)`);
   assert.equal(facts.pills, 0, `${tag}: Here and Plan journey live in the tools bar, not floating`);
   assert.ok(facts.zoom.width > facts.zoom.height, `${tag}: zoom is a horizontal pill`);
