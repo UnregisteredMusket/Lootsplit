@@ -449,7 +449,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 8 | 1s → 24s | +23s | +2300% |
 | Code checks and immutable builds / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 3s → 11s | +8s | +266.67% |
 | Code checks and immutable builds / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 1s → 8s | +7s | +700% |
-| Development / governance / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 6s | +5s | +500% |
+| Development / governance / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 5 | 1s → 10s | +9s | +900% |
 | Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 2s → 160s | +158s | +7900% |
 | Player references / development / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 7s | +3s | +75% |
 | Change scope | open | 5 | 4s → 121s | +117s | +2925% |
@@ -587,7 +587,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts-2 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 36s | +32s | +800% |
 | Development / accounts / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 6s | +4s | +200% |
 | native-widget (35) / Run android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 | open | 2 | 10s → 16s | +6s | +60% |
-| Development / desktop / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 5s | +3s | +150% |
+| Development / desktop / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 11s | +9s | +450% |
 | Development / economy / Run npx playwright install --with-deps chromium | open | 5 | 28s → 694s | +666s | +2378.57% |
 | native-widget (24) / Verify owner isolation, refresh transport and actual RemoteViews layouts | open | 2 | 199s → 319s | +120s | +60.3% |
 | Development / economy / Set up job | open | 2 | 1s → 3s | +2s | +200% |
@@ -897,6 +897,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-28T18:46:11Z | step: Development / desktop / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 5s → 11s | +6s | +120% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40636986277/job/122646724291) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40748111599/job/123027316229) |
+| 2026-10-28T18:46:10Z | step: Development / governance / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 6s → 10s | +4s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40719558066/job/122927486136) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40748111599/job/123027316224) |
 | 2026-10-28T17:14:12Z | step: verify / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 7s → 14s | +7s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40719558066/job/122937431544) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40723039569/job/122976489609) |
 | 2026-10-28T17:03:50Z | step: Code checks and immutable builds / unit-tests | 81s → 95s | +14s | +17.28% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40089855494/job/120860140558) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40731725513/job/122969522807) |
 | 2026-10-28T16:08:52Z | step: Change scope / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40716776586/job/122916491362) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40723039569/job/122938796656) |
