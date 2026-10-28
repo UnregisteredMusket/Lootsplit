@@ -32,15 +32,22 @@ export function viewVersion(view: object): Version | null {
   return (view as { [VIEW_VERSION_KEY]?: Version })[VIEW_VERSION_KEY] ?? null;
 }
 
-/** Projected section texts kept per isolate (UTF-16 characters, all entries together). */
-export const VIEW_CACHE_CHARS = 24_000_000;
+/**
+ * Projected section texts kept per isolate (UTF-16 code units, all entries together; about 4.5 MB
+ * of ASCII text, at most twice that otherwise). Sized for one projection of a campaign at the
+ * 4 MB cap: a batched first load is then served from it, while the isolate keeps its memory for
+ * concurrent full reads (each needs about 14 bytes of heap per stored byte; three concurrent reads
+ * of a 4.3 MB campaign fit 128 MB, measured with this cache in place). LRU; a larger projection
+ * is not cached.
+ */
+export const VIEW_CACHE_CHARS = 4_500_000;
 const cache = new Map<string, { texts: Map<string, string>; chars: number }>();
 let cachedChars = 0;
 const cacheKey = (code: string, seatId: string, protocol: number, version: Version) =>
   JSON.stringify([code, seatId, protocol, version.revision, version.writeId]);
 function remember(key: string, texts: Map<string, string>) {
   const chars = [...texts.values()].reduce((sum, text) => sum + text.length, 0);
-  if (chars > VIEW_CACHE_CHARS / 2) return;
+  if (chars > VIEW_CACHE_CHARS) return;
   const previous = cache.get(key);
   if (previous) {
     cache.delete(key);
@@ -53,6 +60,10 @@ function remember(key: string, texts: Map<string, string>) {
     cache.delete(oldest);
     cachedChars -= entry.chars;
   }
+}
+/** Test-only: what the cache holds. */
+export function viewSectionCacheSizeForTests() {
+  return { entries: cache.size, chars: cachedChars };
 }
 function recall(key: string) {
   const entry = cache.get(key);

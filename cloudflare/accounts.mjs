@@ -1,4 +1,4 @@
-import { accountBackupBytesSql, readBackupPayload } from "./backup-parts.mjs";
+import { ACCOUNT_BACKUP_BYTES, accountBackupBytesSql, readBackupPayload } from "./backup-parts.mjs";
 import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
@@ -84,7 +84,7 @@ const nativeOrigins = ["https://localhost", "http://localhost", "capacitor://loc
 // (largest account: 2 backups, 5.4 MB). Device backups remain unlimited.
 export const LIBRARY_LIMITS = Object.freeze({
   backups: 20,
-  backupBytes: 60_000_000,
+  backupBytes: ACCOUNT_BACKUP_BYTES,
   characters: 100,
   characterBytes: 30_000_000,
 });

@@ -238,3 +238,73 @@ test("a room that changes while sections load is read again; the result is consi
   assert.deepEqual(view.table, full.table);
   assert.ok(view.table.notes.some((n) => n.id === "race-1"));
 });
+
+test("a committed write is never reported as failed or unchanged when its view cannot be assembled", async () => {
+  const { RoomWriteSaved } = await import("../src/lib/quire/room-sync.ts");
+  const table = { ledger: Array.from({ length: 2000 }, (_, i) => ({ id: `l${i}`, note: "x".repeat(300) })) };
+  const split = await splitViewTable(table, "salt");
+  const committedView = () => ({ code: "ABC", seatId: "s1", revision: 2, table: split.table, draft: "[]", viewSections: { v: 1, entries: split.entries, data: {} } });
+  let committed = 0,
+    fullReads = 0;
+  const write = (fullRead) =>
+    createRoomSync({
+      readSections: async () => {
+        throw Error("Network connection lost.");
+      },
+      fullRead,
+    }).roomWrite(async () => {
+      committed++;
+      return committedView();
+    });
+  // A section fetch fails after the commit: the room is read once in full instead.
+  const view = await write(async ({ data }) => {
+    fullReads++;
+    assert.equal(data.tabletopProtocol, 10, "the full read needs no sections");
+    return { code: "ABC", seatId: "s1", revision: 2, table, draft: "[]" };
+  })({ data: { code: "ABC", token: "t", tabletopProtocol: P11 } });
+  assert.deepEqual(view.table, table);
+  assert.equal(committed, 1);
+  assert.equal(fullReads, 1);
+  // If that read fails too, the error says the change was saved, never that nothing changed.
+  await assert.rejects(
+    write(async () => {
+      throw Error("Network connection lost.");
+    })({ data: { code: "ABC", token: "t", tabletopProtocol: P11 } }),
+    (error) => error instanceof RoomWriteSaved && /was saved/.test(error.message) && !/nothing was changed/i.test(error.message),
+  );
+  assert.equal(committed, 2, "each write was sent exactly once");
+});
+
+test("the isolate projection cache stays bounded and never caches views with account-asset map posters", async () => {
+  const { VIEW_CACHE_CHARS, viewSectionCacheSizeForTests } = await import("../src/lib/quire/view-sections.server.ts");
+  clearViewSectionCacheForTests();
+  const { dm, a, b } = await campaign();
+  for (let round = 0; round < 3; round++) for (const seat of [dm, a, b]) await read(seat);
+  const size = viewSectionCacheSizeForTests();
+  assert.ok(size.entries >= 1 && size.chars <= VIEW_CACHE_CHARS, `cache holds ${size.chars} characters in ${size.entries} views`);
+  // A player's view with a map poster (drawn from the owner's account assets) is not cached.
+  const { openRoom: open } = await import("../src/lib/quire/cloud.server.ts");
+  const owner = "poster-owner";
+  await db.prepare(`INSERT INTO "user"(id,name,email,emailVerified,image,createdAt,updatedAt) VALUES(?,'DM','poster-owner@example.com',1,null,0,0)`).bind(owner).run();
+  const host = await open({ name: "Poster DM", table: tradeFixture(), userId: owner });
+  const { sessionId } = await readRoom(host.code);
+  const joined = await joinRoom({ code: host.code, purseId: "a", name: "Poster player", sessionId });
+  const room = await readRoom(host.code);
+  room.table.notes = Array.from({ length: 2000 }, (_, i) => ({ id: `pn-${i}`, at: i, from: "dm", to: "party", purseId: "", text: `Poster line ${i} of a long chat.` }));
+  room.table.journal = readJournal({
+    ...room.table.journal,
+    world: { ...(room.table.journal?.world ?? {}), maps: [{ id: "poster-map", name: "Keep", image: "/art/shop-default.webp", locationId: null, visible: true, anchors: [], markers: [] }] },
+  });
+  room.table.journal.world.maps[0].tabletop = {
+    media: { id: "11111111-1111-4111-8111-111111111111", sha256: "a".repeat(64), mime: "image/png", purpose: "render", width: 10, height: 10, bytes: 10 },
+  };
+  const base = room.revision;
+  room.revision++;
+  await updateRoom(room, base);
+  clearViewSectionCacheForTests();
+  const player = await read({ code: host.code, token: joined.token });
+  assert.ok(player.viewSections.entries.length > 0, "the player's view is sectioned");
+  assert.equal(viewSectionCacheSizeForTests().entries, 0, "the poster view was not cached");
+  await read(host);
+  assert.equal(viewSectionCacheSizeForTests().entries, 1, "the DM's view (no posters) is cached");
+});

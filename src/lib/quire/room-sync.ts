@@ -32,6 +32,18 @@ type SectionServer = Fn<
 >;
 type FullRead = Fn<{ tabletopProtocol: number; code: string; token: string }, unknown>;
 
+/**
+ * A write the room committed whose updated campaign this device could not load yet. The change is
+ * saved; the next sync shows it. Never retry it as a new action.
+ */
+export class RoomWriteSaved extends Error {
+  constructor() {
+    super(
+      "Your change was saved, but this device could not load the updated campaign yet. It will appear after the next refresh; do not send it again.",
+    );
+  }
+}
+
 export function createRoomSync(servers: { readSections: SectionServer; fullRead: FullRead }) {
   const SECTIONS_PROTOCOL = 11;
   let cacheKey = "";
@@ -140,8 +152,12 @@ export function createRoomSync(servers: { readSections: SectionServer; fullRead:
     };
   }
   /**
-   * A room write: sent once (never repeated here); its view is assembled, or, if the room moved on
-   * meanwhile, replaced by a fresh room read (the write's receipts are in it).
+   * A room write: sent once (never repeated here). Once the server has answered, the write is
+   * committed, so nothing after that may report it as failed or unchanged (step 3 review): if its
+   * view cannot be assembled (the room moved on, section downloads are paused, or a section fetch
+   * failed), the room is read once in full as a protocol 10 client, which needs no sections and is
+   * not paused; the write's receipts are in it. Only if that read fails too is an error raised, and
+   * it says the change was saved.
    */
   function roomWrite<I extends Seat, O>(fn: Fn<I & { viewSections?: string[] }, O>): Fn<I, O> {
     return async ({ data }) => {
@@ -149,11 +165,14 @@ export function createRoomSync(servers: { readSections: SectionServer; fullRead:
       const response = await fn({ data: { ...data, viewSections: heldSections(data) } });
       try {
         return await assemble(response, data);
-      } catch (error) {
-        if (!(error instanceof SectionsMoved)) throw error;
-        return roomRead(servers.fullRead as Fn<Seat, O>)({
-          data: { code: data.code, token: data.token, tabletopProtocol: SECTIONS_PROTOCOL },
-        });
+      } catch {
+        try {
+          return (await servers.fullRead({
+            data: { code: data.code, token: data.token, tabletopProtocol: 10 },
+          })) as O;
+        } catch {
+          throw new RoomWriteSaved();
+        }
       }
     };
   }
