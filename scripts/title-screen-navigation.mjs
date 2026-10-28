@@ -130,3 +130,14 @@ export async function navigateApplication(page, destination) {
   }
   await openApplication(page, destination);
 }
+
+/**
+ * A player who joins a room lands on Home with "You're playing <character>" (plan P3). Audits
+ * that continue on the Campaign screen wait for Home and then open Campaign by its link.
+ */
+export async function afterJoining(page) {
+  await page.waitForURL((u) => u.pathname === "/" && u.searchParams.get("view") === "home");
+  await page.locator(".player-home").waitFor();
+  await navigateApplication(page, new URL("/share", page.url()).href);
+  await page.locator(".room-code").waitFor();
+}

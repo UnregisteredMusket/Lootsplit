@@ -7,8 +7,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import {
   openApplication,
   reloadApplication,
-  navigateApplication,
-} from "./title-screen-navigation.mjs";
+  navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { answerThemedDialog } from "./themed-dialogs.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -138,6 +137,7 @@ async function join(width, invitation, character) {
   await page.getByLabel("Your name", { exact: true }).fill(`${character} player`);
   await chooseOption(page.getByLabel(/^Choose your character/), character);
   await page.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(page);
   await page.getByText("You joined as a player", { exact: true }).waitFor();
   return page;
 }

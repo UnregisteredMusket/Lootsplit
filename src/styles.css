@@ -4738,3 +4738,15 @@ button.quest-chip { min-height: 44px; }
 .loot-claims-none > summary { cursor: pointer; list-style: revert; min-height: 2.75rem; display: list-item; padding-top: .7rem; }
 .loot-claims-none[open] > summary { margin-bottom: .35rem; }
 .loot-pass-all { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+
+/* After joining a room: three first steps on player Home (plan P3, Q16). */
+.join-tips { border: 1px solid color-mix(in srgb, var(--color-lead) 45%, transparent); border-radius: .75rem; padding: .75rem 1rem; margin: .75rem 0; }
+.join-tips-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.join-tips-heading h2 { font-size: 1.15rem; margin: 0; }
+.join-tips ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: .25rem 0 0; padding: 0; list-style: none; counter-reset: tip; }
+.join-tips li { counter-increment: tip; display: grid; gap: .1rem; min-width: 0; }
+.join-tips li a { font-weight: 600; min-height: 2.75rem; display: inline-flex; align-items: center; }
+.join-tips li a::before { content: counter(tip) "."; margin-right: .35rem; color: var(--color-muted); }
+.join-tips li span { font-size: .875rem; color: var(--color-muted); overflow-wrap: anywhere; }
+@media (max-width: 639px) { .join-tips li span { display: none; } .join-tips li a { line-height: 1.2; } }
+.room-mode-readout { font-weight: 600; }

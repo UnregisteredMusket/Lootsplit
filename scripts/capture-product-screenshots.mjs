@@ -5,7 +5,7 @@
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication, navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { closeMapSettings, selectMapType } from "./map-workspace-browser.mjs";
 import { buildWayfarers } from "./product-screenshot-fixture.mjs";
@@ -498,6 +498,7 @@ try {
       await guest.page.getByLabel("Your name", { exact: true }).fill("Tamsin's player");
       await guest.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("tamsin");
       await guest.page.getByRole("button", { name: "Join room", exact: true }).click();
+      await afterJoining(guest.page);
       await guest.page.getByText("You joined as a player", { exact: true }).waitFor();
       await navigateApplication(guest.page, origin + "/share?tab=chat");
       // The host's view of the live room: the player has joined and the party chats.
