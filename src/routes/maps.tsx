@@ -8,13 +8,16 @@ const bounded = (value: unknown, limit: number) =>
 export const Route = createFileRoute("/maps")({
   validateSearch: (
     s: Record<string, unknown>,
-  ): { map?: string; record?: string; place?: string; plan?: string } => ({
+  ): { map?: string; record?: string; place?: string; plan?: string; quest?: string } => ({
     map: bounded(s.map, 150),
     record: bounded(s.record, 170),
     // `place=kind:id`: the DM's "Place on map". Players opening it get the plain map.
     place: bounded(s.place, 170),
     // `plan=party` or `plan=ship:<propertyId>` opens the route planner (journey planner).
     plan: bounded(s.plan, 170),
+    // `quest=<id>` opens the Quests panel on that quest and frames its pins and areas (the
+    // seat's own projected quests only).
+    quest: bounded(s.quest, 150),
   }),
   component: () => (
     <Shell>

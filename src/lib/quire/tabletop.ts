@@ -96,6 +96,20 @@ export function mapNeedsMask(settings: MapTabletop) {
   );
 }
 /** Explicit projection: hidden geometry, edit history and original pixels never reach a player. */
+/**
+ * Whether a point on this map reaches this seat, by the rule pins, links and templates follow
+ * (fog first, then vision). Quest radius markers use it for their centre (docs/QUESTS.md).
+ */
+export function mapPointVisibleTo(
+  table: Pick<CloudTable, "journal" | "purses">,
+  map: CampaignMap,
+  seat: Seat,
+): (point: { x: number; y: number }) => boolean {
+  if (seat.role === "dm" || !map.tabletop) return () => true;
+  const settings = readMapTabletop(map),
+    viewers = sceneViewers(table, map, seat, false);
+  return (point) => scenePointVisible(point, settings, map.grid, viewers);
+}
 export function projectTabletopMap(
   table: Pick<CloudTable, "journal" | "purses">,
   map: CampaignMap,
