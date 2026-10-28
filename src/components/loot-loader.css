@@ -24,6 +24,10 @@
   top: 13%;
   font-size: clamp(2.3rem, 10vw, 3.9rem);
   animation: pane-in 1.8s ease-out both;
+}
+/* Ink on the parchment opening: the campaign name and the Continue prompt share it. */
+.loot-opening .quire-dawn-name,
+.loot-opening-prompt {
   color: #392719;
   text-shadow: 0 1px 0 #fff7df80;
 }
@@ -201,8 +205,6 @@
   font-size: 1.2rem;
   font-weight: 600;
   line-height: 1.25;
-  color: #392719;
-  text-shadow: 0 1px 0 #fff7df80;
 }
 @media (orientation: landscape) and (max-height: 500px) {
   .loot-opening-continue {
