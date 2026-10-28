@@ -476,3 +476,34 @@ test("projection: on a player's device (maps already projected) areas the server
   const local = projectRecord(fogged, player("aria"), { tabletopProjected: true });
   assert.deepEqual(questsOf(local)[0]!.areas.map((a) => a.id), ["area-public"]);
 });
+
+test("projection: a DM-only, fogged or hidden-map pin link is dropped from the quest and its objectives", () => {
+  // The fixture links the quest to the party pin and the (later revealed) secret objective to the DM-only pin.
+  let t = revealedCampaign();
+  t = run(t, {
+    id: "s10",
+    kind: "quest-save",
+    questId: "q1",
+    revision: rev(t),
+    quest: draft({ markers: [{ mapId: "city", markerId: "pin-public" }, { mapId: "city", markerId: "pin-dm" }] }),
+  });
+  t = run(t, { id: "o9", kind: "quest-objective", questId: "q1", revision: rev(t), objectiveId: "o-secret", action: "reveal" });
+  const forDm = questsOf(projectRecord(t, dm))[0]!;
+  assert.deepEqual(forDm.markers.map((m) => m.markerId), ["pin-public", "pin-dm"]);
+  assert.equal(forDm.objectives.find((o) => o.id === "o-secret")!.marker?.markerId, "pin-dm");
+  const forPlayer = questsOf(projectRecord(t, player("aria")))[0]!;
+  assert.deepEqual(forPlayer.markers.map((m) => m.markerId), ["pin-public"]);
+  assert.equal(forPlayer.objectives.find((o) => o.id === "o-secret")!.marker, undefined);
+  assert.equal(JSON.stringify(forPlayer).includes("pin-dm"), false);
+  // Under concealed fog even the party pin's link is cut; a hidden map drops every link.
+  const fogged = structuredClone(t);
+  const map = fogged.journal!.world!.maps[0]!;
+  (map as any).tabletop = { fog: { enabled: true, base: "concealed", shapes: [] } };
+  fogged.journal!.world!.maps[0] = campaignMapSchema.parse(map);
+  assert.deepEqual(questsOf(projectRecord(fogged, player("aria")))[0]!.markers, []);
+  const hiddenMap = structuredClone(t);
+  hiddenMap.journal!.world!.maps[0]!.visible = false;
+  assert.deepEqual(questsOf(projectRecord(hiddenMap, player("aria")))[0]!.markers, []);
+  // On a joined player's device the maps are already projected: the party pin's link is kept.
+  assert.deepEqual(questsOf(projectRecord(fogged, player("aria"), { tabletopProjected: true }))[0]!.markers.map((m) => m.markerId), ["pin-public"]);
+});

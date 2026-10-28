@@ -473,6 +473,16 @@ export function projectQuests(
     if (!visibleOn.has(map.id)) visibleOn.set(map.id, mapPointVisibleTo(table, map, seat));
     return visibleOn.get(map.id)!;
   };
+  // A pin link (map + marker ID) reaches a player only when that pin would: a map they can open,
+  // a party-visible marker or placement, and its point outside concealed fog and within vision.
+  const pinVisible = (link: { mapId: string; markerId: string }) => {
+    const map = table.journal?.world?.maps.find((m) => m.id === link.mapId);
+    if (!map || !mapAccessible(table, map, seat)) return false;
+    const pin =
+      map.markers.find((m) => m.id === link.markerId) ??
+      map.connected?.placements.find((p) => p.id === link.markerId);
+    return !!pin && pin.visibility === "party" && (context.tabletopProjected || pointVisible(map)(pin));
+  };
   const quests = readQuests(raw)
     .quests.filter((q) => questReadable(table, q, seat))
     .map((q): Quest => {
@@ -481,6 +491,7 @@ export function projectQuests(
         .map((o) => {
           const projected = { ...o };
           if (!place(o.locationId)) delete projected.locationId;
+          if (o.marker && !pinVisible(o.marker)) delete projected.marker;
           return projected;
         });
       const visibleObjectives = new Set(objectives.map((o) => o.id));
@@ -498,6 +509,7 @@ export function projectQuests(
               }
             : q.audience,
         locationIds: q.locationIds.filter(place),
+        markers: q.markers.filter(pinVisible),
         // A radius marker reaches a player only on a map they can open, with its centre outside
         // concealed fog and within vision: the rule pins and templates follow (docs/MAP-TILES.md).
         areas: q.areas.filter((a) => {
