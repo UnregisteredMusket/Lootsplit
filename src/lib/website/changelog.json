@@ -1,5 +1,47 @@
 [
   {
+    "version": "1.14.0",
+    "date": "2026-10-28",
+    "summary": "A quest log for DMs and players, redesigned map controls, a tidier Desk, Review Inbox and party inventory, search everywhere, and an Android Back button that behaves.",
+    "features": [
+      "Quest log: DMs write quests with a giver, a place, objectives, a promised reward and private DM notes, then reveal them to the whole party or to chosen characters. Mark objectives done or failed, add chronicle entries stamped with the session and campaign day, and close quests as completed or failed. Rewards are words plus links to receipts you already paid; writing or closing a quest never moves coins or items.",
+      "Players follow quests in Home → Quest log: Active, Done and Failed, a Follow pin, private notes and a Quest updated notice, with a New quest notice when the DM shares one while the app is open. Hidden objectives, DM notes and DM-only chronicle lines never reach players' devices. View as player shows the DM exactly what a chosen character sees, and quests also appear on the Desk, on NPC cards and in the map's Here sheet.",
+      "Map controls redesigned: on computers and tablets the tools stand in a rail on the right (Move, Play, Table and View, with Here and Plan journey beside everything else), a Layers panel chooses what shows on the map, zoom is a small pill in the corner, and ← Back opens the parent map while X Close map returns you to the screen you came from. Phones keep the bottom bar, and the map title, buttons and zoom follow your theme.",
+      "DMs place the party, markers, entrances, records, location links, fog, walls, lights, the combat token and the grid from a setup rail on the left, each with its own small panel beside the map; Ctrl+Z undoes fog. All map settings is grouped (This map, Places & party, Players & display, Exploration, Combat, View, Shortcuts & help) with a search box. An Initiative panel (press I) shows the round, turn order and hit points on the map; players see only the combatants revealed to them and their own character.",
+      "Search everything: a search button in the app header (or Ctrl+K / ⌘K) finds any screen, character, NPC, shop, place, map or item and opens common jobs like Add loot or New quest. Press ? for the shortcut list; players only find what their own screens already show.",
+      "Imported character-sheet equipment takes its value from the SRD (via Open5e) instead of arriving at zero, matched offline and preferring the sheet's edition; the import review lists every value found and every item without a match, and Fill missing values from the SRD prices items imported earlier.",
+      "Duplicate a shop with its stock, an encounter with its loot (reset to round 1), or an NPC's setup in one step; the original is untouched.",
+      "Undo a DM's shop purchase straight from its confirmation while the message is on screen: coins, stock and items come back exactly once, and it refuses if the items have since moved. Purchases, sales, transfers, Add loot and encounter awards now confirm with a View receipt button."
+    ],
+    "improvements": [
+      "Android: the Back button closes an open picker, menu, sheet or dialog first, then a map panel, and only then goes to the previous screen; on the first screen with a campaign open it asks you to press back again to exit. Status-bar icons turn dark on the light themes.",
+      "Phones turned sideways give most of the screen to the page: the section tabs become an icon rail on the left and the header hides while you scroll down. The title screen offers Continue · <campaign> · Session N for the campaign you last opened, and the Campaigns dialog lists the others by when you last opened them.",
+      "A tidier Desk: Session, Party, Funds, Market, Activity and Rolls as a 3×2 grid on a computer and a swipe strip with dots on a phone, End & start next at the top of the Session tile, a setup checklist for new campaigns, and empty readouts that point to a next step.",
+      "Review Inbox is one queue, oldest first, with who asked, what it does, the amount and the balance afterwards on every request; Approve is the gold button, Deny can take a remembered reason, decided requests stay in place as a short note, and Approve all payments under an amount approves each one once after a confirmation. Keyboard: A approves, D denies, J and K move.",
+      "Faster loot awards: finished encounters show on the Desk as Ready for loot review, each item is one short row with its value in gold, you can tick several items to assign or pool them at once, and a bottom bar keeps the total and Transfer loot in view. Loot is still transferred only once.",
+      "Party inventory lists each item once with an action menu (Edit, Give, Move to pool, Sell to shop, Remove), grouping, filters and search; select several items to give, pool or remove them, and Resume finishes a run interrupted by a reload without repeating anything. Players see their coins and Give under Combined wealth, identical items as one row, and the party screen is named Party & inventory.",
+      "Market opens with the shops you can visit; a shop's counter keeps a Paying from bar in view, remembers who last paid there, and DMs can pick Sell to a character once and sell each item with one tap. Shop editing has visible labels and one Save changes bar.",
+      "Encounter tracker on phones: a bottom bar keeps Prev, the round, whose turn it is and Next turn in reach, and each combatant shows its side (◆ ally, ✕ enemy). Session Time offers +1 h, +4 h, Long rest · 8 h and Next morning.",
+      "Copper fields show their gold value as you type and accept coins such as 2 gp 5 sp; gold amounts of 1,000 or more read with separators. Copper stays the saved amount.",
+      "Confirmations such as Discard changes? or Delete this? open in Lootsplitter's own style instead of a plain browser box, work the same on phones and in the Android app, and Escape or Back cancels. Delete current campaign lives in a Danger zone fold. Fields that save when you leave them show a Saved tick.",
+      "Joining a room is quicker: a join link finds the room's characters at once, the join card asks only for your character and your name, and you land on Home with a Getting started strip. Players see the DM's campaign name in the header, on the Campaign screen and in My account instead of Party overview.",
+      "Review Inbox's type filter and the inventory's Holder, Category and Equipped filters are remembered per campaign on this device; sections that open and close on Downtime, Party, Market and shop pages share one look, and the exchange board remembers whether you left it open.",
+      "Clearer names: the DM's home screen is the Desk everywhere, Shop Management is Shop schedules, and Downtime is Time & downtime. Old links still open the same screens. Help has a Guide for: Players | Dungeon Masters switch.",
+      "My account shows one section at a time (Campaigns, Characters, Profile, Backups, Support), with Resume leading each saved campaign; accounts that only play no longer see DM hosting details, and sign-in errors appear right under the form.",
+      "Accessibility: the first Tab on any screen offers Skip to content, Add loot and shop edit label every field, sheet tabs announce as tabs, gain and loss colours meet contrast in every theme, and the chat history can be reached and scrolled with the keyboard.",
+      "For site owners: Field monitor is its own section of My account with the widget's summary at the top (status, severity counts, Needs attention, Recently resolved, a traffic chart and plan-usage gauges), Diagnostics can be filtered to critical, warning or info, and Copy diagnostics copies a report-ready summary without email addresses, tokens or join codes.",
+      "For site owners: the home-screen widget's text is larger and grows with Android's font size instead of being cut off, the ✕ ! i counts open Diagnostics already filtered, and the widget settings screen shows a live preview, names each choice in words, applies a preset as soon as it is picked and shows a sample healthy preview in the Widgets list."
+    ],
+    "fixes": [
+      "For site owners: the home-screen Field monitor widget now holds its own one-year owner session instead of borrowing the app's sign-in, so signing out of or back in to the app no longer leaves it on \"Sign in\". Disconnect widget revokes that session, and only the site owner can open or use the widget. Reconnect once after updating to move an existing widget to its own session.",
+      "Large campaigns save online again: a DM edit sends only the part of the campaign it changed, campaign artwork is stored beside the campaign online so it no longer counts toward the size limit, and edits to unrelated parts made on two devices no longer conflict.",
+      "Players who open an NPC from a link or refresh the NPC page can speak to that NPC again, as their own character.",
+      "When the DM awards encounter loot, the One purse coin option reads normally instead of squeezing into a one-letter column.",
+      "Treasure pool: an unclaimed item shows No claims yet, Claim all as Pass marks only the items you haven't answered, and Fairness explains that no loot has been handed out yet instead of rows of 0 cp.",
+      "The human check appears on the sign-in form after a recovery-key password reset, so signing in no longer fails until the page is reloaded."
+    ]
+  },
+  {
     "version": "1.13.0",
     "date": "2026-10-25",
     "summary": "Split the party into groups, more NPC services from fences to stables, a fairness ledger, and an easier-to-find journey planner.",
@@ -66,9 +108,7 @@
       "Players see a message while the DM's device is still updating the map, and screen readers announce token moves, pings and scene changes.",
       "Website links in the app point to the new address, lootsplitter.com."
     ],
-    "fixes": [
-      "None in this release."
-    ]
+    "fixes": ["None in this release."]
   },
   {
     "version": "1.10.0",

@@ -96,6 +96,20 @@ try {
     await continueIntoApp(page);
     await page.locator(".party-inventory").waitFor();
 
+    // --- One FeatureHeader (design plan): eyebrow, title and the primary action together. The
+    // full scenery banner greets the first visit; later visits use the compact band (dm-mobile #19).
+    const header = page.locator("header.feature-header").first();
+    await header.getByRole("heading", { level: 1, name: "Party", exact: true }).waitFor();
+    await header.getByText("Party overview", { exact: true }).waitFor();
+    const addLoot = header.getByRole("button", { name: "+ Add loot", exact: true });
+    await addLoot.waitFor();
+    const firstBanner = await page.locator(".submenu-workspace").first().getAttribute("data-banner");
+    assert.ok([null, "full"].includes(firstBanner), `${label}: first visit banner is ${firstBanner}`);
+    {
+      const box = await addLoot.boundingBox();
+      assert.ok(box && box.height >= 44 && box.y + box.height <= view.height, `${label}: Add loot is in the first screen`);
+    }
+
     // --- DM: one list, row structure.
     await page.getByRole("heading", { name: "Inventory", exact: true }).waitFor();
     assert.equal(await page.getByRole("heading", { name: /Manage holdings/ }).count(), 0, "no second holdings list");
@@ -278,6 +292,13 @@ try {
     await continueIntoApp(page);
     await page.locator(".party-inventory").waitFor();
     assert.equal(await page.getByRole("button", { name: "+ Add loot" }).count(), 0, "players do not see Add loot");
+    // A revisit uses the compact banner, so the title stays high on the first screen.
+    if (firstBanner)
+      assert.equal(await page.locator(".submenu-workspace").first().getAttribute("data-banner"), "compact");
+    {
+      const title = await page.locator("header.feature-header h1").first().boundingBox();
+      assert.ok(title && title.y + title.height <= Math.min(view.height, 360), `${label}: compact header title at ${title?.y}`);
+    }
     const strip = page.getByRole("region", { name: "Coins", exact: true });
     await strip.getByRole("button", { name: "Give", exact: true }).waitFor();
     // Split runs on the DM's device or in a shared room, never on a player-only device link.

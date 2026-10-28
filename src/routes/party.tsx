@@ -30,6 +30,7 @@ import { Shell } from "@/components/shell";
 import { CharacterSheetPanel } from "@/components/character-sheet";
 import { Button, Checkbox, Field, Modal, Segmented, TextInput } from "@/components/ui";
 import { Disclosure } from "@/components/disclosure";
+import { FeatureHeader } from "@/components/feature-header";
 import { RemoveButton } from "@/components/quire-ui";
 import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
@@ -123,31 +124,29 @@ function PartyPage() {
 
   return (
     <Shell>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          {/* Glossary: players see "Party & inventory" (the nav label too); DMs keep "Party". */}
-          <p className="eyebrow">{seat.role === "dm" ? "Party overview" : "Party & inventory"}</p>
-          <h1 className="font-display text-4xl tracking-tight">
-            {seat.role === "dm" ? "Party" : "Inventory & purse"}
-          </h1>
-        </div>
-        {/* Add loot is the DM's; players never see a control they cannot use (P6). */}
-        {seat.role === "dm" ? (
-          <div className="flex flex-wrap justify-end gap-2">
-            {!readOnly && <SplitPartyButton />}
-            <Button
-              disabled={!economy.ready || visible.length === 0 || readOnly}
-              title={readOnly ? `Add loot when it is your turn.` : undefined}
-              onClick={() => {
-                setSection("funds");
-                setAction("add");
-              }}
-            >
-              + Add loot
-            </Button>
-          </div>
-        ) : null}
-      </div>
+      {/* Glossary: players see "Party & inventory" (the nav label too); DMs keep "Party". */}
+      <FeatureHeader
+        eyebrow={seat.role === "dm" ? "Party overview" : "Party & inventory"}
+        title={seat.role === "dm" ? "Party" : "Inventory & purse"}
+        primary={
+          // Add loot is the DM's; players never see a control they cannot use (P6).
+          seat.role === "dm" ? (
+            <>
+              {!readOnly && <SplitPartyButton />}
+              <Button
+                disabled={!economy.ready || visible.length === 0 || readOnly}
+                title={readOnly ? `Add loot when it is your turn.` : undefined}
+                onClick={() => {
+                  setSection("funds");
+                  setAction("add");
+                }}
+              >
+                + Add loot
+              </Button>
+            </>
+          ) : null
+        }
+      />
       <div className="flex flex-wrap items-center gap-3">
         <div
           className={`mode-switch party-sections ${tabs.length === 4 ? "is-four" : "is-three"}`}

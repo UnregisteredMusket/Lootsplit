@@ -91,7 +91,7 @@ try {
           },
           sessions: [{ id: "s12", name: "Session 12", startedAt: Date.now() - 1000 }],
           world: {
-            maps: [{ id: "harrowgate-map", name: "Harrowgate", image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", locationId: "harrowgate", visible: true, type: "city", anchors: [], markers: [] }],
+            maps: [{ id: "harrowgate-map", name: "Harrowgate", image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", locationId: "harrowgate", visible: true, type: "city", anchors: [{ locationId: "north-road", x: 0.5, y: 0.2 }], markers: [{ id: "livery", x: 0.3, y: 0.6, label: "Marsh's Livery", description: "", visibility: "party" }] }],
             npcs: [{ id: "hollin", name: "Hollin Marsh", description: "Livery keeper", locationId: "harrowgate", visible: true, barterAllowed: false, controllerPurseId: null }],
           },
         }),
@@ -178,6 +178,48 @@ try {
     await openApplication(page, origin + "/features/npcs");
     await page.getByRole("region", { name: "Quests from Hollin Marsh" }).getByText("Hollin's Missing Mare").waitFor();
 
+    // Map (DM): the Quests tool links a map pin and adds two radius areas, one for the hidden objective.
+    await openApplication(page, origin + "/maps?map=harrowgate-map");
+    const workspace = page.getByRole("region", { name: "Map workspace", exact: true });
+    await workspace.locator('[aria-controls="map-quests"]').first().click();
+    const questsPanel = page.locator("#map-quests");
+    await questsPanel.getByRole("combobox", { name: /^Quest/ }).first().selectOption({ label: "Hollin's Missing Mare" });
+    await questsPanel.getByLabel("Link a pin on this map").selectOption({ label: "Marsh's Livery" });
+    await questsPanel.getByRole("button", { name: "Link pin" }).click();
+    await page.waitForFunction(async () => {
+      const { economySnapshot } = await import("/src/lib/quire/economy.ts");
+      return ((await economySnapshot()).journal?.quests?.quests?.[0]?.markers ?? []).length === 1;
+    });
+    for (const [n, label, objective] of [
+      [1, "Clover is somewhere in here", ""],
+      [2, "Drover camp", SECRETS[0]],
+    ]) {
+      await questsPanel.getByRole("button", { name: "Add radius area" }).click();
+      await page.waitForFunction(async (n) => {
+        const { economySnapshot } = await import("/src/lib/quire/economy.ts");
+        return ((await economySnapshot()).journal?.quests?.quests?.[0]?.areas ?? []).length === n;
+      }, n);
+      const row = questsPanel.locator(".quest-map-area").nth(n - 1);
+      await row.getByLabel("Label (players read this)").fill(label);
+      await row.getByLabel(/^Radius/).fill("12");
+      if (objective) await row.getByLabel("For objective").selectOption({ label: `${objective} (hidden)` });
+      await row.getByRole("button", { name: "Save area" }).click();
+      await page.waitForFunction(async ([n, label]) => {
+        const { economySnapshot } = await import("/src/lib/quire/economy.ts");
+        return (await economySnapshot()).journal?.quests?.quests?.[0]?.areas?.[n - 1]?.label === label;
+      }, [n, label]);
+    }
+    assert.equal(await workspace.locator(".map-quest-areas circle").count(), 2);
+    // Resize with the keyboard on the edge handle (dragging works the same way).
+    const before = (await quests(page))[0].areas[0].r;
+    await workspace.getByRole("button", { name: "Resize area: Clover is somewhere in here (arrow keys)" }).press("ArrowRight");
+    await page.waitForFunction(async (before) => {
+      const { economySnapshot } = await import("/src/lib/quire/economy.ts");
+      return (await economySnapshot()).journal?.quests?.quests?.[0]?.areas?.[0]?.r > before;
+    }, before);
+    await noOverflow(page, `map quests dm ${width}`);
+    await page.screenshot({ path: `test-results/quest-log/map-dm-${width}.png` });
+
     // Player Tamsin: sees the quest without hidden parts, follows it and writes a private note.
     await seatAs(page, ["tamsin"]);
     await openApplication(page, origin + "/features/quests");
@@ -220,12 +262,27 @@ try {
     await questsHere.getByRole("button", { name: "Read: Hollin's Missing Mare" }).click();
     await page.getByRole("heading", { name: "Quest log", exact: true }).waitFor();
 
+    // Map (player): Show on map opens the Quests panel on the quest; the hidden objective's area
+    // never arrives.
+    await openApplication(page, origin + `/maps?quest=${encodeURIComponent(quest.id)}`);
+    const playerMap = page.getByRole("region", { name: "Map workspace", exact: true });
+    await page.locator("#map-quests").getByRole("button", { name: /Hollin's Missing Mare/, pressed: true }).waitFor();
+    await playerMap.getByRole("button", { name: /^Quest area: Hollin's Missing Mare · Clover is somewhere in here/ }).waitFor();
+    await playerMap.getByRole("button", { name: /^Quest: Hollin's Missing Mare/ }).first().waitFor();
+    assert.equal(await playerMap.locator(".map-quest-areas circle").count(), 1);
+    assert.equal((await visibleText(page)).includes("Drover camp"), false);
+    assert.equal(await playerMap.getByRole("button", { name: /^Resize area/ }).count(), 0);
+    await noOverflow(page, `map quests player ${width}`);
+    await page.screenshot({ path: `test-results/quest-log/map-player-${width}.png` });
+
     // Mira: another player's personal quest is not visible.
     await seatAs(page, ["mira"]);
     await openApplication(page, origin + "/features/quests");
     await page.getByText("No quests yet.", { exact: false }).waitFor();
     text = await visibleText(page);
     assert.equal(text.includes("Hollin's Missing Mare"), false);
+    await openApplication(page, origin + "/maps?map=harrowgate-map");
+    assert.equal(await page.locator('[aria-controls="map-quests"]').count(), 0, "no Quests tool for Mira");
 
     // DM closes it; Done tab.
     await seatAs(page, null);
@@ -247,7 +304,7 @@ try {
     await context.close();
   }
   console.log(
-    "PASS quest log: DM draft with hidden objective and DM notes, reveal to one character with a private message, DM-only chronicle line, objective done, View as player, Desk card and NPC strip; player view without hidden parts, follow, private note, Quest updated toast, Home card, Here sheet; another player sees nothing; close to Done; nothing moved; 1280/390/320 px without sideways scrolling.",
+    "PASS quest log: DM draft with hidden objective and DM notes, reveal to one character with a private message, DM-only chronicle line, objective done, View as player, Desk card and NPC strip; player view without hidden parts, follow, private note, Quest updated toast, Home card, Here sheet; map Quests tool (pin link, two radius areas, keyboard resize), player map panel without the hidden objective's area; another player sees nothing and has no Quests tool; close to Done; nothing moved; 1280/390/320 px without sideways scrolling.",
   );
 } finally {
   await browser.close();

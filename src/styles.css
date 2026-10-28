@@ -2229,6 +2229,16 @@ input,select,textarea { max-width: 100%; }
   user-select: none;
 }
 .submenu-scenery img { width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
+/*
+ * Compact band (dm-mobile #19): 64–96 px of scenery after a screen's first visit on this device,
+ * in split panes and in phone landscape, so the header and primary action stay in the first screen.
+ */
+.submenu-workspace[data-submenu-scene][data-banner="compact"] { padding-top: 4.5rem; }
+.submenu-workspace[data-banner="compact"] > .submenu-scenery { height: clamp(12rem, 24vw, 16rem); }
+@media (orientation: landscape) and (max-height: 500px) {
+  .submenu-workspace[data-submenu-scene] { padding-top: 4rem; }
+  .submenu-workspace[data-submenu-scene] > .submenu-scenery { height: 11rem; }
+}
 .submenu-scenery::after {
   content: "";
   position: absolute;
@@ -2400,6 +2410,7 @@ input,select,textarea { max-width: 100%; }
 /* Feature workspaces reuse the existing parchment, panels and navigation. */
 .feature-screen { width: 100%; max-width: 76rem; margin-inline: auto; }
 .feature-screen > h1 { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3rem); margin-bottom: 1rem; }
+.feature-screen > .feature-header .feature-header-title { font-size: clamp(2rem, 5vw, 3rem); }
 .feature-cards { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit,minmax(min(100%,17rem),1fr)); }
 .feature-cards h2 { font-size: 1.3rem; }
 .feature-return { margin-top: 2rem; padding-block: 1rem; border-top: 1px solid var(--color-border); }
@@ -3289,7 +3300,7 @@ input,select,textarea { max-width: 100%; }
 
 /* Approved trading workspace: dense quotes, chart-led exchanges, central barter slots. */
 .trading-shell .concept-main { max-width:none; padding-top:1rem; }
-.trading-shell .feature-screen>h1 { font-size:2rem; margin-bottom:.5rem; }
+.trading-shell .feature-screen>h1 { font-size:2rem; margin-bottom:.5rem; } .trading-shell .feature-screen>.feature-header { margin-bottom:.5rem; } .trading-shell .feature-screen>.feature-header .feature-header-title { font-size:2rem; }
 .trading-shell .submenu-workspace[data-submenu-scene] { padding-top:1rem; }
 .trading-shell .commodity-dashboard { border-radius:4px; container:commodity / inline-size; }
 .commodity-board-top { padding:.65rem .9rem; }
@@ -4078,8 +4089,8 @@ input,select,textarea { max-width: 100%; }
 .split-divider:focus-visible .split-divider-grip { outline: 2px solid var(--color-lead); outline-offset: 2px; }
 .split-on .split-pane main.concept-main { max-width: 74rem; padding: 1.1rem 1.25rem 2rem; }
 .split-on .split-pane .trading-shell main.concept-main, .split-on .split-pane.trading-shell main.concept-main { max-width: none; }
-.split-on .submenu-workspace[data-submenu-scene] { min-height: 100%; padding-top: 6.5rem; }
-.split-on .submenu-scenery { height: 17rem; }
+.split-on .submenu-workspace[data-submenu-scene] { min-height: 100%; padding-top: 4.5rem; }
+.split-on .submenu-scenery { height: 14rem; }
 .split-on .concept-shell .submenu-workspace[data-submenu-scene] .concept-main,
 .concept-shell.split-on .submenu-workspace[data-submenu-scene] .concept-main { width: 100%; min-height: 0; border-inline: 0; border-radius: 0; }
 .split-on .pane-maps main.concept-main { max-width: none; min-height: 100%; padding: 0; }
@@ -4828,6 +4839,39 @@ button.quest-chip { min-height: 44px; }
 .join-tips li span { font-size: .875rem; color: var(--color-muted); overflow-wrap: anywhere; }
 @media (max-width: theme(--bp-tablet)) { .join-tips li span { display: none; } .join-tips li a { line-height: 1.2; } }
 .room-mode-readout { font-weight: 600; }
+
+/* Quests on the map (docs/QUESTS.md "Map"): accent diamonds and dashed accent circles. */
+.map-quest-areas { position:absolute; inset:0; pointer-events:none; overflow:visible; }
+.map-quest-areas circle { fill:color-mix(in srgb, var(--color-accent) 10%, transparent); stroke:var(--color-accent); stroke-width:2.5; stroke-dasharray:8 6; vector-effect:non-scaling-stroke; }
+.map-quest-areas circle.highlighted { fill:color-mix(in srgb, var(--color-accent) 18%, transparent); stroke-width:3.5; }
+.map-quest-pin { position:absolute; z-index:4; width:44px; height:44px; margin:-36px 0 0 -8px; display:grid; place-items:center; background:none; border:0; }
+.map-quest-pin > span, .map-quest-diamond { display:inline-block; width:14px; height:14px; transform:rotate(45deg); background:var(--color-accent); border:2px solid var(--color-bg); box-shadow:0 0 0 1px var(--color-accent), 0 2px 6px color-mix(in srgb, var(--color-bg) 60%, transparent); }
+.map-quest-pin.highlighted > span { width:18px; height:18px; box-shadow:0 0 0 2px var(--color-accent), 0 0 12px var(--color-accent); }
+.map-quest-pin:focus-visible { outline:2px solid var(--color-accent); outline-offset:2px; border-radius:6px; }
+.map-quest-area-label { position:absolute; z-index:4; transform:translate(-50%, -100%); display:inline-flex; align-items:center; gap:6px; min-height:32px; max-width:220px; padding:2px 10px; border:1px dashed var(--color-accent); border-radius:999px; background:color-mix(in srgb, var(--color-bg) 82%, transparent); color:var(--color-fg); font-size:.8rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.map-quest-area-label .map-quest-diamond { width:9px; height:9px; border-width:1px; flex:none; }
+.map-quest-area-label.highlighted { border-style:solid; }
+.map-quest-handle { position:absolute; z-index:6; width:28px; height:28px; margin:-14px; border-radius:50%; border:2px solid var(--color-bg); background:var(--color-accent); touch-action:none; cursor:grab; box-shadow:0 0 0 1px var(--color-accent); }
+.map-quest-handle.edge { width:22px; height:22px; margin:-11px; border-radius:4px; cursor:ew-resize; }
+.map-quest-handle::after { content:""; position:absolute; inset:-9px; }
+.map-quest-handle:focus-visible { outline:3px solid var(--color-fg); outline-offset:2px; }
+.quest-map-panel { display:grid; gap:.75rem; }
+.quest-map-filter { display:flex; flex-wrap:wrap; gap:.4rem; }
+.quest-map-filter-option { display:inline-flex; align-items:center; gap:.35rem; min-height:44px; padding:.2rem .7rem; border:1px solid var(--color-border); border-radius:999px; font-size:.85rem; font-weight:600; }
+.quest-map-filter-option.selected { border-color:var(--color-accent); color:var(--color-accent); }
+.quest-map-filter-option input { accent-color:var(--color-accent); }
+.quest-map-list { display:grid; gap:.25rem; }
+.quest-map-row { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:.6rem; width:100%; min-height:44px; padding:.45rem .5rem; border-radius:6px; text-align:left; }
+.quest-map-row[aria-pressed="true"] { background:color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.quest-map-row span:last-child { display:grid; min-width:0; }
+.quest-map-row strong { overflow-wrap:anywhere; }
+.quest-map-row small { color:var(--color-muted); overflow-wrap:anywhere; }
+.quest-map-detail { display:grid; gap:.4rem; padding-top:.6rem; border-top:1px solid var(--color-border); }
+.quest-map-detail h3, .quest-map-tools h3 { font-size:.78rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--color-accent); }
+.quest-map-tools { display:grid; gap:.6rem; padding-top:.6rem; border-top:1px solid var(--color-border); }
+.quest-map-item { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+.quest-map-add, .quest-map-area { display:grid; gap:.4rem; padding:.6rem; border:1px dashed var(--color-border); border-radius:8px; }
+
 /* Inline links padded to a 24 px target (WCAG 2.5.8) without changing how they wrap. */
 .tap-link { display: inline-block; min-width: 1.5rem; min-height: 1.5rem; padding-block: .125rem; }
 

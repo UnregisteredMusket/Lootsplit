@@ -2987,8 +2987,64 @@ export async function monitorApi(env, userId, sessionId, request, body) {
         { ...settings, timezone },
         now,
       );
+    } else if (route === "widget-session") {
+      result = await widgetSession(env, userId, sessionId, body, now);
     } else fail("Monitoring route not found.", 404);
   } else fail("Method not allowed.", 405);
   await authorizeOwner(env, userId, sessionId);
   return result;
+}
+
+/** The widget's own sign-in lasts this long; the periodic refresh keeps the row's updatedAt current. */
+export const WIDGET_SESSION_DAYS = 365;
+export const WIDGET_SESSION_AGENT = "Lootsplitter owner widget";
+/**
+ * The home-screen widget authenticates with its own session, separate from the app's. Until
+ * 2026-10-28 it borrowed the app's bearer token, so every sign-out, re-sign-in or 30-day expiry
+ * of the app session also disconnected the widget ("No current owner reading · Sign in").
+ *
+ * `action: "create"` opens a new widget session (revoking this device's previous widget session
+ * when `previousToken` is given) and returns a bearer token in the same `<token>.<signature>`
+ * form Better Auth's bearer plugin verifies. `action: "revoke"` ends the given widget session.
+ * Only widget sessions (identified by their user agent) are ever revoked here, never the app's.
+ */
+async function widgetSession(env, userId, sessionId, body, now) {
+  const db = env.DB;
+  const action = body?.action === "revoke" ? "revoke" : "create";
+  const { generateId } = await import("@better-auth/core/utils/id");
+  // Same form as the tokens Better Auth hands the app (`set-auth-token`): token + "." + standard
+  // base64 HMAC-SHA256, which both the bearer plugin and the signed-cookie layer verify.
+  const sign = async (token) => {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(env.ACCOUNT_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(token)));
+    return `${token}.${btoa(String.fromCharCode(...signature))}`;
+  };
+  const revoke = async (bearer) => {
+    const token = typeof bearer === "string" ? bearer.split(".")[0] : "";
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return 0;
+    const result = await db
+      .prepare("DELETE FROM session WHERE token=? AND userId=? AND userAgent=?")
+      .bind(token, userId, WIDGET_SESSION_AGENT)
+      .run();
+    return result.meta?.changes ?? 0;
+  };
+  if (action === "revoke") return { revoked: (await revoke(body?.token)) > 0 };
+  const stamp = new Date(now).toISOString();
+  const expires = new Date(now + WIDGET_SESSION_DAYS * 86400000).toISOString();
+  const token = generateId(32);
+  await db
+    .prepare(
+      "INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, ipAddress, userAgent, userId) VALUES (?,?,?,?,?,?,?,?)",
+    )
+    .bind(generateId(), expires, token, stamp, stamp, null, WIDGET_SESSION_AGENT, userId)
+    .run();
+  if (body?.previousToken) await revoke(body.previousToken);
+  return { token: await sign(token), expiresAt: expires };
 }

@@ -94,7 +94,14 @@ export async function checkJourneyDiscoverability(page, { origin, frame, width, 
   if (height >= 600)
     assert.ok((await box(link)).bottom <= height, `Downtime's Plan a journey is above the fold at ${label}`);
   assert.ok(
-    await travel.evaluate((e) => !e.previousElementSibling || e.previousElementSibling.tagName === "H1"),
+    // Travel is still the first section: only the screen's own header (the shared FeatureHeader,
+    // which wraps the h1 with its eyebrow, or a bare h1) comes before it.
+    await travel.evaluate(
+      (e) =>
+        !e.previousElementSibling ||
+        e.previousElementSibling.tagName === "H1" ||
+        e.previousElementSibling.matches("header.feature-header"),
+    ),
     "Travel is the Downtime screen's first section",
   );
   await page.screenshot({ path: `${output}/discover-downtime-${label}.png` });

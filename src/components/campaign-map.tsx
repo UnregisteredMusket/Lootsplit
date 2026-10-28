@@ -42,6 +42,7 @@ import { canonicalJson } from "@/lib/quire/canonical-json";
 import { characterLocation, characterVisible } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
 import {
+  Fragment,
   lazy,
   Suspense,
   useEffect,
@@ -50,6 +51,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { useSeat } from "@/lib/quire/seat";
@@ -121,6 +124,8 @@ import { RecordIcon } from "./map-record-icon";
 import { MapPlaceCard } from "./map-place-card";
 import { MapPlaceBar } from "./map-place-bar";
 import { MapHereSheet } from "./map-here-sheet";
+import { useQuestMapSlot } from "./quests-map";
+import { questsOnMap } from "@/lib/quire/quest-view";
 import { nextObjective, questsHere } from "@/lib/quire/quest-view";
 import {
   groupMapRecords,
@@ -261,6 +266,29 @@ export type MapQuestsSlot = {
     setMarkers: (on: boolean) => void;
     setAreas: (on: boolean) => void;
   };
+  /** The quest stage's own layer: quest pins (accent diamonds) beside their map pins or places. */
+  pins?: { key: string; questId: string; x: number; y: number; label: string; title: string; highlighted?: boolean }[];
+  /** Radius markers (dashed accent circles): centre normalized, `r` a fraction of the image width. */
+  areas?: {
+    key: string;
+    questId: string;
+    x: number;
+    y: number;
+    r: number;
+    label?: string;
+    title: string;
+    highlighted?: boolean;
+    /** DM: drag the centre or the edge handle (shown while the quest is picked). */
+    editable?: boolean;
+  }[];
+  /** A quest pin or area was tapped: the panel opens on that quest. */
+  select?: (questId: string) => void;
+  /** Frame these points once per nonce (picking a quest zooms to its pins and areas). */
+  focus?: { nonce: string; points: { x: number; y: number }[] };
+  /** DM: an editable area was moved or resized; called once when the drag ends. */
+  moveArea?: (key: string, next: { x: number; y: number; r: number }) => void;
+  /** A new value opens the Quests panel (a `/maps?quest=` link). */
+  openNonce?: string;
 };
 
 export function CampaignMaps() {
@@ -337,6 +365,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
   );
   const requestedMap = useRouterState({ select: (s) => s.location.search.map }),
     requestedRecord = useRouterState({ select: (s) => s.location.search.record }),
+    requestedQuest = useRouterState({ select: (s) => s.location.search.quest }),
     requestedPlace = useRouterState({ select: (s) => s.location.search.place }),
     requestedPlan = useRouterState({ select: (s) => s.location.search.plan });
   const navigate = useNavigate(),
@@ -545,6 +574,18 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
       : anchorFor(map, t, market.currentLocationId));
   // Split the party: one marker per group, each with its letter and colour (map.html).
   const groupPins = map && partySplit(t) ? mapGroupPins(t, map) : undefined;
+  // Quest log on the map (quests-map.tsx): pins, radius areas and the Quests panel.
+  const questSlot = useQuestMapSlot(map, t as CloudTable, requestedQuest);
+  // `/maps?quest=<id>` (Show on map): open the first map where that quest has a pin or area.
+  const handledQuest = useRef("");
+  useEffect(() => {
+    if (!requestedQuest || handledQuest.current === requestedQuest) return;
+    handledQuest.current = requestedQuest;
+    const target = maps.find((m) => questsOnMap(t as CloudTable, m, seat).some((i) => i.quest.id === requestedQuest));
+    if (target && target.id !== map?.id) setSelected(target.id);
+    // Once per link.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedQuest]);
   function recordsForMap(map: CampaignMap): MapRecord[] {
     const inferredPins = [
       ...t.holdings
@@ -1385,8 +1426,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                   }
                 : undefined
             }
-            // Quest log map stage: pass a MapQuestsSlot here (map controls PR 7).
-            quests={undefined}
+            quests={questSlot}
             entryPick={
               entryPick && entryPick.target === map.id
                 ? {
@@ -2395,6 +2435,59 @@ function MapViewport({
       setInitiativeOpen(false);
       setQuestsOpen(true);
     });
+  };
+  // Quest stage: picking a quest frames its pins and areas (zooming in as far as 3×).
+  const questFocus = quests?.focus;
+  useEffect(() => {
+    if (!questFocus?.points.length || !artworkReady) return;
+    const frame = requestAnimationFrame(() => {
+      const region = root.current?.getBoundingClientRect();
+      if (!region) return;
+      const panel = document.getElementById("map-quests")?.getBoundingClientRect();
+      const area = freeArea(
+        { width: region.width, height: region.height },
+        panel
+          ? { left: panel.left - region.left, top: panel.top - region.top, right: panel.right - region.left, bottom: panel.bottom - region.top }
+          : undefined,
+        { left: 10, top: 112, right: 10, bottom: 10 },
+      );
+      const sidePanel = panel && panel.right - panel.left <= region.width * 0.6;
+      const box = sidePanel ? { ...area, left: 10, right: Math.min(area.right, panel.left - region.left - 8) } : area;
+      const pts = questFocus.points;
+      const xs = pts.map((p) => p.x),
+        ys = pts.map((p) => p.y);
+      const minX = Math.min(...xs),
+        maxX = Math.max(...xs),
+        minY = Math.min(...ys),
+        maxY = Math.max(...ys);
+      const width = Math.max(40, box.right - box.left - 56),
+        height = Math.max(40, box.bottom - box.top - 56);
+      const fit = Math.min(
+        maxX > minX ? width / ((maxX - minX) * w) : 3,
+        maxY > minY ? height / ((maxY - minY) * h) : 3,
+      );
+      const scale = Math.min(3, Math.max(0.5, fit));
+      setView({
+        scale,
+        x: (box.left + box.right) / 2 - ((minX + maxX) / 2) * w * scale,
+        y: (box.top + box.bottom) / 2 - ((minY + maxY) / 2) * h * scale,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+    // Framed once per pick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questFocus?.nonce, artworkReady]);
+  const questOpenNonce = quests?.openNonce;
+  useEffect(() => {
+    if (questOpenNonce && !questsOpen) toggleQuests();
+    // Once per request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questOpenNonce]);
+  // A radius marker being dragged by the DM (shown live; saved once on release).
+  const [questDrag, setQuestDrag] = useState<{ key: string; x: number; y: number; r: number }>();
+  const openQuestOnMap = (questId: string) => {
+    quests?.select?.(questId);
+    if (!questsOpen) toggleQuests();
   };
   const toggleInitiative = () => {
     if (initiativeOpen) {
@@ -3903,6 +3996,28 @@ function MapViewport({
                   ))}
                 </svg>
               )}
+              {quests?.areas && quests.areas.length > 0 && (quests.layers?.areas ?? true) && (
+                <svg
+                  className="map-quest-areas"
+                  width={w}
+                  height={h}
+                  viewBox={`0 0 ${w} ${h}`}
+                  aria-hidden="true"
+                >
+                  {quests.areas.map((a) => {
+                    const live = questDrag?.key === a.key ? questDrag : a;
+                    return (
+                      <circle
+                        key={a.key}
+                        className={a.highlighted ? "highlighted" : undefined}
+                        cx={live.x * w}
+                        cy={live.y * h}
+                        r={Math.max(2, live.r * w)}
+                      />
+                    );
+                  })}
+                </svg>
+              )}
               {tileMode && (gridLocked || gridVisible) && map.grid && (
                 <svg
                   className="map-tile-grid"
@@ -4027,6 +4142,104 @@ function MapViewport({
                 ))}
               </div>
             ))}
+            {quests?.pins &&
+              (quests.layers?.markers ?? true) &&
+              quests.pins.map((p) => (
+                <button
+                  type="button"
+                  key={p.key}
+                  className={`map-quest-pin${p.highlighted ? " highlighted" : ""}`}
+                  style={{ left: view.x + p.x * w * view.scale, top: view.y + p.y * h * view.scale }}
+                  aria-label={`Quest: ${p.title}${p.label && p.label !== p.title ? ` · ${p.label}` : ""}`}
+                  title={p.label || p.title}
+                  onClick={() => {
+                    if (!moved.current) openQuestOnMap(p.questId);
+                  }}
+                >
+                  <span aria-hidden="true" />
+                </button>
+              ))}
+            {quests?.areas &&
+              (quests.layers?.areas ?? true) &&
+              quests.areas.map((a) => {
+                const live = questDrag?.key === a.key ? questDrag : a;
+                const cx = view.x + live.x * w * view.scale,
+                  cy = view.y + live.y * h * view.scale,
+                  rr = live.r * w * view.scale;
+                const drag = (mode: "centre" | "edge") => ({
+                  onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+                    e.stopPropagation();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    setQuestDrag({ key: a.key, x: live.x, y: live.y, r: live.r });
+                  },
+                  onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => {
+                    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+                    e.stopPropagation();
+                    const p = mapPoint(e.clientX, e.clientY);
+                    setQuestDrag((d) =>
+                      !d || d.key !== a.key
+                        ? d
+                        : mode === "centre"
+                          ? { ...d, x: p.x, y: p.y }
+                          : { ...d, r: Math.min(2, Math.max(0.005, Math.hypot((p.x - d.x) * w, (p.y - d.y) * h) / w)) },
+                    );
+                  },
+                  onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => {
+                    e.stopPropagation();
+                    const d = questDrag;
+                    setQuestDrag(undefined);
+                    if (d && d.key === a.key && (d.x !== a.x || d.y !== a.y || d.r !== a.r))
+                      quests.moveArea?.(a.key, { x: d.x, y: d.y, r: d.r });
+                  },
+                  onKeyDown: (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+                    const step = e.shiftKey ? 0.05 : 0.01;
+                    const dx = e.key === "ArrowRight" ? step : e.key === "ArrowLeft" ? -step : 0,
+                      dy = e.key === "ArrowDown" ? step : e.key === "ArrowUp" ? -step : 0;
+                    if (!dx && !dy) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const next =
+                      mode === "centre"
+                        ? { x: Math.min(1, Math.max(0, a.x + dx)), y: Math.min(1, Math.max(0, a.y + dy)), r: a.r }
+                        : { x: a.x, y: a.y, r: Math.min(2, Math.max(0.005, a.r + (dx || -dy) / 2)) };
+                    quests.moveArea?.(a.key, next);
+                  },
+                });
+                return (
+                  <Fragment key={a.key}>
+                    <button
+                      type="button"
+                      className={`map-quest-area-label${a.highlighted ? " highlighted" : ""}`}
+                      style={{ left: cx, top: cy - rr }}
+                      aria-label={`Quest area: ${a.title}${a.label ? ` · ${a.label}` : ""}`}
+                      onClick={() => {
+                        if (!moved.current) openQuestOnMap(a.questId);
+                      }}
+                    >
+                      <span aria-hidden="true" className="map-quest-diamond" />
+                      {a.label || a.title}
+                    </button>
+                    {a.editable && a.highlighted && (
+                      <>
+                        <button
+                          type="button"
+                          className="map-quest-handle centre"
+                          style={{ left: cx, top: cy }}
+                          aria-label={`Move area: ${a.label || a.title} (arrow keys)`}
+                          {...drag("centre")}
+                        />
+                        <button
+                          type="button"
+                          className="map-quest-handle edge"
+                          style={{ left: cx + rr, top: cy }}
+                          aria-label={`Resize area: ${a.label || a.title} (arrow keys)`}
+                          {...drag("edge")}
+                        />
+                      </>
+                    )}
+                  </Fragment>
+                );
+              })}
             {point && (
               <span
                 className="map-place-point"
