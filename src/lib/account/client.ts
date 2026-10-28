@@ -119,6 +119,8 @@ export type AccountLibrary = {
     code: string;
     seat_id: string;
     name: string;
+    /** The DM's campaign name for the room (not private); absent on older servers or unnamed rooms. */
+    campaignName?: string;
     archived: number;
     updated_at: number;
     has_recovery?: number;

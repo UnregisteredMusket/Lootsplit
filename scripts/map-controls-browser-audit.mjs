@@ -212,6 +212,12 @@ async function checkChrome(page, { role, appearance, width, height }) {
   }
   within(facts.toolbar, "Map tools toolbar");
   within(facts.zoom, "zoom pill");
+  // Quests is a reserved slot (map controls PR 7): nothing renders until the quest stage lands.
+  assert.equal(
+    await page.getByRole("button", { name: "Quests", exact: true }).count(),
+    0,
+    `${tag}: no Quests tool before the quest log's map stage`,
+  );
   assert.equal(facts.tabStops, 1, `${tag}: the tools toolbar is one Tab stop (roving tabindex)`);
   assert.equal(facts.pills, 0, `${tag}: Here and Plan journey live in the tools bar, not floating`);
   assert.ok(facts.zoom.width > facts.zoom.height, `${tag}: zoom is a horizontal pill`);
@@ -387,6 +393,14 @@ async function checkSetupRail(page) {
     .toBe(true);
   await page.keyboard.press("Escape");
   await sameDocument(page, "dm entrance panel");
+
+  // Initiative (I): the turn-order panel; with no encounter on this map it offers to start one.
+  await page.getByRole("button", { name: "Initiative", exact: true }).click();
+  const initiative = page.getByRole("dialog", { name: "Initiative", exact: true });
+  await expect(initiative).toContainText("No encounter is running on this map.");
+  await expect(initiative.getByRole("button", { name: "Start encounter here", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(initiative).toHaveCount(0);
 
   // Reveal, Combat and Objects (map controls PR 4): options beside the setup rail.
   await expect(page.getByRole("button", { name: "More map tools", exact: true })).toHaveCount(0);

@@ -22,7 +22,7 @@ export const rollCampaignCharacter = createServerFn({ method: "POST" })
   });
 
 export const openCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { name: string; table: CloudTable }) => input)
+  .validator((input: { name: string; table: CloudTable; campaignName?: string }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
@@ -157,6 +157,18 @@ export const submitCloudCommands = createServerFn({ method: "POST" })
     const { submitCommands } = await import("./cloud.server.ts");
     return tabletopResponse(await submitCommands(data), data.tabletopProtocol);
   });
+/** The DM names the shared campaign; players see that name (campaign-name.ts). */
+export const nameCloudRoom = createServerFn({ method: "POST" })
+  .validator(
+    (input: { tabletopProtocol?: number; code: string; token: string; campaignName: string }) =>
+      input,
+  )
+  .handler(async ({ data }) => {
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { nameRoom } = await import("./cloud.server.ts");
+    return tabletopResponse(await nameRoom(data), data.tabletopProtocol);
+  });
 export const manageCloudRoom = createServerFn({ method: "POST" })
   .validator(
     (input: {
@@ -221,6 +233,16 @@ export const readMapCombatPresentation = createServerFn({method:"POST"})
     setResponseHeader("Cache-Control","no-store");
     const {guardMemberSeat}=await import("./member-access.server.ts");await guardMemberSeat(data);
     const {mapCombatPresentation}=await import("./cloud.server.ts");return mapCombatPresentation(data);
+  });
+
+/** The seat's initiative panel: revealed order, round and turn, own HP only (map controls PR 6). */
+export const readMapCombatOrder = createServerFn({method:"POST"})
+  .validator((input:{code:string;token:string;mapId:string})=>input)
+  .handler(async({data})=>{
+    const {setResponseHeader}=await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control","no-store");
+    const {guardMemberSeat}=await import("./member-access.server.ts");await guardMemberSeat(data);
+    const {mapCombatOrder}=await import("./cloud.server.ts");return mapCombatOrder(data);
   });
 
 /** Read-only NPC barter quote for a seat; players receive no valuation (docs/NPC-BARTER.md). */

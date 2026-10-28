@@ -1,3 +1,4 @@
+import { SavedTick } from "@/components/saved-tick";
 import { SearchSelect } from "@/components/search-select";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
@@ -84,6 +85,10 @@ function CatalogPage() {
 
 function GoodsPane() {
   const { ready, catalog, saveGood, deleteGood, addGoods, invent, restoreGoods } = useEconomy();
+  // The "Saved" tick beside the price that was just saved (design D9).
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const savedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(savedTimer.current), []);
   const { prefs, ready: prefsReady } = usePrefs();
   const dollars = useDollarText();
   const seeded = useRef(false);
@@ -306,9 +311,15 @@ function GoodsPane() {
                 onBlur={(event) => {
                   const copper = parsePrice(event.target.value);
                   if (copper !== null && copper !== item.baseCopper)
-                    void saveGood({ ...item, baseCopper: copper });
+                    void saveGood({ ...item, baseCopper: copper }).then((ok) => {
+                      if (!ok) return;
+                      setSavedId(item.id);
+                      window.clearTimeout(savedTimer.current);
+                      savedTimer.current = window.setTimeout(() => setSavedId(null), 2500);
+                    });
                 }}
               />
+              {savedId === item.id ? <SavedTick saved /> : null}
               <RemoveButton
                 className="shrink-0"
                 label="Remove"

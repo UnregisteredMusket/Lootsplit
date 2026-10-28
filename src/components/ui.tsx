@@ -13,8 +13,9 @@ import {
 } from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, Minus, Plus, X } from "lucide-react";
+import { Minus, Plus, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { DisclosureChevron } from "./disclosure";
 import type { ConfirmTone } from "@/lib/quire/confirm-store";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -89,9 +90,12 @@ export function Fold({
     }
   }, [hash, anchorId]);
   return (
+    // The section variant of `Disclosure` (same chevron, focus ring and spacing). Fold stays a
+    // button because it mounts its content only when open, reopens for its hash anchor and
+    // `reveal`, and can carry actions beside the title.
     <section
       id={anchorId}
-      className="loot-fold mt-4 rounded-lg border border-border"
+      className="loot-fold disclosure disclosure-section"
       style={anchorId ? { scrollMarginTop: "6rem" } : undefined}
     >
       <div className="flex items-stretch">
@@ -99,19 +103,19 @@ export function Fold({
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
-          className="flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 px-4 text-left"
+          className="disclosure-summary min-w-0 flex-1"
         >
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">{title}</span>
+          <span className="disclosure-title">
+            <span className="block">{title}</span>
             {hint && !open ? (
-              <span className="mt-0.5 block truncate text-sm text-muted">{hint}</span>
+              <span className="mt-0.5 block truncate font-normal text-muted">{hint}</span>
             ) : null}
           </span>
-          <ChevronDown className={cn("size-4 shrink-0 text-faint", open && "rotate-180")} />
+          <DisclosureChevron />
         </button>
         {actions ? <div className="flex items-center pr-3">{actions}</div> : null}
       </div>
-      {open ? <div className="border-t border-border px-4 pt-3 pb-4">{children}</div> : null}
+      {open ? <div className="disclosure-body">{children}</div> : null}
     </section>
   );
 }
@@ -342,6 +346,7 @@ export function Modal({
 export type { ConfirmTone };
 /** The shared empty state (icon, one sentence, optional action); defined beside Card. */
 export { EmptyState } from "./terminal";
+export { Disclosure, DisclosureChevron, type DisclosureVariant } from "./disclosure";
 
 /**
  * Themed confirmation (role="alertdialog"; Escape and Cancel close it, focus returns to the

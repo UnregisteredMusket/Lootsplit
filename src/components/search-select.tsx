@@ -14,6 +14,7 @@ import {
 import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { registerBackOverlay } from "@/lib/mobile/back-handlers";
 
 type Option = { value: string; label: string; disabled: boolean };
 function text(node: ReactNode): string {
@@ -81,7 +82,17 @@ export function SearchSelect({
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null),
     input = useRef<HTMLInputElement>(null),
-    list = useRef<HTMLDivElement>(null);
+    list = useRef<HTMLDivElement>(null),
+    content = useRef<HTMLDivElement>(null);
+  // Android Back closes the open picker before the dialog or screen behind it (design M3).
+  useEffect(() => {
+    if (!open || disabled) return;
+    const close = () => {
+      setOpen(false);
+      setQuery("");
+    };
+    return registerBackOverlay({ close, element: () => content.current });
+  }, [open, disabled]);
   useEffect(() => {
     if (!open || disabled) return;
     const visible = window.visualViewport;
@@ -171,6 +182,7 @@ export function SearchSelect({
         }
       >
         <Popover.Content
+          ref={content}
           className="record-select-menu"
           style={
             viewport

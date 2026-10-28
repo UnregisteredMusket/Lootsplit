@@ -7,6 +7,9 @@
  * economy action for one holding with its own command ID; bulk actions run them one by one and
  * can resume after a reload with the same IDs, so nothing moves twice.
  */
+import { readFilters, writeFilters } from "@/lib/quire/campaign-filters";
+import { activeCampaignId } from "@/lib/quire/campaign-context";
+import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 import { useEffect, useMemo, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -58,6 +61,8 @@ const ACTION_LABEL: Record<BulkAction, string> = {
   remove: "Remove",
 };
 
+const INVENTORY_FILTERS = { holder: "", category: "", equipped: false };
+
 export function PartyInventory({
   purses,
   readOnly,
@@ -97,9 +102,20 @@ export function PartyInventory({
     }
   };
   const [query, setQuery] = useState("");
-  const [holder, setHolder] = useState("");
-  const [category, setCategory] = useState("");
-  const [equippedOnly, setEquippedOnly] = useState(false);
+  // Holder, category and Equipped are remembered per campaign on this device (design QoL 3).
+  const [remembered] = useState(() => readFilters(activeCampaignId(), "inventory", INVENTORY_FILTERS));
+  const [holder, setHolder] = useState(remembered.holder);
+  const [category, setCategory] = useState(remembered.category);
+  const [equippedOnly, setEquippedOnly] = useState(remembered.equipped);
+  useEffect(() => {
+    if (!isEphemeralCampaign())
+      writeFilters(
+        activeCampaignId(),
+        "inventory",
+        { holder, category, equipped: equippedOnly },
+        INVENTORY_FILTERS,
+      );
+  }, [holder, category, equippedOnly]);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -141,6 +157,14 @@ export function PartyInventory({
 
   const categories = [...new Set(holdings.map(classify))].sort((a, b) => a.localeCompare(b));
   const equippedCount = holdings.filter((h) => h.equipped).length;
+  // A remembered filter that no longer applies (the holder left, the category emptied) is dropped,
+  // so a remembered choice never hides the whole inventory.
+  useEffect(() => {
+    if (!economy.ready) return;
+    if (holder && !holders.some((p) => p.id === holder)) setHolder("");
+    if (category && !categories.includes(category)) setCategory("");
+    if (equippedOnly && !equippedCount) setEquippedOnly(false);
+  }, [economy.ready, holder, holders, category, categories, equippedOnly, equippedCount]);
   const needle = query.trim().toLowerCase();
   const shown = holdings.filter(
     (h) =>

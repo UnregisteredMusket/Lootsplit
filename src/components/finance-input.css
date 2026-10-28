@@ -1,0 +1,2 @@
+/* Copper amount input (design plan D8): a live gold echo under the copper field. */
+.coin-amount-echo { margin-top: -.25rem; font-size: .875rem; color: var(--color-muted); font-variant-numeric: tabular-nums; }

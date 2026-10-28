@@ -14,6 +14,7 @@ import {
 } from "@/lib/quire/shop-counter-memory";
 import { GlobalCommodityMarket } from "./commodity-board";
 import { AppLink } from "./app-link";
+import { Disclosure } from "./disclosure";
 
 /**
  * The Market's trade exchange as a compact summary tile (design plan D6/P7). The full global
@@ -54,7 +55,7 @@ export function TradeExchangeSection() {
           Trade Exchanges · regional goods & seasonal market →
         </AppLink>
       </div>
-      <details
+      <Disclosure variant="inline"
         className="market-exchange-board"
         open={open}
         onToggle={(event) => {
@@ -62,13 +63,11 @@ export function TradeExchangeSection() {
           if (next === open) return; // Opened by a link, not by the person: nothing to remember.
           setOpen(next);
           writeDeviceFlag(EXCHANGE_OPEN_KEY, next);
-        }}
-      >
-        <summary>
+        }} summary={<>
           Trade exchange · {goods} {goods === 1 ? "good" : "goods"}
-        </summary>
+        </>}>
         {open ? <GlobalCommodityMarket /> : null}
-      </details>
+      </Disclosure>
     </section>
   );
 }

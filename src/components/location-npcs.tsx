@@ -1,4 +1,5 @@
 import { CharacterPlacement } from "./character-placement";
+import { copyName } from "@/lib/quire/duplicate";
 import { actingGroups, seatGroups } from "@/lib/quire/party-groups";
 import { MapRecordStrip } from "./map-record-strip";
 import { characterLocation, characterPosition } from "@/lib/quire/character-position";
@@ -37,6 +38,8 @@ export function LocationNpcs() {
     dm = seat.role === "dm",
     market = readMarketLocations(t.journal.market);
   const [edit, setEdit] = useState<Npc | null | undefined>(),
+    // Duplicate (design Q9): a new NPC editor filled from another NPC, created with Create NPC.
+    [template, setTemplate] = useState<Npc | undefined>(),
     [selected, setSelected] = useState(""),
     [importText, setImportText] = useState(""),
     [importError, setImportError] = useState("");
@@ -65,14 +68,25 @@ export function LocationNpcs() {
       {dm && (
         <>
           <div className="world-toolbar">
-            <Button onClick={() => setEdit(null)}>Create non-party NPC</Button>
+            <Button
+              onClick={() => {
+                setTemplate(undefined);
+                setEdit(null);
+              }}
+            >
+              Create non-party NPC
+            </Button>
           </div>
           {edit !== undefined && (
             <NpcEditor
-              key={edit?.id ?? "new"}
+              key={edit?.id ?? template?.id ?? "new"}
               npc={edit ?? undefined}
+              template={edit ? undefined : template}
               table={t}
-              close={() => setEdit(undefined)}
+              close={() => {
+                setEdit(undefined);
+                setTemplate(undefined);
+              }}
             />
           )}
           <Fold title="Import NPCs">
@@ -226,6 +240,17 @@ export function LocationNpcs() {
               <div className="world-toolbar">
                 <Button onClick={() => setSelected(n.id)}>View & interact</Button>
                 {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
+                {dm && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setTemplate(npcCopy(n));
+                      setEdit(null);
+                    }}
+                  >
+                    Duplicate NPC
+                  </Button>
+                )}
               </div>
               <p>{n.description}</p>
               {t.journal.blacksmith?.profiles
@@ -258,7 +283,18 @@ export function LocationNpcs() {
     </div>
   );
 }
-function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close: () => void }) {
+function NpcEditor({
+  npc,
+  template,
+  table,
+  close,
+}: {
+  npc?: Npc;
+  /** A new NPC's starting values (Duplicate NPC); the editor still creates a new record. */
+  template?: Npc;
+  table: CloudTable;
+  close: () => void;
+}) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.scrollIntoView({ block: "start" });
@@ -266,7 +302,8 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
   }, []);
   const market = readMarketLocations(table.journal?.market),
     [draft, setDraft] = useState<Npc>(
-      npc ?? {
+      npc ??
+        template ?? {
         id: crypto.randomUUID(),
         name: "",
         description: "",
@@ -281,7 +318,7 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
   return (
     <section className="world-card" aria-label="NPC editor">
       <h2 ref={heading} tabIndex={-1} style={{ scrollMarginTop: "6rem" }}>
-        {npc ? "Configure NPC" : "New non-party NPC"}
+        {npc ? "Configure NPC" : template ? "New non-party NPC (copy)" : "New non-party NPC"}
       </h2>
       <CommandForm
         label={npc ? "Save NPC configuration" : "Create NPC"}
@@ -697,4 +734,10 @@ export function NpcMapService({ npcId, onFarewell }: { npcId: string; onFarewell
       </Fold>
     </>
   );
+}
+
+/** Duplicate NPC (design Q9): the same configuration as a new record. Funds, inventory,
+ * messages, a controlling character and service profiles stay with the original. */
+function npcCopy(n: Npc): Npc {
+  return { ...structuredClone(n), id: crypto.randomUUID(), name: copyName(n.name, 160), controllerPurseId: null };
 }

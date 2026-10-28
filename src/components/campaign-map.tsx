@@ -23,6 +23,7 @@ import {
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeatKnown } from "@/lib/quire/seat";
 import { MapCombatHud } from "./map-combat-hud";
+import { MapInitiativePanel } from "./map-initiative-panel";
 import { MapConnectedTools, type EntranceDraft } from "./map-connected-tools";
 import {
   defaultLocationMap,
@@ -87,6 +88,7 @@ import {
   Maximize,
   House,
   Layers,
+  ScrollText,
   CircleDot,
   Paintbrush,
   SquareDashed,
@@ -199,7 +201,15 @@ const REVEAL_TOOLS = [
 ] as const;
 
 /** One group of All map settings (map controls PR 5). */
-function SettingsGroup({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+function SettingsGroup({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <section
       className="map-settings-group"
@@ -232,6 +242,26 @@ const MAP_SHORTCUTS: [string, string, boolean][] = [
   ["+ / − / Home", "Zoom in, zoom out, fit the map", false],
   ["Esc", "Close a panel, then return to Pan", false],
 ];
+
+/**
+ * The quest log's map stage plugs in here (map controls PR 7, docs/MAP-TILES.md "Quests slot").
+ * Until a caller passes it, no Quests tool, panel, shortcut or Layers switch is rendered.
+ * Everything in it must already be projected for the seat (`projectQuests`): hidden objectives,
+ * their pins and areas never reach players. The panel's only route change is "Open the quest log".
+ */
+export type MapQuestsSlot = {
+  /** Active quests with something on this map (the tool's badge); 0 shows no badge. */
+  count: number;
+  /** The Quests panel body: quests with places on this map, each with "Show on map". */
+  panel: ReactNode;
+  /** Layers › Quest markers / Quest areas switches (presentation only, per viewer). */
+  layers?: {
+    markers: boolean;
+    areas: boolean;
+    setMarkers: (on: boolean) => void;
+    setAreas: (on: boolean) => void;
+  };
+};
 
 export function CampaignMaps() {
   const seat = useSeat(),
@@ -1355,6 +1385,8 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                   }
                 : undefined
             }
+            // Quest log map stage: pass a MapQuestsSlot here (map controls PR 7).
+            quests={undefined}
             entryPick={
               entryPick && entryPick.target === map.id
                 ? {
@@ -1737,6 +1769,7 @@ function MapViewport({
   selectMap,
   setup,
   entryPick,
+  quests,
   parentMap,
   goParent,
   locationMaps,
@@ -1787,6 +1820,8 @@ function MapViewport({
     panel?: ReactNode;
     closePanel: () => void;
   };
+  /** Quest log map stage (reserved slot; absent until the quest stage lands). */
+  quests?: MapQuestsSlot;
   /** Picking an entrance's entry camera on this (destination) map. */
   entryPick?: {
     label: string;
@@ -1835,6 +1870,8 @@ function MapViewport({
     [deepLinkedCard, setDeepLinkedCard] = useState<MapRecordReference>(),
     [hereOpen, setHereOpen] = useState(false),
     [layersOpen, setLayersOpen] = useState(false),
+    [initiativeOpen, setInitiativeOpen] = useState(false),
+    [questsOpen, setQuestsOpen] = useState(false),
     [railMore, setRailMore] = useState(false);
   // Desktop and landscape phones: vertical tools rail; phones keep today's bottom hotbar.
   const layout = useMapLayout(),
@@ -2323,6 +2360,7 @@ function MapViewport({
       setDrawerOpen(false);
       setCombatOpen(false);
       setLayersOpen(false);
+      setInitiativeOpen(false);
       tools.hideInspector();
       setHereOpen(true);
     });
@@ -2337,17 +2375,39 @@ function MapViewport({
       setHereOpen(false);
       setCombatOpen(false);
       setMoreTools(false);
+      setInitiativeOpen(false);
       setLayersOpen(true);
     });
   };
-  const toggleCombat = () => {
-    if (combatOpen) {
-      if (allowContextChange(() => setCombatOpen(false))) setCombatOpen(false);
+  // Initiative (I): the turn-order panel. DMs always; players while combat is shown on this map.
+  const combatShownHere = recordTable.journal?.world?.tabletop?.presentation?.mapId === map.id;
+  const initiativeAvailable = useDm || combatShownHere;
+  const toggleQuests = () => {
+    if (!quests) return;
+    if (questsOpen) {
+      setQuestsOpen(false);
       return;
     }
-    setHereOpen(false);
-    setLayersOpen(false);
-    openCombat();
+    afterContextChange(() => {
+      setDrawerOpen(false);
+      setHereOpen(false);
+      setLayersOpen(false);
+      setInitiativeOpen(false);
+      setQuestsOpen(true);
+    });
+  };
+  const toggleInitiative = () => {
+    if (initiativeOpen) {
+      setInitiativeOpen(false);
+      return;
+    }
+    afterContextChange(() => {
+      setDrawerOpen(false);
+      setHereOpen(false);
+      setLayersOpen(false);
+      setCombatOpen(false);
+      setInitiativeOpen(true);
+    });
   };
   const setupPanelRef = useRef<HTMLElement>(null);
   const armSetup = (tool: SetupTool) => {
@@ -2496,7 +2556,8 @@ function MapViewport({
     else if (k === "j") openPlanner();
     else if (k === "e" && !placeBar) toggleHere();
     else if (k === "l") toggleLayers();
-    else if (k === "i" && useDm) toggleCombat();
+    else if (k === "i" && initiativeAvailable) toggleInitiative();
+    else if (k === "q" && quests) toggleQuests();
     else return false;
     return true;
   };
@@ -2568,6 +2629,8 @@ function MapViewport({
         if (drawerOpen) setDrawerOpen(false);
         else if (setupOpen) closeSetupPanel();
         else if (layersOpen) setLayersOpen(false);
+        else if (initiativeOpen) setInitiativeOpen(false);
+        else if (questsOpen) setQuestsOpen(false);
         else if (moreTools) setMoreTools(false);
         else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
           const closeAll = () => {
@@ -2722,16 +2785,30 @@ function MapViewport({
   const lowerGroups = (
     <>
       <MapToolGroup caption="Table">
-        {useDm && (
+        {initiativeAvailable && (
           <MapTool
             icon={<Swords size={19} />}
             label="Initiative"
             shortcut="I"
             keys="I"
-            badge={combatHere ? "●" : undefined}
+            badge={combatHere || (!useDm && combatShownHere) ? "●" : undefined}
             badgeLabel="Encounter on this map"
-            expanded={combatOpen}
-            onClick={toggleCombat}
+            expanded={initiativeOpen}
+            controls="map-initiative"
+            onClick={toggleInitiative}
+          />
+        )}
+        {quests && (
+          <MapTool
+            icon={<ScrollText size={19} />}
+            label="Quests"
+            shortcut="Q"
+            keys="Q"
+            badge={quests.count || undefined}
+            badgeLabel="active quests on this map"
+            expanded={questsOpen}
+            controls="map-quests"
+            onClick={toggleQuests}
           />
         )}
         {!placeBar && (
@@ -2799,6 +2876,8 @@ function MapViewport({
           if (drawerOpen) setDrawerOpen(false);
           else if (setupOpen) closeSetupPanel();
           else if (layersOpen) setLayersOpen(false);
+          else if (initiativeOpen) setInitiativeOpen(false);
+          else if (questsOpen) setQuestsOpen(false);
           else if (moreTools) setMoreTools(false);
           else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
             const closeAll = () => {
@@ -2958,6 +3037,26 @@ function MapViewport({
                 />
                 Show tool names (desktop)
               </label>
+              {quests?.layers && (
+                <>
+                  <label className="map-check-row">
+                    <input
+                      type="checkbox"
+                      checked={quests.layers.markers}
+                      onChange={(e) => quests.layers!.setMarkers(e.target.checked)}
+                    />
+                    Quest markers
+                  </label>
+                  <label className="map-check-row">
+                    <input
+                      type="checkbox"
+                      checked={quests.layers.areas}
+                      onChange={(e) => quests.layers!.setAreas(e.target.checked)}
+                    />
+                    Quest areas (circles)
+                  </label>
+                </>
+              )}
             </div>
             {filtersOpen && (
               <fieldset className="map-filters">
@@ -2993,14 +3092,19 @@ function MapViewport({
               Markers update through the shared campaign.
             </p>
             <dl className="map-shortcut-list">
-              {MAP_SHORTCUTS.filter(([, , dmOnly]) => useDm || !dmOnly).map(([keys, action]) => (
-                <div key={keys}>
-                  <dt>
-                    <kbd>{keys}</kbd>
-                  </dt>
-                  <dd>{action}</dd>
-                </div>
-              ))}
+              {[
+                ...MAP_SHORTCUTS,
+                ...(quests ? ([["Q", "Quests", false]] as [string, string, boolean][]) : []),
+              ]
+                .filter(([, , dmOnly]) => useDm || !dmOnly)
+                .map(([keys, action]) => (
+                  <div key={keys}>
+                    <dt>
+                      <kbd>{keys}</kbd>
+                    </dt>
+                    <dd>{action}</dd>
+                  </div>
+                ))}
             </dl>
           </SettingsGroup>
           {settingsQuery && (
@@ -3238,6 +3342,52 @@ function MapViewport({
               </div>
             </section>
           )}
+          {quests && questsOpen && !drawerOpen && (
+            <aside
+              id="map-quests"
+              className="map-side-panel map-quests-panel map-glass"
+              role="dialog"
+              aria-modal="false"
+              aria-labelledby="map-quests-heading"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setQuestsOpen(false);
+                  root.current?.focus();
+                }
+              }}
+            >
+              <div className="map-panel-heading">
+                <strong id="map-quests-heading">Quests</strong>
+                <button
+                  className="map-icon-button"
+                  aria-label="Close quests"
+                  onClick={() => {
+                    setQuestsOpen(false);
+                    root.current?.focus();
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              {quests.panel}
+            </aside>
+          )}
+          {initiativeOpen && !drawerOpen && !combatOpen && (
+            <MapInitiativePanel
+              map={map}
+              dm={useDm}
+              binding={useDm ? (recordTable.journal?.world?.combat ?? undefined) : undefined}
+              openControls={() => {
+                setInitiativeOpen(false);
+                openCombat();
+              }}
+              close={() => {
+                setInitiativeOpen(false);
+                root.current?.focus();
+              }}
+            />
+          )}
           {layersOpen && !drawerOpen && (
             <aside
               id="map-layers"
@@ -3285,6 +3435,27 @@ function MapViewport({
                 <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
                 <Button onClick={() => setVisible([])}>Hide all</Button>
               </fieldset>
+              {quests?.layers && (
+                <fieldset className="map-filters">
+                  <legend>Quests</legend>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={quests.layers.markers}
+                      onChange={(e) => quests.layers!.setMarkers(e.target.checked)}
+                    />
+                    Quest markers
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={quests.layers.areas}
+                      onChange={(e) => quests.layers!.setAreas(e.target.checked)}
+                    />
+                    Quest areas (circles)
+                  </label>
+                </fieldset>
+              )}
               <button
                 type="button"
                 className="settings-link map-settings-jump"

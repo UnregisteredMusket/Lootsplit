@@ -1297,6 +1297,78 @@ test("shared map tiles and travel placement preserve privacy, reject forged move
   await deleteRoom(host.code, final.revision);
 });
 
+test("initiative panel (map controls): a player reads only revealed order, round, turn and own HP, behind the HUD's gates", async () => {
+  const { mapCombatOrder, choosePace } = await import("./cloud.server.ts");
+  const { campaignMapSchema } = await import("./world-schema.ts");
+  const { readJournal } = await import("./journal.ts");
+  const battle = campaignMapSchema.parse({ id: "order-battle", name: "Order battle", image: "data:image/png;base64,YQ==", visible: true, locationId: null, anchors: [], markers: [],
+    grid: { columns: 10, rows: 10, feetPerTile: 5, diagonal: "equal", x: 0, y: 0, width: 1, height: 1 },
+    tokens: [{ id: "hero-token", label: "Hero", kind: "character", entityId: "order-hero", column: 0, row: 0, visibility: "party" },
+      { id: "ally-token", label: "Ally", kind: "character", entityId: "order-ally", column: 1, row: 0, visibility: "party" },
+      { id: "scout-token", label: "Known scout", kind: "creature", encounterId: "order-encounter", combatantId: "scout", column: 2, row: 0, visibility: "party" },
+      { id: "dragon-token", label: "Secret dragon", kind: "creature", encounterId: "order-encounter", combatantId: "dragon", column: 3, row: 0, visibility: "dm" }],
+  });
+  const table = { ...emptyCloudTable(), purses: [{ id: "order-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }, { id: "order-ally", name: "Ally", kind: "character" as const, coins: emptyCoins() }], journal: readJournal({ world: { maps: [battle] } }) };
+  const host = await openRoom({ name: "Order DM", table }), guest = await joinRoom({ code: host.code, purseId: "order-hero", name: "Order player" });
+  await choosePace({ ...host, live: true });
+  const binding = { id: "order-transition", encounterId: "order-encounter", encounterRevision: 0, mapId: battle.id, returnMapId: battle.id, returnCamera: { x: .5, y: .5, zoom: 1 }, mode: "theatre", phase: "active", scaleConfirmed: false, showPlayers: false };
+  await submitCommands({ ...host, batchId: "order-start", commands: [{ id: "order-activate", kind: "map-combat-transition", before: null, binding, beforeSession: null }] });
+  const body = { name: "Private fight", round: 2, activeId: "scout", notes: "Secret tactics",
+    combatants: [{ id: "dragon", name: "Ancient dragon", initiative: 22, hp: 300, maxHp: 300, conditions: "Invisible" },
+      { id: "order-hero", name: "Hero", initiative: 18, hp: 21, maxHp: 30, conditions: "Blessed" },
+      { id: "scout", name: "Black Gull scout", initiative: 15, hp: 3, maxHp: 16, notes: "Flees" },
+      { id: "order-ally", name: "Ally", initiative: 9, hp: 40, maxHp: 44 }] };
+  sql.exec("CREATE TABLE IF NOT EXISTS user(id TEXT PRIMARY KEY)");
+  sql.prepare("INSERT OR IGNORE INTO user(id) VALUES (?)").run("synthetic-owner");
+  sql.prepare("INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',1,1,1)").run("order-encounter", "synthetic-owner", host.code, JSON.stringify(body));
+  const auth = { code: host.code, token: guest.token, mapId: battle.id };
+  // Not shown to players yet: nothing.
+  assert.equal(await mapCombatOrder(auth), null);
+  await assert.rejects(mapCombatOrder({ ...auth, token: "not-a-seat" }), /not seated/);
+  // The DM shows combat to players on this scene (as the transition does with showPlayers).
+  const room = (await readRoom(host.code))!;
+  const world = room.table.journal!.world!;
+  world.combat = { ...world.combat!, showPlayers: true };
+  world.tabletop = { ...world.tabletop!, presentation: { id: binding.id, mapId: battle.id, mode: "theatre" } };
+  await updateRoom({ ...room, revision: room.revision + 1 }, room.revision);
+  const order = await mapCombatOrder(auth);
+  assert.deepEqual(order, {
+    mapId: battle.id,
+    status: "active",
+    round: 2,
+    entries: [
+      { tokenId: "hero-token", label: "Hero", initiative: 18, active: false, own: true, hp: 21, maxHp: 30 },
+      { tokenId: "scout-token", label: "Known scout", initiative: null, active: true, own: false },
+      { tokenId: "ally-token", label: "Ally", initiative: null, active: false, own: false },
+    ],
+  });
+  const text = JSON.stringify(order);
+  for (const secret of ["dragon", "Ancient", "300", "Invisible", "Blessed", "Black Gull", "Flees", "Private", "Secret", "40", "44"])
+    assert.ok(!text.includes(secret), `a player never reads "${secret}"`);
+  assert.equal(await mapCombatOrder({ ...auth, mapId: "other-map" }), null);
+  // Fog: a party-visible creature outside the seat's vision is never listed (nor its turn).
+  const { mapTabletopSchema } = await import("./tabletop-schema.ts");
+  const fogged = (await readRoom(host.code))!;
+  const foggedMap = fogged.table.journal!.world!.maps.find((m) => m.id === battle.id)!;
+  foggedMap.tabletop = mapTabletopSchema.parse({ fog: { enabled: true, base: "concealed", shapes: [] } });
+  await updateRoom({ ...fogged, revision: fogged.revision + 1 }, fogged.revision);
+  const foggedOrder = await mapCombatOrder(auth);
+  assert.ok(foggedOrder, "still shown to players under fog");
+  assert.ok(
+    !foggedOrder!.entries.some((e) => e.tokenId === "scout-token"),
+    "the fogged scout is not listed",
+  );
+  assert.ok(!JSON.stringify(foggedOrder).includes("scout"), "nothing names the fogged scout");
+  assert.ok(foggedOrder!.entries.every((e) => !e.active), "the fogged scout's turn is not revealed");
+  sql.prepare("UPDATE dm_encounters SET code=? WHERE id=?").run("FOREIGN", "order-encounter");
+  assert.equal(await mapCombatOrder(auth), null);
+  sql.prepare("UPDATE dm_encounters SET code=? WHERE id=?").run(host.code, "order-encounter");
+  const later = (await readRoom(host.code))!;
+  later.table.journal!.world!.tabletop!.presentation = null;
+  await updateRoom({ ...later, revision: later.revision + 1 }, later.revision);
+  assert.equal(await mapCombatOrder(auth), null);
+});
+
 test("connected combat presentation rechecks seats, campaign, fog and scene permission without leaking tracker data", async () => {
   const { mapCombatPresentation, choosePace } = await import("./cloud.server.ts");
   const { campaignMapSchema } = await import("./world-schema.ts");

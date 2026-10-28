@@ -131,8 +131,6 @@
 .gyou > span, .gother > span { min-width: 0; overflow-wrap: anywhere; }
 .gyou small { display: block; color: var(--color-muted); font-size: .82rem; }
 .gother { display: flex; align-items: center; gap: .6rem; padding: .55rem .8rem; border: 1px dashed var(--g); border-radius: 8px; font-size: .9rem; min-width: 0; }
-.gask { border: 1px solid var(--color-border); border-radius: 8px; padding: .5rem .8rem; }
-.gask summary { min-height: 44px; display: flex; align-items: center; font-family: var(--font-display); font-size: 1.1rem; cursor: pointer; }
 
 /* Map: group markers and the Here group switch (map.html). */
 .map-record-icon .map-group-badge { width: 1.6rem; height: 1.6rem; font-size: .85rem; }

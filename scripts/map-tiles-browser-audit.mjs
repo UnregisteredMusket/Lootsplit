@@ -16,8 +16,7 @@ import { blankEncounter, blankCombatant } from "../src/lib/encounters/model.mjs"
 import {
   openApplication,
   reloadApplication,
-  navigateApplication,
-} from "./title-screen-navigation.mjs";
+  navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 import { mapTilesPart, phaseNotice } from "./map-tiles-parts.mjs";
@@ -366,6 +365,7 @@ try {
     await guest.getByLabel("Choose your character", { exact: true }).selectOption("hero");
     await guest.getByPlaceholder("What should the party call you?").fill("Tile guest");
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
+    await afterJoining(guest);
     await expect(guest.locator(".room-code")).toBeVisible();
     await guest.waitForURL((u) => u.pathname === "/share" && !u.searchParams.has("join"));
     await navigateApplication(guest, origin + "/maps");

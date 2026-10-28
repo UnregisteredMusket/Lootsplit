@@ -2,6 +2,7 @@ import { SearchSelect } from "@/components/search-select";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button, Select, TextInput } from "./ui";
+import { Disclosure } from "./disclosure";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { catalogStockDraft } from "@/lib/quire/compose";
 import { CATEGORIES, RARITIES } from "@/lib/quire/labels";
@@ -207,8 +208,7 @@ export function CatalogStockPicker({ shop }: { shop: Shop }) {
   }
 
   return (
-    <details className="mt-4 rounded-lg border border-border p-4">
-      <summary className="min-h-11 cursor-pointer font-display text-xl">Add from catalog</summary>
+    <Disclosure variant="section" summary="Add from catalog">
       <p className="mt-2 text-sm text-muted">
         Select exact items or add every matching item. New prices use this shop’s wealth and
         economic settings. Existing items are kept with their current prices and quantities.
@@ -344,6 +344,6 @@ export function CatalogStockPicker({ shop }: { shop: Shop }) {
             : `Add ${chosen.length} selected ${chosen.length === 1 ? "item" : "items"}`}
         </Button>
       </fieldset>
-    </details>
+    </Disclosure>
   );
 }

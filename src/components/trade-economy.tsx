@@ -29,7 +29,7 @@ import { readMarketLocations, locationLabel } from "@/lib/quire/shop-locations";
 import { SEASON_NAMES, clampRealm } from "@/lib/quire/scale";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import { CommandForm, CommandButton } from "./world-tools";
-import { CoinAmountInput } from "./finance-input";
+import { CoinAmountInput, CopperField } from "./finance-input";
 import { AppLink } from "./app-link";
 import { TradeSeasonReview } from "./trade-season-review";
 import { tradeReversalGuidance } from "@/lib/quire/ledger-reversal";
@@ -969,22 +969,27 @@ function ExchangeEditor({
                         ["askCopper", "Ask price (cp)"],
                         ["bidCopper", "Bid price (cp)"],
                       ] as const
-                    ).map(([key, label]) => (
-                      <NumberField
-                        key={key}
-                        label={`${c.name}: ${label}`}
-                        value={offer[key]}
-                        min={key === "supply" || key === "demand" || key === "askCopper" ? 1 : 0}
-                        max={
-                          key === "supply" || key === "demand"
-                            ? 1000
-                            : key.endsWith("Copper")
-                              ? 1e12
-                              : 1e9
-                        }
-                        set={(n) => update({ [key]: n })}
-                      />
-                    ))}
+                    ).map(([key, label]) =>
+                      key === "askCopper" || key === "bidCopper" ? (
+                        <CopperField
+                          key={key}
+                          label={`${c.name}: ${label}`}
+                          value={offer[key]}
+                          min={key === "askCopper" ? 1 : 0}
+                          max={1e12}
+                          set={(n) => update({ [key]: n })}
+                        />
+                      ) : (
+                        <NumberField
+                          key={key}
+                          label={`${c.name}: ${label}`}
+                          value={offer[key]}
+                          min={key === "supply" || key === "demand" ? 1 : 0}
+                          max={key === "supply" || key === "demand" ? 1000 : 1e9}
+                          set={(n) => update({ [key]: n })}
+                        />
+                      ),
+                    )}
                   </div>
                   <Tick
                     label={`${c.name}: lock prices in Automatic Mode`}

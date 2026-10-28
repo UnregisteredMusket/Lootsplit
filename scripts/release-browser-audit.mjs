@@ -1,4 +1,4 @@
-import { openApplication } from "./title-screen-navigation.mjs";
+import { openApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -44,9 +44,9 @@ async function open(width = 390) {
   await skip.waitFor();
   await skip.click();
   await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
-  await page.getByRole("heading", { name: "Campaign control", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   await page.waitForTimeout(2000); // Initial Vite dependency optimization can reload once.
-  await page.getByRole("heading", { name: "Campaign control", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Desk", exact: true, level: 1 }).waitFor();
   if (await skip.isVisible()) await skip.click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   return page;
@@ -91,6 +91,7 @@ try {
   await player.getByRole("button", { name: "Find characters", exact: true }).click();
   await player.getByPlaceholder("What should the party call you?").fill("Audit player");
   await player.getByRole("button", { name: "Join room", exact: true }).click();
+  await afterJoining(player);
   await player.getByRole("button", { name: "Share join link", exact: true }).waitFor();
   console.log("Audit: player joined; test conflicting invitation");
   await visit(player, origin + "/share?join=TEST1234");

@@ -1,3 +1,4 @@
+import { SavedTick, useSavedTick } from "@/components/saved-tick";
 import { CharacterPlacement } from "@/components/character-placement";
 import { inParty } from "@/lib/quire/character-position";
 import { CharacterPermissionsSheet } from "@/components/character-permissions";
@@ -28,6 +29,7 @@ import { characterControl, type Purse } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
 import { CharacterSheetPanel } from "@/components/character-sheet";
 import { Button, Checkbox, Field, Modal, Segmented, TextInput } from "@/components/ui";
+import { Disclosure } from "@/components/disclosure";
 import { RemoveButton } from "@/components/quire-ui";
 import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
@@ -433,8 +435,7 @@ function PartyPage() {
                 <AppLink href="/share">Open your campaign to choose a character →</AppLink>
               </p>
             )}
-            <details className="inventory-management" open={seat.role === "dm" || undefined}>
-              <summary>Wallets, transfers & property</summary>
+            <Disclosure variant="section" className="inventory-management" open={seat.role === "dm" || undefined} summary="Wallets, transfers & property">
               <h2 className="mt-5 text-sm font-medium text-muted">Members · {visible.length}</h2>
               <ul className="mt-1 divide-y divide-border border-y border-border">
                 {visible.map((purse) => {
@@ -574,7 +575,7 @@ function PartyPage() {
                 </Button>
               </div>
               ) : null}
-            </details>
+            </Disclosure>
             <Modal
               open={action !== ""}
               onOpenChange={(open) => {
@@ -673,6 +674,7 @@ function PurseStrip({
 
 function PurseCard({ purse }: { purse: Purse }) {
   const { updatePurse, setPurseCoins, deletePurse } = useEconomy();
+  const nameSaved = useSavedTick();
   const seat = useSeat();
   const cloud = getCloudTable();
   const readOnly = seat.role === "player" || (cloud.joined && !cloud.mine);
@@ -705,10 +707,11 @@ function PurseCard({ purse }: { purse: Purse }) {
           key={purse.name}
           onBlur={(event) => {
             const name = event.target.value.trim();
-            if (name && name !== purse.name) void updatePurse({ ...purse, name });
+            if (name && name !== purse.name) nameSaved.track(updatePurse({ ...purse, name }));
           }}
           className="font-display text-2xl"
         />
+        <SavedTick saved={nameSaved.saved} label="Name saved" />
         <p className="mt-1 text-sm text-muted">
           {purse.kind === "party"
             ? "Party account"

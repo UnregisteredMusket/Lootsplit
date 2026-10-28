@@ -28,6 +28,7 @@ import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { AppLink } from "@/components/app-link";
 import { Button, Fold, Modal } from "@/components/ui";
+import { Disclosure } from "@/components/disclosure";
 import type { ShopCategory } from "@/lib/quire/types";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 
@@ -408,8 +409,7 @@ function MarketPage() {
             onChange={(e) => setRestockQuantity(e.target.value)}
           />
         </label>
-        <details open>
-          <summary>Manual add-units preview</summary>
+        <Disclosure variant="inline" open summary="Manual add-units preview">
           {stock
             .filter((s) => s.shopId === restockId)
             .map((s) => (
@@ -420,7 +420,7 @@ function MarketPage() {
                   : `${s.quantity} → ${s.quantity + (Number.isSafeInteger(addedUnits) && addedUnits >= 1 ? addedUnits : 0)}`}
               </p>
             ))}
-        </details>
+        </Disclosure>
         {restockError && <p role="alert">{restockError}</p>}
         <Button
           disabled={

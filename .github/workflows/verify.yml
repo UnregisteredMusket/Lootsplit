@@ -252,24 +252,39 @@ jobs:
       - name: dev-loot-claims
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-loot-claims 300 node scripts/loot-claims-browser-audit.mjs
+      - name: dev-undo-toasts
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-undo-toasts 240 node scripts/undo-toasts-browser-audit.mjs
       - name: dev-loot-fairness
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-loot-fairness 300 node scripts/loot-fairness-browser-audit.mjs
       - name: dev-party-inventory
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-party-inventory 300 node --experimental-strip-types scripts/party-inventory-browser-audit.mjs
+      - name: dev-tracker-time
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-tracker-time 240 node scripts/tracker-time-browser-audit.mjs
       - name: dev-themed-confirm
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-themed-confirm 180 node scripts/themed-confirm-browser-audit.mjs
+      - name: dev-dm-mobile
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-dm-mobile 240 node scripts/dm-mobile-browser-audit.mjs
       - name: dev-review-inbox
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-review-inbox 300 node scripts/review-inbox-browser-audit.mjs
+      - name: dev-duplicate-filters
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-duplicate-filters 240 node scripts/duplicate-filters-browser-audit.mjs
       - name: dev-command-palette
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-command-palette 240 node scripts/command-palette-browser-audit.mjs
       - name: dev-finance
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs
+      - name: dev-landscape
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-landscape 240 node scripts/landscape-browser-audit.mjs
       - name: dev-shop-stock
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-shop-stock 240 node scripts/shop-stock-browser-audit.mjs
@@ -342,6 +357,9 @@ jobs:
       - name: dev-journey-planner
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-journey-planner 240 node scripts/journey-planner-browser-audit.mjs
+      - name: dev-player-onboarding
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-player-onboarding 240 node scripts/player-onboarding-browser-audit.mjs
       - name: Summarize measured verification stages
         if: always()
         run: node scripts/verification-timing.mjs

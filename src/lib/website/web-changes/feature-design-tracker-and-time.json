@@ -1,0 +1,9 @@
+{
+  "title": "Encounter tracker on phones, and quick Session Time choices",
+  "summary": "The encounter tracker keeps the turn controls in reach on a phone and shows who is on which side at a glance; Session Time offers one-tap hour choices.",
+  "items": [
+    "A bar at the bottom of the tracker stays in reach while you scroll: ◀ Prev, the round and whose turn it is, and Next turn ▶.",
+    "Each combatant shows its side with a coloured edge and a mark: ◆ ally, ✕ enemy. The tracker's instructions now sit behind a ? button.",
+    "Session Time has +1 h, +4 h, Long rest · 8 h and Next morning. They fill the form; you still review the preview and approve."
+  ]
+}

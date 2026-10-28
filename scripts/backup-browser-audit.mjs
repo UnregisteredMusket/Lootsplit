@@ -510,7 +510,7 @@ try {
   await page.waitForURL((url) => url.pathname === "/features/downtime");
   // Router history can update while the outgoing overview still has #sessions.
   // Wait for the actual destination before opening or approving its session form.
-  await page.getByRole("heading", { name: "Downtime", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Time & downtime", exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.sessionDraftDocument), "same-document");
   assert.equal(await page.locator(".loot-opening").count(), 0);
   await showSessions();

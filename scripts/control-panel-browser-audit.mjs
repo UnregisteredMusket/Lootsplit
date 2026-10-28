@@ -228,7 +228,7 @@ try {
   await page.evaluate(() => {
     window.unifiedHomeMarker = "same-document";
   });
-  await expect(page.getByRole("heading", { name: "Campaign control", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toHaveCount(1);
   await expect(page.locator(".feature-cards")).toHaveCount(1);
   await expect(page.locator(".desk-shortcuts")).toHaveCount(0);
   assert.equal(await page.locator(".desk-overview").count(), 0);

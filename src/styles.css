@@ -44,6 +44,27 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+
+  /*
+   * Breakpoints (design tokens). In this file write @media (max-width: theme(--bp-phone));
+   * Tailwind resolves theme() in dev and build. Component CSS files repeat the px value.
+   * scripts/design-tokens.mjs fails a change that adds another breakpoint or a raw hex colour.
+   */
+  --bp-phone: 430px;
+  --bp-tablet: 650px;
+  --bp-tablet-up: 651px;
+  --bp-wide-down: 1023.98px;
+  --bp-wide: 1024px;
+  /* Phone landscape: @media (orientation: landscape) and (max-height: theme(--bp-landscape-height)) */
+  --bp-landscape-height: 500px;
+
+  /* Type scale: 12 / 14 / 16 / 20 / 24 / 32 px (text-caption … text-display, or var(--text-*)). */
+  --text-caption: 0.75rem;
+  --text-small: 0.875rem;
+  --text-body: 1rem;
+  --text-heading: 1.25rem;
+  --text-title: 1.5rem;
+  --text-display: 2rem;
 }
 
 :root {
@@ -279,7 +300,7 @@
 .member-detail > section { border: 0; padding-top: 0; }
 input,select,textarea { max-width: 100%; }
 .modal-pop { padding-bottom: max(1.5rem,env(safe-area-inset-bottom)); }
-@media (max-width: 639px) {
+@media (max-width: theme(--bp-tablet)) {
  .wealth-card { padding: 1.25rem; }
  .stat-card { padding: 1rem; }
  .stat-card p.mt-4 { margin-top: .65rem; }
@@ -288,7 +309,7 @@ input,select,textarea { max-width: 100%; }
  .section-heading > span { font-size: .75rem; }
 }
 
-@media (max-width: 639px) { .dashboard-top .stat-card:nth-child(n+3) { display: none; } }
+@media (max-width: theme(--bp-tablet)) { .dashboard-top .stat-card:nth-child(n+3) { display: none; } }
 
 /* Classic Ledger: a single, legible home for shared adventures. */
 .multiplayer-heading { text-align: center; margin-bottom: 1rem; }
@@ -322,6 +343,11 @@ input,select,textarea { max-width: 100%; }
 .chat-bubble { max-width: 88%; min-width: 7rem; border: 1px solid var(--color-border); border-radius: .8rem .8rem .8rem .15rem; padding: .75rem .9rem; background: var(--color-elevated); overflow-wrap: anywhere; }
 .own .chat-bubble { border-color: color-mix(in srgb,var(--color-lead) 45%,transparent); border-radius: .8rem .8rem .15rem .8rem; background: color-mix(in srgb,var(--color-lead) 13%,var(--color-bg)); }
 .chat-author { margin-bottom: .3rem; font-size: .75rem; font-weight: 600; color: var(--color-lead); }.chat-time { margin-top: .4rem; font-size: .72rem; color: var(--color-muted); }.chat-composer { padding: .85rem; border-top: 1px solid var(--color-border); background: var(--color-bg); }
+/* "Saved" tick beside a field that saves on blur (design D9). */
+.saved-tick { display: inline-flex; align-items: center; gap: .25rem; min-height: 1.25rem; font-size: .8rem; color: var(--color-positive); }
+.saved-tick:empty { min-height: 0; }
+/* Toast actions (Undo, View receipt) stay usable while a modal dialog keeps the page inert. */
+[data-sonner-toast] { pointer-events: auto; }
 .chat-nav-badge { position: absolute; top: -.65rem; left: .65rem; min-width: 1rem; height: 1rem; padding: 0 .2rem; display: grid; place-items: center; border-radius: 1rem; background: var(--color-lead); color: var(--color-bg); font-size: .6rem; font-weight: 700; line-height: 1; }
 
 /* Illustrated ledger. Artwork is decorative; all data and controls remain HTML. */
@@ -487,7 +513,7 @@ input,select,textarea { max-width: 100%; }
 .encounter-rolls li { display:flex; justify-content:space-between; gap:1rem; padding:.9rem 0; border-top:1px solid var(--sheet-line); }
 .encounter-rolls span { display:block; font-size:.8rem; margin-top:.35rem; }
 @media(max-width:800px) { .encounter-layout { grid-template-columns:minmax(0,1fr); } .encounter-library { max-height:240px; overflow:auto; } .encounter-panel { padding:.9rem; } }
-@media(max-width:430px) { .encounter-vitals { grid-template-columns:repeat(2,minmax(0,1fr)); } .encounter-coins { grid-template-columns:repeat(3,minmax(0,1fr)); } .encounter-grid { grid-template-columns:minmax(0,1fr); } .encounter-index-row { flex-wrap:wrap; } }
+@media (max-width: theme(--bp-phone)) { .encounter-vitals { grid-template-columns:repeat(2,minmax(0,1fr)); } .encounter-coins { grid-template-columns:repeat(3,minmax(0,1fr)); } .encounter-grid { grid-template-columns:minmax(0,1fr); } .encounter-index-row { flex-wrap:wrap; } }
 .encounter-workspace .encounter-library-row { display:grid; }
 
 /* Approved mobile control panel: shared tokens preserve custom/light themes. */
@@ -625,6 +651,73 @@ input,select,textarea { max-width: 100%; }
   width: 28px;
   height: 2px;
   background: var(--color-lead);
+}
+/* Phone landscape (design M2): the six tabs become a 56 px icon rail on the left (names stay
+   as accessible labels) and the header slides away while scrolling down (shell.tsx). The map
+   keeps its own rails and hides this chrome (.maps-shell). */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px) {
+  .loot-shell .loot-tabbar {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    width: calc(56px + env(safe-area-inset-left));
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+    border-top: 0;
+    border-right: 1px solid color-mix(in srgb, var(--color-lead) 30%, transparent);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .loot-shell .loot-tabbar > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100%;
+    max-width: none;
+  }
+  .concept-shell .loot-tabbar .loot-nav-tab {
+    flex: 1 1 0;
+    width: 56px;
+    min-height: 48px;
+    max-height: 72px;
+    padding: 0;
+  }
+  .loot-tabbar .loot-nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .concept-shell .loot-tabbar .loot-nav-tab::before,
+  .concept-shell .loot-tabbar .loot-nav-tab[aria-current="page"]::before {
+    top: 50%;
+    left: 0;
+    width: 3px;
+    height: 28px;
+    transform: translateY(-50%);
+    border-radius: 0 2px 2px 0;
+  }
+  .concept-shell .loot-tabbar .loot-nav-tab[aria-current="page"]::after {
+    display: none;
+  }
+  .loot-shell:not(.maps-shell) .app-column {
+    padding-left: calc(56px + env(safe-area-inset-left));
+  }
+  .loot-shell .loot-header {
+    transition: transform 0.2s var(--ease-smooth-out, ease-out);
+  }
+  .loot-shell .loot-header[data-scrolled-away] {
+    transform: translateY(-100%);
+  }
+  .loot-shell:not(.maps-shell) .concept-main {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+}
+@media (orientation: landscape) and (max-height: 500px) and (prefers-reduced-motion: reduce) {
+  .loot-shell .loot-header {
+    transition: none;
+  }
 }
 .concept-shell button.bg-lead,
 .gold-link {
@@ -1244,7 +1337,7 @@ input,select,textarea { max-width: 100%; }
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
-@media (max-width: 430px) {
+@media (max-width: theme(--bp-phone)) {
   .concept-shell > div > div > header > div:first-child {
     gap: 0.45rem;
     padding: 0.55rem 0.75rem;
@@ -1474,6 +1567,33 @@ input,select,textarea { max-width: 100%; }
 .combat-summary::-webkit-details-marker {
   display: none;
 }
+/* Session Time quick chips (design Q6). */
+.time-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: .25rem 0 .75rem; }
+.time-chip { min-height: 44px; padding: 0 .9rem; border: 1px solid color-mix(in srgb, var(--color-lead) 45%, transparent); border-radius: 999px; font-size: .9rem; }
+.time-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--color-lead) 18%, transparent); border-color: var(--color-lead); }
+/* Encounter tracker (design D10): side stripe + glyph, help behind "?", sticky turn bar. */
+.concept-shell .encounter-combatant.side-ally { border-left: 4px solid var(--color-positive); }
+.concept-shell .encounter-combatant.side-enemy { border-left: 4px solid var(--color-negative); }
+.combat-side { flex: none; width: 1.25rem; text-align: center; font-size: 1rem; line-height: 1; }
+.side-ally .combat-side { color: var(--color-positive); }
+.side-enemy .combat-side { color: var(--color-negative); }
+.encounter-help-toggle { min-width: 44px; min-height: 44px; justify-content: center; margin-left: auto; border: 1px solid var(--sheet-line); border-radius: 999px; font-weight: 700; }
+.encounter-turn-bar { position: sticky; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 5; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: .5rem; margin-top: 1rem; padding: .5rem; border: 1px solid var(--color-lead); border-radius: .9rem; background: color-mix(in srgb, var(--color-elevated) 94%, transparent); backdrop-filter: blur(6px); box-shadow: 0 8px 24px #0006; }
+.encounter-turn-bar button { min-height: 48px; justify-content: center; }
+.encounter-turn-bar button:last-child { background: var(--color-lead); color: var(--color-bg); border-radius: .6rem; font-weight: 600; }
+.encounter-turn-round { display: flex; flex-direction: column; align-items: center; font-family: var(--font-display); font-size: 1.05rem; white-space: nowrap; }
+.encounter-turn-round small { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-sans); font-size: .75rem; color: var(--color-muted); }
+@media (max-width: 1023.98px) {
+  .encounter-turn-bar { bottom: calc(74px + env(safe-area-inset-bottom)); }
+}
+/* With the phone-landscape side rail (.loot-tabbar), nothing sits under the bar. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px) {
+  .loot-shell:has(nav.loot-tabbar) .encounter-turn-bar { bottom: calc(8px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 360px) {
+  .encounter-turn-bar { gap: .25rem; padding: .35rem; }
+  .encounter-turn-bar button { padding-inline: .4rem; font-size: .85rem; }
+}
 .initiative-number {
   font-size: 1.3rem;
   font-family: var(--font-display);
@@ -1616,18 +1736,6 @@ input,select,textarea { max-width: 100%; }
 .concept-shell {
   font-family: var(--font-sans);
 }
-.inventory-management {
-  margin-top: 1.25rem;
-  border: 1px solid var(--edge);
-  border-radius: 8px;
-  padding: 0.1rem 0.8rem 0.8rem;
-}
-.inventory-management > summary {
-  padding: 0.7rem 0;
-  font-size: 1rem;
-  color: var(--color-lead);
-  cursor: pointer;
-}
 .inventory-empty {
   margin: 1rem 0;
   color: var(--color-muted);
@@ -1673,7 +1781,7 @@ input,select,textarea { max-width: 100%; }
 .campaign-support {
   display: contents;
 }
-@media (min-width: 1024px) {
+@media (min-width: theme(--bp-wide)) {
   .concept-shell .concept-main {
     max-width: none;
     padding: 1.5rem clamp(1.5rem, 2.2vw, 3rem) 3rem;
@@ -2054,7 +2162,7 @@ input,select,textarea { max-width: 100%; }
   border-color: var(--fantasy-metal);
   box-shadow: inset 0 2px 0 #e1bd7833, inset 0 -2px 0 #00000020;
 }
-:root[data-fantasy-theme]:not([data-fantasy-theme=""]) :is(.readout,.shortcut-button,.loot-fold,.modal-pop) {
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) :is(.readout,.shortcut-button,.loot-fold,.disclosure-section,.modal-pop) {
   border-color: var(--fantasy-metal);
   border-radius: 3px;
   background-image: linear-gradient(120deg, var(--color-elevated), var(--color-bg));
@@ -2141,7 +2249,7 @@ input,select,textarea { max-width: 100%; }
   .concept-shell .submenu-workspace[data-submenu-scene] .concept-main { width: calc(100% - 1rem); }
   .submenu-scenery img { object-position: center 35%; }
 }
-@media (min-width: 1024px) {
+@media (min-width: theme(--bp-wide)) {
   .concept-shell .submenu-workspace[data-submenu-scene] .concept-main {
     width: 100%;
     border-inline: 0;
@@ -2262,7 +2370,7 @@ input,select,textarea { max-width: 100%; }
   font-size: 0.8rem;
   margin-top: 2rem;
 }
-@media (max-width: 640px) {
+@media (max-width: theme(--bp-tablet)) {
   .journal-spread {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2298,7 +2406,7 @@ input,select,textarea { max-width: 100%; }
 .feature-screen input:not([type=checkbox]), .feature-screen textarea, .feature-screen select { max-width: 100%; }
 .feature-screen .review-inbox { margin-block: 1rem; }
 .feature-desktop-links { display: none; }
-@media(min-width:1024px) { .feature-desktop-links { display: flex; flex-wrap: wrap; gap: .35rem; } .feature-desktop-links .journal-entry { padding: .25rem; margin:0; } }
+@media (min-width: theme(--bp-wide)) { .feature-desktop-links { display: flex; flex-wrap: wrap; gap: .35rem; } .feature-desktop-links .journal-entry { padding: .25rem; margin:0; } }
 
 /* The unified DM home keeps detailed campaign tools below the compact controls. */
 .dm-campaign-details {
@@ -3917,6 +4025,14 @@ input,select,textarea { max-width: 100%; }
 .map-shortcut-list dd { margin:0; font-size:13px; }
 .map-settings-jump { display:inline-block; margin:0 0 6px; font-size:12.5px; }
 
+/* Initiative panel (map controls PR 6). */
+.map-initiative-round { margin:0 0 8px; }
+.map-initiative-list { list-style:none; margin:0 0 10px; padding:0; display:grid; gap:2px; }
+.map-initiative-list li { display:grid; grid-template-columns:32px 1fr auto; gap:8px; align-items:center; min-height:40px; padding:4px 8px; border-radius:10px; }
+.map-initiative-list li[aria-current="true"] { background:color-mix(in srgb,var(--color-accent) 22%,transparent); outline:1px solid var(--color-accent); font-weight:600; }
+.map-initiative-score { font-variant-numeric:tabular-nums; color:var(--color-muted); text-align:right; }
+.map-initiative-hp { font-size:12px; font-variant-numeric:tabular-nums; }
+
 /* Split view: two screens in one window (desktop web and tablet landscape, >=1024px).
    Uses theme tokens only, so Adventurer's Ledger, Ironbound Dragon and custom colors apply. */
 .split-passthrough { display: contents; }
@@ -4009,7 +4125,7 @@ input,select,textarea { max-width: 100%; }
 }
 /* Split controls exist only from 1024px; hide them in the same frame a window narrows,
    before React re-renders on the media change, so narrow layouts never overflow. */
-@media (max-width: 1023.98px) { .split-open-beside, .split-layout-toggle { display: none !important; } }
+@media (max-width: theme(--bp-wide-down)) { .split-open-beside, .split-layout-toggle { display: none !important; } }
 
 /* NPC conversation (docs/NPC-BARTER.md): portrait stage, transcript, numbered replies. */
 .npc-talk { display:grid; grid-template-columns:minmax(150px,200px) minmax(0,1fr); min-width:0; margin:1rem 0; border:1px solid var(--color-lead); border-radius:12px; overflow:hidden; background:color-mix(in srgb,var(--color-bg) 85%,var(--color-elevated)); box-shadow:inset 0 0 0 4px var(--color-bg),inset 0 0 0 5px color-mix(in srgb,var(--color-lead) 25%,transparent); }
@@ -4238,7 +4354,7 @@ input,select,textarea { max-width: 100%; }
 .coin-split-lines li small { grid-column: 1 / -1; margin: 0; }
 .coin-split-lines li.is-remainder { font-style: italic; }
 .coin-split-session { margin: .35rem 0 0; font-size: .875rem; }
-@media (max-width: 430px) {
+@media (max-width: theme(--bp-phone)) {
   .coin-split-lines { margin-left: .5rem; }
   .coin-split-entry > summary { grid-template-columns: auto minmax(0, 1fr); }
   .coin-split-total { grid-column: 2; text-align: left; }
@@ -4256,12 +4372,12 @@ input,select,textarea { max-width: 100%; }
 .loot-pool { min-width: 0; }
 .loot-pool-summary { display: grid; gap: .25rem 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: .75rem; font-size: .875rem; }
 .loot-pool-summary > span > span { display: block; font-size: .75rem; color: var(--color-faint); }
-@media (max-width: 430px) { .loot-pool-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: theme(--bp-phone)) { .loot-pool-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .loot-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .9rem; }
 .loot-chip { min-height: 36px; padding: 0 .75rem; border: 1px solid var(--color-border); border-radius: 999px; background: transparent; color: var(--color-muted); font-size: .82rem; font-weight: 600; }
 .loot-chip[aria-pressed="true"] { background: var(--color-lead); border-color: var(--color-lead); color: var(--color-bg); }
 .loot-lots { display: grid; gap: .85rem; margin-top: 1rem; }
-@media (min-width: 1024px) { .loot-lots.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+@media (min-width: theme(--bp-wide)) { .loot-lots.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
 .loot-lot { position: relative; padding: .9rem 1rem 1rem; border: 1px solid var(--fantasy-metal, var(--color-border)); border-radius: 3px; min-width: 0; overflow-wrap: anywhere;
   background-image: linear-gradient(120deg, var(--color-elevated), var(--color-bg));
   box-shadow: inset 0 0 0 2px var(--color-bg), inset 0 0 0 3px var(--fantasy-inner, var(--color-border)), 0 2px 3px #00000018; }
@@ -4274,7 +4390,7 @@ input,select,textarea { max-width: 100%; }
 .loot-lot-meta { display: block; font-size: .78rem; color: var(--color-muted); margin-top: .1rem; }
 .loot-lot-value { text-align: right; font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .loot-lot-value small { display: block; color: var(--color-muted); font-size: .72rem; }
-@media (max-width: 430px) { .loot-lot-head { grid-template-columns: auto minmax(0, 1fr); } .loot-lot-value { grid-column: 2; text-align: left; } .loot-lot { padding: .8rem; } }
+@media (max-width: theme(--bp-phone)) { .loot-lot-head { grid-template-columns: auto minmax(0, 1fr); } .loot-lot-value { grid-column: 2; text-align: left; } .loot-lot { padding: .8rem; } }
 .loot-lot-notes { margin: .55rem 0 0; font-size: .85rem; color: var(--color-muted); font-style: italic; }
 .loot-status { display: inline-flex; align-items: center; gap: .3rem; margin-top: .6rem; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--color-lead); }
 .loot-claim-for { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .3rem .75rem; margin-top: .8rem; font-size: .85rem; }
@@ -4335,7 +4451,7 @@ input,select,textarea { max-width: 100%; }
 .loot-pool-fold > summary::-webkit-details-marker { display: none; }
 .loot-pool-fold > summary span + span { font-weight: 400; font-size: .85rem; color: var(--color-muted); }
 .loot-pool-fold > .loot-pool-fold-body { border-top: 1px solid var(--color-border); padding: .75rem 1rem 1rem; display: grid; gap: .75rem; min-width: 0; }
-@media (max-width: 430px) { .loot-pool-fold > .loot-pool-fold-body { padding: .6rem .7rem .8rem; } .loot-pool-fold > summary { padding: 0 .75rem; } }
+@media (max-width: theme(--bp-phone)) { .loot-pool-fold > .loot-pool-fold-body { padding: .6rem .7rem .8rem; } .loot-pool-fold > summary { padding: 0 .75rem; } }
 .loot-fieldset { border: 1px solid var(--color-border); border-radius: 8px; padding: .5rem .75rem .65rem; min-width: 0; }
 .loot-fieldset > legend { padding: 0 .3rem; font-weight: 600; font-size: .9rem; }
 .loot-pool-preview { border-left: 3px solid var(--color-lead); padding-left: .6rem; }
@@ -4600,8 +4716,8 @@ input,select,textarea { max-width: 100%; }
 .quest-screen { display: grid; gap: 1rem; max-width: 72rem; }
 .quest-toolbar { display: flex; justify-content: flex-end; }
 .quest-columns { display: grid; gap: 1.25rem; }
-@media (min-width: 1024px) { .quest-screen.dm .quest-columns { grid-template-columns: minmax(18rem, 2fr) minmax(0, 3fr); align-items: start; } .quest-back.quest-phone-only { display: none; } }
-@media (max-width: 1023px) { .quest-list-column.quest-hide-phone { display: none; } }
+@media (min-width: theme(--bp-wide)) { .quest-screen.dm .quest-columns { grid-template-columns: minmax(18rem, 2fr) minmax(0, 3fr); align-items: start; } .quest-back.quest-phone-only { display: none; } }
+@media (max-width: theme(--bp-wide-down)) { .quest-list-column.quest-hide-phone { display: none; } }
 .quest-list-column, .quest-detail-column { display: grid; gap: .75rem; min-width: 0; }
 .quest-tabs { display: flex; flex-wrap: wrap; gap: .5rem; }
 .quest-tabs button { min-height: 44px; padding: .35rem 1rem; border: 1px solid var(--color-border); border-radius: 999px; font-weight: 600; }
@@ -4701,6 +4817,17 @@ button.quest-chip { min-height: 44px; }
 .loot-claims-none[open] > summary { margin-bottom: .35rem; }
 .loot-pass-all { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
 
+/* After joining a room: three first steps on player Home (plan P3, Q16). */
+.join-tips { border: 1px solid color-mix(in srgb, var(--color-lead) 45%, transparent); border-radius: .75rem; padding: .75rem 1rem; margin: .75rem 0; }
+.join-tips-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.join-tips-heading h2 { font-size: 1.15rem; margin: 0; }
+.join-tips ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: .25rem 0 0; padding: 0; list-style: none; counter-reset: tip; }
+.join-tips li { counter-increment: tip; display: grid; gap: .1rem; min-width: 0; }
+.join-tips li a { font-weight: 600; min-height: 2.75rem; display: inline-flex; align-items: center; }
+.join-tips li a::before { content: counter(tip) "."; margin-right: .35rem; color: var(--color-muted); }
+.join-tips li span { font-size: .875rem; color: var(--color-muted); overflow-wrap: anywhere; }
+@media (max-width: 639px) { .join-tips li span { display: none; } .join-tips li a { line-height: 1.2; } }
+.room-mode-readout { font-weight: 600; }
 /* Inline links padded to a 24 px target (WCAG 2.5.8) without changing how they wrap. */
 .tap-link { display: inline-block; min-width: 1.5rem; min-height: 1.5rem; padding-block: .125rem; }
 

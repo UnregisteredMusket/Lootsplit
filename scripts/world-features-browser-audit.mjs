@@ -14,8 +14,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import {
   openApplication,
   reloadApplication,
-  navigateApplication,
-} from "./title-screen-navigation.mjs";
+  navigateApplication, afterJoining } from "./title-screen-navigation.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 import { FANTASY_LOOKS, themeVars } from "../src/lib/quire/theme.ts";
 import { answerThemedDialog } from "./themed-dialogs.mjs";
@@ -623,6 +622,10 @@ try {
     );
     await page.getByLabel("Second side coins (copper)", { exact: true }).fill("50");
     await page.getByRole("button", { name: "Send counteroffer", exact: true }).click();
+    // Accept only once the counteroffer's new revision is on screen: on a slower packaged Worker an
+    // earlier click carried the previous revision and was refused as "already decided".
+    await expect(page.getByText(/revision 2/)).toBeVisible();
+    await expect(page.getByText("5 sp offered", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Accept barter", exact: true }).click();
     await expect(page.getByText("No pending barter offers.", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Trade history", exact: true }).click();
@@ -853,6 +856,7 @@ try {
     await guest.getByRole("button", { name: "Find characters", exact: true }).click();
     await guest.getByPlaceholder("What should the party call you?").fill("Map guest");
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
+    await afterJoining(guest);
     await expect(guest.locator(".room-code")).toBeVisible();
     await navigateApplication(guest, origin + "/maps");
     await selectWorkspaceMap(guest, sharedMap.id);

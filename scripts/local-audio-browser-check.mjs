@@ -1,3 +1,4 @@
+import { TITLE_SCREEN } from "./title-screen-navigation.mjs";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
 
@@ -8,7 +9,7 @@ export async function checkLocalAudio(page, context, width) {
     .locator('nav[aria-label="Sections"]:visible')
     .getByRole("link", { name: "Desk", exact: true })
     .click();
-  await expect(page.getByRole("heading", { name: "Campaign control", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toBeVisible();
   await page.evaluate(() => {
     if (!window.__loops) {
       window.__loops = new Set();
@@ -220,13 +221,13 @@ export async function checkLocalAudio(page, context, width) {
     fullPage: true,
   });
   await page.reload();
-  await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).waitFor();
+  await page.getByRole("button", { name: TITLE_SCREEN }).waitFor();
   assert.equal(
     await page.locator(".local-audio-mini").count(),
     0,
     "A fresh document does not autoplay local playlists",
   );
-  await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
+  await page.getByRole("button", { name: TITLE_SCREEN }).click();
   await panel.getByRole("button", { name: "Road music 1 tracks", exact: true }).click();
   await expect(player.locator(".local-audio-tracks li")).toContainText("Road Theme");
   await expect(player.getByLabel("Playlist music volume", { exact: true })).toHaveValue("23");
@@ -270,10 +271,7 @@ export async function checkLocalAudio(page, context, width) {
     try {
       const guest = await anonymous.newPage();
       await guest.goto(origin + "/features/music");
-      const title = guest.getByRole("button", {
-        name: "Lootsplitter. Click to continue",
-        exact: true,
-      });
+      const title = guest.getByRole("button", { name: TITLE_SCREEN });
       await title.waitFor({ state: "visible" });
       await title.click();
       await expect(

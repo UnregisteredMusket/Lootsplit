@@ -15,6 +15,7 @@ import {
 import { locationLabel, type MarketLocations } from "@/lib/quire/shop-locations";
 import type { Shop } from "@/lib/quire/types";
 import { Button, Modal, Select } from "./ui";
+import { Disclosure } from "./disclosure";
 
 export function MarketNameImport({
   market,
@@ -220,8 +221,7 @@ export function MarketNameImport({
               placeholder={"Green Coast\nNorthern Highlands"}
             />
           </label>
-          <details className="text-sm text-muted">
-            <summary className="cursor-pointer">Import a complete hierarchy</summary>
+          <Disclosure variant="inline" className="text-sm text-muted" summary="Import a complete hierarchy">
             <p className="mt-2">
               CSV and TSV use region, city, town, area and shop column headers. Leave unused columns
               empty. A city or town needs a region; an area needs a city or town. Repeated parents
@@ -232,7 +232,7 @@ export function MarketNameImport({
                 "region,city,town,area,shop\nGreen Coast,Port,,Docks,Salt & Rope\nGreen Coast,,Oakford,,The Copper Kettle"
               }
             </pre>
-          </details>
+          </Disclosure>
           <p className="text-sm text-muted">
             New shops start closed with empty stock, general goods, modest wealth and standard
             buy/sell rates. Open each shop to configure its stock, image, keeper, prices and

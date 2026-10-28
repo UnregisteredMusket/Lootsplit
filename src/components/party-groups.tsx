@@ -46,6 +46,7 @@ import {
 import { groupColours, MAX_PARTY_GROUPS } from "@/lib/quire/world-schema";
 import type { Purse } from "@/lib/quire/types";
 import { Button, Modal } from "./ui";
+import { Disclosure } from "./disclosure";
 import { ReviewCard, useReviewStubs, type ReviewDecision, type SavedReasons } from "./review-card";
 import { AppLink } from "./app-link";
 import { LocationOptions } from "./market-locations";
@@ -1047,8 +1048,7 @@ export function PlayerGroupCard() {
           </span>
         </div>
       ))}
-      <details className="gask">
-        <summary>Move your group</summary>
+      <Disclosure variant="section" className="gask" summary="Move your group">
         <p className="gnote">Ask the DM. Nothing moves until the DM approves.</p>
         {waiting ? (
           <p className="grequest-line">
@@ -1078,7 +1078,7 @@ export function PlayerGroupCard() {
           </>
         )}
         <p className="gnote">Far places go by journey: ask the DM to plan one for {mine.name}.</p>
-      </details>
+      </Disclosure>
       <GroupRequestInbox />
       {error && <p role="alert" className="gerror">{error}</p>}
     </section>

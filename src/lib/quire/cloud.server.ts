@@ -27,6 +27,7 @@ import {
 import { archiveSession, projectRecord } from "./session-records.ts";
 import { npcController } from "./world.ts";
 import { canReadNote } from "./chat-visibility.ts";
+import { roomCampaignName } from "./campaign-name.ts";
 import { characterControl, type Purse } from "./types.ts";
 import type { BillFile } from "./table.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
@@ -207,6 +208,7 @@ export async function openRoom(input: {
   name: string;
   table: CloudTable;
   userId?: string;
+  campaignName?: unknown;
 }, probe?: ProbeAccess): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
   const table = readCloudTableForImport(input.table);
   if (!table)
@@ -226,7 +228,9 @@ export async function openRoom(input: {
     purseIds: [],
   };
   const { hostedCampaignLimit } = await import("../../../cloudflare/hosted-campaigns.mjs");
+  const campaignName = roomCampaignName(input.campaignName);
   await createRoom({
+    ...(campaignName ? { campaignName } : {}),
     ownerId: input.userId,
     sessionId: input.userId ? crypto.randomUUID() : undefined,
     code,
@@ -245,11 +249,18 @@ export async function previewRoom(
   code: string,
   sessionId?: string,
   userId?: string,
-): Promise<{ characters: { id: string; name: string }[] }> {
+): Promise<{ characters: { id: string; name: string }[]; campaignName?: string }> {
   const room = await must(code);
   refuseProbeRoom(room);
+  // The same refusals as joinRoom, before anything about the room is shown.
+  if (room.testMode) throw Error("Test rooms are private to the owner.");
   requireInvitationSession(room, sessionId);
+  const blocked = userId ? room.blockedUsers?.[userId] : undefined;
+  if (blocked === "banned") throw Error("You are banned from this campaign.");
   return {
+    // The campaign's name is not private: the join card reads "Joining <name>". A kicked
+    // account (which needs a fresh invitation to rejoin) is not told the current name.
+    ...(room.campaignName && !blocked ? { campaignName: room.campaignName } : {}),
     characters: room.table.purses
       .filter(
         (purse) =>
@@ -435,6 +446,28 @@ export async function choosePace(input: {
   return view(next, seat, room);
 }
 
+/**
+ * The DM names the shared campaign (players see it in the header, join card and tab title).
+ * Only the DM seat may set it; an unchanged name writes nothing.
+ */
+export async function nameRoom(input: {
+  code: string;
+  token: string;
+  campaignName: unknown;
+}): Promise<RoomView> {
+  const room = await must(input.code);
+  const seat = room.seats.find((item) => item.token === input.token);
+  if (!seat) throw new Error("This browser is not seated at that table.");
+  if (seat.role !== "dm") throw new Error("Only the DM can name the campaign.");
+  const campaignName = roomCampaignName(input.campaignName);
+  if ((room.campaignName ?? undefined) === campaignName) return view(room, seat);
+  const next: CloudRoom = { ...room, revision: room.revision + 1 };
+  if (campaignName) next.campaignName = campaignName;
+  else delete next.campaignName;
+  await updateRoom(next, room.revision);
+  return view(next, seat, room);
+}
+
 export async function closeRoom(input: {
   code: string;
   token: string;
@@ -509,6 +542,8 @@ export type RoomView = {
   acknowledged: string[];
   table: CloudTable;
   live: boolean;
+  /** The DM's campaign name; absent when the DM has not named it (shown as "Shared campaign · CODE"). */
+  campaignName?: string;
   departed?: Array<{ id: string; name: string; status: string; invitation?: string }>;
   testMode?: boolean;
 };
@@ -580,6 +615,7 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
     mine: room.viewOnly ? seat.role === "dm" : room.live || current?.id === seat.id,
     who: room.live ? "everyone" : (current?.name ?? "Someone"),
     live: room.live === true,
+    ...(room.campaignName ? { campaignName: room.campaignName } : {}),
     testMode: room.testMode === true,
     departed:
       seat.role === "dm"
@@ -1101,6 +1137,28 @@ export async function manageRoom(input: {
 }
 
 /** Read-only, freshly authorized combat presentation for the map being viewed. */
+/**
+ * The initiative panel for a seat (map controls PR 6). The same gates as the HUD (seated, the
+ * active binding on this map, re-read after the private store read, players only while the DM
+ * shows combat on this scene), then the seat's projected map and `projectMapCombatOrder`.
+ */
+export async function mapCombatOrder(input: {code:string;token:string;mapId:string}) {
+  const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
+  if(!initialSeat)throw Error("This browser is not seated at that table.");
+  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
+  const db=database();
+  if(!db)return null;
+  const row=await db.prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?").bind(binding.encounterId,initial.code).first<{body:string;status:string}>();
+  if(!row)return null;
+  const room=await must(input.code),seat=room.seats.find(s=>s.token===input.token),current=room.table.journal?.world?.combat;
+  if(!seat)throw Error("This browser is not seated at that table.");
+  if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
+  if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
+  const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
+  if(!map)return null;
+  const {projectMapCombatOrder}=await import("./map-combat.ts");
+  return projectMapCombatOrder(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)},seat.role==="dm"?[]:seat.purseIds);
+}
 export async function mapCombatPresentation(input: {code:string;token:string;mapId:string}) {
   const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
   if(!initialSeat)throw Error("This browser is not seated at that table.");
