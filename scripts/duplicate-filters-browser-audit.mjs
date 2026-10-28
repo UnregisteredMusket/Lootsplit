@@ -104,15 +104,27 @@ try {
     // --- Duplicate NPC.
     await page.goto(origin + "/features/npcs");
     await continueIntoApp(page);
+    // The editor copies the party's current location into its draft when it opens; opening it
+    // before the campaign has loaded leaves NPC location on "Choose location" and Create NPC is
+    // then held back by the required field (how this audit failed 1 run in 3 on 2026-10-28).
+    await expect(page.getByText(/^Meet people at (?!Campaignwide)/)).toBeVisible();
     await page.getByRole("button", { name: "Create non-party NPC", exact: true }).click();
     const editor = page.getByRole("region", { name: "NPC editor", exact: true });
+    await expect(editor.getByRole("combobox", { name: "NPC location", exact: true })).not.toHaveText("Choose location");
     await editor.getByRole("textbox").first().fill(`Odile ${width}`);
     await editor.getByRole("button", { name: "Create NPC", exact: true }).click();
     await expect(editor).toHaveCount(0);
-    await page.getByRole("button", { name: `Details & actions for Odile ${width}` }).click().catch(async () => {
-      await page.locator("summary", { hasText: "Details & actions" }).last().click();
-    });
-    await page.getByRole("button", { name: "Duplicate NPC", exact: true }).last().click();
+    // The record's <summary> has no ARIA role, so it is addressed through its own record: the
+    // role-button attempt this used to make waited 45 s per width and its fallback raced the
+    // list render on busy runners (main d5cf7a0 and several PRs failed here on 2026-10-28).
+    const record = page
+      .getByRole("article")
+      .filter({ has: page.getByRole("heading", { name: `Odile ${width}`, exact: true }) });
+    await expect(record).toBeVisible();
+    const details = record.locator("details.npc-record-details");
+    await details.locator("summary").click();
+    await expect(details).toHaveJSProperty("open", true);
+    await details.getByRole("button", { name: "Duplicate NPC", exact: true }).click();
     await expect(editor.getByRole("heading")).toHaveText("New non-party NPC (copy)");
     await expect(editor.getByRole("textbox").first()).toHaveValue(`Odile ${width} (copy)`);
     await editor.getByRole("button", { name: "Create NPC", exact: true }).click();
