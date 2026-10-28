@@ -188,6 +188,30 @@
   font-size: 1rem;
   letter-spacing: 0.12em;
 }
+/* "Continue · <campaign> · Session N" above the tap/click hint (design D10 / dm #27). */
+.loot-opening-prompt {
+  position: absolute;
+  bottom: calc(max(3rem, env(safe-area-inset-bottom)) + 1.9rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #392719;
+  text-shadow: 0 1px 0 #fff7df80;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .loot-opening-continue {
+    bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .loot-opening-prompt {
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 1.7rem);
+  }
+}
 .loot-opening:focus-visible {
   outline: none;
 }

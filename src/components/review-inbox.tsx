@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { readFilters, writeFilters } from "@/lib/quire/campaign-filters";
+import { activeCampaignId } from "@/lib/quire/campaign-context";
+import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 import { CheckCheck } from "lucide-react";
 import { AppLink } from "@/components/app-link";
 import { Button, EmptyState } from "@/components/ui";
@@ -62,7 +65,7 @@ function readLimit() {
  * decision, "Approve all payments under N gp", saved deny reasons and A / D / J / K keys.
  */
 export function ReviewInbox() {
-  const { purses, holdings, journal, loans, commandOutcome } = useEconomy();
+  const { ready, purses, holdings, journal, loans, commandOutcome } = useEconomy();
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const world = useWorldTable() as unknown as CloudTable;
   const [imports, setImports] = useState<number | null>(null);
@@ -77,7 +80,16 @@ export function ReviewInbox() {
   const counts = reviewCounts(items);
   const total = reviewTotal(items);
   const reasons = useSavedReasons();
-  const [filter, setFilter] = useState<ReviewType | "all">("all");
+  // The type chip is remembered per campaign on this device (design QoL 3).
+  const [filter, setFilterState] = useState<ReviewType | "all">(() => {
+    const { type } = readFilters(activeCampaignId(), "review-inbox", { type: "all" });
+    return type === "all" || REVIEW_TYPES.some((t) => t.type === type) ? (type as ReviewType | "all") : "all";
+  });
+  const setFilter = (type: ReviewType | "all") => {
+    setFilterState(type);
+    if (!isEphemeralCampaign())
+      writeFilters(activeCampaignId(), "review-inbox", { type }, { type: "all" });
+  };
   const [query, setQuery] = useState("");
   const filtering = total > FILTER_THRESHOLD;
   const q = filtering ? query.trim().toLowerCase() : "";
@@ -88,11 +100,13 @@ export function ReviewInbox() {
   );
   const present = REVIEW_TYPES.filter((t) => counts[t.type] > 0);
   const empty = REVIEW_TYPES.filter((t) => counts[t.type] === 0 && (t.type !== "imports" || room.joined));
-  // A chip that empties while chosen falls back to the whole queue.
+  // A chip that empties while chosen falls back to the whole queue (once the campaign has
+  // loaded; the remembered chip itself is kept for the next visit).
   useEffect(() => {
+    if (!ready) return;
     if (filter !== "all" && counts[filter] === 0 && !rows.some((r) => r.item.type === filter && r.decided))
-      setFilter("all");
-  }, [filter, counts, rows]);
+      setFilterState("all");
+  }, [ready, filter, counts, rows]);
 
   const poolRow = rows.some((r) => r.item.kind === "pool");
   const poolLots = pooledLots(table).length;

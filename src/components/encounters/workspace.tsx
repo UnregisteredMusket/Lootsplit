@@ -1,4 +1,5 @@
 import { PlayerDisplayButton } from "../player-display-controller";
+import { resultToast } from "@/lib/quire/result-toast";
 import { inParty } from "@/lib/quire/character-position";
 import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
 import { SearchSelect } from "@/components/search-select";
@@ -63,9 +64,11 @@ import {
   generatorSchema,
   estimate,
   nextTurn,
+  previousTurn,
   sortInitiative,
 } from "@/lib/encounters/model.mjs";
 import { requestConfirm } from "@/lib/quire/confirm-store";
+import { duplicateEncounter } from "@/lib/encounters/duplicate";
 import {
   assignLoot,
   gpInputText,
@@ -455,6 +458,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
                   dirty.current = v;
                 }}
                 onSaved={() => setRefresh((v) => v + 1)}
+                onDuplicate={(body) => void create(duplicateEncounter(body))}
               />
             ) : (
               <div className="encounter-panel encounter-empty">
@@ -484,11 +488,14 @@ function EncounterEditor({
   initialTab,
   onDirty,
   onSaved,
+  onDuplicate,
 }: {
   id: string;
   initialTab?: string;
   onDirty: (v: boolean) => void;
   onSaved: () => void;
+  /** Duplicate (design Q9): create a fresh draft from this saved encounter, with its loot. */
+  onDuplicate?: (body: Encounter) => void;
 }) {
   const seat = useSeat();
   const router = useRouter();
@@ -507,6 +514,7 @@ function EncounterEditor({
     ),
     [expanded, setExpanded] = useState(""),
     [hpAmount, setHpAmount] = useState(1),
+    [trackerHelp, setTrackerHelp] = useState(false),
     [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -647,7 +655,20 @@ function EncounterEditor({
       onDirty(false);
       onSaved();
       if (path === "award" && id.startsWith("local-")) await reloadEconomy();
-      if (path === "award") void playSound("loot");
+      if (path === "award") {
+        void playSound("loot");
+        // Result toast (design D9). An award is locked against a second one and has no reversal
+        // command, so it offers its receipt (shown on this page) and no Undo.
+        resultToast("Loot awarded.", {
+          receipt: () => {
+            const receipt = document.querySelector<HTMLElement>(".encounter-award-receipt");
+            if (!receipt) return;
+            receipt.tabIndex = -1;
+            receipt.scrollIntoView({ block: "center" });
+            receipt.focus({ preventScroll: true });
+          },
+        });
+      }
       setNotice(
         !refreshed
           ? "Saved. Refresh to see the latest version."
@@ -1020,6 +1041,15 @@ function EncounterEditor({
           >
             Export draft
           </button>
+          {onDuplicate && detail.readOnly !== true && (
+            <button
+              disabled={busy || dirty}
+              title={dirty ? "Save or reload first: the copy is made from the saved encounter." : undefined}
+              onClick={() => onDuplicate(detail.body as Encounter)}
+            >
+              Duplicate
+            </button>
+          )}
           {detail.status === "draft" && (
             <button disabled={locked || dirty} onClick={() => void action("start")}>
               Start encounter
@@ -1237,21 +1267,35 @@ function EncounterEditor({
                 <FantasyIcon ui="Encounters" size={26} /> Initiative & combat
               </h3>
               <span>Round {draft.round}</span>
+              {/* How the tracker works sits behind "?" so the turn order comes first (design D10). */}
+              <button
+                type="button"
+                className="encounter-help-toggle"
+                aria-expanded={trackerHelp}
+                aria-controls="encounter-tracker-help"
+                aria-label="How the tracker works"
+                onClick={() => setTrackerHelp((open) => !open)}
+              >
+                ?
+              </button>
             </div>
             <AppLink className="settings-link" href={journal.world?.combat?.encounterId === id ? `/maps?map=${encodeURIComponent(journal.world.combat.mapId)}` : "/maps"}>
               Open combat maps →
             </AppLink>
-            <p>
-              In Maps, enable a grid, enter tile mode and use this saved campaign encounter's
-              roster. Token positions share through campaign commands; turns, HP and loot stay in
-              this tracker.
-            </p>
-            <p>
-              Enter physical initiative rolls, adjust HP and conditions, and choose any active
-              combatant. Scores stay in place while you enter them. Press Sort initiative when
-              ready; ties keep their roster order and blank scores go last. Next turn follows that
-              saved order. Effects and defeated turns are handled by the DM.
-            </p>
+            <div id="encounter-tracker-help" hidden={!trackerHelp}>
+              <p>
+                In Maps, enable a grid, enter tile mode and use this saved campaign encounter's
+                roster. Token positions share through campaign commands; turns, HP and loot stay in
+                this tracker.
+              </p>
+              <p>
+                Enter physical initiative rolls, adjust HP and conditions, and choose any active
+                combatant. Scores stay in place while you enter them. Press Sort initiative when
+                ready; ties keep their roster order and blank scores go last. Next turn follows that
+                saved order; Previous turn steps back. Each combatant shows its side: ◆ ally, ✕
+                enemy. Effects and defeated turns are handled by the DM.
+              </p>
+            </div>
             <div className="character-toolbar">
               <label>
                 Round
@@ -1262,9 +1306,6 @@ function EncounterEditor({
                   onChange={(e) => change({ ...draft, round: n(e.target.value) })}
                 />
               </label>
-              <button disabled={!draft.combatants.length} onClick={() => change(nextTurn(draft))}>
-                Next turn
-              </button>
               <button
                 disabled={draft.combatants.length < 2}
                 onClick={() => change(sortInitiative(draft))}
@@ -1289,9 +1330,18 @@ function EncounterEditor({
               <details
                 key={c.id}
                 open={draft.activeId === c.id || expanded === c.id || !draft.activeId}
-                className={`encounter-combatant ${draft.activeId === c.id ? "is-active" : ""}`}
+                className={`encounter-combatant side-${c.side === "ally" ? "ally" : "enemy"} ${draft.activeId === c.id ? "is-active" : ""}`}
               >
                 <summary className="combat-summary" onClick={() => setExpanded(c.id)}>
+                  {/* Side stripe (CSS) plus a glyph, so allies and enemies differ without colour. */}
+                  <span
+                    className="combat-side"
+                    role="img"
+                    aria-label={c.side === "ally" ? "Ally" : "Enemy"}
+                    title={c.side === "ally" ? "Ally" : "Enemy"}
+                  >
+                    {c.side === "ally" ? "◆" : "✕"}
+                  </span>
                   <span className="initiative-number">{c.initiative ?? "—"}</span>
                   <span className="combat-portrait">
                     <FantasyIcon entry={{ ...c, kind: "creatures" }} size={36} />
@@ -1477,6 +1527,32 @@ function EncounterEditor({
                 </div>
               </details>
             ))}
+            {/* Sticky turn bar (design D10): reachable with a thumb at the bottom of a phone. */}
+            <div className="encounter-turn-bar" role="group" aria-label="Turn order">
+              <button
+                type="button"
+                disabled={!draft.combatants.length}
+                aria-label="Previous turn"
+                onClick={() => change(previousTurn(draft))}
+              >
+                <span aria-hidden="true">◀ Prev</span>
+              </button>
+              <span className="encounter-turn-round" aria-live="polite">
+                Round {draft.round}
+                {draft.activeId ? (
+                  <small>
+                    {draft.combatants.find((c) => c.id === draft.activeId)?.name ?? ""}
+                  </small>
+                ) : null}
+              </span>
+              <button
+                type="button"
+                disabled={!draft.combatants.length}
+                onClick={() => change(nextTurn(draft))}
+              >
+                Next turn <span aria-hidden="true">▶</span>
+              </button>
+            </div>
           </div>
         )}
         {tab === "build" && (

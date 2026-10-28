@@ -6,6 +6,9 @@ import { APP_VISITOR_COOKIE } from "../src/lib/deployment/public-urls.mjs";
 export async function markAppVisitor(context, origin) {
   await context.addCookies([{ name: APP_VISITOR_COOKIE, value: "1", url: new URL(origin).origin }]);
 }
+/** The title screen button: "Click" with a mouse, "Tap" on touch screens, then the campaign to
+ * continue when this device has opened one (design D10). */
+export const TITLE_SCREEN = /^Lootsplitter\. (Click|Tap) to continue/;
 /** An address no route matches; audits use it to check the website's not-found page. */
 export const NOT_FOUND_AUDIT_PATH = "/this-page-does-not-exist";
 const publicPaths = new Set([
@@ -28,7 +31,7 @@ const isPublicPath = (path) => publicPaths.has(path) || path.startsWith("/commun
 export async function continueIntoApp(page) {
   const path = new URL(page.url()).pathname.replace(/\/$/, "") || "/";
   if (isPublicPath(path)) return;
-  const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
+  const title = page.getByRole("button", { name: TITLE_SCREEN });
   await page.waitForFunction(() =>
     document.querySelector(".loot-opening") ||
     document.querySelector("main"),
@@ -129,4 +132,15 @@ export async function navigateApplication(page, destination) {
     }
   }
   await openApplication(page, destination);
+}
+
+/**
+ * A player who joins a room lands on Home with "You're playing <character>" (plan P3). Audits
+ * that continue on the Campaign screen wait for Home and then open Campaign by its link.
+ */
+export async function afterJoining(page) {
+  await page.waitForURL((u) => u.pathname === "/" && u.searchParams.get("view") === "home");
+  await page.locator(".player-home").waitFor();
+  await navigateApplication(page, new URL("/share", page.url()).href);
+  await page.locator(".room-code").waitFor();
 }
