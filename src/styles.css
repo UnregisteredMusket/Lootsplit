@@ -4866,7 +4866,7 @@ button.quest-chip { min-height: 44px; }
 .share-chat-full .live-chat { overflow: clip; }
 .share-chat-full .chat-history { height: max(16rem, calc(100dvh - 26rem)); }
 .share-chat-full .chat-composer { position: sticky; bottom: calc(4.6rem + env(safe-area-inset-bottom)); z-index: 5; }
-@media (min-width: 1024px) {
+@media (min-width: theme(--bp-wide)) {
   .share-chat-full .chat-history { height: max(20rem, calc(100dvh - 22rem)); }
   .share-chat-full .chat-composer { bottom: 0; }
 }
