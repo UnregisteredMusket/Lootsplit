@@ -114,9 +114,10 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
         Unconnected Cloudflare traffic stays labeled.
       </p>
       <p className="text-sm text-muted">
-        Your name and private totals will be visible on your home screen. Signing out, switching
-        accounts or disconnecting clears this device’s widget. Server-revoked access clears on its
-        next server check. Removing the final widget disconnects it.
+        Your name and private totals will be visible on your home screen. The widget keeps its own
+        owner session (valid for a year), so signing out of the app or switching accounts no longer
+        stops its automatic readings; only Disconnect widget, removing the final widget or losing
+        owner access ends it. Server-revoked access clears on its next server check.
       </p>
       {!supported ? (
         <p className="text-sm">
