@@ -10,7 +10,7 @@ import {
   isGrokScriptUrl,
 } from "./grok-script-check.mjs";
 import { SCRIPT_POLICY } from "../cloudflare/release-assets.mjs";
-import { markAppVisitor } from "./title-screen-navigation.mjs";
+import { markAppVisitor, TITLE_SCREEN } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8082";
 // Additional audited origins (scripts/live-audit-origins.mjs) write to their own folder.
 const results = process.env.LIVE_RELEASE_RESULTS || "test-results/live-release";
@@ -146,10 +146,7 @@ try {
         errors.push(`${response.status()} ${path}`);
     });
     await page.goto(origin, { waitUntil: "networkidle" });
-    const title = page.getByRole("button", {
-      name: "Lootsplitter. Click to continue",
-      exact: true,
-    });
+    const title = page.getByRole("button", { name: TITLE_SCREEN });
     await title.waitFor();
     await page.waitForFunction(() => {
       const button = document.querySelector(".loot-opening");
@@ -222,7 +219,7 @@ try {
   await markAppVisitor(reduced, origin);
   const page = await reduced.newPage();
   await page.goto(origin, { waitUntil: "networkidle" });
-  const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
+  const title = page.getByRole("button", { name: TITLE_SCREEN });
   await title.waitFor();
   assert.equal(
     await page.locator(".quire-dawn-name").evaluate((el) => getComputedStyle(el).animationName),

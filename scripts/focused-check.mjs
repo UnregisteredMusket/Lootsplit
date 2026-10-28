@@ -26,6 +26,7 @@ const featureAudits = {
   "themed-confirm": "scripts/themed-confirm-browser-audit.mjs",
   "market-shops": "scripts/market-shops-browser-audit.mjs",
   a11y: "scripts/a11y-browser-audit.mjs",
+  landscape: "scripts/landscape-browser-audit.mjs",
   "map-controls": "scripts/map-controls-browser-audit.mjs",
   "review-inbox": "scripts/review-inbox-browser-audit.mjs",
   "command-palette": "scripts/command-palette-browser-audit.mjs",

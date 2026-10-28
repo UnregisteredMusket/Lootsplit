@@ -1,7 +1,7 @@
 import { chromium, expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication, TITLE_SCREEN } from "./title-screen-navigation.mjs";
 import { checkLocalAudio } from "./local-audio-browser-check.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!["127.0.0.1", "localhost"].includes(new URL(origin).hostname))
@@ -98,13 +98,13 @@ try {
     );
     await page.screenshot({ path: `test-results/sound/menu-audio-${width}.png`, fullPage: true });
     await page.reload();
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).waitFor();
+    await page.getByRole("button", { name: TITLE_SCREEN }).waitFor();
     assert.equal(
       await page.evaluate(() => window.__audioStarts),
       0,
       "Saved-on preferences do not autoplay a fresh document",
     );
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
+    await page.getByRole("button", { name: TITLE_SCREEN }).click();
     await page.getByText("Sound effects", { exact: true }).click();
     await expect(menus.getByLabel("Enable menu music")).toBeChecked();
     await expect(menus.getByLabel("Enable ambient sound")).toBeChecked();
@@ -117,7 +117,7 @@ try {
       .click();
     await page.waitForFunction(() => window.__loops.size === 0);
     await page.reload();
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
+    await page.getByRole("button", { name: TITLE_SCREEN }).click();
     assert.equal(await page.evaluate(() => window.__loopStarts), 0);
     await page.evaluate(() => (window.soundNavigationMarker = "same-document"));
     await page
@@ -200,7 +200,7 @@ try {
     assert.equal(await page.evaluate(() => window.__loops.size), 0);
     // A new document retains preferences but never starts audio by itself.
     await page.goto(origin + "/settings");
-    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).waitFor();
+    await page.getByRole("button", { name: TITLE_SCREEN }).waitFor();
     assert.equal(await page.evaluate(() => window.__audioStarts), 0);
     await openApplication(page, origin + "/settings");
     await page.getByText("Sound effects", { exact: true }).click();
