@@ -393,7 +393,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "appearance",
         title: "Theme, reading and audio",
         paragraphs: [
-          "Open Settings & Management → Appearance for Light · Adventurer's Ledger or Dark · Ironbound Dragon, reading size, dollar estimates and sound preferences. These device preferences do not change campaign rules or funds. Motion follows your device's reduced-motion setting.",
+          "Open Settings & Management → Appearance for Light · Adventurer's Ledger or Dark · Ironbound Dragon, reading size, dollar estimates and sound preferences. These device preferences do not change campaign rules or funds. Motion follows your device's reduced-motion setting. Show fantasy backgrounds puts a scene above each screen: the full scene the first time you open a screen on this device, then a short band so the screen's title and main action stay in view (always a short band in split view and with a phone turned sideways).",
           "The title screen appears on a fresh app document; moving between internal menus keeps it dismissed. Sound playback can require a user gesture. Keep device volume and your app sound preferences in mind when using shared play.",
         ],
         links: [["Appearance & sounds", "/?view=home#management"]],

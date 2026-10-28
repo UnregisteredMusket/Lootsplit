@@ -2218,6 +2218,16 @@ input,select,textarea { max-width: 100%; }
   user-select: none;
 }
 .submenu-scenery img { width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
+/*
+ * Compact band (dm-mobile #19): 64–96 px of scenery after a screen's first visit on this device,
+ * in split panes and in phone landscape, so the header and primary action stay in the first screen.
+ */
+.submenu-workspace[data-submenu-scene][data-banner="compact"] { padding-top: 4.5rem; }
+.submenu-workspace[data-banner="compact"] > .submenu-scenery { height: clamp(12rem, 24vw, 16rem); }
+@media (orientation: landscape) and (max-height: 500px) {
+  .submenu-workspace[data-submenu-scene] { padding-top: 4rem; }
+  .submenu-workspace[data-submenu-scene] > .submenu-scenery { height: 11rem; }
+}
 .submenu-scenery::after {
   content: "";
   position: absolute;
@@ -2389,6 +2399,7 @@ input,select,textarea { max-width: 100%; }
 /* Feature workspaces reuse the existing parchment, panels and navigation. */
 .feature-screen { width: 100%; max-width: 76rem; margin-inline: auto; }
 .feature-screen > h1 { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3rem); margin-bottom: 1rem; }
+.feature-screen > .feature-header .feature-header-title { font-size: clamp(2rem, 5vw, 3rem); }
 .feature-cards { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit,minmax(min(100%,17rem),1fr)); }
 .feature-cards h2 { font-size: 1.3rem; }
 .feature-return { margin-top: 2rem; padding-block: 1rem; border-top: 1px solid var(--color-border); }
@@ -3278,7 +3289,7 @@ input,select,textarea { max-width: 100%; }
 
 /* Approved trading workspace: dense quotes, chart-led exchanges, central barter slots. */
 .trading-shell .concept-main { max-width:none; padding-top:1rem; }
-.trading-shell .feature-screen>h1 { font-size:2rem; margin-bottom:.5rem; }
+.trading-shell .feature-screen>h1 { font-size:2rem; margin-bottom:.5rem; } .trading-shell .feature-screen>.feature-header { margin-bottom:.5rem; } .trading-shell .feature-screen>.feature-header .feature-header-title { font-size:2rem; }
 .trading-shell .submenu-workspace[data-submenu-scene] { padding-top:1rem; }
 .trading-shell .commodity-dashboard { border-radius:4px; container:commodity / inline-size; }
 .commodity-board-top { padding:.65rem .9rem; }
@@ -4067,8 +4078,8 @@ input,select,textarea { max-width: 100%; }
 .split-divider:focus-visible .split-divider-grip { outline: 2px solid var(--color-lead); outline-offset: 2px; }
 .split-on .split-pane main.concept-main { max-width: 74rem; padding: 1.1rem 1.25rem 2rem; }
 .split-on .split-pane .trading-shell main.concept-main, .split-on .split-pane.trading-shell main.concept-main { max-width: none; }
-.split-on .submenu-workspace[data-submenu-scene] { min-height: 100%; padding-top: 6.5rem; }
-.split-on .submenu-scenery { height: 17rem; }
+.split-on .submenu-workspace[data-submenu-scene] { min-height: 100%; padding-top: 4.5rem; }
+.split-on .submenu-scenery { height: 14rem; }
 .split-on .concept-shell .submenu-workspace[data-submenu-scene] .concept-main,
 .concept-shell.split-on .submenu-workspace[data-submenu-scene] .concept-main { width: 100%; min-height: 0; border-inline: 0; border-radius: 0; }
 .split-on .pane-maps main.concept-main { max-width: none; min-height: 100%; padding: 0; }
