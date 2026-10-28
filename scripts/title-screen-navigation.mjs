@@ -64,11 +64,15 @@ export async function prepareDmFixture(page, origin, { useAccountLink = false } 
     const owner = localStorage.getItem(`quire.owner.${id}`);
     return !!owner && owner === sessionStorage.getItem("lootsplit.verified-account");
   })) return;
-  const session = await page.context().request.get(origin + "/api/account/auth/get-session");
+  // Better Auth groups IPv6 by /64: vary the prefix, not only host bits.
+  const address = () => `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1`;
+  // The identity read carries its own address too: the account API rate-limits by address, and
+  // the audits sharing a development server otherwise pool these reads under one address (the
+  // 2026-10-28 gameplay group failed with "Fixture identity: 429" in whichever audit ran last).
+  const session = await page.context().request.get(origin + "/api/account/auth/get-session", { headers: { "cf-connecting-ip": address() } });
   if (!session.ok()) throw Error(`Fixture identity: ${session.status()}`);
   if (!(await session.json())?.user) {
-    // Better Auth groups IPv6 by /64: vary the prefix, not only host bits.
-    await page.context().setExtraHTTPHeaders({ "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1` });
+    await page.context().setExtraHTTPHeaders({ "cf-connecting-ip": address() });
     const response = await page.context().request.post(origin + "/api/account/auth/sign-up/email", { headers: { origin }, data: { name: "Disposable audit DM", email: `dm-${crypto.randomUUID()}@example.com`, password: "disposable audit password 2026" } });
     if (!response.ok()) throw Error(`Fixture signup: ${response.status()} ${await response.text()}`);
   }
