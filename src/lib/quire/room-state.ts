@@ -85,3 +85,26 @@ export function roomStatusLabels(
           : `Waiting for ${state.who || "the current player"}`,
   };
 }
+
+/**
+ * A shared room with nothing to report: connected, confirmed, in play and with no pending or
+ * recovery work. Only then may the status card collapse into the header pill (plan P4).
+ */
+export function roomHealthy(
+  state: RoomStatusInput & { recoveries?: unknown[]; unverifiedRecoveries?: number },
+  online = true,
+) {
+  return (
+    state.joined &&
+    online &&
+    !!state.lastSync &&
+    state.status === "synced" &&
+    !state.pending &&
+    !state.error &&
+    !state.viewOnly &&
+    !state.closed &&
+    !state.recoveries?.length &&
+    !state.unverifiedRecoveries &&
+    !roomSaveDetail(state, { online })
+  );
+}
