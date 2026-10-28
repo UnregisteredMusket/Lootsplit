@@ -425,6 +425,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Android signed release APK | open | 4 | 668s → 3918s | +3250s | +486.53% |
 | native-widget (24) / Run android-actions/setup-android@v3 | open | 2 | 15s → 33s | +18s | +120% |
+| native-widget (35) / Run npm run build:mobile && npx cap sync android | open | 2 | 7s → 11s | +4s | +57.14% |
 | native-widget (35) / Verify owner isolation, refresh transport and actual RemoteViews layouts | open | 3 | 148s → 479s | +331s | +223.65% |
 | Android native widget verification | open | 5 | 354s → 1071s | +717s | +202.54% |
 | native-widget (35) | open | 4 | 350s → 1071s | +721s | +206% |
@@ -897,6 +898,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-28T22:39:14Z | step: native-widget (35) / Run npm run build:mobile && npx cap sync android | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454345394/job/118737125856) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40781486457/job/123143995339) |
+| 2026-10-28T22:06:18Z | step: Packaged Worker / economy / worker-loot | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39704913242/job/119583443765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40776055485/job/123127761129) |
 | 2026-10-28T21:35:59Z | step: Code checks and immutable builds / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 24s → 46s | +22s | +91.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40716776586/job/122916490806) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40773161675/job/123115420528) |
 | 2026-10-28T21:18:58Z | step: deploy / Verify deployed identity and read-only desktop/mobile website behavior | 288s → 405s | +117s | +40.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39960834180/job/120438104512) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40769754921/job/123103445576) |
 | 2026-10-28T21:02:40Z | step: Packaged Worker / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 6s → 10s | +4s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40723242168/job/122950871821) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40766251792/job/123099101303) |
