@@ -15,9 +15,38 @@ import {
 } from "@/lib/quire/cloud-client";
 import { Button, Confirm } from "./ui";
 import { toast } from "sonner";
-import { roomStatusLabels, roomSaveDetail } from "@/lib/quire/room-state";
+import { roomHealthy, roomStatusLabels, roomSaveDetail } from "@/lib/quire/room-state";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
-export function SyncStatus({ compact = false }: { compact?: boolean }) {
+/**
+ * The header pill (plan P4, Q21): a healthy shared room needs one line, not a card. It names the
+ * mode and links to Campaign; the full status stays available to assistive technology.
+ */
+export function RoomPill() {
+  const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
+  if (!roomHealthy(state, online)) return null;
+  const labels = roomStatusLabels(state, { online });
+  const full = [labels.mode, labels.room, labels.play, labels.turn, labels.save].filter(Boolean).join(" · ");
+  const short = labels.turn ? (state.mine ? "Your turn" : "Waiting") : labels.mode;
+  return (
+    <Link to="/share" className="room-pill" aria-label={`${full}. Open Campaign`}>
+      <span className="status-dot connected" aria-hidden="true" />
+      <span aria-hidden="true">{short}</span>
+      <span className="sr-only" role="status">
+        {full}
+      </span>
+    </Link>
+  );
+}
+
+export function SyncStatus({
+  compact = false,
+  collapseHealthy = false,
+}: {
+  compact?: boolean;
+  /** Screens with the header pill show the card only when it needs attention. */
+  collapseHealthy?: boolean;
+}) {
   const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
   const labels = roomStatusLabels(state, { online });
@@ -33,6 +62,7 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
       recoveryDetails.current.scrollIntoView({ block: "start" });
     }
   }, [compact, state.joined, hash]);
+  if (collapseHealthy && roomHealthy(state, online)) return null;
   if (
     !state.joined &&
     state.status === "local" &&

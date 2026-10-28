@@ -1,0 +1,497 @@
+{
+  "kind": "lootsplit.live-load-browser-audit.v1",
+  "authorization": "owner-2026-10-28",
+  "startedAt": "2026-10-28T12:58:05.787Z",
+  "finishedAt": "2026-10-28T13:05:17.163Z",
+  "origin": "http://127.0.0.1:8150",
+  "stageSeconds": 60,
+  "stages": [
+    {
+      "users": 1,
+      "actions": 9,
+      "actionMs": {
+        "p50": 957,
+        "p95": 1092,
+        "max": 1092
+      },
+      "actionErrors": [],
+      "burst": {
+        "failed": [],
+        "maxMs": 1217
+      },
+      "propagationMs": {
+        "p50": null,
+        "p95": null,
+        "max": null,
+        "timeouts": 0
+      },
+      "pageErrors": [],
+      "perClient": [
+        {
+          "client": "dm",
+          "joinMs": null,
+          "requestsPerMinute": 104,
+          "kbPerMinute": 11642,
+          "byPath": {
+            "serverFn": {
+              "n": 116,
+              "bytes": 12629711
+            }
+          },
+          "longTasks": 96,
+          "longTaskMsTotal": 8219,
+          "longestTaskMs": 350,
+          "heapMB": 179
+        }
+      ]
+    },
+    {
+      "users": 2,
+      "actions": 13,
+      "actionMs": {
+        "p50": 816,
+        "p95": 1068,
+        "max": 1068
+      },
+      "actionErrors": [],
+      "burst": {
+        "failed": [],
+        "maxMs": 817
+      },
+      "propagationMs": {
+        "p50": 885,
+        "p95": 2004,
+        "max": 2004,
+        "timeouts": 0
+      },
+      "pageErrors": [],
+      "perClient": [
+        {
+          "client": "dm",
+          "joinMs": null,
+          "requestsPerMinute": 101,
+          "kbPerMinute": 12431,
+          "byPath": {
+            "serverFn": {
+              "n": 110,
+              "bytes": 14148731
+            }
+          },
+          "longTasks": 50,
+          "longTaskMsTotal": 4295,
+          "longestTaskMs": 234,
+          "heapMB": 179
+        },
+        {
+          "client": "p1",
+          "joinMs": 5180,
+          "requestsPerMinute": 105,
+          "kbPerMinute": 1532,
+          "byPath": {
+            "/api/account/auth/get-session": {
+              "n": 1,
+              "bytes": 248
+            },
+            "serverFn": {
+              "n": 113,
+              "bytes": 1573745
+            }
+          },
+          "longTasks": 98,
+          "longTaskMsTotal": 7746,
+          "longestTaskMs": 232,
+          "heapMB": 133
+        }
+      ]
+    },
+    {
+      "users": 3,
+      "actions": 15,
+      "actionMs": {
+        "p50": 746,
+        "p95": 1027,
+        "max": 1027
+      },
+      "actionErrors": [],
+      "burst": {
+        "failed": [],
+        "maxMs": 1360
+      },
+      "propagationMs": {
+        "p50": 1109,
+        "p95": 2000,
+        "max": 2133,
+        "timeouts": 0
+      },
+      "pageErrors": [],
+      "perClient": [
+        {
+          "client": "dm",
+          "joinMs": null,
+          "requestsPerMinute": 98,
+          "kbPerMinute": 11864,
+          "byPath": {
+            "serverFn": {
+              "n": 107,
+              "bytes": 12154320
+            }
+          },
+          "longTasks": 40,
+          "longTaskMsTotal": 3773,
+          "longestTaskMs": 288,
+          "heapMB": 179
+        },
+        {
+          "client": "p1",
+          "joinMs": 5180,
+          "requestsPerMinute": 104,
+          "kbPerMinute": 1908,
+          "byPath": {
+            "serverFn": {
+              "n": 113,
+              "bytes": 2133458
+            }
+          },
+          "longTasks": 57,
+          "longTaskMsTotal": 4748,
+          "longestTaskMs": 188,
+          "heapMB": 133
+        },
+        {
+          "client": "p2",
+          "joinMs": 5695,
+          "requestsPerMinute": 103,
+          "kbPerMinute": 1673,
+          "byPath": {
+            "serverFn": {
+              "n": 111,
+              "bytes": 1801280
+            }
+          },
+          "longTasks": 105,
+          "longTaskMsTotal": 8872,
+          "longestTaskMs": 377,
+          "heapMB": 111
+        }
+      ]
+    },
+    {
+      "users": 4,
+      "actions": 16,
+      "actionMs": {
+        "p50": 580,
+        "p95": 1008,
+        "max": 1008
+      },
+      "actionErrors": [],
+      "burst": {
+        "failed": [],
+        "maxMs": 2805
+      },
+      "propagationMs": {
+        "p50": 967,
+        "p95": 1976,
+        "max": 2062,
+        "timeouts": 0
+      },
+      "pageErrors": [],
+      "perClient": [
+        {
+          "client": "dm",
+          "joinMs": null,
+          "requestsPerMinute": 96,
+          "kbPerMinute": 14810,
+          "byPath": {
+            "serverFn": {
+              "n": 104,
+              "bytes": 15170636
+            },
+            "/api/account/activity": {
+              "n": 1,
+              "bytes": 238
+            }
+          },
+          "longTasks": 65,
+          "longTaskMsTotal": 6039,
+          "longestTaskMs": 290,
+          "heapMB": 179
+        },
+        {
+          "client": "p1",
+          "joinMs": 5180,
+          "requestsPerMinute": 97,
+          "kbPerMinute": 1829,
+          "byPath": {
+            "serverFn": {
+              "n": 106,
+              "bytes": 1974911
+            }
+          },
+          "longTasks": 44,
+          "longTaskMsTotal": 3548,
+          "longestTaskMs": 192,
+          "heapMB": 133
+        },
+        {
+          "client": "p2",
+          "joinMs": 5695,
+          "requestsPerMinute": 98,
+          "kbPerMinute": 2022,
+          "byPath": {
+            "serverFn": {
+              "n": 106,
+              "bytes": 2167914
+            }
+          },
+          "longTasks": 65,
+          "longTaskMsTotal": 6443,
+          "longestTaskMs": 266,
+          "heapMB": 111
+        },
+        {
+          "client": "p3",
+          "joinMs": 5434,
+          "requestsPerMinute": 96,
+          "kbPerMinute": 1887,
+          "byPath": {
+            "serverFn": {
+              "n": 105,
+              "bytes": 2031589
+            }
+          },
+          "longTasks": 105,
+          "longTaskMsTotal": 10002,
+          "longestTaskMs": 439,
+          "heapMB": 133
+        }
+      ]
+    },
+    {
+      "users": 5,
+      "actions": 17,
+      "actionMs": {
+        "p50": 582,
+        "p95": 943,
+        "max": 943
+      },
+      "actionErrors": [],
+      "burst": {
+        "failed": [],
+        "maxMs": 2608
+      },
+      "propagationMs": {
+        "p50": 1186,
+        "p95": 2045,
+        "max": 2308,
+        "timeouts": 0
+      },
+      "pageErrors": [],
+      "perClient": [
+        {
+          "client": "dm",
+          "joinMs": null,
+          "requestsPerMinute": 94,
+          "kbPerMinute": 15721,
+          "byPath": {
+            "serverFn": {
+              "n": 107,
+              "bytes": 16840402
+            }
+          },
+          "longTasks": 65,
+          "longTaskMsTotal": 6290,
+          "longestTaskMs": 295,
+          "heapMB": 179
+        },
+        {
+          "client": "p1",
+          "joinMs": 5180,
+          "requestsPerMinute": 98,
+          "kbPerMinute": 2419,
+          "byPath": {
+            "serverFn": {
+              "n": 112,
+              "bytes": 2697028
+            }
+          },
+          "longTasks": 69,
+          "longTaskMsTotal": 5901,
+          "longestTaskMs": 231,
+          "heapMB": 133
+        },
+        {
+          "client": "p2",
+          "joinMs": 5695,
+          "requestsPerMinute": 96,
+          "kbPerMinute": 2235,
+          "byPath": {
+            "serverFn": {
+              "n": 109,
+              "bytes": 2398555
+            }
+          },
+          "longTasks": 55,
+          "longTaskMsTotal": 5414,
+          "longestTaskMs": 286,
+          "heapMB": 111
+        },
+        {
+          "client": "p3",
+          "joinMs": 5434,
+          "requestsPerMinute": 92,
+          "kbPerMinute": 2077,
+          "byPath": {
+            "serverFn": {
+              "n": 107,
+              "bytes": 2343046
+            }
+          },
+          "longTasks": 75,
+          "longTaskMsTotal": 7528,
+          "longestTaskMs": 370,
+          "heapMB": 133
+        },
+        {
+          "client": "p4",
+          "joinMs": 5449,
+          "requestsPerMinute": 94,
+          "kbPerMinute": 2002,
+          "byPath": {
+            "serverFn": {
+              "n": 108,
+              "bytes": 2158641
+            }
+          },
+          "longTasks": 117,
+          "longTaskMsTotal": 11762,
+          "longestTaskMs": 607,
+          "heapMB": 125
+        }
+      ]
+    },
+    {
+      "users": 6,
+      "actions": 17,
+      "actionMs": {
+        "p50": 605,
+        "p95": 840,
+        "max": 840
+      },
+      "actionErrors": [],
+      "burst": {
+        "failed": [],
+        "maxMs": 4042
+      },
+      "propagationMs": {
+        "p50": 1180,
+        "p95": 2359,
+        "max": 2616,
+        "timeouts": 0
+      },
+      "pageErrors": [],
+      "perClient": [
+        {
+          "client": "dm",
+          "joinMs": null,
+          "requestsPerMinute": 89,
+          "kbPerMinute": 14486,
+          "byPath": {
+            "serverFn": {
+              "n": 89,
+              "bytes": 14833562
+            }
+          },
+          "longTasks": 133,
+          "longTaskMsTotal": 13931,
+          "longestTaskMs": 401,
+          "heapMB": 179
+        },
+        {
+          "client": "p1",
+          "joinMs": 5180,
+          "requestsPerMinute": 94,
+          "kbPerMinute": 2417,
+          "byPath": {
+            "serverFn": {
+              "n": 95,
+              "bytes": 2476010
+            }
+          },
+          "longTasks": 74,
+          "longTaskMsTotal": 7132,
+          "longestTaskMs": 378,
+          "heapMB": 133
+        },
+        {
+          "client": "p2",
+          "joinMs": 5695,
+          "requestsPerMinute": 94,
+          "kbPerMinute": 2339,
+          "byPath": {
+            "serverFn": {
+              "n": 94,
+              "bytes": 2394676
+            }
+          },
+          "longTasks": 62,
+          "longTaskMsTotal": 6235,
+          "longestTaskMs": 317,
+          "heapMB": 111
+        },
+        {
+          "client": "p3",
+          "joinMs": 5434,
+          "requestsPerMinute": 89,
+          "kbPerMinute": 2164,
+          "byPath": {
+            "serverFn": {
+              "n": 89,
+              "bytes": 2215793
+            }
+          },
+          "longTasks": 64,
+          "longTaskMsTotal": 6766,
+          "longestTaskMs": 261,
+          "heapMB": 133
+        },
+        {
+          "client": "p4",
+          "joinMs": 5449,
+          "requestsPerMinute": 94,
+          "kbPerMinute": 2400,
+          "byPath": {
+            "serverFn": {
+              "n": 94,
+              "bytes": 2457854
+            }
+          },
+          "longTasks": 87,
+          "longTaskMsTotal": 8879,
+          "longestTaskMs": 290,
+          "heapMB": 125
+        },
+        {
+          "client": "p5",
+          "joinMs": 4933,
+          "requestsPerMinute": 92,
+          "kbPerMinute": 1991,
+          "byPath": {
+            "/api/account/auth/get-session": {
+              "n": 1,
+              "bytes": 248
+            },
+            "serverFn": {
+              "n": 91,
+              "bytes": 2039041
+            }
+          },
+          "longTasks": 123,
+          "longTaskMsTotal": 12967,
+          "longestTaskMs": 649,
+          "heapMB": 104
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

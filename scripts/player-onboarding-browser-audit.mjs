@@ -7,6 +7,9 @@
 // - the join link finds its characters by itself, the support panels fold into one group until
 //   joining, an empty name is refused inline, "Your name" is remembered, and the player lands on
 //   Home with "You're playing <character>" and a dismissible Sheet · Inventory & coins · Chat strip;
+// - a healthy room is a "● Live" header pill instead of the status card (the card returns when
+//   offline), the phone scene strip is at most 48 px, and Home shows "Since you were away" with
+//   the pooled lot waiting for the player's claim;
 // - the character sheet opens straight to the sheet with a Home breadcrumb, the DM lock as an
 //   icon, no save bar until an edit, quick ±HP that saves, a "Last roll" chip and the shared-room
 //   roll-log wording; the character library is folded below the sheet and opens from Sheet tools;
@@ -83,7 +86,19 @@ try {
             sheet: { ...blankSheet(), name: p.name, hp: 10, maxHp: 12 },
           })),
         ],
-        holdings: [],
+        // One pooled lot: "Since you were away" counts it as waiting for the player's claim.
+        holdings: [
+          {
+            id: "pooled-sword",
+            purseId: "hoard",
+            name: "+1 Longsword",
+            kind: "item",
+            quantity: 1,
+            unitCopper: 50000,
+            notes: "",
+            pool: { at: Date.now(), source: "add-loot" },
+          },
+        ],
         shops: [],
         stock: [],
         ledger: [],
@@ -140,9 +155,33 @@ try {
     await fits(page, `home tips ${player.width}`);
     await page.screenshot({ path: `${output}/joined-home-${player.width}.png`, fullPage: true });
     await expect(page).toHaveTitle(`${player.name} · ${CAMPAIGN}`);
+    // A healthy room is a header pill, not a status card (P4).
+    const pill = page.locator(".room-pill");
+    await expect(pill).toBeVisible();
+    await expect(pill).toHaveAttribute("aria-label", /^Live · Room online · Play active · Saved to room/);
+    await expect(page.locator(".sync-status")).toHaveCount(0);
+    const away = page.getByRole("region", { name: "Since you were away", exact: true });
+    await expect(away.getByRole("link", { name: "1 item waiting for your claim →", exact: true })).toBeVisible();
+    if (player.width <= 430) {
+      const strip = await page
+        .locator(".submenu-workspace[data-submenu-scene]")
+        .evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).paddingTop)));
+      assert.ok(strip.every((px) => px <= 48), `${player.width}: the scene strip is at most 48 px (${strip})`);
+    }
     if (player.width === 390) {
       await tips.getByRole("button", { name: "Dismiss getting started tips", exact: true }).click();
       await expect(tips).toHaveCount(0);
+    }
+    if (player.width === 320) {
+      // Offline: the pill gives way to the full card that says what needs attention.
+      await page.context().setOffline(true);
+      await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+      await expect(page.locator(".sync-status")).toContainText("Offline");
+      await expect(pill).toHaveCount(0);
+      await page.screenshot({ path: `${output}/offline-${player.width}.png`, fullPage: true });
+      await page.context().setOffline(false);
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await expect(pill).toBeVisible();
     }
     await navigateApplication(page, origin + "/share");
     await page.getByText("You joined as a player", { exact: true }).waitFor();
@@ -215,7 +254,7 @@ try {
   }
   await dm.context.close();
   assert.deepEqual(errors, []);
-  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips, read-only room mode and the character sheet at 1280/390/320.");
+  console.log("PASS: player onboarding: campaign name, automatic join lookup, inline validation, remembered name, Home landing with tips and read-only room mode, status pill, scene strip, Since you were away and the character sheet at 1280/390/320.");
 } finally {
   await browser.close();
 }

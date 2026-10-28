@@ -8,16 +8,28 @@ import { characterSheet } from "@/lib/characters/campaign-sheet.mjs";
 import { Guide } from "./guide";
 import { LedgerArt } from "./ledger-art";
 import { PlayerQuestHome } from "./quests";
-import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { dismissJoinTips, joinTipsOffered } from "@/lib/quire/join-memory";
+import { useChatUnread } from "@/lib/quire/use-chat-unread";
+import { activeCampaignId } from "@/lib/quire/campaign-context";
+import { getCloudTable } from "@/lib/quire/cloud-client";
+import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
+import {
+  awaySnapshot,
+  readAwaySnapshot,
+  sinceAway,
+  writeAwaySnapshot,
+  type AwaySnapshot,
+  type AwayTable,
+} from "@/lib/quire/since-away";
+import { useEffect, useRef, useState } from "react";
 
 // Fixed player services share the existing destination labels and artwork.
 const playerServices = normalizeShortcuts(null, "player").map((item) =>
   shortcutDestinations.find((target) => target.id === item.destination)!,
 );
 export function PlayerHome() {
-  const { purses, ready, holdings, sheets } = useEconomy(),
+  const { purses, ready, holdings, sheets, journal } = useEconomy(),
     seat = useSeat();
   const mine = purses.filter((p) => seat.purseIds.includes(p.id) && p.kind === "character");
   return (
@@ -59,6 +71,9 @@ export function PlayerHome() {
               </article>
             );
           })
+        )}
+        {ready && mine.length > 0 && (
+          <SinceAway table={{ holdings, journal } as AwayTable} mine={mine.map((p) => p.id)} />
         )}
         {ready && mine.length > 0 && <JoinTips sheetHref={`/characters?id=${encodeURIComponent(`party:${mine[0]!.id}`)}`} />}
         {ready && mine.length > 0 && <PlayerQuestHome />}
@@ -125,6 +140,39 @@ function JoinTips({ sheetHref }: { sheetHref: string }) {
           <span>Talk with your party and your DM.</span>
         </li>
       </ol>
+    </section>
+  );
+}
+
+/** "Since you were away" (plan P4, Q21): shown only when something is waiting for this player. */
+function SinceAway({ table, mine }: { table: AwayTable; mine: string[] }) {
+  const { count } = useChatUnread();
+  // The comparison point is the last time this device left Home; it is read once per visit.
+  const [previous, setPrevious] = useState<AwaySnapshot | null | undefined>(undefined);
+  const latest = useRef({ table, mine });
+  latest.current = { table, mine };
+  useEffect(() => {
+    const room = getCloudTable();
+    // Guests keep this in memory only; account seats are keyed by campaign and seat.
+    const scope = { campaign: activeCampaignId(), seatId: room.seatId, guest: isEphemeralCampaign() };
+    setPrevious(readAwaySnapshot(scope));
+    return () => {
+      writeAwaySnapshot(scope, awaySnapshot(latest.current.table, latest.current.mine, Date.now()));
+    };
+  }, []);
+  if (previous === undefined) return null;
+  const items = sinceAway(table, mine, previous, count);
+  if (!items.length) return null;
+  return (
+    <section className="since-away" aria-label="Since you were away">
+      <h2>Since you were away</h2>
+      <ul>
+        {items.map((item) => (
+          <li key={item.id}>
+            <AppLink href={item.href}>{item.text} →</AppLink>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
