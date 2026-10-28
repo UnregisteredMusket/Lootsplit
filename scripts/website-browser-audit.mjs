@@ -56,8 +56,11 @@ try {
       ["community", "Find your"],
       ["account", "Welcome to your next chapter."],
     ]) {
+      // The live /account page loads Cloudflare Turnstile, whose challenge traffic can keep the
+      // network busy well past 20 s, so that page waits for load plus its heading instead of
+      // networkidle (the 2026-10-28 release audit timed out there after a successful deploy).
       const response = await openApplication(page, `${origin}/${path}`, {
-        waitUntil: "networkidle",
+        waitUntil: path === "account" ? "load" : "networkidle",
       });
       assert.equal(response.status(), 200);
       await page.getByRole("heading", { level: 1 }).filter({ hasText: heading }).waitFor();

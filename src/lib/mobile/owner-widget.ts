@@ -20,6 +20,8 @@ export const OwnerWidget = registerPlugin<{
   configure(options: { widgetId: number }): Promise<void>;
   consumeOpenRequest(): Promise<{ open: boolean; destination?: string }>;
   installId(): Promise<{ id: string }>;
+  /** The widget's own stored session token ("" when disconnected); never the app's token. */
+  sessionToken(): Promise<{ token: string }>;
 }>("OwnerWidget");
 
 export function hasOwnerWidget() {
@@ -33,13 +35,38 @@ export async function readInstallId(): Promise<string> {
   return typeof id === "string" ? id : "";
 }
 
-/** Called before account switches/sign-out; no widget credential survives that transition. */
+/**
+ * Clears this device's widget. The widget has its own owner session (not the app's token), so an
+ * app sign-out or re-sign-in no longer reaches it: `expectedToken` only matches a widget that is
+ * still connected with that same app token (installs connected before 2026-10-28), which is the
+ * legacy case this call still has to clear. An explicit disconnect also revokes the widget session.
+ */
 export async function disconnectOwnerWidget(expectedToken?: string) {
-  if (hasOwnerWidget()) await OwnerWidget.disconnect({ expectedToken });
+  if (!hasOwnerWidget()) return;
+  if (expectedToken === undefined) {
+    const { accountRequest } = await import("../account/client");
+    const current = await OwnerWidget.status();
+    if (current.connected) {
+      const { token } = await OwnerWidget.sessionToken().catch(() => ({ token: "" }));
+      if (token)
+        await accountRequest("owner/monitor/widget-session", { action: "revoke", token }).catch(
+          () => undefined,
+        );
+    }
+  }
+  await OwnerWidget.disconnect({ expectedToken });
 }
 
+/** Opens a dedicated owner session for the widget; the server refuses it for anyone but the owner. */
 export async function connectOwnerWidget() {
-  const token = localStorage.getItem("lootsplit.account.token.v1");
-  if (!token) throw new Error("Sign in to your owner account first.");
-  await OwnerWidget.connect({ token });
+  if (!localStorage.getItem("lootsplit.account.token.v1"))
+    throw new Error("Sign in to your owner account first.");
+  const { accountRequest } = await import("../account/client");
+  const previous = await OwnerWidget.sessionToken().catch(() => ({ token: "" }));
+  const session = await accountRequest<{ token: string; expiresAt: string }>(
+    "owner/monitor/widget-session",
+    { action: "create", previousToken: previous.token || undefined },
+  );
+  if (!session?.token) throw new Error("The widget session could not be opened.");
+  await OwnerWidget.connect({ token: session.token });
 }
