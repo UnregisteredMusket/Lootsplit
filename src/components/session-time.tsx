@@ -9,6 +9,7 @@ import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm } from "./world-tools";
 import { Fold } from "./ui";
 import { AppLink } from "./app-link";
+import { timeChips } from "@/lib/quire/time-chips";
 export function SessionTime({ initialHours = "1" }: { initialHours?: string } = {}) {
   const t = useWorldTable(),
     f = readFinance(t.journal.finance),
@@ -55,6 +56,28 @@ export function SessionTime({ initialHours = "1" }: { initialHours?: string } = 
           };
         }}
       >
+        {/* Quick chips (design Q6) fill the form; Approve & advance still applies it. */}
+        <div className="time-chips" role="group" aria-label="Quick time">
+          {timeChips(f.minuteOfDay ?? 0).map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              className="time-chip"
+              aria-pressed={
+                Number(hours) === chip.hours && (chip.rest ? rest === chip.rest : true)
+              }
+              onClick={() => {
+                setHours(String(chip.hours));
+                if (chip.rest) {
+                  setRest(chip.rest);
+                  setRecipients(characters.map((p) => p.id));
+                }
+              }}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
         <label>
           Hours to advance
           <input

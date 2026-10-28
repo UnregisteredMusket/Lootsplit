@@ -19,6 +19,7 @@ const featureAudits = {
   "party-inventory": "scripts/party-inventory-browser-audit.mjs",
   "journey-planner": "scripts/journey-planner-browser-audit.mjs",
   "party-split": "scripts/party-split-browser-audit.mjs",
+  "tracker-time": "scripts/tracker-time-browser-audit.mjs",
   "quest-log": "scripts/quest-log-browser-audit.mjs",
   services: "scripts/services-browser-audit.mjs",
   "dm-mobile": "scripts/dm-mobile-browser-audit.mjs",

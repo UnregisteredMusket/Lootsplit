@@ -261,6 +261,9 @@ jobs:
       - name: dev-party-inventory
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-party-inventory 300 node --experimental-strip-types scripts/party-inventory-browser-audit.mjs
+      - name: dev-tracker-time
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-tracker-time 240 node scripts/tracker-time-browser-audit.mjs
       - name: dev-themed-confirm
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-themed-confirm 180 node scripts/themed-confirm-browser-audit.mjs
