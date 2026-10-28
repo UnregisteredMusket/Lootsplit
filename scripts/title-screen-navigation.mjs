@@ -152,6 +152,18 @@ export async function afterJoining(page) {
   const viewport = page.viewportSize();
   if (viewport) await page.mouse.move(1, viewport.height - 1);
   await page.locator("[data-sonner-toast]").first().waitFor({ state: "detached", timeout: 10000 }).catch(() => undefined);
-  await navigateApplication(page, new URL("/share", page.url()).href);
+  try {
+    await navigateApplication(page, new URL("/share", page.url()).href);
+  } catch (error) {
+    // A dialog over Home has intermittently blocked this link on the packaged Worker
+    // (main d374e38). Print what it is so the next failure can be fixed at its source.
+    const dialogs = page.locator("[role=dialog],[role=alertdialog]");
+    const count = await dialogs.count().catch(() => 0);
+    for (let i = 0; i < count; i++) {
+      console.error(`afterJoining: open dialog ${i + 1}/${count} at ${page.url()}:\n` +
+        await dialogs.nth(i).ariaSnapshot().catch((e) => String(e)));
+    }
+    throw error;
+  }
   await page.locator(".room-code").waitFor();
 }
