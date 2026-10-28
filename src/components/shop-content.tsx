@@ -1,5 +1,6 @@
 import { SavedTick, useSavedTick } from "@/components/saved-tick";
 import { SearchSelect } from "@/components/search-select";
+import { copyName, shelfCopy, shopSettingsCopy } from "@/lib/quire/duplicate";
 import { useSeatGroups } from "@/lib/quire/use-seat-groups";
 import { MapRecordStrip } from "./map-record-strip";
 import { BlacksmithServices } from "@/components/blacksmith-services";
@@ -77,6 +78,7 @@ export function ShopContent({
   // Only the row being edited shows its cost and afterward-balance sentence.
   const [activeRow, setActiveRow] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const characters = spendable.filter((purse) => purse.kind === "character");
   const choices = sellTo && characters.length ? characters : spendable;
 
@@ -132,6 +134,41 @@ export function ShopContent({
   const region = shop.locationId
     ? locationLabel(readMarketLocations(economy.journal.market), shop.locationId)
     : "";
+  /** Duplicate (design Q9): a new shop with the same settings and stock, via the shop composer's
+   * create path; trade-exchange links and the restock schedule stay with the original. */
+  async function duplicate() {
+    if (!shop || duplicating) return;
+    setDuplicating(true);
+    try {
+      const name = copyName(shop.name);
+      const result = await economy.openShelfOutcome({
+        ...(shop.locationId ? { locationId: shop.locationId } : {}),
+        ...(shop.image ? { image: shop.image } : {}),
+        name,
+        keeper: shop.keeper,
+        place: shop.place,
+        notes: shop.notes,
+        sellRate: shop.sellRate,
+        buyRate: shop.buyRate,
+        wealth: shop.wealth,
+        category: shop.category,
+        priceScale: shop.priceScale,
+        lines: shelfCopy(lines),
+      });
+      // The remaining settings (accepted categories, black market, open/closed) as saved.
+      await economy.updateShop(shopSettingsCopy(shop, result.id, name));
+      toast.success(
+        result.status === "pending"
+          ? "Copy accepted as pending. Submit your turn or check sync before repeating it."
+          : `${name} created with ${lines.length} stock ${lines.length === 1 ? "line" : "lines"}.`,
+      );
+      void navigate({ to: "/shop/$shopId", params: { shopId: result.id } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The shop could not be duplicated.");
+    } finally {
+      setDuplicating(false);
+    }
+  }
   const pdf = (
     <Button
       variant="secondary"
@@ -298,6 +335,17 @@ export function ShopContent({
           </p>
           {pdf}
         </div>
+      ) : null}
+      {viewing === "edit" ? (
+        <Button
+          variant="secondary"
+          className="mt-8"
+          disabled={duplicating || editDirty}
+          title={editDirty ? "Save the shop first: the copy is made from the saved shop." : undefined}
+          onClick={() => void duplicate()}
+        >
+          {duplicating ? "Duplicating…" : "Duplicate shop"}
+        </Button>
       ) : null}
       {viewing === "edit" ? (
         <button

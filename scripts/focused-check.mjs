@@ -21,6 +21,7 @@ const featureAudits = {
   "party-split": "scripts/party-split-browser-audit.mjs",
   "tracker-time": "scripts/tracker-time-browser-audit.mjs",
   "quest-log": "scripts/quest-log-browser-audit.mjs",
+  "duplicate-filters": "scripts/duplicate-filters-browser-audit.mjs",
   services: "scripts/services-browser-audit.mjs",
   "dm-mobile": "scripts/dm-mobile-browser-audit.mjs",
   "themed-confirm": "scripts/themed-confirm-browser-audit.mjs",
