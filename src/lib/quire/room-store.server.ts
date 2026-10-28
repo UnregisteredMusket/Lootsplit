@@ -251,16 +251,17 @@ export async function createRoom(
     if (host && hosting) await hosting.assertCanHost(db, host.userId, host.path, host.limit);
     const encoded = await encodeRoomImages(room);
     await guardRoomSize(db, room, encoded);
+    const writeId = crypto.randomUUID();
     const insert = host && hosting
       ? db
           .prepare(
-            `INSERT INTO campaign_rooms (code, revision, body) SELECT ?, ?, ? WHERE ${hosting.hostedCampaignGuardSql}`,
+            `INSERT INTO campaign_rooms (code, revision, body, write_id) SELECT ?, ?, ?, ? WHERE ${hosting.hostedCampaignGuardSql}`,
           )
-          .bind(room.code, room.revision, encoded.body, ...hosting.hostedCampaignGuardArgs(host.userId, host.limit))
+          .bind(room.code, room.revision, encoded.body, writeId, ...hosting.hostedCampaignGuardArgs(host.userId, host.limit))
       : db
-          .prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)")
-          .bind(room.code, room.revision, encoded.body);
-    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, encoded.body)];
+          .prepare("INSERT INTO campaign_rooms (code, revision, body, write_id) VALUES (?, ?, ?, ?)")
+          .bind(room.code, room.revision, encoded.body, writeId);
+    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, writeId)];
     const result = members.length ? (await db.batch([insert, ...members]))[0]! : await insert.run();
     if (host && hosting && !result.meta.changes) {
       // A concurrent open filled the last slot between the pre-check and this write.
@@ -387,7 +388,7 @@ export async function updateRoom(
       .bind(room.revision, encoded.body, writeId, room.code, baseRevision);
     const members = [
       ...await roomImageStatements(db, stored, encoded),
-      ...accountSeats(db, stored, encoded.body),
+      ...accountSeats(db, stored, writeId),
       ...(receipts.length ? [receiptStatement(db, room.code, receipts, writeId)] : []),
     ];
     const result = members.length ? (await db.batch([update, ...members]))[0]! : await update.run();
@@ -437,13 +438,18 @@ export async function deleteRoom(code: string, baseRevision: number): Promise<vo
   });
 }
 
-function accountSeats(db: Database, room: CloudRoom, body: string): Statement[] {
+/**
+ * Library membership for account seats, written only if the room write with `writeId` committed in
+ * the same batch. (It used to compare the whole room body, sending it to D1 once per account seat on
+ * every write: load audit F14, 2026-10-28.)
+ */
+function accountSeats(db: Database, room: CloudRoom, writeId: string): Statement[] {
   return room.seats
     .filter((s) => s.userId)
     .map((s) =>
       db
         .prepare(
-          "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,updated_at=excluded.updated_at WHERE library_members.seat_id<>excluded.seat_id OR library_members.token<>excluded.token",
+          "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND write_id=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,updated_at=excluded.updated_at WHERE library_members.seat_id<>excluded.seat_id OR library_members.token<>excluded.token",
         )
         .bind(
           s.userId,
@@ -453,7 +459,7 @@ function accountSeats(db: Database, room: CloudRoom, body: string): Statement[] 
           "Campaign",
           Date.now(),
           room.code,
-          body,
+          writeId,
         ),
     );
 }

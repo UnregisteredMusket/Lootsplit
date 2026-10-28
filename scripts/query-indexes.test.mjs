@@ -31,3 +31,18 @@ test("0017 is additive and lets the real Worker queries use its indexes", () => 
   assert.equal(names.length, 4);
   db.close();
 });
+
+test("0024 and 0025 serve the per-poll room queries from indexes (load audit F1, F5)", () => {
+  assertAdditiveSql("0025_encounter_code_status_index.sql", readFileSync(`${directory}/0025_encounter_code_status_index.sql`, "utf8"));
+  const db = schema();
+  // cloud.server.ts activeEncounter: asked on every poll and every view; it scanned all encounters.
+  const encounter = plan(db, "SELECT 1 AS active FROM dm_encounters WHERE code=? AND status='active' LIMIT 1");
+  assert.match(encounter, /USING (COVERING )?INDEX dm_encounters_code_status/);
+  assert.doesNotMatch(encounter, /SCAN dm_encounters/);
+  // room-store.server.ts receipts: lookups by key and each seat's latest acknowledgements.
+  assert.match(plan(db, "SELECT key, hash FROM campaign_room_receipts WHERE code=? AND kind=? AND key IN (?,?)"), /USING INDEX campaign_room_receipts_key/);
+  const recent = plan(db, "SELECT key FROM campaign_room_receipts WHERE code=? AND seat_id=? AND kind='command' ORDER BY seq DESC LIMIT ?");
+  assert.match(recent, /USING INDEX campaign_room_receipts_recent/);
+  assert.doesNotMatch(recent, /TEMP B-TREE/);
+  db.close();
+});
