@@ -121,6 +121,12 @@ try {
     const context = await browser.newContext({
       viewport: { width, height: width === 320 ? 640 : width === 390 ? 844 : 900 },
       hasTouch: phone,
+      // Its own documentation-range address per width: the DM fixture signs up through the
+      // account API, which rate-limits by address across every audit sharing the dev server
+      // (main's run at e74a5b0 failed here with "Fixture identity: 429").
+      extraHTTPHeaders: {
+        "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1`,
+      },
     });
     await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
     const page = await context.newPage();
