@@ -14,6 +14,7 @@ import {
   hostedCampaignGuardSql,
   hostedCampaignLimit,
 } from "./hosted-campaigns.mjs";
+import { readRoomCore, roomJsonSql, roomWriteStatements } from "./room-storage.mjs";
 
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
@@ -160,7 +161,7 @@ export const deletionRecoverySql = `json_object(
  'encounterRolls',json((SELECT COALESCE(json_group_array(json_object('seq',r.seq,'encounter_id',r.encounter_id,'request_key',r.request_key,'body',json(r.body),'created_at',r.created_at)),'[]') FROM (SELECT * FROM dm_encounter_rolls ORDER BY seq) r JOIN dm_encounters e ON e.id=r.encounter_id WHERE e.code=? AND e.user_id=?)),
  'characterRolls',json((SELECT COALESCE(json_group_array(json_object('id',id,'user_id',user_id,'character_id',character_id,'request_key',request_key,'body',json(body),'created_at',created_at)),'[]') FROM (SELECT * FROM play_rolls WHERE code=? ORDER BY seq))),
  'imports',json((SELECT COALESCE(json_group_array(json_object('id',id,'user_id',user_id,'character_id',character_id,'purse_id',purse_id,'source_revision',source_revision,'target_revision',target_revision,'seat_id',seat_id,'session_id',session_id,'body',json(body),'status',status,'created_at',created_at,'reviewed_at',reviewed_at,'reviewed_by',reviewed_by)),'[]') FROM character_imports WHERE code=?)),
- 'assignments',json((SELECT COALESCE(json_group_array(json_object('id',c.id,'user_id',c.user_id,'purse_id',c.purse_id,'revision',c.revision,'updated_at',c.updated_at,'body',json(json_set(json_extract(p.value,'$.sheet'),'$.coins',json('{"cp":0,"sp":0,"ep":0,"gp":0,"pp":0}'),'$.equipment',json('[]'))))),'[]') FROM play_characters c JOIN campaign_rooms r ON r.code=c.campaign_code LEFT JOIN json_each(r.body,'$.table.purses') p ON json_extract(p.value,'$.id')=c.purse_id WHERE c.campaign_code=?))
+ 'assignments',json((SELECT COALESCE(json_group_array(json_object('id',c.id,'user_id',c.user_id,'purse_id',c.purse_id,'revision',c.revision,'updated_at',c.updated_at,'body',json(json_set(json_extract(p.value,'$.sheet'),'$.coins',json('{"cp":0,"sp":0,"ep":0,"gp":0,"pp":0}'),'$.equipment',json('[]'))))),'[]') FROM play_characters c JOIN campaign_rooms r ON r.code=c.campaign_code LEFT JOIN json_each(${roomJsonSql("r", "$.table.purses")}) p ON json_extract(p.value,'$.id')=c.purse_id WHERE c.campaign_code=?))
 )`;
 
 export function deletionRecoveryArgs(room, seat, name, userId) {
@@ -194,12 +195,11 @@ export function deletionRecoveryArgs(room, seat, name, userId) {
 
 async function restoredMembership(db, userId, code) {
   const row = await db
-    .prepare(
-      "SELECT m.*,r.body FROM library_members m JOIN campaign_rooms r ON r.code=m.code WHERE m.user_id=? AND m.code=?",
-    )
+    .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
     .bind(userId, code)
     .first();
-  const room = row && JSON.parse(row.body);
+  // Seats and owner only: the light read (room-storage.mjs) never loads the campaign table.
+  const room = row && (await readRoomCore(db, code));
   const seat = room?.seats.find(
     (s) => s.id === row.seat_id && s.token === row.token && s.userId === userId && s.role === "dm",
   );
@@ -326,6 +326,12 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
       413,
     );
   const committed = "EXISTS(SELECT 1 FROM campaign_recoveries WHERE id=? AND user_id=?)";
+  const roomWrite = roomWriteStatements(db, room, {
+    create: true,
+    body: encoded.body,
+    extraWhere: committed,
+    extraArgs: [id, userId],
+  });
   const statements = [
     db
       .prepare(
@@ -344,12 +350,10 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
         ...accountGuardArgs,
         ...hostedCampaignGuardArgs(userId, limit),
       ),
-    db
-      .prepare(`INSERT INTO campaign_rooms(code,revision,body) SELECT ?,1,? WHERE ${committed}`)
-      .bind(code, encoded.body, id, userId),
-    // Guarded by the row just inserted (code, revision 1, exact body): nothing is stored unless
-    // the restore commits, and the whole batch is one atomic D1 transaction.
-    ...(await roomImageStatements(db, { code, revision: 1 }, encoded)),
+    ...roomWrite.statements,
+    // Guarded by the row just inserted (its write_id): nothing is stored unless the restore
+    // commits, and the whole batch is one atomic D1 transaction.
+    ...(await roomImageStatements(db, { code, revision: 1 }, encoded, roomWrite.writeId)),
     db
       .prepare(
         `INSERT INTO library_members(user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE ${committed}`,

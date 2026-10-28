@@ -1,3 +1,4 @@
+import { roomCommittedSql } from "./room-storage.mjs";
 /**
  * Archived session snapshots (`table.journal.reports[].snapshot`) live in campaign_room_reports,
  * not in the room row. The stored room keeps each report's id, name, time and seat list plus a
@@ -8,9 +9,9 @@
  * their next authoritative write (encodeRoomReports in updateRoom). Nothing is bulk rewritten,
  * and no snapshot is ever dropped: a missing row stops the read instead of degrading the room.
  *
- * Raw-body writers (character-play, encounters, account link, test mode) parse and re-serialize
- * the stored body, which keeps the references as they are. They must never parse the journal
- * with the zod journal schema, which requires `snapshot`.
+ * Raw-body writers (character-play, encounters, account link, test mode) read the stored form
+ * (room-storage.mjs `readStoredRoom`) and write it back, which keeps the references as they are.
+ * They must never parse the journal with the zod journal schema, which requires `snapshot`.
  */
 const REFERENCE = /^session-report:[a-f0-9]{64}$/;
 
@@ -92,8 +93,10 @@ export async function hydrateRoomReports(db, code, value) {
  * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
  * @param {{code:string;revision:number}} room
  * @param {{body:string;reports?:{reference:string;body:string}[]}} encoded
+ * @param {string} writeId the room write (room-storage.mjs) these rows depend on
  */
-export async function roomReportStatements(db, room, encoded) {
+export async function roomReportStatements(db, room, encoded, writeId) {
+  const committed = roomCommittedSql(room.code, writeId);
   if (!encoded.reports?.length) return [];
   const present = await db
     .prepare("SELECT reference FROM campaign_room_reports WHERE code=?")
@@ -105,8 +108,8 @@ export async function roomReportStatements(db, room, encoded) {
     .map((doc) =>
       db
         .prepare(
-          "INSERT INTO campaign_room_reports(code,reference,body) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=? AND body=?) ON CONFLICT(code,reference) DO NOTHING",
+          `INSERT INTO campaign_room_reports(code,reference,body) SELECT ?,?,? WHERE ${committed.sql} ON CONFLICT(code,reference) DO NOTHING`,
         )
-        .bind(room.code, doc.reference, doc.body, room.code, room.revision, encoded.body),
+        .bind(room.code, doc.reference, doc.body, ...committed.args),
     );
 }

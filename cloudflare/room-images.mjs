@@ -1,3 +1,4 @@
+import { roomCommittedSql } from "./room-storage.mjs";
 import {
   encodeRoomResources,
   hydrateRoomResources,
@@ -188,11 +189,13 @@ export async function readRoomImage(db, code, ref) {
 }
 /** Writes follow the room CAS in the same atomic D1 batch; a losing writer creates no assets.
  * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
- * @param {{code:string;revision:number}} room @param {{body:string;assets:{reference:string;image:string}[];documents?:{reference:string;body:string}[];reports?:{reference:string;body:string}[]}} encoded */
-export async function roomImageStatements(db, room, encoded) {
+ * @param {{code:string;revision:number}} room @param {{body:string;assets:{reference:string;image:string}[];documents?:{reference:string;body:string}[];reports?:{reference:string;body:string}[]}} encoded
+ * @param {string} writeId the room write (room-storage.mjs) these rows depend on */
+export async function roomImageStatements(db, room, encoded, writeId) {
+  const committed = roomCommittedSql(room.code, writeId);
   const documents = [
-    ...(await roomReportStatements(db, room, encoded)),
-    ...(await roomResourceStatements(db, room, encoded)),
+    ...(await roomReportStatements(db, room, encoded, writeId)),
+    ...(await roomResourceStatements(db, room, encoded, writeId)),
   ];
   if (!encoded.assets.length) return documents;
   const present = await db
@@ -207,9 +210,9 @@ export async function roomImageStatements(db, room, encoded) {
       .map((asset) =>
         db
           .prepare(
-            "INSERT INTO campaign_room_images(code,reference,image) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=? AND body=?) ON CONFLICT(code,reference) DO NOTHING",
+            `INSERT INTO campaign_room_images(code,reference,image) SELECT ?,?,? WHERE ${committed.sql} ON CONFLICT(code,reference) DO NOTHING`,
           )
-          .bind(room.code, asset.reference, asset.image, room.code, room.revision, encoded.body),
+          .bind(room.code, asset.reference, asset.image, ...committed.args),
       ),
   ];
 }

@@ -6,6 +6,13 @@ import {
   ROOM_BODY_LIMIT,
   ROOM_IMAGE_SOURCES,
 } from "../../../cloudflare/room-images.mjs";
+import {
+  readStoredRoom,
+  roomCommittedSql,
+  roomDeleteStatement,
+  roomJsonSql,
+  roomWriteStatements,
+} from "../../../cloudflare/room-storage.mjs";
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { CloudRoom } from "./cloud.ts";
@@ -69,6 +76,7 @@ export async function readRoomAccess(code: string): Promise<RoomAccess | null> {
     const { revision, ownerId, sessionId, closed, seats } = room;
     return { code: canonicalCode, revision, ownerId, sessionId, closed, seats };
   }
+  // Top-level fields only (they stay on the room row in sectioned storage).
   const row = await db.prepare(
     "SELECT revision,json_extract(body,'$.ownerId') AS ownerId,json_extract(body,'$.sessionId') AS sessionId,json_extract(body,'$.closed') AS closed,json_extract(body,'$.seats') AS seats FROM campaign_rooms WHERE code=?",
   ).bind(canonicalCode).first<{ revision: number; ownerId: string | null; sessionId: string | null; closed: number | null; seats: string }>();
@@ -154,16 +162,13 @@ export type ReadRoomOptions = {
 export async function readRoom(code: string, options: ReadRoomOptions = {}): Promise<CloudRoom | null> {
   const db = database();
   if (db) {
-    const row = await db
-      .prepare("SELECT body FROM campaign_rooms WHERE code = ?")
-      .bind(code)
-      .first<{ body: string }>();
-    if (!row) return null;
+    const read = await readStoredRoom(db, code);
+    if (!read) return null;
     const { hydrateCampaignCharacters } =
       await import("../../../cloudflare/campaign-characters.mjs");
-    const parsed = JSON.parse(row.body) as CloudRoom, revision = parsed.revision;
+    const parsed = read.room as CloudRoom, revision = parsed.revision;
     const room = await hydrateCampaignCharacters(db, parsed);
-    const stored = room.revision === revision ? row.body : JSON.stringify(room);
+    const stored = room.revision === revision ? read.body : JSON.stringify(room);
     const hydrated = await hydrateRoomImages(db, room.code, room, {
       keepMapImageReferences: options.mapImageReferences === true,
     });
@@ -196,7 +201,7 @@ export async function readCombatView(code: string): Promise<CombatViewRead | nul
   }
   const row = await db
     .prepare(
-      "SELECT r.body AS body,e.body AS encounter_body,e.status AS encounter_status FROM campaign_rooms r LEFT JOIN dm_encounters e ON e.id=json_extract(r.body,'$.table.journal.world.combat.encounterId') AND e.code=r.code WHERE r.code=?",
+      `SELECT r.body AS body,e.body AS encounter_body,e.status AS encounter_status FROM campaign_rooms r LEFT JOIN dm_encounters e ON e.id=${roomJsonSql("r", "$.table.journal.world.combat.encounterId")} AND e.code=r.code WHERE r.code=?`,
     )
     .bind(code)
     .first<{ body: string; encounter_body: string | null; encounter_status: string | null }>();
@@ -293,17 +298,15 @@ export async function createRoom(
     if (host && hosting) await hosting.assertCanHost(db, host.userId, host.path, host.limit);
     const encoded = await encodeRoomImages(room);
     await guardRoomSize(db, room, encoded);
-    const writeId = crypto.randomUUID();
-    const insert = host && hosting
-      ? db
-          .prepare(
-            `INSERT INTO campaign_rooms (code, revision, body, write_id) SELECT ?, ?, ?, ? WHERE ${hosting.hostedCampaignGuardSql}`,
-          )
-          .bind(room.code, room.revision, encoded.body, writeId, ...hosting.hostedCampaignGuardArgs(host.userId, host.limit))
-      : db
-          .prepare("INSERT INTO campaign_rooms (code, revision, body, write_id) VALUES (?, ?, ?, ?)")
-          .bind(room.code, room.revision, encoded.body, writeId);
-    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, writeId)];
+    const write = roomWriteStatements(db, room, {
+      create: true,
+      body: encoded.body,
+      ...(host && hosting
+        ? { extraWhere: hosting.hostedCampaignGuardSql, extraArgs: hosting.hostedCampaignGuardArgs(host.userId, host.limit) }
+        : {}),
+    });
+    const [insert] = write.statements as [Statement];
+    const members = [...await roomImageStatements(db, room, encoded, write.writeId), ...accountSeats(db, room, write.writeId)];
     const result = members.length ? (await db.batch([insert, ...members]))[0]! : await insert.run();
     if (host && hosting && !result.meta.changes) {
       // A concurrent open filled the last slot between the pre-check and this write.
@@ -400,6 +403,7 @@ function withoutReceipts(room: CloudRoom): CloudRoom {
 }
 /** Inserts receipts only if the room write with `writeId` committed in the same batch. */
 function receiptStatement(db: Database, code: string, receipts: RoomReceipt[], writeId: string): Statement {
+  const committed = roomCommittedSql(code, writeId);
   const rows = JSON.stringify(receipts.map((r) => [r.key, r.hash ?? null, r.kind]));
   return db
     .prepare(
@@ -407,10 +411,10 @@ function receiptStatement(db: Database, code: string, receipts: RoomReceipt[], w
        SELECT ?, substr(json_extract(j.value,'$[0]'), 1, instr(json_extract(j.value,'$[0]'), ':') - 1),
          json_extract(j.value,'$[2]'), json_extract(j.value,'$[0]'), json_extract(j.value,'$[1]'), ?
        FROM json_each(?) AS j
-       WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND write_id=?)
+       WHERE ${committed.sql}
        ORDER BY j.key`,
     )
-    .bind(code, Date.now(), rows, code, writeId);
+    .bind(code, Date.now(), rows, ...committed.args);
 }
 export async function updateRoom(
   room: CloudRoom,
@@ -424,12 +428,11 @@ export async function updateRoom(
     const stored = withoutReceipts(room);
     const encoded = await encodeRoomImages(stored);
     await guardRoomSize(db, stored, encoded);
-    const writeId = crypto.randomUUID();
-    const update = db
-      .prepare("UPDATE campaign_rooms SET revision = ?, body = ?, write_id = ? WHERE code = ? AND revision = ?")
-      .bind(room.revision, encoded.body, writeId, room.code, baseRevision);
+    const write = roomWriteStatements(db, room, { expect: { revision: baseRevision }, body: encoded.body });
+    const [update] = write.statements as [Statement];
+    const writeId = write.writeId;
     const members = [
-      ...await roomImageStatements(db, stored, encoded),
+      ...await roomImageStatements(db, stored, encoded, writeId),
       ...accountSeats(db, stored, writeId),
       ...(receipts.length ? [receiptStatement(db, room.code, receipts, writeId)] : []),
     ];
@@ -462,7 +465,7 @@ export async function deleteRoom(code: string, baseRevision: number): Promise<vo
   if (db) {
     // A deleted room's receipts go with it, in the same transaction (only once the room is gone).
     const [result] = await db.batch([
-      db.prepare("DELETE FROM campaign_rooms WHERE code = ? AND revision = ?").bind(code, baseRevision),
+      roomDeleteStatement(db, code, { expect: { revision: baseRevision } }) as Statement,
       db
         .prepare(
           "DELETE FROM campaign_room_receipts WHERE code = ? AND NOT EXISTS (SELECT 1 FROM campaign_rooms WHERE code = ?)",
@@ -491,7 +494,7 @@ function accountSeats(db: Database, room: CloudRoom, writeId: string): Statement
     .map((s) =>
       db
         .prepare(
-          "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND write_id=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,updated_at=excluded.updated_at WHERE library_members.seat_id<>excluded.seat_id OR library_members.token<>excluded.token",
+          `INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE ${roomCommittedSql(room.code, writeId).sql} ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,updated_at=excluded.updated_at WHERE library_members.seat_id<>excluded.seat_id OR library_members.token<>excluded.token`,
         )
         .bind(
           s.userId,
@@ -500,8 +503,7 @@ function accountSeats(db: Database, room: CloudRoom, writeId: string): Statement
           s.token,
           "Campaign",
           Date.now(),
-          room.code,
-          writeId,
+          ...roomCommittedSql(room.code, writeId).args,
         ),
     );
 }

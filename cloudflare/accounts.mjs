@@ -4,6 +4,13 @@ import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
 import { libraryMemberRoom } from "./library-member-room.mjs";
+import {
+  readStoredRoom,
+  roomCoreColumnsSql,
+  roomCoreFromRow,
+  roomVersionSql,
+  roomWriteStatements,
+} from "./room-storage.mjs";
 import { hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 /** Tabletop protocol the account client declared: 0 (none) to 9 (current; 4 adds nothing here,
@@ -224,12 +231,12 @@ async function rateLimit(env, request, userId = null) {
     tooMany();
 }
 async function roomSeat(db, code, token) {
-  const row = await db.prepare("SELECT body FROM campaign_rooms WHERE code = ?").bind(code).first();
-  const room = row ? JSON.parse(row.body) : null;
+  const stored = await readStoredRoom(db, code);
+  const room = stored ? stored.room : null;
   const seat = room?.seats.find((s) => s.token === token);
   if (!seat || room.closed)
     fail("This campaign membership is no longer available. Ask the DM for a new invitation.", 403);
-  return { room, seat };
+  return { room, seat, version: stored.version };
 }
 
 /**
@@ -239,7 +246,7 @@ async function roomSeat(db, code, token) {
 export async function linkAccountSeat(db, userId, body, limit = hostedCampaignLimit()) {
   const code = text(body.code, 16).toUpperCase(),
     token = text(body.token, 128);
-  const { room, seat } = await roomSeat(db, code, token);
+  const { room, seat, version } = await roomSeat(db, code, token);
   if (
     (room.ownerId && seat.role === "dm" && room.ownerId !== userId) ||
     (seat.userId && seat.userId !== userId)
@@ -250,45 +257,36 @@ export async function linkAccountSeat(db, userId, body, limit = hostedCampaignLi
     .bind(code, seat.id)
     .first();
   if (owner && owner.user_id !== userId) fail("This seat is linked to another account.", 409);
-  const prior = JSON.stringify(room);
   const changes = seat.userId !== userId || (seat.role === "dm" && room.ownerId !== userId);
   // Taking ownership of an unowned live room (a guest-era DM seat) makes this account its host.
   const hosting = seat.role === "dm" && room.ownerId !== userId;
   if (hosting) await assertCanHost(db, userId, "link", limit);
   const statements = [];
+  let write = null;
   if (changes) {
     seat.userId = userId;
     if (seat.role === "dm") room.ownerId = userId;
-    // Same conditional write as character-play: the body comparison detects a concurrent
+    // Same conditional write as character-play: the version guard detects a concurrent
     // change, and the revision bump invalidates revision-only CAS writers (updateRoom) and
     // tells knownRevision pollers that the room changed.
     room.revision = (Number.isSafeInteger(room.revision) ? room.revision : 0) + 1;
-    statements.push(
-      hosting
-        ? db
-            .prepare(
-              `UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=? AND ${hostedCampaignGuardSql}`,
-            )
-            .bind(
-              JSON.stringify(room),
-              room.revision,
-              code,
-              prior,
-              ...hostedCampaignGuardArgs(userId, limit),
-            )
-        : db
-            .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=?")
-            .bind(JSON.stringify(room), room.revision, code, prior),
-    );
+    write = roomWriteStatements(db, room, {
+      expect: version,
+      ...(hosting
+        ? { extraWhere: hostedCampaignGuardSql, extraArgs: hostedCampaignGuardArgs(userId, limit) }
+        : {}),
+    });
+    statements.push(...write.statements);
   }
   // An already linked seat leaves the room untouched (no revision bump); the membership
-  // row is still refreshed, and only while the room is exactly as read.
+  // row is still refreshed, and only while the room is exactly as read (or as just written).
+  const current = write ? write.committed : roomVersionSql(version);
   statements.push(
     db
       .prepare(
-        "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,name=excluded.name,archived=0,updated_at=excluded.updated_at",
+        `INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE ${current.sql} ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,name=excluded.name,archived=0,updated_at=excluded.updated_at`,
       )
-      .bind(userId, code, seat.id, token, text(body.name), Date.now(), code, JSON.stringify(room)),
+      .bind(userId, code, seat.id, token, text(body.name), Date.now(), ...current.args),
   );
   const updated = await db.batch(statements);
   if (!updated[0].meta.changes) {
@@ -554,7 +552,7 @@ export async function handleAccounts(request, env, context = null) {
       const [members, backups, characters, recovery] = await Promise.all([
         db
           .prepare(
-            "SELECT m.code,m.seat_id,m.name,m.archived,m.updated_at,r.body AS room_body,r.revision AS room_revision,m.token,EXISTS(SELECT 1 FROM campaign_recoveries c WHERE c.user_id=m.user_id AND c.code=m.code) AS has_recovery FROM library_members m LEFT JOIN campaign_rooms r ON r.code=m.code WHERE m.user_id=? ORDER BY m.updated_at DESC",
+            `SELECT m.code,m.seat_id,m.name,m.archived,m.updated_at,${roomCoreColumnsSql("r")},m.token,EXISTS(SELECT 1 FROM campaign_recoveries c WHERE c.user_id=m.user_id AND c.code=m.code) AS has_recovery FROM library_members m LEFT JOIN campaign_rooms r ON r.code=m.code WHERE m.user_id=? ORDER BY m.updated_at DESC`,
           )
           .bind(userId)
           .all(),
@@ -591,10 +589,10 @@ export async function handleAccounts(request, env, context = null) {
               .bind(userId)
               .all()
           ).results,
-          members: members.results.map(({ room_body, token, ...m }) => ({
-            ...m,
-            ...libraryMemberRoom(room_body ? JSON.parse(room_body) : null, m, token),
-          })),
+          members: members.results.map((row) => {
+            const { room_code: _code, room_write_id: _writeId, room_core: _core, token, ...m } = row;
+            return { ...m, ...libraryMemberRoom(roomCoreFromRow(row), m, token) };
+          }),
           backups: backups.results,
           characters: characters.results.map((r) => ({ id: r.id, ...JSON.parse(r.body) })),
           hasRecoveryKey: !!recovery,

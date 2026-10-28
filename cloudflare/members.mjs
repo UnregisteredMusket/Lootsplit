@@ -1,4 +1,5 @@
 import { APIError } from "better-auth/api";
+import { readRoomCore } from "./room-storage.mjs";
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -46,8 +47,9 @@ export async function assertActive(db, id, authHook = false) {
 export async function assertLinkedSeatActive(db, code, token, seat) {
   if (!db) return;
   if (seat === undefined) {
-    const row = await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first();
-    seat = row ? JSON.parse(row.body).seats?.find((s) => s.token === token) : null;
+    // Seats only: the light read (room-storage.mjs) never loads the campaign table.
+    const room = await readRoomCore(db, code);
+    seat = room ? room.seats?.find((s) => s.token === token) : null;
   }
   // Forget removes a library card, not the account identity of a current seat.
   const row = await db

@@ -9,6 +9,12 @@ import { parseDice, throwDice } from "../src/lib/characters/model.mjs";
 import { applyEncounterSplit } from "../src/lib/quire/coin-split.ts";
 import { encounterPoolRows } from "../src/lib/quire/loot-claims.ts";
 import { encounterCoinLine, encounterItemLine } from "../src/lib/quire/award-tag.ts";
+import {
+  readStoredRoom,
+  readMemberRooms,
+  roomVersionSql,
+  roomWriteStatements,
+} from "./room-storage.mjs";
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -27,15 +33,16 @@ export async function dmMembership(db, user, code) {
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
     .bind(user, text(code, 16))
     .first();
-  const row = await db.prepare("SELECT * FROM campaign_rooms WHERE code=?").bind(code).first();
-  const room = row ? JSON.parse(row.body) : null;
+  const stored = await readStoredRoom(db, code);
+  const room = stored ? stored.room : null;
   const seat = room?.seats.find((s) => s.id === m?.seat_id && s.token === m?.token);
   if (seat?.role !== "dm")
     fail(
       "Only an active saved campaign DM can use encounters. Save your DM membership in My account.",
       403,
     );
-  return { room, raw: row.body, revision: row.revision, seat, m };
+  // `version` (room-storage.mjs) guards every write below: the room must be exactly as read.
+  return { room, version: stored.version, revision: stored.version.revision, seat, m };
 }
 function requireOpenCampaign(d) {
   if (!d.personal && d.room.closed)
@@ -86,7 +93,7 @@ async function save(db, user, d, encounter, status = d.row.status) {
   }
   const result = await db
     .prepare(
-      `UPDATE dm_encounters SET body=?,status=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
+      `UPDATE dm_encounters SET body=?,status=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=? AND ${roomVersionSql(d.version).sql} AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
     )
     .bind(
       JSON.stringify(encounter),
@@ -95,8 +102,7 @@ async function save(db, user, d, encounter, status = d.row.status) {
       d.row.id,
       user,
       d.row.revision,
-      d.row.code,
-      d.raw,
+      ...roomVersionSql(d.version).args,
       user,
       d.row.code,
       d.m.seat_id,
@@ -113,15 +119,10 @@ export async function handleEncounters(db, user, path, body = {}) {
   if (path === "encounters") {
     // Read memberships and current seats together instead of issuing two more
     // database round trips per saved campaign. Mutations retain dmMembership/CAS.
-    const ms = await db
-      .prepare(`SELECT m.code,m.name,m.seat_id,m.token,r.body AS room_body
-        FROM library_members m JOIN campaign_rooms r ON r.code=m.code
-        WHERE m.user_id=? AND m.archived=0`)
-      .bind(user)
-      .all();
+    const ms = await readMemberRooms(db, user, { archived: false });
     const campaigns = [{ code: "personal", name: "My account drafts", purses: [] }];
-    for (const m of ms.results) {
-      const room = JSON.parse(m.room_body);
+    for (const { member: m, stored } of ms) {
+      const room = stored.room;
       const seat = room.seats.find((s) => s.id === m.seat_id && s.token === m.token);
       if (seat?.role !== "dm") continue;
       campaigns.push({
@@ -175,7 +176,7 @@ export async function handleEncounters(db, user, path, body = {}) {
     }
     const created = await db
       .prepare(
-        `INSERT INTO dm_encounters(id,user_id,code,body,created_at,updated_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
+        `INSERT INTO dm_encounters(id,user_id,code,body,created_at,updated_at) SELECT ?,?,?,?,?,? WHERE ${roomVersionSql(d.version).sql} AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
       )
       .bind(
         id,
@@ -184,8 +185,7 @@ export async function handleEncounters(db, user, path, body = {}) {
         JSON.stringify(encounter),
         Date.now(),
         Date.now(),
-        code,
-        d.raw,
+        ...roomVersionSql(d.version).args,
         user,
         code,
         d.m.seat_id,
@@ -331,7 +331,7 @@ export async function handleEncounters(db, user, path, body = {}) {
     } else {
       await db
         .prepare(
-          `INSERT INTO dm_encounter_rolls(encounter_id,request_key,body,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND revision=?) AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?) ON CONFLICT(encounter_id,request_key) DO NOTHING`,
+          `INSERT INTO dm_encounter_rolls(encounter_id,request_key,body,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND revision=?) AND ${roomVersionSql(d.version).sql} AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?) ON CONFLICT(encounter_id,request_key) DO NOTHING`,
         )
         .bind(
           d.row.id,
@@ -340,8 +340,7 @@ export async function handleEncounters(db, user, path, body = {}) {
           Date.now(),
           d.row.id,
           d.row.revision,
-          d.row.code,
-          d.raw,
+          ...roomVersionSql(d.version).args,
           user,
           d.row.code,
           d.m.seat_id,
@@ -458,10 +457,17 @@ export async function handleEncounters(db, user, path, body = {}) {
     };
     // D1 batch is one serializable transaction. A unique receipt is acquired only against
     // the current room, encounter and DM membership; every mutation requires that receipt.
+    // The room write carries no version guard of its own: the award receipt it requires was
+    // acquired against the room version in the statement before it, in the same transaction.
+    const roomWrite = roomWriteStatements(db, room, {
+      expect: null,
+      extraWhere: "EXISTS(SELECT 1 FROM dm_encounter_awards WHERE encounter_id=? AND receipt_id=?)",
+      extraArgs: [d.row.id, receiptId],
+    });
     const results = await db.batch([
       db
         .prepare(
-          `INSERT INTO dm_encounter_awards(encounter_id,receipt_id,body,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND revision=? AND status='review') AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=? AND body=?) AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?) ON CONFLICT(encounter_id) DO NOTHING`,
+          `INSERT INTO dm_encounter_awards(encounter_id,receipt_id,body,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND revision=? AND status='review') AND ${roomVersionSql(d.version).sql} AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?) ON CONFLICT(encounter_id) DO NOTHING`,
         )
         .bind(
           d.row.id,
@@ -470,19 +476,13 @@ export async function handleEncounters(db, user, path, body = {}) {
           at,
           d.row.id,
           d.row.revision,
-          d.row.code,
-          d.revision,
-          d.raw,
+          ...roomVersionSql(d.version).args,
           user,
           d.row.code,
           d.m.seat_id,
           d.m.token,
         ),
-      db
-        .prepare(
-          "UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND EXISTS(SELECT 1 FROM dm_encounter_awards WHERE encounter_id=? AND receipt_id=?)",
-        )
-        .bind(JSON.stringify(room), room.revision, d.row.code, d.row.id, receiptId),
+      ...roomWrite.statements,
       db
         .prepare(
           "UPDATE dm_encounters SET status='awarded',revision=revision+1,updated_at=? WHERE id=? AND EXISTS(SELECT 1 FROM dm_encounter_awards WHERE encounter_id=? AND receipt_id=?)",
