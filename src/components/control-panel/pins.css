@@ -45,7 +45,8 @@
   overflow-x: auto;
   padding-bottom: 0.25rem;
 }
-@media (min-width: 640px) {
+/* --bp-tablet-up */
+@media (min-width: 651px) {
   .desk-pins-row {
     flex-wrap: wrap;
     overflow: visible;

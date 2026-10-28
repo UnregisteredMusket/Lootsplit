@@ -14,7 +14,8 @@
 .session-chip:hover {
   border-color: var(--color-lead);
 }
-@media (max-width: 639.98px) {
+/* --bp-tablet */
+@media (max-width: 650px) {
   /* Phones: Settings & Management carries the chip, so the campaign name keeps its width. */
   .concept-shell header .session-chip {
     display: none;
@@ -71,7 +72,8 @@
   background: var(--panel);
   scroll-margin-top: 6rem;
 }
-@media (min-width: 800px) {
+/* --bp-tablet-up */
+@media (min-width: 651px) {
   .desk-since {
     max-width: 650px;
   }
@@ -116,7 +118,8 @@
 .desk-since .session-digest-lines strong {
   text-align: left;
 }
-@media (min-width: 800px) {
+/* --bp-tablet-up */
+@media (min-width: 651px) {
   .desk-since {
     max-width: none;
   }
