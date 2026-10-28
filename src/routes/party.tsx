@@ -1,3 +1,4 @@
+import { SavedTick, useSavedTick } from "@/components/saved-tick";
 import { CharacterPlacement } from "@/components/character-placement";
 import { inParty } from "@/lib/quire/character-position";
 import { CharacterPermissions } from "@/components/character-permissions";
@@ -675,6 +676,7 @@ function PurseStrip({
 
 function PurseCard({ purse }: { purse: Purse }) {
   const { updatePurse, setPurseCoins, deletePurse } = useEconomy();
+  const nameSaved = useSavedTick();
   const seat = useSeat();
   const cloud = getCloudTable();
   const readOnly = seat.role === "player" || (cloud.joined && !cloud.mine);
@@ -707,10 +709,11 @@ function PurseCard({ purse }: { purse: Purse }) {
           key={purse.name}
           onBlur={(event) => {
             const name = event.target.value.trim();
-            if (name && name !== purse.name) void updatePurse({ ...purse, name });
+            if (name && name !== purse.name) nameSaved.track(updatePurse({ ...purse, name }));
           }}
           className="font-display text-2xl"
         />
+        <SavedTick saved={nameSaved.saved} label="Name saved" />
         <p className="mt-1 text-sm text-muted">
           {purse.kind === "party"
             ? "Party account"

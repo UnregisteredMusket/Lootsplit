@@ -1,4 +1,5 @@
 import { PlayerDisplayButton } from "../player-display-controller";
+import { resultToast } from "@/lib/quire/result-toast";
 import { inParty } from "@/lib/quire/character-position";
 import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
 import { SearchSelect } from "@/components/search-select";
@@ -647,7 +648,20 @@ function EncounterEditor({
       onDirty(false);
       onSaved();
       if (path === "award" && id.startsWith("local-")) await reloadEconomy();
-      if (path === "award") void playSound("loot");
+      if (path === "award") {
+        void playSound("loot");
+        // Result toast (design D9). An award is locked against a second one and has no reversal
+        // command, so it offers its receipt (shown on this page) and no Undo.
+        resultToast("Loot awarded.", {
+          receipt: () => {
+            const receipt = document.querySelector<HTMLElement>(".encounter-award-receipt");
+            if (!receipt) return;
+            receipt.tabIndex = -1;
+            receipt.scrollIntoView({ block: "center" });
+            receipt.focus({ preventScroll: true });
+          },
+        });
+      }
       setNotice(
         !refreshed
           ? "Saved. Refresh to see the latest version."

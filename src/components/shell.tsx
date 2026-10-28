@@ -43,6 +43,7 @@ import { useLibrary } from "@/lib/quire/library";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
 import { setSeat } from "@/lib/quire/table";
 import { BillReceipt } from "@/components/bill-receipt";
+import { ActionReceipt } from "@/components/action-receipt";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { SeatSwitch } from "@/components/seat-switch";
 import { Confirm, Modal } from "@/components/ui";
@@ -418,6 +419,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
       </nav>
       <BillReceipt />
       <SeatSwitch open={switching} onOpenChange={setSwitching} seat={seat} />
+      <ActionReceipt />
       <Confirm
         open={leaving}
         onOpenChange={setLeaving}
