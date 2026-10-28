@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { handleAccounts, LIBRARY_LIMITS } from "../cloudflare/accounts.mjs";
 import { closeRoom, roomState } from "../src/lib/quire/cloud.server.ts";
+import { WIDGET_SESSION_AGENT } from "../cloudflare/monitor-journal.mjs";
 const origin = "http://localhost:8080";
 function setup() {
   const DB = localAccountDb();
@@ -1252,6 +1253,164 @@ test("cloud library storage is bounded per account; edits and removals keep work
     assert.match(extra.data.error, /character storage is full/);
     const edited = await call("character", { id: saved.data.id, name: "Renamed" }, a.cookie);
     assert.equal(edited.response.status, 200, "editing an existing character is not blocked");
+  } finally {
+    DB.close();
+  }
+});
+
+test("the home-screen widget gets its own owner session that app sign-out leaves intact and non-owners cannot mint", async () => {
+  const { DB, env, call, signup } = setup();
+  try {
+    const bearer = (path, body, token, viewQuery = "") =>
+      handleAccounts(
+        new Request(origin + "/api/account/" + path + viewQuery, {
+          method: body === undefined ? "GET" : "POST",
+          headers: {
+            origin: "https://localhost",
+            "content-type": "application/json",
+            "cf-connecting-ip": "192.0.2.90",
+            authorization: `Bearer ${token}`,
+          },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        }),
+        env,
+      );
+    env.ASSETS = { fetch: async () => Response.json({ commit: "c".repeat(40) }) };
+    const stranger = await signup("widget-stranger@example.com");
+    const strangerId = stranger.data.user.id;
+    // Members, admins and moderators are refused: only the owner role mints a widget session.
+    for (const role of [null, "admin", "moderator"]) {
+      if (role)
+        await DB.prepare("INSERT OR REPLACE INTO site_roles VALUES (?,?,?)")
+          .bind(strangerId, role, Date.now())
+          .run();
+      const refused = await call(
+        "owner/monitor/widget-session",
+        { action: "create" },
+        stranger.cookie,
+      );
+      assert.equal(refused.response.status, 403, String(role));
+    }
+    assert.equal(
+      (await call("owner/monitor/widget-session", { action: "create" })).response.status,
+      401,
+    );
+    const owner = await signup("widget-owner@example.com");
+    const ownerId = owner.data.user.id;
+    await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(ownerId, Date.now()).run();
+    // The app signs in natively (bearer token) and asks for a widget session.
+    const native = await bearer(
+      "auth/sign-in/email",
+      {
+        email: "widget-owner@example.com",
+        password: "a long unique test password",
+      },
+      "",
+    );
+    const appToken = native.headers.get("set-auth-token");
+    assert.ok(appToken);
+    const minted = await bearer("owner/monitor/widget-session", { action: "create" }, appToken);
+    assert.equal(minted.status, 200);
+    const widget = await minted.json();
+    assert.match(widget.token, /^[A-Za-z0-9_-]{16,64}\.[A-Za-z0-9+/]+=*$/);
+    assert.notEqual(widget.token, appToken);
+    assert.ok(Date.parse(widget.expiresAt) > Date.now() + 300 * 86400000);
+    const widgetRow = await DB.prepare("SELECT userAgent, userId FROM session WHERE token=?")
+      .bind(widget.token.split(".")[0])
+      .first();
+    assert.deepEqual({ ...widgetRow }, { userAgent: WIDGET_SESSION_AGENT, userId: ownerId });
+    // The widget reads with its own token; a forged signature is refused.
+    assert.equal(
+      (await bearer("owner/monitor", undefined, widget.token, "?view=widget")).status,
+      200,
+    );
+    assert.equal(
+      (
+        await bearer(
+          "owner/monitor",
+          undefined,
+          widget.token.split(".")[0] + ".forged",
+          "?view=widget",
+        )
+      ).status,
+      401,
+    );
+    // The widget session cannot be used to mint or revoke anything but widget sessions, and the
+    // app's own session is never touched by a revoke.
+    assert.equal(
+      (
+        await bearer(
+          "owner/monitor/widget-session",
+          { action: "revoke", token: appToken },
+          widget.token,
+        )
+      ).status,
+      200,
+    );
+    assert.equal((await bearer("library", undefined, appToken)).status, 200);
+    // Signing the app out (what the owner does when switching accounts) leaves the widget reading.
+    assert.equal((await bearer("auth/sign-out", {}, appToken)).status, 200);
+    assert.equal((await bearer("library", undefined, appToken)).status, 401);
+    assert.equal(
+      (await bearer("owner/monitor", undefined, widget.token, "?view=widget")).status,
+      200,
+    );
+    // Reconnecting rotates: the previous widget session is revoked once the new one exists.
+    const again = await bearer(
+      "auth/sign-in/email",
+      {
+        email: "widget-owner@example.com",
+        password: "a long unique test password",
+      },
+      "",
+    );
+    const appToken2 = again.headers.get("set-auth-token");
+    const rotated = await (
+      await bearer(
+        "owner/monitor/widget-session",
+        { action: "create", previousToken: widget.token },
+        appToken2,
+      )
+    ).json();
+    assert.equal(
+      (await bearer("owner/monitor", undefined, widget.token, "?view=widget")).status,
+      401,
+    );
+    assert.equal(
+      (await bearer("owner/monitor", undefined, rotated.token, "?view=widget")).status,
+      200,
+    );
+    // Losing the owner role stops the widget on its next read, and a non-owner cannot revoke it.
+    assert.equal(
+      (
+        await call(
+          "owner/monitor/widget-session",
+          { action: "revoke", token: rotated.token },
+          stranger.cookie,
+        )
+      ).response.status,
+      403,
+    );
+    await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(ownerId).run();
+    assert.equal(
+      (await bearer("owner/monitor", undefined, rotated.token, "?view=widget")).status,
+      403,
+    );
+    await DB.prepare("UPDATE site_roles SET role='owner' WHERE user_id=?").bind(ownerId).run();
+    // An explicit disconnect revokes the widget session.
+    const revoked = await (
+      await bearer(
+        "owner/monitor/widget-session",
+        { action: "revoke", token: rotated.token },
+        appToken2,
+      )
+    ).json();
+    assert.equal(revoked.revoked, true);
+    assert.equal(
+      (await bearer("owner/monitor", undefined, rotated.token, "?view=widget")).status,
+      401,
+    );
+    assert.equal((await bearer("library", undefined, appToken2)).status, 200);
   } finally {
     DB.close();
   }
