@@ -824,6 +824,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-loot | open | 2 | 10s → 14s | +4s | +40% |
 | Packaged Worker / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 10s | +8s | +400% |
 | verify / Verify identity, asset bytes and desktop/mobile behavior without deploying | open | 2 | 60s → 312s | +252s | +420% |
+| Player references / worker / account shard 1 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 4s | +2s | +100% |
 | Development / accounts-2 / dev-backup | open | 2 | 22s → 30s | +8s | +36.36% |
 | Development / accounts-2 / dev-ships | open | 2 | 64s → 92s | +28s | +43.75% |
 | Development / economy / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 7s → 21s | +14s | +200% |
@@ -898,6 +899,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-28T23:07:27Z | step: Player references / worker / account shard 1 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39907665897/job/120263218875) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40785061031/job/123156051391) |
 | 2026-10-28T22:39:14Z | step: native-widget (35) / Run npm run build:mobile && npx cap sync android | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454345394/job/118737125856) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40781486457/job/123143995339) |
 | 2026-10-28T22:06:18Z | step: Packaged Worker / economy / worker-loot | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39704913242/job/119583443765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40776055485/job/123127761129) |
 | 2026-10-28T21:35:59Z | step: Code checks and immutable builds / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 24s → 46s | +22s | +91.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40716776586/job/122916490806) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40773161675/job/123115420528) |

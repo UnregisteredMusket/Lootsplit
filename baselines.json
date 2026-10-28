@@ -58239,19 +58239,19 @@
   },
   "[\".github/workflows/player-reference-audit.yml\",\"pull_request\",\"pull-request\",\"step\",\"Player references / worker / account shard 1 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "39907665897:1:96587a64b9f90a72cfb05bf950add8013a0221a08c600f4ccfc28e81bfa8a167",
+    "id": "40785061031:1:96587a64b9f90a72cfb05bf950add8013a0221a08c600f4ccfc28e81bfa8a167",
     "scope": "[\".github/workflows/player-reference-audit.yml\",\"pull_request\",\"pull-request\",\"step\",\"Player references / worker / account shard 1 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Player references / worker / account shard 1 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
     "environment": "ubuntu-latest",
-    "commit": "3c6f0ac45ea697bc86277afd9e561adeaee2cb08",
-    "runId": 39907665897,
+    "commit": "d0d3fb4293f8943ad4e4dac81582aad9641a1610",
+    "runId": 40785061031,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39907665897/job/120263218875",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40785061031/job/123156051391",
     "outcome": "success",
-    "startedAt": "2026-10-23T05:47:06Z",
-    "finishedAt": "2026-10-23T05:47:09Z",
-    "durationMs": 3000,
+    "startedAt": "2026-10-28T23:07:23Z",
+    "finishedAt": "2026-10-28T23:07:27Z",
+    "durationMs": 4000,
     "trendId": "39782773421:1:96587a64b9f90a72cfb05bf950add8013a0221a08c600f4ccfc28e81bfa8a167"
   },
   "[\".github/workflows/player-reference-audit.yml\",\"pull_request\",\"pull-request\",\"step\",\"Player references / development / account shard 2 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262\",\"ubuntu-latest\",1]": {
@@ -65818,5 +65818,22 @@
     "finishedAt": "2026-10-28T14:57:52Z",
     "durationMs": 1000,
     "trendId": "40707361833:1:511f181771d2911528395f6bb12bb9a355ce054d6876fc8b2064f196f3165218"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-campaign-loading\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "40785061027:1:74dca366718562aab5d3867356bc54ac4742aad3beabd78a03ebbb00296b60eb",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-campaign-loading\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / gameplay / dev-campaign-loading",
+    "environment": "ubuntu-latest",
+    "commit": "d0d3fb4293f8943ad4e4dac81582aad9641a1610",
+    "runId": 40785061027,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40785061027/job/123156101349",
+    "outcome": "success",
+    "startedAt": "2026-10-28T23:18:18Z",
+    "finishedAt": "2026-10-28T23:18:41Z",
+    "durationMs": 23000,
+    "trendId": "40785061027:1:74dca366718562aab5d3867356bc54ac4742aad3beabd78a03ebbb00296b60eb"
   }
 }
