@@ -23,11 +23,11 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Start disposable development server | open | 3 | 4s → 10s | +6s | +150% |
 | Code checks and immutable builds / web-build | open | 2 | 4s → 9s | +5s | +125% |
 | Development / desktop / Start disposable development server | open | 3 | 6s → 11s | +5s | +83.33% |
-| Code checks and immutable builds / Run node scripts/release-artifact.mjs prepare | open | 4 | 2s → 6s | +4s | +200% |
+| Code checks and immutable builds / Run node scripts/release-artifact.mjs prepare | open | 5 | 2s → 7s | +5s | +250% |
 | Code checks and immutable builds / mobile-build | open | 4 | 3s → 9s | +6s | +200% |
 | Development / gameplay / dev-bug-data-integrity | open | 4 | 4s → 21s | +17s | +425% |
 | Code checks and immutable builds | open | 7 | 48s → 415s | +367s | +764.58% |
-| Development / gameplay / dev-encounter | open | 7 | 8s → 52s | +44s | +550% |
+| Development / gameplay / dev-encounter | open | 8 | 8s → 61s | +53s | +662.5% |
 | Packaged Worker / interface / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 5 | 2s → 15s | +13s | +650% |
 | Packaged Worker / accounts / Run npm ci | open | 4 | 8s → 20s | +12s | +150% |
@@ -696,7 +696,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / world / Start disposable development server | open | 2 | 7s → 11s | +4s | +57.14% |
 | Dependency vulnerabilities (OSV-Scanner) / osv-scan / Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 | open | 2 | 2s → 4s | +2s | +100% |
 | Development / accounts-2 / dev-account-2 | open | 2 | 88s → 118s | +30s | +34.09% |
-| Packaged Worker / world / Start disposable built Worker | open | 2 | 11s → 16s | +5s | +45.45% |
+| Packaged Worker / world / Start disposable built Worker | open | 3 | 11s → 41s | +30s | +272.73% |
 | Packaged Worker / pull request / Run npx playwright install --with-deps chromium | open | 2 | 258s → 583s | +325s | +125.97% |
 | Packaged Worker / pull request | open | 2 | 295s → 626s | +331s | +112.2% |
 | Accessibility (axe-core) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 6s | +5s | +500% |
@@ -829,6 +829,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-28T10:46:59Z | step: Code checks and immutable builds / Run node scripts/release-artifact.mjs prepare | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40634385186/job/122637859395) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40674402900/job/122769019562) |
+| 2026-10-28T10:35:47Z | step: Packaged Worker / world / Start disposable built Worker | 16s → 41s | +25s | +156.25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40639694120/job/122661959570) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40672608220/job/122764890367) |
+| 2026-10-28T10:32:12Z | step: Development / gameplay / dev-encounter | 52s → 61s | +9s | +17.31% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39579512693/job/119153402336) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40672556857/job/122762816210) |
 | 2026-10-28T06:26:43.000Z | workflow: Verify preserved functionality | 2932s → 3523s | +591s | +20.16% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40271020983) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40637922883) |
 | 2026-10-28T06:14:30Z | step: Development / world / dev-player-onboarding | 18s → 21s | +3s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40310609020/job/121539150673) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40639694120/job/122660526888) |
 | 2026-10-28T06:08:39Z | step: Packaged Worker / world / Start disposable built Worker | 13s → 16s | +3s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39758546887/job/119758824894) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40639694120/job/122661959570) |
