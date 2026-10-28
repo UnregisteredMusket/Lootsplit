@@ -1,4 +1,5 @@
 import { database, readRoom } from "./room-store.server.ts";
+import { readStoredRoom } from "../../../cloudflare/room-storage.mjs";
 import { mapPingInput, PING_DURATION, type MapPing } from "./map-signals.ts";
 import type { CloudRoom, CloudSeat, CloudTable } from "./cloud.ts";
 import type { CampaignMap } from "./world-schema.ts";
@@ -31,6 +32,7 @@ type SignalAccess = {
  * anchors or markers, and the few visibility fields, so the Worker receives a few KB at most.
  */
 const ACCESS_QUERY = `SELECT r.revision AS revision,
+  json_type(r.body,'$."$sections"') IS NOT NULL AS sectioned,
   json_extract(r.body,'$.closed') AS closed,
   json_extract(r.body,'$.viewOnly') AS viewOnly,
   json_extract(r.body,'$.sessionId') AS sessionId,
@@ -49,6 +51,7 @@ FROM campaign_rooms r WHERE r.code=?1`;
 
 type AccessRow = {
   revision: number;
+  sectioned: number;
   closed: number | null;
   viewOnly: number | null;
   sessionId: string | null;
@@ -63,23 +66,26 @@ const list = (value: string | null) => {
   const parsed: unknown = value ? JSON.parse(value) : [];
   return Array.isArray(parsed) ? parsed : [];
 };
+function roomAccess(room: CloudRoom | null, mapId: string): SignalAccess | null {
+  if (!room) return null;
+  return {
+    revision: room.revision,
+    closed: !!room.closed,
+    viewOnly: !!room.viewOnly,
+    sessionId: room.sessionId || "",
+    seats: room.seats,
+    map: room.table.journal?.world?.maps.find((m) => m.id === mapId),
+    table: room.table,
+  };
+}
 async function readSignalAccess(code: string, mapId: string): Promise<SignalAccess | null> {
   const db = database();
-  if (!db) {
-    const room: CloudRoom | null = await readRoom(code);
-    if (!room) return null;
-    return {
-      revision: room.revision,
-      closed: !!room.closed,
-      viewOnly: !!room.viewOnly,
-      sessionId: room.sessionId || "",
-      seats: room.seats,
-      map: room.table.journal?.world?.maps.find((m) => m.id === mapId),
-      table: room.table,
-    };
-  }
+  if (!db) return roomAccess(await readRoom(code), mapId);
   const row = await db.prepare(ACCESS_QUERY).bind(code, mapId).first<AccessRow>();
   if (!row) return null;
+  // A sectioned room (above the inline threshold, room-storage.mjs) keeps its table out of the
+  // row: read it through the storage API (stored form; signals need no image hydration).
+  if (row.sectioned) return roomAccess(((await readStoredRoom(db, code))?.room ?? null) as CloudRoom | null, mapId);
   const seats = list(row.seats) as CloudSeat[];
   const tabletop: unknown = row.tabletop ? JSON.parse(row.tabletop) : undefined;
   const map = row.map ? (JSON.parse(row.map) as CampaignMap) : undefined;

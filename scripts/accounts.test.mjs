@@ -1,4 +1,5 @@
 import test from "node:test";
+import { readStoredRoom, roomWriteStatements } from "../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { handleAccounts, LIBRARY_LIMITS } from "../cloudflare/accounts.mjs";
@@ -118,10 +119,7 @@ test("a DM can reopen both saved campaigns from independent signed-in devices wi
     for (const member of library.members) {
       assert.equal(member.role, "dm", "A closed shared session must retain its linked DM identity");
       assert.equal(member.closed, true);
-      const before = JSON.parse(
-        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(member.code).first())
-          .body,
-      );
+      const before = await storedRoomOf(DB, member.code);
       const request = { code: member.code, reopen: true, revision: member.room_revision };
       assert.equal(
         (await call("resume", { ...request, role: "dm" }, player.cookie)).response.status,
@@ -136,32 +134,19 @@ test("a DM can reopen both saved campaigns from independent signed-in devices wi
         409,
       );
       const pending = { ...before, drafts: { dm: [{ id: "keep-pending-action" }] } };
-      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
-        .bind(JSON.stringify(pending), member.code)
-        .run();
+      await writeStoredRoom(DB, pending);
       assert.equal((await call("resume", request, phone.cookie)).response.status, 409);
       assert.deepEqual(
-        JSON.parse(
-          (
-            await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
-              .bind(member.code)
-              .first()
-          ).body,
-        ),
+        await storedRoomOf(DB, member.code),
         pending,
         "Pending actions must never be discarded by reopen",
       );
-      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
-        .bind(JSON.stringify(before), member.code)
-        .run();
+      await writeStoredRoom(DB, before);
       const resumed = await call("resume", request, desktop.cookie);
       assert.equal(resumed.response.status, 200, JSON.stringify(resumed.data));
       assert.equal(resumed.data.role, "dm");
       assert.equal(resumed.data.reopened, true);
-      const after = JSON.parse(
-        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(member.code).first())
-          .body,
-      );
+      const after = await storedRoomOf(DB, member.code);
       assert.equal(after.closed, false);
       assert.deepEqual(
         after.table,
@@ -184,13 +169,7 @@ test("a DM can reopen both saved campaigns from independent signed-in devices wi
         "A repeated DM resume is safe across devices",
       );
       assert.equal(
-        JSON.parse(
-          (
-            await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
-              .bind(member.code)
-              .first()
-          ).body,
-        ).revision,
+        (await storedRoomOf(DB, member.code)).revision,
         after.revision,
       );
     }
@@ -360,6 +339,13 @@ test("recovery rotates the key, revokes sessions and rejects replay", async () =
     DB.close();
   }
 });
+
+/** The stored room (assembled when sectioned) and a same-revision write through the storage API. */
+const storedRoomOf = async (DB, code) => (await readStoredRoom(DB, code)).room;
+async function writeStoredRoom(DB, room) {
+  const current = await readStoredRoom(DB, room.code);
+  await DB.batch(roomWriteStatements(DB, room, { expect: current.version }).statements);
+}
 
 test("signed native sessions work without third-party cookies; unsigned tokens fail", async () => {
   const { DB, env } = setup();

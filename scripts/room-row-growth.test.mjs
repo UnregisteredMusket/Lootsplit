@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readStoredRoom } from "../cloudflare/room-storage.mjs";
 import test from "node:test";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { openRoom, joinRoom, roomState, submitCommands, choosePace } from "../src/lib/quire/cloud.server.ts";
@@ -116,7 +117,8 @@ test("an old room with inline snapshots still loads, projects, and moves them ou
   const { dm, a, b } = await liveRoom();
   await submitCommands({ ...a, batchId: "legacy-chat", commands: [message("legacy-1", "a", "Legacy party line"), message("legacy-dm", "a", "Legacy DM line", "dm")] });
   // Write a pre-change room directly: the archived snapshot is inline in the room body.
-  const legacy = JSON.parse((await raw(dm.code)).body);
+  // Read through the storage API (assembled when sectioned); written back as one inline row.
+  const legacy = (await readStoredRoom(db, dm.code)).room;
   archiveSession(legacy.table, "legacy-session", "Legacy session");
   legacy.table.journal.reports[0].seatIds = legacy.seats.map((s) => s.id);
   legacy.revision++;
@@ -131,7 +133,7 @@ test("an old room with inline snapshots still loads, projects, and moves them ou
 
   // Lazy migration: the next ordinary write moves the snapshot out; nothing is lost.
   await submitCommands({ ...a, batchId: "legacy-next", commands: [message("legacy-2", "a", "Next line")] });
-  const migrated = await raw(dm.code);
+  const migrated = await readStoredRoom(db, dm.code);
   assert.equal(migrated.body.includes('"snapshot"'), false);
   assert.equal((await roomState(dm)).table.journal .reports [0].snapshot, before, "snapshot restored byte for byte");
   // And it still archives new sessions alongside the old one.

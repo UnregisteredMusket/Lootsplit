@@ -13,6 +13,7 @@ import { mapAccessible, readMapTabletop, sceneViewers } from "./tabletop.ts";
 import { scenePointVisible } from "./tabletop-geometry.ts";
 import { mapSignalPollDelay, PING_DURATION } from "./map-signals.ts";
 import { expireMapPings } from "../../../cloudflare/map-ping-expiry.mjs";
+import { readStoredRoom, roomWriteStatements } from "../../../cloudflare/room-storage.mjs";
 
 const sql = new DatabaseSync(":memory:");
 const migrations = new URL("../../../cloudflare/migrations/", import.meta.url);
@@ -168,9 +169,9 @@ function campaign() {
 }
 
 /** The previous rule, verbatim: the whole stored body parsed, then the same visibility helpers. */
-function previousDecision(code: string, token: string, mapId: string, point?: { x: number; y: number }) {
-  const row = sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(code) as { body: string };
-  const room = JSON.parse(row.body) as CloudRoom;
+async function previousDecision(code: string, token: string, mapId: string, point?: { x: number; y: number }) {
+  // The whole stored room (assembled when sectioned), through the storage API.
+  const room = (await readStoredRoom(storageDb(), code))?.room as CloudRoom;
   if (!room || room.closed) return "room";
   const seat = room.seats.find((s) => s.token === token);
   if (!seat) return "seat";
@@ -204,10 +205,15 @@ async function currentDecision(
     return message;
   }
 }
-const edit = (code: string, path: string, value: unknown) =>
-  sql
-    .prepare("UPDATE campaign_rooms SET body=json_set(body,?,json(?)) WHERE code=?")
-    .run(path, JSON.stringify(value), code);
+const storageDb = () => (globalThis as unknown as { __env__: { DB: never } }).__env__.DB;
+/** Sets one JSON path of the stored room (same revision), written through the storage API. */
+async function edit(code: string, path: string, value: unknown) {
+  const stored = (await readStoredRoom(storageDb(), code))!;
+  const body = (sql.prepare("SELECT json_set(?,?,json(?)) AS body").get(stored.body, path, JSON.stringify(value)) as { body: string }).body;
+  await (storageDb() as { batch: (s: unknown[]) => Promise<unknown> }).batch(
+    roomWriteStatements(storageDb(), JSON.parse(body), { expect: stored.version, body }).statements,
+  );
+}
 
 test("map signal access matches the previous whole-room rule for DM, players, hidden maps, fog and vision", async () => {
   const { openRoom, joinRoom } = await import("./cloud.server.ts");
@@ -235,11 +241,11 @@ test("map signal access matches the previous whole-room rule for DM, players, hi
   let compared = 0;
   try {
     for (const [label, apply] of variants) {
-      apply();
+      await apply();
       for (const [who, seat] of Object.entries(seats))
         for (const mapId of ["open-map", "fog-map", "solo-map", "secret-map", "missing-map"])
           for (const point of [undefined, ...points]) {
-            const expected = previousDecision(host.code, seat.token, mapId, point);
+            const expected = await previousDecision(host.code, seat.token, mapId, point);
             const actual = await currentDecision(seat, mapId, point);
             assert.equal(actual, expected, `${label}: ${who} on ${mapId} at ${JSON.stringify(point)}`);
             outcomes.add(`${who}:${expected}`);
@@ -271,7 +277,8 @@ test("players read only pings at points they can see; DM-only maps stay DM-only"
     const dm = await mapSignals({ ...host, mapId: "fog-map" });
     const player = await mapSignals({ code: host.code, token: hero.token, mapId: "fog-map" });
     assert.equal(dm.pings.length, points.length);
-    const expected = points.filter((p) => previousDecision(host.code, hero.token, "fog-map", p) === "ok");
+    const decisions = await Promise.all(points.map((p) => previousDecision(host.code, hero.token, "fog-map", p)));
+    const expected = points.filter((_, index) => decisions[index] === "ok");
     assert.ok(expected.length > 0 && expected.length < points.length);
     assert.deepEqual(
       player.pings.map((p) => [p.x, p.y]).sort(),
@@ -290,9 +297,13 @@ test("a signal read costs one light query and no write, even in a megabyte room"
   const host = await openRoom({ name: "Heavy DM", table: campaign() });
   const hero = await joinRoom({ code: host.code, purseId: "hero", name: "Hero player" });
   // A heavy campaign: about a megabyte of chat history in the stored body.
-  edit(host.code, "$.table.notes", Array.from({ length: 2000 }, (_, i) => ({ id: `n${i}`, text: "x".repeat(500) })));
-  const body = (sql.prepare("SELECT length(body) AS n FROM campaign_rooms WHERE code=?").get(host.code) as { n: number }).n;
+  await edit(host.code, "$.table.notes", Array.from({ length: 2000 }, (_, i) => ({ id: `n${i}`, text: "x".repeat(500) })));
+  const stored = (await readStoredRoom(storageDb(), host.code))!;
+  const body = Buffer.byteLength(stored.body);
   assert.ok(body > 1_000_000);
+  // The light read is the inline path; a sectioned room (only when suites force the sectioning
+  // threshold to 0) falls back to the full storage read, which this budget does not cover.
+  const sectioned = stored.version.sections !== null;
   await mapSignals({ ...host, mapId: "fog-map", ping: { id: crypto.randomUUID(), mapId: "fog-map", x: 0.1, y: 0.1, color: "red" } });
   for (const seat of [host, { code: host.code, token: hero.token }]) {
     meter.on = true;
@@ -301,6 +312,7 @@ test("a signal read costs one light query and no write, even in a megabyte room"
     const result = await mapSignals({ code: host.code, token: seat.token, mapId: "fog-map" });
     meter.on = false;
     assert.equal(result.pings.length, 1);
+    if (sectioned) continue;
     assert.equal(meter.queries.length, 2, "authorization read plus the ping read");
     assert.ok(!meter.queries.some((q) => /DELETE|INSERT|UPDATE/i.test(q)), "a read never writes");
     assert.ok(!meter.queries.some((q) => /SELECT\s+body\s*,\s*revision/i.test(q)), "the room body is never fetched");

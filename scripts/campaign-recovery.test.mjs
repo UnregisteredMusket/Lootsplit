@@ -15,6 +15,15 @@ import {
 } from "../src/lib/account/restore-request.ts";
 import { characterRoll } from "../src/lib/quire/cloud.server.ts";
 import { hydrateRoomImages } from "../cloudflare/room-images.mjs";
+import { readStoredRoom, roomWriteStatements } from "../cloudflare/room-storage.mjs";
+
+/** The stored room (assembled when sectioned), through the storage API. */
+const storedRoom = async (DB, code) => (await readStoredRoom(DB, code)).room;
+/** Writes `room` (stored form) at its current version, as a server write does. */
+async function writeStoredRoom(DB, room) {
+  const current = await readStoredRoom(DB, room.code);
+  await DB.batch(roomWriteStatements(DB, room, { expect: current.version }).statements);
+}
 
 async function setup(kind) {
   let DB;
@@ -395,9 +404,7 @@ for (const kind of ["sqlite", "libsql"]) {
       // snapshot exactly the newly visible shared state rather than a fallback.
       const hydrated = await call("sheets/detail", { id: `campaign:${code}:hero` }, dm.cookie);
       assert.equal(hydrated.status, 200, JSON.stringify(hydrated.data));
-      const currentRoom = await DB.prepare("SELECT revision,body FROM campaign_rooms WHERE code=?")
-        .bind(code)
-        .first();
+      const currentRoom = await storedRoom(DB, code);
       assert.equal(currentRoom.revision, 2);
       const deleted = await call(
         "campaign",
@@ -409,7 +416,7 @@ for (const kind of ["sqlite", "libsql"]) {
         .payload;
       assert.equal(
         backup.campaignRecovery.assignments[0].body.notes,
-        JSON.parse(currentRoom.body).table.purses[0].sheet.notes,
+        currentRoom.table.purses[0].sheet.notes,
       );
       assert.equal(backup.purses[0].coins.gp, 73);
       assert.equal(backup.campaignRecovery.assignments[0].body.coins.gp, 0);
@@ -498,9 +505,7 @@ for (const kind of ["sqlite", "libsql"]) {
       )
         .bind(otherEncounterId)
         .first();
-      const sourceRoom = JSON.parse(
-        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first()).body,
-      );
+      const sourceRoom = await storedRoom(DB, code);
       const note = {
         id: `encounter-loot:${sourceAward.receipt_id}`,
         at: 1,
@@ -567,9 +572,7 @@ for (const kind of ["sqlite", "libsql"]) {
           },
         ],
       };
-      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
-        .bind(JSON.stringify(sourceRoom), code)
-        .run();
+      await writeStoredRoom(DB, sourceRoom);
       const savedRoll = await DB.prepare("SELECT body FROM dm_encounter_rolls WHERE encounter_id=?")
         .bind(encounterId)
         .first();
@@ -634,9 +637,7 @@ for (const kind of ["sqlite", "libsql"]) {
             status === "pending" ? null : dm.id,
           )
           .run();
-      const before = JSON.parse(
-        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first()).body,
-      );
+      const before = await storedRoom(DB, code);
       const deletion = { action: "delete", code, confirm: code, revision: before.revision };
       assert.equal((await call("campaign", deletion, player.cookie)).status, 403);
       assert.equal((await call("campaign", { ...deletion, revision: 0 }, dm.cookie)).status, 409);
@@ -710,11 +711,9 @@ for (const kind of ["sqlite", "libsql"]) {
       assert.ok([...markers.keys()].every((k) => !k.includes(dm.id)));
       // Archived snapshots are stored beside the restored row (campaign_room_reports) and
       // hydrate to the exact original bytes, as every room reader sees them.
-      const nextBody = (
-        await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(resumed.code).first()
-      ).body;
-      assert.equal(nextBody.includes('"snapshot"'), false, "Restore stores no inline snapshot");
-      const next = await hydrateRoomImages(DB, resumed.code, JSON.parse(nextBody));
+      const nextStored = await readStoredRoom(DB, resumed.code);
+      assert.equal(nextStored.body.includes('"snapshot"'), false, "Restore stores no inline snapshot");
+      const next = await hydrateRoomImages(DB, resumed.code, nextStored.room);
       assert.equal(next.viewOnly, true);
       assert.equal(next.seats.length, 1);
       assert.equal(next.seats[0].userId, dm.id);
@@ -846,13 +845,7 @@ for (const kind of ["sqlite", "libsql"]) {
       const final = await hydrateRoomImages(
         DB,
         resumed.code,
-        JSON.parse(
-          (
-            await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
-              .bind(resumed.code)
-              .first()
-          ).body,
-        ),
+        await storedRoom(DB, resumed.code),
       );
       assert.deepEqual(
         final.table.purses[0].coins,
@@ -995,32 +988,42 @@ for (const kind of ["sqlite", "libsql"]) {
       await DB.prepare("UPDATE dm_encounters SET body=? WHERE id=?")
         .bind(JSON.stringify(blankEncounter()), id)
         .run();
-      const original = JSON.parse(
-        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first()).body,
-      );
-      original.table.journal = {
-        reports: [
-          { id: "broken-archive", name: "Unreadable old archive", at: 1, snapshot: "not JSON" },
-        ],
+      // Room edits go through the storage API (every real writer sets a fresh write_id, and a
+      // sectioned room keeps its table out of the row); the revision stays 1 throughout.
+      const rewrite = async (edit) => {
+        const stored = await readStoredRoom(DB, code);
+        const next = structuredClone(stored.room);
+        edit(next);
+        await DB.batch(roomWriteStatements(DB, next, { expect: stored.version }).statements);
       };
-      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
-        .bind(JSON.stringify(original), code)
-        .run();
+      const original = structuredClone((await readStoredRoom(DB, code)).room);
+      await rewrite((room) => {
+        room.table.journal = {
+          reports: [
+            { id: "broken-archive", name: "Unreadable old archive", at: 1, snapshot: "not JSON" },
+          ],
+        };
+      });
       assert.equal((await call("campaign", request, dm.cookie)).status, 409);
       assert.equal((await call("library", undefined, dm.cookie)).data.backups.length, 0);
-      delete original.table.journal;
-      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
-        .bind(JSON.stringify(original), code)
-        .run();
+      await rewrite((room) => {
+        room.table = original.table;
+        delete room.table.journal;
+      });
       const batch = DB.batch.bind(DB);
+      let raced = false;
       env.DB = {
         ...DB,
         async batch(statements) {
-          const next = structuredClone(original);
-          next.seats = next.seats.filter((s) => s.role !== "dm");
-          await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
-            .bind(JSON.stringify(next), code)
-            .run();
+          // Another writer changes the seats at the same revision just before the deletion
+          // batch: the deletion's version guard must refuse it.
+          if (!raced) {
+            raced = true;
+            const stored = await readStoredRoom(DB, code);
+            const next = structuredClone(stored.room);
+            next.seats = next.seats.filter((s) => s.role !== "dm");
+            await batch(roomWriteStatements(DB, next, { expect: stored.version }).statements);
+          }
           return batch(statements);
         },
       };

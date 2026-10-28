@@ -437,11 +437,15 @@ test("large exact snapshots retain metadata and leave shared state intact when b
   // covered in scripts/room-row-growth.test.mjs, does not refuse the write first:
   // the sale's receipt copies the 450 KB lot, taking the row from ~0.9 MB to ~1.35 MB.
   sql.exec("CREATE TEMP TRIGGER market_test_row_budget BEFORE UPDATE ON campaign_rooms WHEN length(CAST(NEW.body AS BLOB)) > 1000000 BEGIN SELECT RAISE(ABORT, 'market test row storage budget'); END");
+  // When the room is stored sectioned (suites run with the sectioning threshold forced to 0), the
+  // same rejection comes from a section row instead; every section here starts below this budget.
+  sql.exec("CREATE TEMP TRIGGER market_test_section_budget BEFORE INSERT ON campaign_room_sections WHEN length(CAST(NEW.body AS BLOB)) > 400000 BEGIN SELECT RAISE(ABORT, 'market test row storage budget'); END");
   try {
     await assert.rejects(submitCommands({ ...bounded, batchId: "row-budget-sale", commands: [{ ...sale, id: "row-budget-sale", holdingId: "near-limit-0" }] }), /row storage budget/);
     assert.deepEqual(await readRoom(bounded.code), saved);
   } finally {
     sql.exec("DROP TRIGGER market_test_row_budget");
+    sql.exec("DROP TRIGGER market_test_section_budget");
     await deleteRoom(bounded.code, saved!.revision);
   }
 });
@@ -564,6 +568,9 @@ sql.exec(
 );
 sql.exec(
   readFileSync(new URL("../../../cloudflare/migrations/0024_campaign_room_receipts.sql", import.meta.url), "utf8"),
+);
+sql.exec(
+  readFileSync(new URL("../../../cloudflare/migrations/0026_campaign_room_sections.sql", import.meta.url), "utf8"),
 );
 sql.exec(
   readFileSync(
@@ -1031,11 +1038,12 @@ test("multiple large maps persist outside the D1 room row and hydrate exact arch
   const host=await openRoom({name:"Maps DM",table});const raw=sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as {body:string};assert.ok(raw.body.length<10000);assert.ok(!raw.body.includes(maps[0].image));assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
   const hydrated=await readRoom(host.code);assert.deepEqual(hydrated!.table.journal!.world!.maps,maps);assert.equal(hydrated!.table.journal!.reports![0].snapshot,snapshot);
   await updateRoom({...hydrated!,revision:hydrated!.revision+1},hydrated!.revision);assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
-  await assert.rejects(hydrateRoomImages(database()!,"another-campaign",JSON.parse(raw.body)),/missing/);
-  const direct = JSON.parse((sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as {body:string}).body);
+  const {readStoredRoom,roomWriteStatements}=await import("../../../cloudflare/room-storage.mjs");
+  await assert.rejects(hydrateRoomImages(database()!,"another-campaign",(await readStoredRoom(database()!,host.code))!.room),/missing/);
+  const directRead=(await readStoredRoom(database()!,host.code))!,direct=directRead.room;
   direct.table.purses[0].portrait=maps[0].image;
   const directBody=JSON.stringify(direct);
-  sql.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").run(directBody,host.code);
+  await database()!.batch(roomWriteStatements(database()!,direct,{expect:directRead.version,body:directBody}).statements);
   const latest=await readRoom(host.code),stale=structuredClone(latest!);
   const {roomStorageBody}=await import("./room-store.server.ts"),{encodeRoomImages}=await import("../../../cloudflare/room-images.mjs");
   assert.equal(latest!.table.purses[0].portrait,maps[0].image);
@@ -1120,7 +1128,11 @@ test("large resource packs deduplicate across archives, hydrate complete bytes a
   );
   assert.deepEqual(await readRoom(room.code), room);
   await assert.rejects(
-    hydrateRoomResources(database()!, "other-campaign", JSON.parse(raw.body)),
+    hydrateRoomResources(
+      database()!,
+      "other-campaign",
+      (await (await import("../../../cloudflare/room-storage.mjs")).readStoredRoom(database()!, room.code))!.room,
+    ),
     /missing/,
   );
   const changed = structuredClone(room);
@@ -1476,10 +1488,13 @@ test("combat HUD and initiative polls read the room once, without map rasters (a
     ] as const) {
       queries.length = 0;
       assert.deepEqual(await (read as typeof mapCombatOrder)({ code: host.code, token: seat.token, mapId: battle.id }), expected);
-      assert.equal(queries.filter((q) => /FROM campaign_rooms/.test(q)).length, 1, queries.join("\n"));
-      assert.equal(queries.filter((q) => /dm_encounters/.test(q)).length, 1, "the encounter is read in the same statement");
+      // A sectioned room (suites run with the sectioning threshold forced to 0) keeps the combat
+      // binding in a section, so its encounter is read in a second, version-guarded statement.
+      const reads = stored.body.startsWith('{"$sections":') ? 2 : 1;
+      assert.equal(queries.filter((q) => /FROM campaign_rooms/.test(q)).length, reads, queries.join("\n"));
+      assert.equal(queries.filter((q) => /dm_encounters/.test(q)).length, reads, "the encounter is read in the same statement");
       // Besides it, only the shared character-sheet lookup that every room read makes.
-      assert.equal(queries.filter((q) => !/FROM play_characters/.test(q)).length, 1, queries.join("\n"));
+      assert.equal(queries.filter((q) => !/FROM play_characters/.test(q)).length, reads, queries.join("\n"));
       assert.ok(!queries.some((q) => /campaign_room_images|campaign_room_reports/.test(q)), "no rasters or reports");
     }
   } finally {

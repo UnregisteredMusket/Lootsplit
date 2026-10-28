@@ -1,5 +1,6 @@
 /** Synthetic account HTTP + actual shared-room boundary probes. No real data/network. */
 import test from "node:test";
+import { readStoredRoom, roomWriteStatements } from "../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import { authorizationDatabase } from "./authorization-test-fixture.mjs";
 import { handleAccounts } from "../cloudflare/accounts.mjs";
@@ -127,16 +128,13 @@ async function fixture() {
       ).status,
       200,
     );
+  // The stored room and its writes go through the storage API (assembled when sectioned).
   async function current() {
-    return JSON.parse(
-      (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(room.code).first())
-        .body,
-    );
+    return (await readStoredRoom(DB, room.code)).room;
   }
   async function persist(r) {
-    await DB.prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=?")
-      .bind(JSON.stringify(r), r.revision, r.code)
-      .run();
+    const stored = await readStoredRoom(DB, r.code);
+    await DB.batch(roomWriteStatements(DB, r, { expect: stored.version }).statements);
   }
   async function assignProfile() {
     const saved = await call("sheets/save", { sheet }, player.cookie);

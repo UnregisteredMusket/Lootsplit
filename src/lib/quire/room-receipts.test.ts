@@ -17,7 +17,8 @@ import {
 } from "./cloud.server.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { toCopper } from "./money.ts";
-import { ACKNOWLEDGED_LIMIT, deleteRoom, readRoom, updateRoom } from "./room-store.server.ts";
+import { ACKNOWLEDGED_LIMIT, database, deleteRoom, readRoom, updateRoom } from "./room-store.server.ts";
+import { readStoredRoom } from "../../../cloudflare/room-storage.mjs";
 import { ROOM_BODY_LIMIT } from "../../../cloudflare/room-images.mjs";
 
 // Disposable in-memory D1 stand-in with every production migration; never a real campaign.
@@ -112,7 +113,9 @@ test("a campaign full of older body receipts saves again, can end its session an
   const { dm, aria } = await room();
   // An action committed by an older server: its receipt lives in the body.
   const gift = { id: "old-gift", kind: "give" as const, fromId: "party", toId: "aria", copper: 100, holdingId: null, quantity: 0 };
-  const stored = JSON.parse(storedBody(dm.code));
+  // The stored form (assembled if this room is sectioned), written back below as one inline row,
+  // exactly as an older server stored it.
+  const stored = (await readStoredRoom(database()!, dm.code))!.room;
   const hash = "a".repeat(64);
   stored.commands = [];
   stored.commandHashes = {};

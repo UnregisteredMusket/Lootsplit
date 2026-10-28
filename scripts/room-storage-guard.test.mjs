@@ -1,7 +1,8 @@
 // Every shared-room read of campaign data and every room write goes through the storage API
 // (cloudflare/room-storage.mjs and src/lib/quire/room-store.server.ts, built on it), so sectioned
 // storage (owner plan 2026-10-28, step 2b) changes room storage in one place. This test fails if
-// any other source file writes `campaign_rooms` or reads a room body directly in SQL.
+// any other source file writes `campaign_rooms`, reads a room body directly in SQL, or touches the
+// room sections table (`campaign_room_sections`, step 2b) at all.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -13,14 +14,16 @@ const EXTENSIONS = /\.(mjs|js|ts|tsx)$/;
 /** The storage API itself. */
 const STORAGE = new Set(["cloudflare/room-storage.mjs", "src/lib/quire/room-store.server.ts"]);
 /**
- * Known exceptions, each with its reason. Keep this list short; 2b must handle each one.
- * - map-signals.server.ts: its room read is being rewritten by PR #353 (light map signals);
- *   move it onto readStoredRoom/readRoomCore once that lands.
- * - multiplayer-probe.mjs: deletes its own synthetic MONITOR-PROBE rooms by code (no body read).
+ * Known exceptions, each with its reason. Keep this list short.
+ * - map-signals.server.ts: the light map-signal read (load audit F6) projects a few fields of an
+ *   inline room in SQL instead of reading the whole campaign every second; for a sectioned room
+ *   (its table is not in the row) it falls back to readStoredRoom.
+ * - multiplayer-probe.mjs: deletes its own synthetic MONITOR-PROBE rooms by code (no body read),
+ *   with their receipts and any sections.
  */
 const EXCEPTIONS = new Map([
-  ["src/lib/quire/map-signals.server.ts", "body-read"],
-  ["cloudflare/multiplayer-probe.mjs", "delete"],
+  ["src/lib/quire/map-signals.server.ts", new Set(["body-read"])],
+  ["cloudflare/multiplayer-probe.mjs", new Set(["delete", "sections"])],
 ]);
 /** Top-level fields that stay on the room row; json_extract on these may be used directly. */
 const TOP_LEVEL =
@@ -67,8 +70,8 @@ function enclosing(sql, index) {
 }
 
 export function roomSqlProblems(sql) {
-  if (!/\bcampaign_rooms\b/.test(sql)) return [];
-  const problems = [];
+  const problems = /\bcampaign_room_sections\b/.test(sql) ? ["sections"] : [];
+  if (!/\bcampaign_rooms\b/.test(sql)) return problems;
   if (/\b(UPDATE|INSERT\s+(OR\s+\w+\s+)?INTO|REPLACE\s+INTO)\s+campaign_rooms\b/i.test(sql))
     problems.push("write");
   if (/\bDELETE\s+FROM\s+campaign_rooms\b/i.test(sql)) problems.push("delete");
@@ -102,6 +105,10 @@ test("the room SQL detector catches direct writes and body reads", () => {
   assert.deepEqual(roomSqlProblems("SELECT json_extract(body,'$.table.ledger') FROM campaign_rooms"), ["body-read"]);
   assert.deepEqual(roomSqlProblems("FROM campaign_rooms r LEFT JOIN json_each(r.body,'$.table.purses') p"), ["body-read"]);
   assert.deepEqual(roomSqlProblems("DELETE FROM campaign_rooms WHERE code=?"), ["delete"]);
+  // Room sections belong to the storage module only, read or write.
+  assert.deepEqual(roomSqlProblems("SELECT body FROM campaign_room_sections WHERE code=?"), ["sections"]);
+  assert.deepEqual(roomSqlProblems("DELETE FROM campaign_room_sections WHERE code=?"), ["sections"]);
+  assert.deepEqual(roomSqlProblems("SELECT 1 FROM campaign_rooms r JOIN campaign_room_sections s ON s.code=r.code"), ["sections"]);
   // Allowed: guards and counts without the body, top-level fields, other tables' bodies.
   assert.deepEqual(roomSqlProblems("EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=?)"), []);
   assert.deepEqual(roomSqlProblems("(SELECT COUNT(*) FROM campaign_rooms WHERE json_extract(body,'$.ownerId')=? AND json_extract(body,'$.closed') IS NOT 1)"), []);
@@ -118,23 +125,24 @@ test("only the room storage API writes campaign_rooms or reads room bodies", () 
     const source = readFileSync(path.join(root, file), "utf8");
     for (const sql of literals(source))
       for (const problem of roomSqlProblems(sql)) {
-        if (EXCEPTIONS.get(file) === problem) continue;
+        if (EXCEPTIONS.get(file)?.has(problem)) continue;
         found.push(`${file}: ${problem}: ${sql.replace(/\s+/g, " ").slice(0, 140)}`);
       }
   }
   assert.deepEqual(
     found,
     [],
-    "Use cloudflare/room-storage.mjs (readStoredRoom, readRoomCore, roomWriteStatements, roomVersionSql, roomJsonSql) instead of campaign_rooms SQL.",
+    "Use cloudflare/room-storage.mjs (readStoredRoom, readRoomCore, readRoomTablePage, roomWriteStatements, roomVersionSql, roomSectionsDeletedStatement) instead of campaign_rooms or campaign_room_sections SQL.",
   );
 });
 
 test("each listed exception still exists, so the list cannot go stale", () => {
-  for (const [file, problem] of EXCEPTIONS) {
+  for (const [file, problems] of EXCEPTIONS) {
     const source = readFileSync(path.join(root, file), "utf8");
-    assert.ok(
-      literals(source).some((sql) => roomSqlProblems(sql).includes(problem)),
-      `${file} no longer needs its ${problem} exception; remove it from the list.`,
-    );
+    for (const problem of problems)
+      assert.ok(
+        literals(source).some((sql) => roomSqlProblems(sql).includes(problem)),
+        `${file} no longer needs its ${problem} exception; remove it from the list.`,
+      );
   }
 });

@@ -14,7 +14,7 @@ import {
   hostedCampaignGuardSql,
   hostedCampaignLimit,
 } from "./hosted-campaigns.mjs";
-import { readRoomCore, roomJsonSql, roomWriteStatements } from "./room-storage.mjs";
+import { readRoomCore, roomWriteStatements } from "./room-storage.mjs";
 
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
@@ -161,7 +161,7 @@ export const deletionRecoverySql = `json_object(
  'encounterRolls',json((SELECT COALESCE(json_group_array(json_object('seq',r.seq,'encounter_id',r.encounter_id,'request_key',r.request_key,'body',json(r.body),'created_at',r.created_at)),'[]') FROM (SELECT * FROM dm_encounter_rolls ORDER BY seq) r JOIN dm_encounters e ON e.id=r.encounter_id WHERE e.code=? AND e.user_id=?)),
  'characterRolls',json((SELECT COALESCE(json_group_array(json_object('id',id,'user_id',user_id,'character_id',character_id,'request_key',request_key,'body',json(body),'created_at',created_at)),'[]') FROM (SELECT * FROM play_rolls WHERE code=? ORDER BY seq))),
  'imports',json((SELECT COALESCE(json_group_array(json_object('id',id,'user_id',user_id,'character_id',character_id,'purse_id',purse_id,'source_revision',source_revision,'target_revision',target_revision,'seat_id',seat_id,'session_id',session_id,'body',json(body),'status',status,'created_at',created_at,'reviewed_at',reviewed_at,'reviewed_by',reviewed_by)),'[]') FROM character_imports WHERE code=?)),
- 'assignments',json((SELECT COALESCE(json_group_array(json_object('id',c.id,'user_id',c.user_id,'purse_id',c.purse_id,'revision',c.revision,'updated_at',c.updated_at,'body',json(json_set(json_extract(p.value,'$.sheet'),'$.coins',json('{"cp":0,"sp":0,"ep":0,"gp":0,"pp":0}'),'$.equipment',json('[]'))))),'[]') FROM play_characters c JOIN campaign_rooms r ON r.code=c.campaign_code LEFT JOIN json_each(${roomJsonSql("r", "$.table.purses")}) p ON json_extract(p.value,'$.id')=c.purse_id WHERE c.campaign_code=?))
+ 'assignments',json((SELECT COALESCE(json_group_array(json_object('id',c.id,'user_id',c.user_id,'purse_id',c.purse_id,'revision',c.revision,'updated_at',c.updated_at,'body',json(json_set(json_extract(p.value,'$.sheet'),'$.coins',json('{"cp":0,"sp":0,"ep":0,"gp":0,"pp":0}'),'$.equipment',json('[]'))))),'[]') FROM play_characters c LEFT JOIN json_each(?) p ON json_extract(p.value,'$.id')=c.purse_id WHERE c.campaign_code=?))
 )`;
 
 export function deletionRecoveryArgs(room, seat, name, userId) {
@@ -189,6 +189,9 @@ export function deletionRecoveryArgs(room, seat, name, userId) {
     userId,
     room.code,
     room.code,
+    // The stored purses as read: the deletion batch writes only while the room is still at that
+    // version (roomVersionSql), so they are the room's purses inside the transaction too.
+    room.table?.purses == null ? null : JSON.stringify(room.table.purses),
     room.code,
   ];
 }

@@ -7,10 +7,14 @@ import {
   ROOM_IMAGE_SOURCES,
 } from "../../../cloudflare/room-images.mjs";
 import {
+  readRoomSectionHashes,
   readStoredRoom,
+  readStoredRoomWithCombatEncounter,
+  roomBodySectioned,
   roomCommittedSql,
   roomDeleteStatement,
-  roomJsonSql,
+  roomSectionsDeletedStatement,
+  roomStorageSizes,
   roomWriteStatements,
 } from "../../../cloudflare/room-storage.mjs";
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
@@ -51,8 +55,9 @@ export function roomStorageBody(room: CloudRoom): string {
  * compare against the hydrated JSON (with inline images/resources) and never match.
  */
 export function keepStoredBody<T extends CloudRoom>(source: CloudRoom, derived: T): T {
-  const stored = (source as CloudRoom & { [STORED_BODY]?: string })[STORED_BODY];
-  if (stored !== undefined) Object.defineProperty(derived, STORED_BODY, { value: stored });
+  // The descriptor, not the value: a sectioned room's body is assembled only if someone asks.
+  const stored = Object.getOwnPropertyDescriptor(source, STORED_BODY);
+  if (stored) Object.defineProperty(derived, STORED_BODY, stored);
   const sources = roomImageSources(source);
   if (sources.size)
     Object.defineProperty(derived, ROOM_IMAGE_SOURCES, { value: sources, configurable: true });
@@ -168,11 +173,12 @@ export async function readRoom(code: string, options: ReadRoomOptions = {}): Pro
       await import("../../../cloudflare/campaign-characters.mjs");
     const parsed = read.room as CloudRoom, revision = parsed.revision;
     const room = await hydrateCampaignCharacters(db, parsed);
-    const stored = room.revision === revision ? read.body : JSON.stringify(room);
+    const upgraded = room.revision === revision ? undefined : JSON.stringify(room);
     const hydrated = await hydrateRoomImages(db, room.code, room, {
       keepMapImageReferences: options.mapImageReferences === true,
     });
-    Object.defineProperty(hydrated, STORED_BODY, { value: stored });
+    // Lazy: a sectioned room's exact body is only assembled if a caller asks for it.
+    Object.defineProperty(hydrated, STORED_BODY, { get: () => upgraded ?? read.body });
     ensureCityExchanges(hydrated.table);
     return hydrated;
   }
@@ -182,13 +188,14 @@ export async function readRoom(code: string, options: ReadRoomOptions = {}): Pro
 }
 export type CombatViewRead = {
   room: CloudRoom;
-  /** The bound encounter's row in this campaign, read in the same statement as the room. */
+  /** The bound encounter's row in this campaign, read consistently with the room. */
   encounter: { body: string; status: string } | null;
 };
 /**
  * Read-only room for the map combat views (`mapCombatOrder`, `mapCombatPresentation`; audit
- * 2026-10-28 F8). One statement reads the room and the encounter its combat binding names, so
- * seats, binding, scene and encounter come from a single consistent snapshot. Archived reports
+ * 2026-10-28 F8). The room and the encounter its combat binding names come from one consistent
+ * state (one statement for an inline room; room-storage.mjs `readStoredRoomWithCombatEncounter`),
+ * so seats, binding, scene and encounter agree. Archived reports
  * are left out (the combat views never project them) and the current maps' image references stay
  * references, so no map rasters or report snapshots are read. Never write this room back,
  * export it or use it as a guard.
@@ -199,14 +206,9 @@ export async function readCombatView(code: string): Promise<CombatViewRead | nul
     const room = await readRoom(code);
     return room ? { room, encounter: null } : null;
   }
-  const row = await db
-    .prepare(
-      `SELECT r.body AS body,e.body AS encounter_body,e.status AS encounter_status FROM campaign_rooms r LEFT JOIN dm_encounters e ON e.id=${roomJsonSql("r", "$.table.journal.world.combat.encounterId")} AND e.code=r.code WHERE r.code=?`,
-    )
-    .bind(code)
-    .first<{ body: string; encounter_body: string | null; encounter_status: string | null }>();
-  if (!row) return null;
-  const parsed = JSON.parse(row.body) as CloudRoom;
+  const read = await readStoredRoomWithCombatEncounter(db, code);
+  if (!read) return null;
+  const parsed = read.stored.room as CloudRoom;
   if (parsed.table?.journal) parsed.table.journal.reports = [];
   const { hydrateCampaignCharacters } =
     await import("../../../cloudflare/campaign-characters.mjs");
@@ -214,13 +216,7 @@ export async function readCombatView(code: string): Promise<CombatViewRead | nul
     keepMapImageReferences: true,
   });
   ensureCityExchanges(room.table);
-  return {
-    room,
-    encounter:
-      typeof row.encounter_body === "string" && typeof row.encounter_status === "string"
-        ? { body: row.encounter_body, status: row.encounter_status }
-        : null,
-  };
+  return { room, encounter: read.encounter };
 }
 /**
  * D1 rejects rows above 2,000,000 bytes with an opaque error. Room bodies (after images, resource
@@ -236,6 +232,9 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
   if (bytes <= ROOM_BODY_LIMIT && largestReport <= ROOM_BODY_LIMIT) return;
   const now = Date.now();
   try {
+    // `bytes` is the assembled stored room (the logical cap); `storage` is what the row and its
+    // sections would hold (sectioned storage, step 2b).
+    const storage = roomStorageSizes(encoded.body);
     const stored = JSON.parse(encoded.body) as CloudRoom;
     const size = (value: unknown) => (value === undefined ? 0 : utf8(JSON.stringify(value)));
     const { initializeMonitor, recordLog } = await import("../../../cloudflare/monitor-journal.mjs");
@@ -257,6 +256,12 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
         bytes,
         largestReport,
         limit: ROOM_BODY_LIMIT,
+        storage: {
+          sectioned: storage.sectioned,
+          rowBytes: storage.rowBytes,
+          sectionBytes: storage.sectionBytes,
+          sections: storage.sections,
+        },
         parts: {
           notes: size(stored.table?.notes),
           ledger: size(stored.table?.ledger),
@@ -305,9 +310,8 @@ export async function createRoom(
         ? { extraWhere: hosting.hostedCampaignGuardSql, extraArgs: hosting.hostedCampaignGuardArgs(host.userId, host.limit) }
         : {}),
     });
-    const [insert] = write.statements as [Statement];
-    const members = [...await roomImageStatements(db, room, encoded, write.writeId), ...accountSeats(db, room, write.writeId)];
-    const result = members.length ? (await db.batch([insert, ...members]))[0]! : await insert.run();
+    const statements = [...(write.statements as Statement[]), ...await roomImageStatements(db, room, encoded, write.writeId), ...accountSeats(db, room, write.writeId)];
+    const result = statements.length > 1 ? (await db.batch(statements))[0]! : await statements[0]!.run();
     if (host && hosting && !result.meta.changes) {
       // A concurrent open filled the last slot between the pre-check and this write.
       await hosting.assertCanHost(db, host.userId, host.path, host.limit);
@@ -428,15 +432,21 @@ export async function updateRoom(
     const stored = withoutReceipts(room);
     const encoded = await encodeRoomImages(stored);
     await guardRoomSize(db, stored, encoded);
-    const write = roomWriteStatements(db, room, { expect: { revision: baseRevision }, body: encoded.body });
-    const [update] = write.statements as [Statement];
+    // A sectioned write re-sends only sections that are not stored yet (hashes only are read).
+    const present = roomBodySectioned(encoded.body) ? await readRoomSectionHashes(db, room.code) : undefined;
+    const write = roomWriteStatements(db, room, {
+      expect: { revision: baseRevision },
+      body: encoded.body,
+      ...(present ? { present } : {}),
+    });
     const writeId = write.writeId;
-    const members = [
+    const statements = [
+      ...(write.statements as Statement[]),
       ...await roomImageStatements(db, stored, encoded, writeId),
       ...accountSeats(db, stored, writeId),
       ...(receipts.length ? [receiptStatement(db, room.code, receipts, writeId)] : []),
     ];
-    const result = members.length ? (await db.batch([update, ...members]))[0]! : await update.run();
+    const result = statements.length > 1 ? (await db.batch(statements))[0]! : await statements[0]!.run();
     if (!result.meta.changes)
       throw new Error("The table changed. Refresh before sending your turn.");
     return;
@@ -471,6 +481,7 @@ export async function deleteRoom(code: string, baseRevision: number): Promise<vo
           "DELETE FROM campaign_room_receipts WHERE code = ? AND NOT EXISTS (SELECT 1 FROM campaign_rooms WHERE code = ?)",
         )
         .bind(code, code),
+      roomSectionsDeletedStatement(db, code) as Statement,
     ]);
     if (!result!.meta.changes) throw new Error("The table changed. Refresh before closing it.");
     return;

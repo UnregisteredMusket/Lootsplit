@@ -8,7 +8,7 @@ import {
 } from "../src/lib/quire/analytics.ts";
 import { roleOf } from "./members.mjs";
 import { hydrateRoomReports } from "./room-reports.mjs";
-import { roomJsonSql } from "./room-storage.mjs";
+import { readRoomTablePage } from "./room-storage.mjs";
 
 // Bound repeated homepage reads per database/isolate; failures are never cached as zero.
 const snapshots = new WeakMap();
@@ -31,18 +31,12 @@ async function collect(db) {
     sharedCampaigns = 0;
   // Keyset pagination, projecting table data only; never deserialize room tokens or chats.
   for (;;) {
-    const { results } = await db
-      .prepare(
-        `SELECT code,
-      ${roomJsonSql("campaign_rooms", "$.table.ledger")} AS ledger,
-      ${roomJsonSql("campaign_rooms", "$.table.purses")} AS purses,
-      ${roomJsonSql("campaign_rooms", "$.table.holdings")} AS holdings,
-      ${roomJsonSql("campaign_rooms", "$.table.journal")} AS journal
-      FROM campaign_rooms WHERE code > ? AND COALESCE(json_extract(body, '$.testMode'), 0) = 0 AND ${notProbeRoom()} ORDER BY code LIMIT 100`,
-      )
-      .bind(after)
-      .all();
-    for (const row of results) {
+    const results = await readRoomTablePage(db, ["ledger", "purses", "holdings", "journal"], {
+      after,
+      limit: 100,
+      where: `COALESCE(json_extract(body, '$.testMode'), 0) = 0 AND ${notProbeRoom()}`,
+    });
+    for (const { code, fields: row } of results) {
       addMetrics(
         metrics,
         campaignAnalytics({
@@ -50,12 +44,12 @@ async function collect(db) {
           purses: JSON.parse(row.purses || "[]"),
           holdings: JSON.parse(row.holdings || "[]"),
           // Archived session snapshots are stored beside the room row (room-reports.mjs).
-          journal: (await hydrateRoomReports(db, row.code, { journal: JSON.parse(row.journal || "null") }))
+          journal: (await hydrateRoomReports(db, code, { journal: JSON.parse(row.journal || "null") }))
             .journal,
         }),
       );
       sharedCampaigns++;
-      after = row.code;
+      after = code;
     }
     if (results.length < 100) break;
   }

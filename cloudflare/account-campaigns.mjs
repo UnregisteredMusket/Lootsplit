@@ -19,6 +19,7 @@ import {
   readRoomCore,
   readStoredRoom,
   roomDeleteStatement,
+  roomSectionsDeletedStatement,
   roomVersionSql,
   roomWriteStatements,
 } from "./room-storage.mjs";
@@ -64,12 +65,14 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
     next.seats = next.seats.filter((s) => s.role === "dm");
     next.turn = next.seats.findIndex((s) => s.id === seat.id);
     // Revision-only guard, as before (the reopen request names the revision it saw).
-    const saved = await roomWriteStatements(db, next, {
+    const write = roomWriteStatements(db, next, {
       expect: { revision: row.version.revision },
       extraWhere: hostedCampaignGuardSql,
       extraArgs: hostedCampaignGuardArgs(userId, limit),
-    }).statements[0].run();
-    if (saved.meta.changes !== 1) {
+      // Sections of the room as read, so a sectioned room does not re-send unchanged parts.
+      present: new Map((row.version.sections ?? []).map((s) => [s.hash, s.parts])),
+    });
+    if (!write.changed(await db.batch(write.statements), write.statements)) {
       await assertCanHost(db, userId, "reopen", limit);
       const current = await readRoomCore(db, member.code);
       if (current?.revision === row.version.revision) throw hostedCampaignLimitError(limit);
@@ -116,6 +119,9 @@ export async function campaignAction(db, userId, body, actor) {
   if (!row) fail("This campaign is already closed.", 404);
   const room = row.room,
     seat = room.seats.find((s) => s.id === member.seat_id && s.token === member.token);
+  // The purses exactly as stored at this version, for the recovery copy (taken before any
+  // hydration below can touch the room object).
+  const recoveryRoom = { ...room, table: { purses: structuredClone(room.table?.purses) } };
   if (seat?.role !== "dm")
     fail("Only the linked dungeon master can delete a shared campaign.", 403);
   if (Object.values(room.drafts || {}).some((d) => d.length))
@@ -142,7 +148,7 @@ export async function campaignAction(db, userId, body, actor) {
   try {
     const checked = await db
       .prepare(`SELECT ${deletionRecoverySql} AS body`)
-      .bind(...deletionRecoveryArgs(room, seat, member.name, userId))
+      .bind(...deletionRecoveryArgs(recoveryRoom, seat, member.name, userId))
       .first();
     recovery = JSON.parse(checked.body);
   } catch {
@@ -192,7 +198,7 @@ export async function campaignAction(db, userId, body, actor) {
         )
         .bind(
           JSON.stringify(payload),
-          ...deletionRecoveryArgs(room, seat, member.name, userId),
+          ...deletionRecoveryArgs(recoveryRoom, seat, member.name, userId),
           backupId,
           userId,
           member.name + " (before deletion)",
@@ -214,6 +220,7 @@ export async function campaignAction(db, userId, body, actor) {
         extraWhere: "EXISTS(SELECT 1 FROM campaign_deletion_backups WHERE backup_id=? AND user_id=?)",
         extraArgs: [backupId, userId],
       }),
+      roomSectionsDeletedStatement(db, body.code),
       db
         .prepare(
           "DELETE FROM library_members WHERE code=? AND NOT EXISTS (SELECT 1 FROM campaign_rooms WHERE code=?)",

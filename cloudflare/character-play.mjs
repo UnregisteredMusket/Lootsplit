@@ -248,8 +248,9 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
           npc.portrait = p.portrait;
         }
         room.revision++;
-        const saved = await roomWriteStatements(db, room, { expect: version }).statements[0].run();
-        if (!saved.meta.changes) fail("Campaign changed. Reload and retry.", 409);
+        const write = roomWriteStatements(db, room, { expect: version });
+        if (!write.changed(await db.batch(write.statements), write.statements))
+          fail("Campaign changed. Reload and retry.", 409);
         return { id };
       }
       if (!Number.isSafeInteger(body.revision)) fail("Missing sheet revision.");
@@ -452,6 +453,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
           approval?.id || "",
         );
       const statements = [update];
+      /** Statements that must each change a row (room section uploads and cleanup may not). */
+      const required = [update];
       const assigned =
         "EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?)";
       let targetWrite = null;
@@ -462,34 +465,37 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
           extraArgs: [r.id, code, purse, body.revision + 1],
         });
         statements.push(...targetWrite.statements);
+        required.push(targetWrite.statements[0]);
       }
-      if (detached)
-        statements.push(
-          ...roomWriteStatements(db, detached.room, {
-            expect: detached.version,
-            extraWhere: assigned,
-            extraArgs: [r.id, code, code ? purse : "", body.revision + 1],
-          }).statements,
-        );
-      if (approval && targetWrite)
-        statements.push(
-          db
-            .prepare(
-              `UPDATE character_imports SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?) AND ${targetWrite.committed.sql}`,
-            )
-            .bind(
-              Date.now(),
-              approval.reviewer,
-              approval.id,
-              r.id,
-              code,
-              purse,
-              body.revision + 1,
-              ...targetWrite.committed.args,
-            ),
-        );
+      if (detached) {
+        const detachedWrite = roomWriteStatements(db, detached.room, {
+          expect: detached.version,
+          extraWhere: assigned,
+          extraArgs: [r.id, code, code ? purse : "", body.revision + 1],
+        });
+        statements.push(...detachedWrite.statements);
+        required.push(detachedWrite.statements[0]);
+      }
+      if (approval && targetWrite) {
+        const approved = db
+          .prepare(
+            `UPDATE character_imports SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?) AND ${targetWrite.committed.sql}`,
+          )
+          .bind(
+            Date.now(),
+            approval.reviewer,
+            approval.id,
+            r.id,
+            code,
+            purse,
+            body.revision + 1,
+            ...targetWrite.committed.args,
+          );
+        statements.push(approved);
+        required.push(approved);
+      }
       const result = await db.batch(statements);
-      if (result.some((x) => !x.meta.changes))
+      if (required.some((statement) => !result[statements.indexOf(statement)]?.meta.changes))
         fail("Character or campaign changed. Reload before assigning.", 409);
     } catch (e) {
       if (e.status) throw e;

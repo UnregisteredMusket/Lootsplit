@@ -27,7 +27,7 @@ import type { Purse } from "./types.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
 const sql = new DatabaseSync(":memory:");
-for (const file of ["0001_campaign_rooms.sql", "0024_campaign_room_receipts.sql", "0003_accounts.sql", "0008_encounters.sql"])
+for (const file of ["0001_campaign_rooms.sql", "0024_campaign_room_receipts.sql", "0026_campaign_room_sections.sql", "0003_accounts.sql", "0008_encounters.sql"])
   sql.exec(readFileSync(new URL(`../../../cloudflare/migrations/${file}`, import.meta.url), "utf8"));
 (globalThis as any).__env__ = {
   DB: {

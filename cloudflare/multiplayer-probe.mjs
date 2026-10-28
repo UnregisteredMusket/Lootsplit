@@ -71,6 +71,13 @@ async function sweep(db, slot) {
         "DELETE FROM campaign_room_receipts WHERE code GLOB 'MONITOR-PROBE-*' AND CAST(substr(code,15) AS INTEGER)<?",
       )
       .bind(slot),
+    // And any stored sections (room-storage.mjs; a probe room is far below the inline threshold,
+    // so normally there are none).
+    db
+      .prepare(
+        "DELETE FROM campaign_room_sections WHERE code GLOB 'MONITOR-PROBE-*' AND CAST(substr(code,15) AS INTEGER)<?",
+      )
+      .bind(slot),
   ]);
   return result.meta?.changes ?? 0;
 }
@@ -272,6 +279,7 @@ async function finalCleanup(db, code, pending) {
     await db.batch([
       db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code),
       db.prepare("DELETE FROM campaign_room_receipts WHERE code=?").bind(code),
+      db.prepare("DELETE FROM campaign_room_sections WHERE code=?").bind(code),
     ]);
     return "deleted-after-failure";
   } catch {
