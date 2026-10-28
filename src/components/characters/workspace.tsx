@@ -1072,7 +1072,7 @@ function CharacterEditor({
               </span>
             </button>
           </div>
-          <div className="quick-hp" role="group" aria-label="Quick hit points">
+          <div className="sheet-quick-hp" role="group" aria-label="Quick hit points">
             <button
               type="button"
               disabled={!canPlay || busy || sheet.hp + sheet.tempHp <= 0}
@@ -1087,7 +1087,7 @@ function CharacterEditor({
             >
               +1 HP
             </button>
-            {dirty ? null : <span className="quick-hp-note">Saves at once</span>}
+            {dirty ? null : <span className="sheet-quick-hp-note">Saves at once</span>}
           </div>
           {sheet.conditions && <p className="condition-pill">{sheet.conditions}</p>}
           <CharacterTabs

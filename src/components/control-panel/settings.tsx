@@ -6,13 +6,14 @@ import { RollModeSetting } from "@/components/roll-mode-setting";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
 import { TestModeSettings } from "@/components/test-mode";
-import { ChevronDown, LogIn } from "lucide-react";
+import { ChevronDown, CircleHelp, LogIn } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import { FANTASY_LOOKS } from "@/lib/quire/theme";
 import { usePrefs, useShowDollars } from "@/lib/quire/prefs";
 import { Campaigns } from "@/components/campaigns";
 import { useRouterState } from "@tanstack/react-router";
 import { openShortcutSheet } from "@/components/command-palette";
+import { openSessionSheet, useSessionChipLabel } from "@/components/session-chip";
 import { OPEN_WORKSPACE_WINDOWS } from "@/components/split-view";
 type Group = {
   name: string;
@@ -37,6 +38,7 @@ export function ManagementPanel({
     showDollars = useShowDollars(),
     [expanded, setExpanded] = useState("");
   const href = useRouterState({ select: (s) => s.location.href });
+  const sessionLabel = useSessionChipLabel();
   const native = import.meta.env.VITE_MOBILE === "true";
   const tools = (
     <div className="settings-tool-buttons">
@@ -157,8 +159,8 @@ export function ManagementPanel({
           content: (
             <>
               <p>
-                The Desk uses swipeable information panels. Previously saved shortcuts remain
-                accessible in their settings.
+                Your six saved shortcuts. Once you save them, or use Pin to Desk at the top of a
+                feature screen, they show as a Pinned row on the Desk.
               </p>
               <AppLink
                 href="/?view=home&customize=1#saved-shortcuts"
@@ -262,6 +264,28 @@ export function ManagementPanel({
       returnFocus=".settings-trigger"
     >
       <div className="management-panel">
+        {/* Help on every screen, and the DM's session chip on phones (design M4, D5). */}
+        <div className="management-quick">
+          <AppLink
+            href={dm ? "/help?guide=dm" : "/help?guide=player"}
+            onClick={() => onOpenChange(false)}
+          >
+            <CircleHelp size={18} aria-hidden="true" />
+            Help
+          </AppLink>
+          {dm && (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => {
+                onOpenChange(false);
+                openSessionSheet();
+              }}
+            >
+              {sessionLabel}
+            </button>
+          )}
+        </div>
         <p className="management-scope">
           {campaign} · {dm ? "Dungeon Master" : "Player"}
         </p>

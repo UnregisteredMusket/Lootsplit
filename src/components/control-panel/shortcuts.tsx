@@ -269,6 +269,8 @@ export function Shortcuts({
                 setItems(data.items);
                 setRevision(data.revision);
                 cacheShortcuts(identity!, role, data.items);
+                // The Desk's Pinned row and Pin to Desk buttons reread the account copy.
+                window.dispatchEvent(new Event("lootsplit:shortcuts-changed"));
                 setOpen(false);
                 toast.success("Account shortcuts saved");
               } catch (e) {

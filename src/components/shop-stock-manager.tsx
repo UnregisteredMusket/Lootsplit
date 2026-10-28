@@ -279,7 +279,7 @@ export function CatalogStockPicker({ shop }: { shop: Shop }) {
                 <label className="flex min-h-14 items-center gap-3 py-2">
                   <input
                     type="checkbox"
-                    className="size-5 shrink-0 accent-accent"
+                    className="size-6 shrink-0 accent-accent"
                     aria-label={`Stock ${item.name}`}
                     disabled={stocked}
                     checked={stocked || selected.has(item.id)}
