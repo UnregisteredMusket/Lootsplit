@@ -14,13 +14,6 @@
 .pin-to-desk[aria-pressed="true"] {
   border-color: var(--color-lead);
 }
-.feature-heading-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem 1rem;
-}
 .desk-pins {
   margin: 0 0 1rem;
 }

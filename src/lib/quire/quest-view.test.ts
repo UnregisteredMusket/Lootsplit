@@ -16,6 +16,9 @@ import {
   writeQuestState,
 } from "./quest-view.ts";
 import type { Quest } from "./quests-schema.ts";
+import { campaignMapSchema } from "./world-schema.ts";
+import { areaRadiusFromUnits, areaRadiusUnits, linkableMapPins, questMapHref, questsOnMap } from "./quest-view.ts";
+
 import { forgetQuestState } from "./campaigns.ts";
 
 const quest = (id: string, extra: Partial<Quest> = {}): Quest => ({
@@ -167,4 +170,69 @@ test("deleting a campaign forgets its quest Follow/Updated marks only", () => {
     Object.defineProperty(globalThis, "localStorage", { configurable: true, value: saved, writable: true });
   }
   assert.deepEqual([...store.keys()], ["quire.quests.v1.gone2.player.aria", "quire.seat.v1.gone"]);
+});
+
+// --- On the map ---
+
+const cityMap = (extra: Record<string, unknown> = {}) =>
+  campaignMapSchema.parse({
+    id: "city",
+    name: "Harrowgate",
+    image: "data:image/png;base64,YQ==",
+    locationId: "town",
+    visible: true,
+    type: "city",
+    anchors: [{ locationId: "road", x: 0.2, y: 0.3 }],
+    markers: [{ id: "stable", x: 0.6, y: 0.4, label: "Stable", description: "", visibility: "party" }],
+    ...extra,
+  });
+function mapTable(quests: Quest[]) {
+  const t = table(quests);
+  t.journal!.world!.maps = [cityMap()];
+  return t;
+}
+
+test("on the map: pins for linked map pins, open objectives' pins and places; areas follow their objective", () => {
+  const t = mapTable([
+    quest("mare", {
+      markers: [{ mapId: "city", markerId: "stable" }],
+      objectives: [
+        { id: "o1", text: "Follow the tracks", state: "open", locationId: "road" },
+        { id: "o2", text: "Done already", state: "done", locationId: "road" },
+        { id: "o3", text: "Secret", state: "open", hidden: true, marker: { mapId: "city", markerId: "stable" } },
+      ],
+      areas: [
+        { id: "a1", mapId: "city", x: 0.4, y: 0.4, r: 0.1, label: "Somewhere in here" },
+        { id: "a2", mapId: "city", x: 0.5, y: 0.5, r: 0.1, objectiveId: "o2" },
+        { id: "a3", mapId: "city", x: 0.5, y: 0.5, r: 0.1, objectiveId: "o3" },
+        { id: "a4", mapId: "other", x: 0.5, y: 0.5, r: 0.1 },
+      ],
+    }),
+    quest("elsewhere", { locationIds: ["ford"] }),
+    quest("draft", { audience: { kind: "none" }, markers: [{ mapId: "city", markerId: "stable" }] }),
+    quest("closed", { status: "completed", markers: [{ mapId: "city", markerId: "stable" }] }),
+  ]);
+  const map = t.journal!.world!.maps[0]!;
+  const forPlayer = questsOnMap(t, map, player);
+  assert.deepEqual(forPlayer.map((i) => i.quest.id), ["mare"]);
+  const mare = forPlayer[0]!;
+  assert.deepEqual(mare.pins.map((p) => [p.x, p.y]).sort(), [[0.2, 0.3], [0.6, 0.4]]);
+  // Areas of a finished objective or a hidden one are not drawn for players; the DM sees the hidden one.
+  assert.deepEqual(mare.areas.map((a) => a.areaId), ["a1"]);
+  assert.deepEqual(questsOnMap(t, map, dm).find((i) => i.quest.id === "mare")!.areas.map((a) => a.areaId), ["a1", "a3"]);
+  assert.ok(questsOnMap(t, map, dm).some((i) => i.quest.id === "draft"));
+  assert.deepEqual(mare.openObjectives.map((o) => o.id), ["o1"]);
+  assert.equal(questMapHref(t, mare.quest, player), "/maps?quest=mare");
+  assert.deepEqual(linkableMapPins(t, map), [{ mapId: "city", markerId: "stable", label: "Stable" }]);
+});
+
+test("radius in map units: a grid wins (feet), then a scale bar; the inverse round-trips", () => {
+  const grid = cityMap({ grid: { columns: 20, rows: 10, feetPerTile: 5, x: 0, y: 0, width: 1, height: 1 } });
+  assert.deepEqual(areaRadiusUnits(grid, 0.1), { value: 10, unit: "ft" });
+  const scaled = cityMap({ scale: { a: { x: 0, y: 0.5 }, b: { x: 0.5, y: 0.5 }, distance: 10, unit: "mi", aspect: 2 } });
+  // Half the width is 10 mi, so a radius of a tenth of the width is 2 mi.
+  assert.deepEqual(areaRadiusUnits(scaled, 0.1), { value: 2, unit: "mi" });
+  assert.ok(Math.abs(areaRadiusFromUnits(scaled, 2)! - 0.1) < 1e-9);
+  assert.equal(areaRadiusUnits(cityMap(), 0.1), undefined);
+  assert.equal(areaRadiusFromUnits(cityMap(), 2), undefined);
 });
