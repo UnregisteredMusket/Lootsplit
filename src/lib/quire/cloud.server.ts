@@ -999,12 +999,17 @@ export async function submitCommands(input: {
           (note) => !room.table.notes.some((old) => old.id === note.id),
         );
         if (fresh.length) {
-          try {
-            const { pushMessages } = await import("./push.server.ts");
-            await pushMessages(next, seat.id, fresh);
-          } catch {
-            console.warn("Background notification failed; campaign changes remain saved.");
-          }
+          // After the response on a Worker (waitUntil), so a slow push service never holds the
+          // sender's submit or tab lock (2026-10-28 load audit, F12); awaited without a context.
+          const { afterResponse } = await import("../../../cloudflare/request-context.mjs");
+          await afterResponse(async () => {
+            try {
+              const { pushMessages } = await import("./push.server.ts");
+              await pushMessages(next, seat.id, fresh);
+            } catch {
+              console.warn("Background notification failed; campaign changes remain saved.");
+            }
+          });
         }
       }
       return view(next, seat, room);

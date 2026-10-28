@@ -655,9 +655,18 @@ async function refresh(conditional = false) {
             knownSeatId: s.seatId,
           },
         });
-      } catch {
-        // One bounded readonly fallback supports an older edge/client protocol.
-        // Full reads recheck the same credentials; errors still retain all pending work.
+      } catch (error) {
+        // One bounded readonly fallback supports an older edge/client protocol (an edge without
+        // the poll endpoint, or a response this client cannot decode). Any other failure (offline,
+        // 429, 5xx, a closed room or a released seat) is reported as is: a full read would only
+        // double the load during an outage (2026-10-28 load audit, F13). Pending work is retained.
+        const message = error instanceof Error ? error.message : String(error);
+        const protocol =
+          error instanceof SyntaxError ||
+          /server function|serverFnId|not found|invariant failed|content-type|unsupported framed protocol|unexpected token|not valid JSON/i.test(
+            message,
+          );
+        if (!protocol) throw error;
         remote = await pullCloudTable({
           data: { tabletopProtocol: 10, code: s.code, token: s.token },
         });
@@ -714,6 +723,14 @@ async function refresh(conditional = false) {
 }
 export async function refreshShared() {
   return serial(refresh);
+}
+/**
+ * Re-read the shared room for window focus and workspace changes: the light "unchanged" poll
+ * first, so an unchanged room costs ~250 bytes instead of the whole room (2026-10-28 load
+ * audit, F7). A changed room is read and applied exactly as by refreshShared().
+ */
+export async function refreshSharedIfChanged() {
+  return serial(() => refresh(true));
 }
 // Capture a settled shared view without racing this tab's queued operations.
 export function captureDeviceBackup() {
@@ -982,7 +999,9 @@ export async function queueCommand(
       await accept(remote);
       return { status: "committed" };
     }
-    if (!s.pending.length) await refresh();
+    // Conditional: an unchanged room answers "unchanged" and the device table is already that
+    // revision (accept() would not rewrite it either); a changed room is read in full (F7).
+    if (!s.pending.length) await refresh(true);
     guard();
     const current = requireSession(),
       before = await economySnapshot();
@@ -1091,7 +1110,7 @@ export function runSharedMutation(
       );
     if (!view.mine) throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100) throw new Error("Submit your pending actions first.");
-    if (!s.pending.length) await refresh();
+    if (!s.pending.length) await refresh(true);
     guard();
     const before = await economySnapshot();
     guard();

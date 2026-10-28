@@ -1,0 +1,11 @@
+{
+  "title": "Lighter traffic in live shared rooms",
+  "summary": "Map pings, actions and returning to a tab no longer re-download the whole campaign when nothing changed, so busy live tables stay quicker for everyone.",
+  "items": [
+    "An open map checks for pings every second while pings are flying and every three seconds when the map is quiet; switching back to the tab checks at once.",
+    "Pings now check only the room's seats and the one map you're on, with the same rules for who sees what.",
+    "Before an action, and when you return to the window, the room is only downloaded again if someone changed it.",
+    "Chat notifications to other players are sent after your message is saved, so a slow notification service no longer holds up your table.",
+    "During a server hiccup, a failed update check waits and tries again instead of downloading the whole room."
+  ]
+}
