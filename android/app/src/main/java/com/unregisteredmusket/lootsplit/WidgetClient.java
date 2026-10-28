@@ -12,7 +12,7 @@ final class WidgetClient {
     static void initialize(android.content.Context context) { appContext = context.getApplicationContext(); }
     // The compact widget view omits only lists the widgets never read (the 100 scanned workflow runs,
     // closed pull requests, device reports), keeping the response far below the 256 KiB bound.
-    static final String ENDPOINT = "https://lootsplitter.com/api/account/owner/monitor?view=widget";
+    static final String ENDPOINT = "https://lootsplit.oliverstorie2017.workers.dev/api/account/owner/monitor?view=widget";
     static final class AccessDenied extends Exception { }
     // Every HTTP limit ends inside WidgetRefresh's task deadline, so a slow server or network
     // releases the fetch thread instead of holding it past the tap/job that started it.

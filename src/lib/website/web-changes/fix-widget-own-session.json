@@ -3,7 +3,6 @@
   "summary": "The Android home-screen Field monitor now holds its own owner session instead of borrowing the app's, so signing out or back in to the app no longer leaves it stuck on \"Sign in\".",
   "items": [
     "Connect owner account opens a one-year widget session that only the site owner can mint; anyone else gets \"forbidden\" on that route and on every widget reading.",
-    "Disconnect widget revokes that session on the server; app sign-out and account switching leave it running.",
-    "The widget reads from lootsplitter.com (needs the Android 1.14.0 update)."
+    "Disconnect widget revokes that session on the server; app sign-out and account switching leave it running (needs the Android 1.14.0 update)."
   ]
 }
