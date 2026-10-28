@@ -2,7 +2,7 @@
 // the last visit, current chat and pool counts.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { awaySnapshot, sinceAway, type AwayTable } from "./since-away.ts";
+import { awaySnapshot, readAwaySnapshot, sinceAway, writeAwaySnapshot, type AwayTable } from "./since-away.ts";
 
 const table = (over: Partial<NonNullable<AwayTable["journal"]>> = {}): AwayTable => ({
   holdings: [
@@ -56,4 +56,73 @@ test("DM answers and quest updates since the last visit, for this player's chara
 
 test("tables without a journal are quiet", () => {
   assert.deepEqual(sinceAway({ holdings: [], journal: null }, ["mira"], null, 0), []);
+});
+
+test("answers are worded by their actual status, and anything unexpected neutrally", () => {
+  const before = awaySnapshot(
+    table({
+      requests: [
+        { id: "a", purseId: "mira", note: "Armour", status: "pending" },
+        { id: "b", purseId: "mira", note: "Rope", status: "pending" },
+        { id: "c", purseId: "mira", note: "Oil", status: "pending" },
+      ],
+      world: {
+        journeys: [
+          { id: "j1", requestedBy: "mira", status: "proposed" },
+          { id: "j2", requestedBy: "mira", status: "proposed" },
+          { id: "j3", requestedBy: "mira", status: "proposed" },
+        ],
+      },
+      quests: { quests: [] },
+    }),
+    ["mira"],
+    50,
+  );
+  const after = table({
+    requests: [
+      { id: "a", purseId: "mira", note: "Armour", status: "denied" },
+      { id: "b", purseId: "mira", note: "Rope", status: "cancelled" },
+      { id: "c", purseId: "mira", note: "Oil", status: "archived" },
+    ],
+    world: {
+      journeys: [
+        { id: "j1", requestedBy: "mira", status: "cancelled" },
+        { id: "j2", requestedBy: "mira", status: "planned" },
+        { id: "j3", requestedBy: "mira", status: "completed" },
+      ],
+    },
+    quests: { quests: [] },
+  });
+  assert.deepEqual(
+    sinceAway(after, ["mira"], before, 0)
+      .filter((i) => i.id !== "pool")
+      .map((i) => i.text),
+    [
+      "The DM declined your request: Armour",
+      "Your request was cancelled: Rope",
+      "Your request was updated: Oil",
+      "Your journey was cancelled",
+      "The DM approved your journey",
+      "Your journey was updated",
+    ],
+  );
+});
+
+test("guest snapshots stay in memory; account seats are stored per campaign and seat", () => {
+  const store = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+  };
+  const snapshot = awaySnapshot(table(), ["mira"], 75);
+  const guest = { campaign: "main", seatId: "seat-g", guest: true };
+  writeAwaySnapshot(guest, snapshot);
+  assert.equal(store.size, 0, "a guest leaves nothing in browser storage");
+  assert.deepEqual(readAwaySnapshot(guest), snapshot);
+  const ann = { campaign: "account-u-ROOM", seatId: "seat-ann", guest: false };
+  writeAwaySnapshot(ann, snapshot);
+  assert.deepEqual([...store.keys()], ["lootsplit.away.v1.account-u-ROOM.seat-ann"]);
+  assert.deepEqual(readAwaySnapshot(ann), snapshot);
+  assert.equal(readAwaySnapshot({ ...ann, seatId: "seat-other" }), null, "another seat starts fresh");
+  delete (globalThis as { localStorage?: unknown }).localStorage;
 });

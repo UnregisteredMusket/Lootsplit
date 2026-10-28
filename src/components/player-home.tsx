@@ -12,6 +12,8 @@ import { X } from "lucide-react";
 import { dismissJoinTips, joinTipsOffered } from "@/lib/quire/join-memory";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
+import { getCloudTable } from "@/lib/quire/cloud-client";
+import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 import {
   awaySnapshot,
   readAwaySnapshot,
@@ -150,10 +152,12 @@ function SinceAway({ table, mine }: { table: AwayTable; mine: string[] }) {
   const latest = useRef({ table, mine });
   latest.current = { table, mine };
   useEffect(() => {
-    const campaign = activeCampaignId();
-    setPrevious(readAwaySnapshot(campaign));
+    const room = getCloudTable();
+    // Guests keep this in memory only; account seats are keyed by campaign and seat.
+    const scope = { campaign: activeCampaignId(), seatId: room.seatId, guest: isEphemeralCampaign() };
+    setPrevious(readAwaySnapshot(scope));
     return () => {
-      writeAwaySnapshot(campaign, awaySnapshot(latest.current.table, latest.current.mine, Date.now()));
+      writeAwaySnapshot(scope, awaySnapshot(latest.current.table, latest.current.mine, Date.now()));
     };
   }, []);
   if (previous === undefined) return null;

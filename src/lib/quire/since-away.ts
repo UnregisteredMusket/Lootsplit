@@ -27,6 +27,22 @@ export type AwayItem = { id: string; text: string; href: string };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+/** Each answer in the words of its actual status; anything else is reported neutrally. */
+function answerWords(status: string, what: "request" | "journey"): string {
+  switch (status) {
+    case "approved":
+    case "planned":
+    case "active":
+      return `The DM approved your ${what}`;
+    case "denied":
+      return `The DM declined your ${what}`;
+    case "cancelled":
+      return `Your ${what} was cancelled`;
+    default:
+      return `Your ${what} was updated`;
+  }
+}
+
 /** What this device remembers when the player leaves Home. */
 export function awaySnapshot(t: AwayTable, mine: string[], at: number): AwaySnapshot {
   return {
@@ -70,22 +86,13 @@ export function sinceAway(
     if (!mine.includes(r.purseId) || previous.requests[r.id] !== "pending" || r.status === "pending") continue;
     items.push({
       id: `request-${r.id}`,
-      text: `The DM ${r.status === "approved" ? "approved" : "declined"} your request: ${r.note}`,
+      text: `${answerWords(r.status, "request")}: ${r.note}`,
       href: "/features/bank",
     });
   }
   for (const j of t.journal?.world?.journeys ?? []) {
     if (!mine.includes(j.requestedBy) || previous.journeys[j.id] !== "proposed" || j.status === "proposed") continue;
-    items.push({
-      id: `journey-${j.id}`,
-      text:
-        j.status === "denied"
-          ? "The DM declined your journey"
-          : j.status === "cancelled"
-            ? "Your proposed journey was cancelled"
-            : "The DM approved your journey",
-      href: "/maps",
-    });
+    items.push({ id: `journey-${j.id}`, text: answerWords(j.status, "journey"), href: "/maps" });
   }
   const quests = (t.journal?.quests?.quests ?? []).filter((q) => !q.archived && q.updatedAt > previous.at).length;
   if (quests > 0)
@@ -97,20 +104,34 @@ export function sinceAway(
   return items;
 }
 
-const key = (campaign: string) => `lootsplit.away.v1.${campaign}`;
+/**
+ * The last-visit snapshot. Account and device seats keep it in browser storage, keyed by campaign
+ * and seat; guest seats keep it in memory only, so a guest leaves nothing behind on the device.
+ */
+export type AwayScope = { campaign: string; seatId: string; guest: boolean };
+const key = (scope: AwayScope) => `lootsplit.away.v1.${scope.campaign}.${scope.seatId || "device"}`;
+const guestSnapshots = new Map<string, AwaySnapshot>();
 
-export function readAwaySnapshot(campaign: string): AwaySnapshot | null {
+function valid(value: AwaySnapshot | null | undefined): AwaySnapshot | null {
+  return value && typeof value.at === "number" && value.requests && value.journeys ? value : null;
+}
+
+export function readAwaySnapshot(scope: AwayScope): AwaySnapshot | null {
+  if (scope.guest) return valid(guestSnapshots.get(key(scope)));
   try {
-    const value = JSON.parse(localStorage.getItem(key(campaign)) || "null") as AwaySnapshot | null;
-    return value && typeof value.at === "number" && value.requests && value.journeys ? value : null;
+    return valid(JSON.parse(localStorage.getItem(key(scope)) || "null") as AwaySnapshot | null);
   } catch {
     return null;
   }
 }
 
-export function writeAwaySnapshot(campaign: string, snapshot: AwaySnapshot) {
+export function writeAwaySnapshot(scope: AwayScope, snapshot: AwaySnapshot) {
+  if (scope.guest) {
+    guestSnapshots.set(key(scope), snapshot);
+    return;
+  }
   try {
-    localStorage.setItem(key(campaign), JSON.stringify(snapshot));
+    localStorage.setItem(key(scope), JSON.stringify(snapshot));
   } catch {
     // Without storage the card shows only current unread chat and pool claims.
   }
