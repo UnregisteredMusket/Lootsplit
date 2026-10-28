@@ -426,7 +426,7 @@ test("privacy: a hidden group is 'Elsewhere' for other groups' players; its own 
 
 test("protocol 10: older apps get one party at the main group's place and keep groups on write", () => {
   assert.equal(PARTY_GROUPS_PROTOCOL, 10);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, 10);
+  assert.ok(CURRENT_TABLETOP_PROTOCOL >= 10);
   let t = splitFixture();
   t = run(t, {
     kind: "character-downtime-start",

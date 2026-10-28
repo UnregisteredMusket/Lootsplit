@@ -64,8 +64,17 @@ export const SERVICES_WAVE2_PROTOCOL = 9;
  * pending drafts with group commands ask them to finish on the updated website.
  */
 export const PARTY_GROUPS_PROTOCOL = 10;
+/**
+ * Protocol 11 (2026-10-28, sectioned storage step 3): section-aware room sync. A protocol 11
+ * client sends the section hashes it holds (`viewSections`); room views then carry the seat's
+ * projected table with its large parts replaced by `null` and a `viewSections` manifest
+ * (view-sections.ts), with the texts the client lacks inline up to a budget and the rest from
+ * `readCloudSections`. The table content is exactly protocol 10's. Protocols 0-10 (bundled
+ * Android apps, older tabs) receive the full view as before and never see a manifest.
+ */
+export const VIEW_SECTIONS_PROTOCOL = 11;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = PARTY_GROUPS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = VIEW_SECTIONS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
