@@ -384,7 +384,7 @@ try {
     for (const label of ["Encounters", "Party", "Market", "Library", "Maps", "Desk"]) {
       const inMaps = new URL(page.url()).pathname === "/maps";
       if (inMaps)
-        await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
+        await page.getByRole("button", { name: /map navigation menu$/i }).click();
       const nav = page.locator('nav[aria-label="Sections"]:visible');
       await click(
         page,

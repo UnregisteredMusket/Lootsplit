@@ -202,7 +202,8 @@ export function MapWorkspaceChrome({
             )}
             <button
               className="map-title-button"
-              aria-label="Map navigation menu"
+              // The visible map name leads the accessible name (WCAG 2.5.3, label in name).
+              aria-label={`${parent ? `${parent.name} › ` : ""}${map?.name || "Maps"}, map navigation menu`}
               aria-expanded={menu}
               onClick={() => setMenu(!menu)}
             >

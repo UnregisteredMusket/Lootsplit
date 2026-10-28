@@ -204,7 +204,7 @@ export async function checkFullscreenMap(page, output, width) {
       await expectMapFillsScreen(page);
       await expect.poll(sameCamera).toBe(true);
       await expect(
-        page.getByRole("button", { name: "Map navigation menu", exact: true }),
+        page.getByRole("button", { name: /map navigation menu$/i }),
       ).toBeInViewport();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
       await checkMobileMapControls(page);
