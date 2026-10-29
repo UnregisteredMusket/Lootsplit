@@ -468,6 +468,13 @@ export const zoneRequestSchema = z
     tally: z.object({ yes: z.number().int(), no: z.number().int(), waiting: z.number().int(), mine: z.enum(["yes", "no"]).nullable().optional() }).strict().optional(),
     sessionId: z.string().max(150).optional(),
     decidedAt: z.number().optional(),
+    /**
+     * What the request was asked from (privacy review 2026-10-29): the mover's group and their
+     * token's square on the map being left. An open request is cancelled when either changes.
+     * DM-only (never projected to players).
+     */
+    groupId: z.string().max(150).optional(),
+    tokenAt: z.string().max(300).optional(),
   })
   .strict();
 export type ZoneRequest = z.infer<typeof zoneRequestSchema>;

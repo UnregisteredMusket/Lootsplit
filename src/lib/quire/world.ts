@@ -373,7 +373,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     return;
   }
   if (cmd.kind === "map-token-follow") {
-    applyTokenFollow(t, seat, cmd, at);
+    applyTokenFollow(t, seat, cmd, at, false, execution);
     return;
   }
   if (ZONE_COMMAND_KINDS.has(cmd.kind)) {

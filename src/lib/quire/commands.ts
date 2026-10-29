@@ -21,6 +21,7 @@ import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
 import { applyTradeCommand, prepareTradeSeason, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { applyWorldCommand, validateWorld, shopVisible, shopAsking } from "./world.ts";
+import { cancelStaleZoneRequests } from "./zone-commands.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { estateCommands } from "./estate-schema.ts";
 import { estateImportCommand, estateImportFingerprint, previewEstateImport } from "./estate-import.ts";
@@ -1414,6 +1415,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       n.portrait = p.portrait;
     }
   }
+  // Open party-split requests that no longer fit are cancelled (zones, privacy review 2026-10-29).
+  cancelStaleZoneRequests(t, at, cmd.id, execution.playerSeats);
   // A shared-play preview runs on the seat's projected table (a private map's party position and
   // journey are redacted); the room re-validates the full table.
   validateWorld(t, execution.preview === true);

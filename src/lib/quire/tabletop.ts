@@ -27,7 +27,7 @@ import {
 } from "./fog-history.ts";
 import { consolidateFog } from "./fog-consolidate.ts";
 import { legacyDiagonals } from "./tabletop-protocol.ts";
-import { crossing, followRefusal, zoneName, zoneOf } from "./zones.ts";
+import { characterPlace, crossing, followRefusal, zoneName, zoneOf } from "./zones.ts";
 import { applyZoneChange } from "./zone-split.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
@@ -165,7 +165,28 @@ export type TabletopExecution = {
   mapCombat?: MapCombatTurn | "unavailable";
   /** Zones (map tokens PR 7A): the room's player seats (party votes). */
   playerSeats?: { id: string; purseIds: string[] }[];
+  /** Zones: the client predates zone requests (protocol < 18), so it can't ask the party. */
+  zoneRequestsUnsupported?: boolean;
 };
+/**
+ * Why a player's crossing into an adjacent zone can't happen now (null when it can): the leaving
+ * zone's split rule decides splits and joins alike (privacy review 2026-10-29). Block refuses; a
+ * vote or the session's end needs a `zone-request`, which a client older than zones can't send.
+ */
+function splitRefusal(
+  move: ReturnType<typeof crossing>,
+  name: string,
+  mapName: string,
+  execution: TabletopExecution,
+): string | null {
+  if ((move.kind !== "split" && move.kind !== "join") || move.rule.allow) return null;
+  if (move.rule.rule === "block")
+    return move.kind === "join"
+      ? `The DM is keeping the party together here. Ask your DM if ${name} should go to ${mapName}.`
+      : `The DM is keeping the party together here. Ask your DM if ${name} should split off to ${mapName}.`;
+  if (execution.zoneRequestsUnsupported) return "Update Lootsplitter to vote on or request party splits.";
+  return `Going to ${mapName} would split ${name} off: ask the party first.`;
+}
 export function sceneViewers(
   table: Pick<CloudTable, "journal" | "purses">,
   map: CampaignMap,
@@ -544,11 +565,30 @@ export function applyTabletopCommand(
     )
       throw Error("Choose a visible square.");
     assertCombatTurn(table, map, [token], seat, execution);
+    // Zones (privacy review 2026-10-29): placing a first token on a map in another zone is a
+    // crossing like following there, under the same split rule. A character with no place yet
+    // (no group location and no token) may place anywhere they can see.
+    const world = table.journal!.world!;
+    const elsewhere = world.maps.find((m) => m.id !== map.id && (m.tokens ?? []).some((t) => t.kind === "character" && t.entityId === person.id));
+    const crossed =
+      seat.role !== "dm" && characterPlace(table, person.id, elsewhere?.id).kind !== "unknown"
+        ? crossing(table, person.id, person.name, map.id, elsewhere?.id)
+        : undefined;
+    if (crossed?.kind === "refused") throw Error(crossed.message);
+    if (crossed?.kind === "far") throw Error(followRefusal(table, person.id, person.name, map.id, elsewhere?.id)!);
+    if (crossed && (crossed.kind === "join" || crossed.kind === "split")) {
+      const combat = world.combat?.phase === "active" ? world.combat : undefined;
+      if (combat && zoneOf(table, combat.mapId) === crossed.from) throw Error(`Finish the encounter before leaving ${zoneName(table, crossed.from)}.`);
+      const refusal = splitRefusal(crossed, person.name, map.name, execution);
+      if (refusal) throw Error(refusal);
+    }
     map.tokens = [...(map.tokens ?? []), token];
     if (map.tabletop && settings.vision !== "off")
       map.tabletop = { ...settings, revision: settings.revision + 1 };
     // Shown to that character's player and the DM only.
     event(`${person.name}'s token placed`, person.id);
+    if (crossed && (crossed.kind === "join" || crossed.kind === "split"))
+      applyZoneChange(table, person, crossed, map, command.at, command.id, at);
   } else if (command.kind === "map-grid-snap") {
     dm();
     if (!map.grid) throw Error("Configure a combat grid before turning on grid mode.");
@@ -692,6 +732,7 @@ export function applyTokenFollow(
   at: number,
   /** A split request being applied (vote passed, the DM approved, the session ended). */
   zoneApply = false,
+  execution: TabletopExecution = {},
 ) {
   const world = table.journal!.world!;
   const map = world.maps.find((m) => m.id === command.mapId);
@@ -724,12 +765,9 @@ export function applyTokenFollow(
     const combat = world.combat?.phase === "active" ? world.combat : undefined;
     if (combat && zoneOf(table, combat.mapId) === move.from) throw Error(`Finish the encounter before leaving ${zoneName(table, move.from)}.`);
   }
-  if (move.kind === "split" && !zoneApply && !move.rule.allow)
-    throw Error(
-      move.rule.rule === "block"
-        ? `The DM is keeping the party together here. Ask your DM if ${person.name} should split off to ${map.name}.`
-        : `Going to ${map.name} would split ${person.name} off: ask the party first.`,
-    );
+  // The DM can always move a character; an applied request was already decided.
+  const refusal = zoneApply || seat.role === "dm" ? null : splitRefusal(move, person.name, map.name, execution);
+  if (refusal) throw Error(refusal);
   // The token on the map being left goes, exactly as the client saw it.
   if (from) {
     const current = (from.tokens ?? []).find((t) => t.kind === "character" && t.entityId === person.id) ?? null;

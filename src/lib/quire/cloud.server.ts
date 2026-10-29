@@ -64,6 +64,7 @@ import {
   groupCommandText,
   refuseOldClientGroupActions,
   upgradeOldClientCommands,
+  ZONES_PROTOCOL,
 } from "./tabletop-protocol.ts";
 
 /**
@@ -1193,6 +1194,8 @@ export async function submitCommands(input: {
         manualRolls,
         mapCombat,
         playerSeats: room.seats.filter((s) => s.role === "player").map((s) => ({ id: s.id, purseIds: s.purseIds })),
+        // A client older than zone requests is told to update instead of "ask the party".
+        zoneRequestsUnsupported: (input.tabletopProtocol ?? 0) < ZONES_PROTOCOL,
         random: (draw) => {
           const key = command.id + ":" + draw;
           if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());

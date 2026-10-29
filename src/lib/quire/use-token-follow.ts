@@ -146,13 +146,17 @@ async function followNow(
       });
       continue;
     }
-    if (move.kind === "split" && !move.rule.allow && move.rule.rule === "block") {
-      toast.info("The DM is keeping the party together here.", { description: `Ask your DM if ${person.name} should split off to ${to.name}.` });
+    // Joining a group in an adjacent zone follows the same split rule (privacy review 2026-10-29).
+    const ruled = move.kind === "split" || move.kind === "join" ? move : undefined;
+    if (ruled && !ruled.rule.allow && ruled.rule.rule === "block") {
+      toast.info("The DM is keeping the party together here.", {
+        description: ruled.kind === "join" ? `Ask your DM if ${person.name} should go to ${to.name}.` : `Ask your DM if ${person.name} should split off to ${to.name}.`,
+      });
       continue;
     }
     const square = beforeTo ? { column: beforeTo.column, row: beforeTo.row } : followSquare(table, to, seat, arrival(table, from, to, purseId), beforeFrom ?? undefined);
     if (!square) continue;
-    if (move.kind === "split" && !move.rule.allow) {
+    if (ruled && !ruled.rule.allow) {
       // Wait until end of session, or a party vote: the request waits; the token stays.
       try {
         await send(commandOutcome, { kind: "zone-request", requestId: crypto.randomUUID(), purseId, fromMapId: from.id, toMapId: to.id, grid: canonicalJson(to.grid), at: square });
