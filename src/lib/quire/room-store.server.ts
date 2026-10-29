@@ -268,16 +268,26 @@ export async function hydrateDeferredReports<R extends { snapshot: string }>(cod
  * Returns a new room object (the working room is not changed) that keeps the read's stored-body
  * and version bookkeeping, so it can be written back exactly like a whole read.
  */
-export async function withRoomHistory(room: CloudRoom, options: { reports?: boolean } = {}): Promise<CloudRoom> {
+export async function withRoomHistory(
+  room: CloudRoom,
+  options: { reports?: boolean | ReadonlySet<string> } = {},
+): Promise<CloudRoom> {
   const db = database();
   const value = room as CloudRoom & { [HISTORY_KEY]?: unknown };
   const reports = room.table.journal?.reports ?? [];
-  const deferred = options.reports === true && reports.some((r) => isDeferredSnapshot(r.snapshot));
+  // `reports`: every deferred archived session (true), or only those with these report IDs (a
+  // set: archive-keys.mjs; the others stay deferred).
+  const wanted = (r: { id: string; snapshot: string }) =>
+    isDeferredSnapshot(r.snapshot) && (options.reports === true || (options.reports instanceof Set && options.reports.has(r.id)));
+  const deferred = !!options.reports && reports.some(wanted);
   if (!db || (!(HISTORY_KEY in value) && !deferred)) return room;
   const next = keepStoredBody(room, { ...room, table: { ...room.table } }) as CloudRoom & { [HISTORY_KEY]?: unknown };
   if (HISTORY_KEY in value) await restoreRoomHistory(db, next);
-  if (deferred)
-    next.table.journal = { ...next.table.journal!, reports: await hydrateDeferredReports(room.code, reports) };
+  if (deferred) {
+    const hydrated = await hydrateDeferredReports(room.code, reports.filter(wanted));
+    let at = 0;
+    next.table.journal = { ...next.table.journal!, reports: reports.map((r) => (wanted(r) ? hydrated[at++]! : r)) };
+  }
   return next;
 }
 export type CombatViewRead = {
@@ -332,14 +342,14 @@ export async function readCombatView(code: string): Promise<CombatViewRead | nul
 export { ROOM_BODY_LIMIT, ROOM_ROW_LIMIT };
 type Encoded = Awaited<ReturnType<typeof encodeRoomImages>>;
 const utf8 = (text: string) => new TextEncoder().encode(text).length;
-/** Stored bytes of this room's archived sessions (parts included); read only when a write archives one. */
+/**
+ * Bytes of the snapshots this room's archived sessions stand for (parts included; a delta-stored
+ * session counts its whole snapshot, which is what whole-campaign operations load); read only when
+ * a write archives one.
+ */
 async function archivedBytes(db: Database, code: string): Promise<number> {
-  const row = await db
-    .prepare(
-      "SELECT (SELECT COALESCE(SUM(length(body)),0) FROM campaign_room_reports WHERE code=?1)+(SELECT COALESCE(SUM(length(body)),0) FROM campaign_room_report_parts WHERE code=?1) AS n",
-    )
-    .bind(code)
-    .first<{ n: number }>();
+  const { ARCHIVED_BYTES_SQL } = await import("../../../cloudflare/room-reports.mjs");
+  const row = await db.prepare(ARCHIVED_BYTES_SQL).bind(code).first<{ n: number }>();
   return Number(row?.n ?? 0);
 }
 type StorageSizes = ReturnType<typeof roomStorageSizes>;
@@ -368,7 +378,7 @@ async function logRoomStorage(
     const summary =
       entry.kind === "refusal"
         ? `A shared room write was refused before reaching D1: its ${entry.refusal} size exceeds the ${{ working: ROOM_BODY_LIMIT, row: ROOM_ROW_LIMIT, live: ROOM_LIVE_LIMIT }[entry.refusal]}-byte budget (${measured}). The stored campaign was not changed. Later refusals for this room in the same half-hour share this entry.`
-        : `Warning (nothing refused): a shared room archived a session and its total with archived sessions passed ${ROOM_TOTAL_LIMIT} bytes, the size at which whole-campaign operations (exports, Download a copy, deletion copies, Undo of archived lines) fit comfortably in a Worker (${measured}). The session was archived; the DM is shown a notice recommending Download a copy. Later warnings for this room in the same half-hour share this entry.`;
+        : `Warning (nothing refused): a shared room archived a session and its total with archived sessions passed ${ROOM_TOTAL_LIMIT} bytes, the size at which the operations that still read the whole campaign (restoring a deletion copy, the complete view older app versions load, commands that fall back to every archived session) fit comfortably in a Worker (${measured}). The session was archived; the DM is shown a notice recommending Download a copy. Later warnings for this room in the same half-hour share this entry.`;
     await recordLog(
       db,
       {
