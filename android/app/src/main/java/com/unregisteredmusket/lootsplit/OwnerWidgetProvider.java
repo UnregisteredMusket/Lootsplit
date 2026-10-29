@@ -31,6 +31,13 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         manager.notifyAppWidgetViewDataChanged(ids(context), R.id.monitor_list);
         WidgetRefresh.scheduleActivity(context); // Arms or cancels the Agent activity fast cadence.
     }
+    /** "Not connected — tap Sign in · Owner access rejected · 10:41": the disconnected face, with why. */
+    static String disconnectedLine(Context context) {
+        String note = WidgetStore.disconnectNote(context);
+        return note.isEmpty() ? WidgetRefresh.NOT_CONNECTED : WidgetRefresh.NOT_CONNECTED + " · " + note;
+    }
+    /** Where a sign-in tap goes: the app's widget Connect screen (My account sign-in first when signed out). */
+    static final String CONNECT = "connect";
     static JSONObject current(JSONObject state) {
         JSONObject snapshot = state.optJSONObject("snapshot");
         if (state.optString("token").isEmpty() || snapshot == null || System.currentTimeMillis()-snapshot.optLong("checkedAt")>3600000) return null;
@@ -117,7 +124,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         }
         // The whole status block opens Diagnostics (My account when signed out); › shows that it is a link.
         view.setTextColor(R.id.monitor_status_more,p.muted);
-        view.setOnClickPendingIntent(R.id.monitor_status,WidgetActions.pending(context,id,snapshot==null?"account":"diagnostics",false));
+        view.setOnClickPendingIntent(R.id.monitor_status,WidgetActions.pending(context,id,snapshot==null?CONNECT:"diagnostics",false));
         view.setOnClickPendingIntent(R.id.monitor_refresh,WidgetActions.pending(context,id,"refresh",false));
     }
     static int blend(int a,int b,float t){ return Color.rgb(Math.round(Color.red(a)*(1-t)+Color.red(b)*t),Math.round(Color.green(a)*(1-t)+Color.green(b)*t),Math.round(Color.blue(a)*(1-t)+Color.blue(b)*t)); }
@@ -154,13 +161,14 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
 
         // Reason line (the full list stays in its spoken description and in the items).
         String[] reason=WidgetRows.reason(snapshot);
-        view.setTextViewText(R.id.monitor_services,!message.isEmpty()?message:snapshot==null?(connected?"No current reading · tap Refresh":"Tap Sign in to connect your owner account"):reason[0]);
-        view.setContentDescription(R.id.monitor_services,!message.isEmpty()?message:snapshot==null?"No current reading":reason[1]);
+        String services=!connected?disconnectedLine(context):!message.isEmpty()?message:snapshot==null?"No current reading · tap Refresh":reason[0];
+        view.setTextViewText(R.id.monitor_services,services);
+        view.setContentDescription(R.id.monitor_services,!connected||!message.isEmpty()?services:snapshot==null?"No current reading":reason[1]);
         view.setTextColor(R.id.monitor_services,failure&&!light?text:muted);
 
         // The list. Expanded rows and tiles are kept by ID across readings; IDs no longer present are pruned.
         java.util.Set<String> expandedRows=WidgetRowState.prune(context,id,WidgetRows.rows(snapshot,WidgetRowState.expanded(context,id)));
-        org.json.JSONArray rows=WidgetRows.rows(snapshot,expandedRows);
+        org.json.JSONArray rows=snapshot==null?WidgetRows.placeholder(context,state):WidgetRows.rows(snapshot,expandedRows);
         if(Build.VERSION.SDK_INT>=31) {
             RemoteViews.RemoteCollectionItems.Builder items=new RemoteViews.RemoteCollectionItems.Builder().setViewTypeCount(OwnerWidgetService.VIEW_TYPES).setHasStableIds(false);
             for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);items.addItem(i,OwnerWidgetService.rowView(context,row,id,expandedRows));}
@@ -177,11 +185,11 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
 
         // Footer: identity (no email on the face), LOGS and REFRESH.
         view.setTextViewText(R.id.monitor_identity,snapshot==null?"OWNER · SIGN IN":"OWNER · "+snapshot.optString("name")+" · #"+snapshot.optLong("snapshotId"));
-        view.setContentDescription(R.id.monitor_account,snapshot==null?"Owner access. Sign in in My account":"Owner access, "+snapshot.optString("name")+". Open My account");
-        view.setOnClickPendingIntent(R.id.monitor_account,WidgetActions.pending(context,id,"account",false));
+        view.setContentDescription(R.id.monitor_account,snapshot==null?"Owner access. Open the widget's Connect screen":"Owner access, "+snapshot.optString("name")+". Open My account");
+        view.setOnClickPendingIntent(R.id.monitor_account,WidgetActions.pending(context,id,snapshot==null?CONNECT:"account",false));
         view.setTextViewText(R.id.monitor_open,connected?"LOGS":"SIGN IN");
-        view.setContentDescription(R.id.monitor_open,connected?"Open logs and reports":"Sign in");
-        view.setOnClickPendingIntent(R.id.monitor_open,WidgetActions.pending(context,id,connected?"logs":"account",false));
+        view.setContentDescription(R.id.monitor_open,connected?"Open logs and reports":"Sign in: open the widget's Connect screen in the app");
+        view.setOnClickPendingIntent(R.id.monitor_open,WidgetActions.pending(context,id,connected?"logs":CONNECT,false));
         return view;
     }
     /**
@@ -208,7 +216,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         java.util.List<JSONObject> items=WidgetRows.attentionItems(snapshot);
         JSONObject top=null; for(JSONObject item:items) if(!"info".equals(item.optString("severity"))){top=item;break;}
         String chip="",line; int tone=p.muted;
-        if(snapshot==null){line=!message.isEmpty()?message:connected?"No current reading · tap ↻":"Sign in to connect your owner account";}
+        if(snapshot==null){line=!connected?disconnectedLine(context):!message.isEmpty()?message:"No current reading · tap ↻";}
         else if(top!=null){chip=WidgetRows.chip(top.optString("severity"));tone=p.severity(top.optString("severity"));line=top.optString("title")+" · "+top.optString("meta");}
         else {
             JSONObject resolved=snapshot.optJSONObject("resolved");org.json.JSONArray list=resolved==null?null:resolved.optJSONArray("items");
@@ -219,8 +227,8 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         view.setViewVisibility(R.id.medium_item_chip,chip.isEmpty()?View.GONE:View.VISIBLE);
         view.setTextViewText(R.id.medium_item_chip,chip);view.setTextColor(R.id.medium_item_chip,tone);
         view.setTextViewText(R.id.medium_item_text,line);view.setTextColor(R.id.medium_item_text,p.ink);
-        view.setContentDescription(R.id.medium_item,(top!=null?WidgetRows.severityWord(top.optString("severity"))+": ":"")+line+". Open diagnostics");
-        view.setOnClickPendingIntent(R.id.medium_item,WidgetActions.pending(context,id,snapshot==null?"account":"diagnostics",false));
+        view.setContentDescription(R.id.medium_item,(top!=null?WidgetRows.severityWord(top.optString("severity"))+": ":"")+line+(snapshot==null?". Open the widget's Connect screen":". Open diagnostics"));
+        view.setOnClickPendingIntent(R.id.medium_item,WidgetActions.pending(context,id,snapshot==null?CONNECT:"diagnostics",false));
         view.setViewVisibility(R.id.medium_tiles,tiles?View.VISIBLE:View.GONE);
         if(!tiles) return view;
         float density=context.getResources().getDisplayMetrics().density;
@@ -299,6 +307,24 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         renderAll(context);
         OwnerWidgetJob.schedule(context);
     }
+    @Override public void onEnabled(Context context) { restart(context, this); }
+    /**
+     * The first widget placed again (after all were removed): the stored connection was kept, so
+     * restart the periodic job and, when the last reading is no longer current, fetch one now so the
+     * new widget shows a reading instead of waiting up to 30 minutes. Shared by both providers.
+     */
+    static void restart(Context context, android.content.BroadcastReceiver receiver) {
+        renderAll(context);
+        OwnerWidgetJob.schedule(context);
+        JSONObject state = WidgetStore.read(context);
+        if (state.optString("token").isEmpty() || state.optBoolean(WidgetStore.UNAVAILABLE)) return;
+        JSONObject snapshot = current(state);
+        if (snapshot != null && System.currentTimeMillis() - snapshot.optLong("checkedAt") < STALE_AFTER_MILLIS) return;
+        // goAsync keeps the broadcast alive for the fetch; every request path calls the completion
+        // (at once when it has nothing to do, otherwise within TASK_DEADLINE_MILLIS).
+        final android.content.BroadcastReceiver.PendingResult pending = receiver == null ? null : receiver.goAsync();
+        WidgetRefresh.request(context, false, error -> { if (pending != null) pending.finish(); });
+    }
     @Override public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int id, Bundle options) {
         render(context, manager, id, options);
     }
@@ -345,11 +371,16 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         } catch (PendingIntent.CanceledException ignored) { }
     }
     @Override public void onDeleted(Context context,int[] ids){ for(int id:ids){CompanionSettings.remove(context,id);WidgetRowState.remove(context,id);} }
+    /**
+     * The last Field monitor was removed. Background work stops when no companion remains either, but
+     * the owner connection is kept (encrypted, revocable from the app): removing and re-adding widgets
+     * must not sign the widget out (owner report 2026-10-29). Only Disconnect widget in the app, a
+     * 401/403 from the server or an unusable key ends it.
+     */
     @Override public void onDisabled(Context context) {
         if (CompanionWidgetProvider.ids(context).length == 0) {
             OwnerWidgetJob.cancel(context);
             WidgetRefresh.cancelActivity(context);
-            WidgetStore.clear(context, null);
         }
     }
 }
