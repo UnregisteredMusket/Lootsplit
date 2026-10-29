@@ -1,10 +1,12 @@
 // Loading screen for a large shared campaign (sectioned storage step 3C). A disposable DM shares a
 // synthetic campaign of about 2.5 MB (long party ledger and chat) live; players join at 320 px and
 // 1280 px. Section downloads are slowed in the browser so the screen is observable. Checks: the
-// screen appears with progress (role=progressbar, MB and parts) and both choices; Keep waiting
+// screen appears with the brand chase (adventurer and kobold running in place, centred), "Loading
+// your campaign…" with an "N%/100%" value that rises and matches role=progressbar, MB and parts as
+// secondary detail, a 10 % polite announcement and both choices; Keep waiting
 // continues behind a progress pill and the campaign arrives complete; Go back returns to the
-// previous screen and pauses downloads until Continue loading; reduced motion has no bar
-// animation; nothing scrolls sideways; no page errors. Never targets a real campaign.
+// previous screen and pauses downloads until Continue loading; reduced motion shows the still
+// mascot (no stride, dust or streaks) and no bar animation; nothing scrolls sideways; no page errors. Never targets a real campaign.
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
@@ -55,6 +57,39 @@ async function slowSections(context, ms) {
     await route.continue();
   });
   return counts;
+}
+const PERCENT = /^(\d{1,3})%\/100%$/;
+/** The shown "N%/100%" value, checked against the progressbar. */
+async function shownPercent(screen) {
+  const text = (await screen.locator("[data-campaign-loading-percent]").first().textContent()).trim();
+  const match = PERCENT.exec(text);
+  assert.ok(match, `percentage in the owner's format: ${text}`);
+  const value = Number(match[1]);
+  assert.ok(value >= 0 && value <= 100, `0–100: ${value}`);
+  return value;
+}
+/** The chase's two layers: loaded, centred on the screen, and their transforms over time. */
+async function chase(page) {
+  return page.locator("[data-campaign-loading-chase]").evaluate(async (stage) => {
+    const imgs = [...stage.querySelectorAll("img")];
+    await Promise.all(imgs.map((img) => img.decode().catch(() => {})));
+    const rect = stage.getBoundingClientRect();
+    const sample = () => imgs.map((img) => getComputedStyle(img).transform);
+    const first = sample();
+    await new Promise((done) => setTimeout(done, 170));
+    const second = sample();
+    return {
+      layers: imgs.map((img) => img.getAttribute("src")),
+      loaded: imgs.every((img) => img.complete && img.naturalWidth > 0),
+      animations: imgs.map((img) => getComputedStyle(img).animationName),
+      moved: first.some((t, i) => t !== second[i]),
+      transforms: second,
+      offCentre: Math.abs(rect.left + rect.width / 2 - innerWidth / 2),
+      decor: [...stage.querySelectorAll(".chase-dust, .chase-streak, .chase-ground")].map(
+        (el) => getComputedStyle(el).display,
+      ),
+    };
+  });
 }
 const fits = async (page, label) =>
   assert.ok(
@@ -111,20 +146,37 @@ try {
   await phone.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("mira");
   await phone.page.getByLabel("Your name", { exact: true }).fill("Loading audit player");
   await phone.page.getByRole("button", { name: "Join room", exact: true }).click();
-  const screen = phone.page.getByRole("dialog", { name: "Loading a large campaign", exact: true });
+  const screen = phone.page.getByRole("dialog", { name: "Loading your campaign…", exact: true });
   await expect(screen).toBeVisible();
+  await expect(screen.getByRole("heading", { level: 2 })).toHaveText(/^Loading your campaign… \d{1,3}%\/100%$/);
+  const running = await chase(phone.page);
+  assert.deepEqual(running.layers, ["/brand/chase-adventurer.webp", "/brand/chase-kobold.webp"]);
+  assert.ok(running.loaded, "both chase layers loaded");
+  assert.deepEqual(running.animations, ["chase-stride-adventurer", "chase-stride-kobold"]);
+  assert.ok(running.moved, "the runners move in place");
+  assert.ok(running.offCentre <= 2, `the chase is centred (${running.offCentre}px off)`);
+  assert.ok(running.decor.every((d) => d !== "none"), "dust, streaks and ground show");
   const bar = screen.getByRole("progressbar", { name: "Campaign download" });
+  await expect(bar).toHaveAttribute("aria-valuemin", "0");
   await expect(bar).toHaveAttribute("aria-valuemax", "100");
-  await expect(bar).toHaveAttribute("aria-valuetext", /MB · \d+ of \d+ parts$/);
-  await expect(screen.getByRole("status")).toContainText(/of [\d.]+ MB · \d+ of \d+ parts/);
+  await expect(bar).toHaveAttribute("aria-valuetext", /^\d{1,3}% · [\d.]+ MB of [\d.]+ MB · \d+ of \d+ parts$/);
+  const firstPercent = await shownPercent(screen);
+  assert.ok(firstPercent < 100, "100% only when complete");
+  assert.equal(Number(await bar.getAttribute("aria-valuenow")), firstPercent, "progressbar matches the text");
+  await expect(screen.locator(".campaign-loading-detail")).toHaveText(/^[\d.]+ MB of [\d.]+ MB · \d+ of \d+ parts$/);
+  await expect(screen.getByRole("status")).toHaveText(/^Loading your campaign: (\d0|0|100)% loaded\.$/);
   await expect(screen.getByRole("button", { name: "Keep waiting", exact: true })).toBeFocused();
   await expect(screen.getByRole("button", { name: "Go back", exact: true })).toBeVisible();
   await fits(phone.page, "loading screen 320");
   await phone.page.screenshot({ path: `${output}/loading-320.png` });
+  await expect.poll(() => shownPercent(screen), { timeout: 30000 }).toBeGreaterThan(firstPercent);
+  const laterPercent = await shownPercent(screen);
+  assert.equal(Number(await bar.getAttribute("aria-valuenow")), laterPercent, "progressbar follows the text");
   await screen.getByRole("button", { name: "Keep waiting", exact: true }).click();
   const pill = phone.page.locator('[data-campaign-loading="background"]');
   await expect(pill).toBeVisible();
   await expect(pill.getByRole("progressbar")).toBeVisible();
+  await expect(pill).toContainText(/Loading your campaign… \d{1,3}%\/100%/);
   await fits(phone.page, "background pill 320");
   await phone.page.screenshot({ path: `${output}/background-320.png` });
   await expect(phone.page.locator("[data-campaign-loading]")).toHaveCount(0, { timeout: 60000 });
@@ -144,8 +196,16 @@ try {
   await desk.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("kael");
   await desk.page.getByLabel("Your name", { exact: true }).fill("Desktop loading audit player");
   await desk.page.getByRole("button", { name: "Join room", exact: true }).click();
-  const deskScreen = desk.page.getByRole("dialog", { name: "Loading a large campaign", exact: true });
+  const deskScreen = desk.page.getByRole("dialog", { name: "Loading your campaign…", exact: true });
   await expect(deskScreen).toBeVisible();
+  const still = await chase(desk.page);
+  assert.ok(still.loaded, "reduced motion: the mascot layers show");
+  assert.deepEqual(still.animations, ["none", "none"], "reduced motion: no stride");
+  assert.deepEqual(still.transforms, ["none", "none"], "reduced motion: the still mascot");
+  assert.ok(!still.moved, "reduced motion: nothing moves");
+  assert.ok(still.decor.every((d) => d === "none"), "reduced motion: no dust, streaks or ground");
+  assert.ok(still.offCentre <= 2, "reduced motion: centred");
+  await shownPercent(deskScreen);
   const transition = await deskScreen
     .locator(".campaign-loading-bar > span")
     .evaluate((el) => getComputedStyle(el).transitionDuration);

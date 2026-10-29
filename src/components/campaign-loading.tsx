@@ -4,9 +4,13 @@ import { Button } from "./ui";
 import "./campaign-loading.css";
 import {
   LOADING_SCREEN_BYTES,
+  announcedLoadingStep,
+  formatLoadingPercent,
   getRoomLoadingState,
+  loadingPercent,
   pauseRoomLoading,
   resumeRoomLoading,
+  roomLoadingComplete,
   subscribeRoomLoading,
 } from "@/lib/quire/room-loading";
 import { refreshShared } from "@/lib/quire/cloud-client";
@@ -14,10 +18,39 @@ import { refreshShared } from "@/lib/quire/cloud-client";
 const megabytes = (bytes: number) =>
   `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
 
+/** The two layers cut from the brand mascot (docs/brand/01-mascot-chase-2048.png). */
+const CHASE_LAYERS = ["/brand/chase-adventurer.webp", "/brand/chase-kobold.webp"] as const;
+
+/**
+ * The brand chase, running in place: the adventurer chases the kobold and its stolen coin. Two
+ * stacked layers that together are the mascot art, each with a stride (bounce, lean and squash,
+ * offset between the two), dust at their feet, motion streaks and a scrolling ground line. With
+ * reduced motion it is the still mascot. Decorative: the text below carries the progress.
+ */
+function LoadingChase() {
+  return (
+    <div className="campaign-loading-chase" data-campaign-loading-chase aria-hidden="true">
+      <span className="chase-ground" />
+      <span className="chase-streak chase-streak-a" />
+      <span className="chase-streak chase-streak-b" />
+      <span className="chase-streak chase-streak-c" />
+      <span className="chase-figure chase-adventurer">
+        <img src={CHASE_LAYERS[0]} width="640" height="460" alt="" decoding="async" />
+      </span>
+      <span className="chase-dust chase-dust-adventurer" />
+      <span className="chase-figure chase-kobold">
+        <img src={CHASE_LAYERS[1]} width="640" height="460" alt="" decoding="async" />
+      </span>
+      <span className="chase-dust chase-dust-kobold" />
+    </div>
+  );
+}
+
 /**
  * Loading screen for a large shared campaign (sectioned storage step 3). Shown while a first load
  * or catch-up downloads at least `LOADING_SCREEN_BYTES` of campaign sections (room-loading.ts):
- * progress in MB and parts, "Keep waiting" (the load continues behind a small progress pill) and
+ * the brand chase, "Loading your campaign… 42%/100%" from the real bytes, MB and parts as
+ * secondary detail, "Keep waiting" (the load continues behind a small progress pill) and
  * "Go back" (pauses downloads for that campaign in this tab and returns to the previous screen;
  * "Continue loading" resumes). Mounted once by the root document.
  */
@@ -32,12 +65,13 @@ export function CampaignLoadingHost() {
   const router = useRouter();
   const navigate = useNavigate();
   const large = !!loading && loading.totalBytes >= LOADING_SCREEN_BYTES;
-  // A short delay so a fast connection never flashes the screen.
+  // A short delay so a fast connection never flashes the screen; the art starts downloading now.
   useEffect(() => {
     if (!large) {
       setVisible(false);
       return;
     }
+    for (const src of CHASE_LAYERS) new Image().src = src;
     const timer = window.setTimeout(() => setVisible(true), 250);
     return () => window.clearTimeout(timer);
   }, [large]);
@@ -57,9 +91,12 @@ export function CampaignLoadingHost() {
       </div>
     );
   if (!loading || !large || !visible) return null;
-  const percent = loading.totalBytes
-    ? Math.round((loading.loadedBytes / loading.totalBytes) * 100)
-    : 0;
+  const percent = loadingPercent(
+    loading.loadedBytes,
+    loading.totalBytes,
+    roomLoadingComplete(loading),
+  );
+  const shown = formatLoadingPercent(percent);
   const detail = `${megabytes(loading.loadedBytes)} of ${megabytes(loading.totalBytes)} · ${loading.loadedSections} of ${loading.totalSections} parts`;
   const bar = (
     <div
@@ -69,16 +106,28 @@ export function CampaignLoadingHost() {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
-      aria-valuetext={detail}
+      aria-valuetext={`${percent}% · ${detail}`}
     >
       <span style={{ width: `${percent}%` }} />
     </div>
   );
+  // Announced politely every 10 %, not on every downloaded part.
+  const announcement = (
+    <p className="sr-only" role="status" aria-live="polite" data-campaign-loading-announce>
+      Loading your campaign: {announcedLoadingStep(percent)}% loaded.
+    </p>
+  );
   if (minimized === loading.startedAt)
     return (
-      <div className="campaign-loading-pill" role="status" data-campaign-loading="background">
-        <span>Loading campaign… {percent}%</span>
+      <div className="campaign-loading-pill" data-campaign-loading="background">
+        <span>
+          Loading your campaign…{" "}
+          <span className="campaign-loading-percent" data-campaign-loading-percent>
+            {shown}
+          </span>
+        </span>
         {bar}
+        {announcement}
       </div>
     );
   return (
@@ -90,17 +139,21 @@ export function CampaignLoadingHost() {
         aria-labelledby="campaign-loading-title"
         aria-describedby="campaign-loading-message"
       >
-        <img src="/brand/kobold-icon-128.png" width="56" height="56" alt="" />
-        <h2 id="campaign-loading-title" className="font-display">
-          Loading a large campaign
+        <LoadingChase />
+        <h2 className="campaign-loading-line">
+          <span id="campaign-loading-title" className="font-display">
+            Loading your campaign…
+          </span>{" "}
+          <span className="campaign-loading-percent" data-campaign-loading-percent>
+            {shown}
+          </span>
         </h2>
+        {bar}
+        <p className="campaign-loading-detail">{detail}</p>
+        {announcement}
         <p id="campaign-loading-message">
           This campaign has a long history, so its first load takes a little longer. Later updates
           download only what changed.
-        </p>
-        {bar}
-        <p className="campaign-loading-detail" role="status" aria-live="polite">
-          {detail}
         </p>
         <div className="campaign-loading-actions">
           <Button
