@@ -1,4 +1,5 @@
 import { LedgerCoverage } from "../history-loader";
+import { StorageWarningNotice } from "../storage-warning-notice";
 import { lotClaims, pooledLots } from "@/lib/quire/loot-claims";
 import { inParty } from "@/lib/quire/character-position";
 import { localEncounterRequest } from "@/lib/encounters/local";
@@ -189,6 +190,7 @@ function DmDeskContents() {
             Multiplayer settings
           </AppLink>
         </div>
+        <StorageWarningNotice />
         <DeskSetupChecklist campaign={contextKey} online={room.joined} />
         <DeskPinned />
         <div className="readout-grid desk-pinned-readouts">

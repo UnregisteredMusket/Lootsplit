@@ -8,6 +8,9 @@ import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
 import { loadSeatLock } from "./lock.ts";
 import { notify } from "./notify.ts";
+import { toast } from "sonner";
+/** The storage notice this tab has shown (room code and size), so it is shown once. */
+let storageWarningShown = "";
 import {
   closeCloudTable,
   joinCloudTable,
@@ -91,6 +94,8 @@ const initialView = {
   departed: [] as NonNullable<RoomView["departed"]>,
   testMode: false,
   viewOnly: false,
+  /** DM only: the campaign passed the total size warning threshold (storage-warning-notice.tsx). */
+  storageWarning: null as { totalBytes: number; limit: number } | null,
   /** The DM's name for the shared campaign ("" when unnamed); campaign-name.ts shows it. */
   campaignName: "",
   encounterActive: undefined as boolean | undefined,
@@ -565,6 +570,18 @@ async function accept(value: RoomView, committed = false) {
       purseIds: remote.purseIds,
       shopIds: remote.shopIds,
     });
+  // The campaign passed the total size warning threshold: tell the DM once per tab and size
+  // (the Desk keeps the notice; storage-warning-notice.tsx). Never blocks anything.
+  if (s.role === "dm" && remote.storageWarning) {
+    const shown = `${remote.code}:${remote.storageWarning.totalBytes}`;
+    if (shown !== storageWarningShown && typeof window !== "undefined") {
+      storageWarningShown = shown;
+      toast("This campaign is getting large", {
+        description: "With its archived sessions it now passes the size at which every download and undo always works online. Download a copy (My account → Campaigns) to keep the whole campaign safe. Nothing was refused.",
+        duration: 10000,
+      });
+    }
+  }
   publish(
     {
       joined: true,
@@ -578,6 +595,10 @@ async function accept(value: RoomView, committed = false) {
       departed: remote.departed || [],
       testMode: remote.testMode === true,
       viewOnly: remote.viewOnly === true,
+      storageWarning:
+        s.role === "dm" && remote.storageWarning && Number.isFinite(remote.storageWarning.totalBytes) && Number.isFinite(remote.storageWarning.limit)
+          ? { totalBytes: remote.storageWarning.totalBytes, limit: remote.storageWarning.limit }
+          : null,
       // The server stores a cleaned name (campaign-name.ts); absent means unnamed.
       campaignName: typeof remote.campaignName === "string" ? remote.campaignName : "",
       encounterActive: remote.encounterActive,
