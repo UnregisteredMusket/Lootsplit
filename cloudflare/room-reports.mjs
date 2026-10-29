@@ -105,17 +105,23 @@ async function sha256(text) {
 }
 
 /**
- * Replaces inline snapshots with references. Returns a new value; the input is not changed.
+ * Replaces inline snapshots with references. Returns a new value; the input is not changed
+ * (unless `options.owned`). `options.transform` rewrites each snapshot's text before it is stored
+ * and named (image references, room-images.mjs).
  * @template T @param {T} value
+ * @param {{ owned?: boolean; transform?: (text: string) => string }} [options]
  * `changed` is true when the value was rewritten (a snapshot moved out, or a deferred report
  * turned back into its reference).
  * @returns {Promise<{ value: T; reports: { reference: string; body: string }[]; changed: boolean }>}
  */
-export async function encodeRoomReports(value) {
+export async function encodeRoomReports(value, options = {}) {
   const documents = new Map();
   if (!reportLists(value).length) return { value, reports: [], changed: false };
   let changed = false;
-  const result = structuredClone(value);
+  // `owned`: the value is the caller's own fresh copy (room-images.mjs), changed in place rather
+  // than cloned with every archived session it carries.
+  const result = options.owned ? value : structuredClone(value);
+  const transform = options.transform ?? ((/** @type {string} */ text) => text);
   for (const list of reportLists(result))
     for (const [index, report] of list.entries()) {
       if (!report || typeof report.snapshot !== "string") continue;
@@ -128,8 +134,9 @@ export async function encodeRoomReports(value) {
         changed = true;
         continue;
       }
-      const reference = "session-report:" + (await sha256(report.snapshot));
-      documents.set(reference, { reference, body: report.snapshot });
+      const text = transform(report.snapshot);
+      const reference = "session-report:" + (await sha256(text));
+      documents.set(reference, { reference, body: text });
       const { snapshot: _snapshot, ...stored } = report;
       list[index] = { ...stored, snapshotReference: reference };
       changed = true;

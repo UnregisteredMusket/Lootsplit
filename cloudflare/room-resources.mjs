@@ -4,7 +4,13 @@ const refPattern = /^resource-pack:[a-f0-9]{64}$/;
 /** @param {any} value @param {(pack:any)=>any} transform @param {number} depth @returns {Promise<any>} */
 async function visit(value, transform, depth = 0) {
   if (depth > 64) throw Error("Resource document nesting is invalid.");
-  if (Array.isArray(value)) return Promise.all(value.map((v) => visit(v, transform, depth + 1)));
+  // One element at a time: run together, every archived session's parsed snapshot was held at
+  // once (each waits inside its own visit), which is the whole history in memory (follow-up (b)).
+  if (Array.isArray(value)) {
+    const result = [];
+    for (const v of value) result.push(await visit(v, transform, depth + 1));
+    return result;
+  }
   if (!value || typeof value !== "object") return value;
   const result = { ...value };
   for (const [key, child] of Object.entries(value)) {

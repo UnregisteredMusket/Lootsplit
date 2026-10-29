@@ -59,7 +59,21 @@ async function setup(path) {
     storedBytes: Buffer.byteLength(stored.body),
     reportBytes: Number((await db.prepare("SELECT COALESCE(SUM(length(body)),0) AS n FROM campaign_room_reports WHERE code=?").bind(dm.code).first()).n),
   };
-  writeFileSync(path + ".json", JSON.stringify({ seats, sizes }));
+  // `--backup 1`: the campaign is then deleted from a DM account, leaving its deletion recovery
+  // copy for the `restore` op (the room itself is gone after this).
+  let backup = null;
+  if (flag("backup", 0)) {
+    const { campaignAction } = await import("../cloudflare/account-campaigns.mjs");
+    const user = "measure-owner", session = "measure-session";
+    await db.prepare(`INSERT INTO "user"(id,name,email,emailVerified,image,createdAt,updatedAt) VALUES(?, 'M', 'measure-owner@example.com', 1, null, 0, 0)`).bind(user).run();
+    await db.prepare(`INSERT INTO "session"(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,0,0,?)`).bind(session, new Date(Date.now() + 365 * 86_400_000).toISOString(), "measure-token", user).run();
+    const dmSeat = stored.room.seats.find((s) => s.role === "dm");
+    await db.prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)").bind(user, dm.code, dmSeat.id, dmSeat.token, "Measured").run();
+    const deleted = await campaignAction(db, user, { action: "delete", code: dm.code, confirm: dm.code, revision: stored.version.revision }, { id: session });
+    backup = { user, session, id: deleted.backupId };
+    sizes.backupBytes = Number((await db.prepare("SELECT length(body)+COALESCE((SELECT SUM(length(body)) FROM library_backup_parts WHERE backup_id=?1),0) AS n FROM library_backups WHERE id=?1").bind(backup.id).first()).n);
+  }
+  writeFileSync(path + ".json", JSON.stringify({ seats, sizes, backup }));
   return sizes;
 }
 
@@ -70,7 +84,8 @@ async function setup(path) {
  * every page and archived session, projected for the DM, as exports were built before part 2),
  * `undo-archived` (Undo of a line in an archived session: only the sessions that can hold it are
  * loaded since part 3), `stream` (the DM's campaign file streamed one archived session at a time, as Download a copy and
- * deletion copies are built since part 2).
+ * deletion copies are built since part 2), `restore` (restoring the deletion recovery copy that
+ * setup `--backup 1` leaves).
  */
 async function read(path) {
   const { seats } = JSON.parse(readFileSync(path + ".json", "utf8"));
@@ -118,6 +133,13 @@ async function read(path) {
         let length = 0;
         for await (const chunk of file.chunks()) length += chunk.length;
         return length;
+      }
+      if (op === "restore") {
+        // Restore of a deletion recovery copy (setup `--backup 1`), as Account → Restore runs it.
+        const { backup } = JSON.parse(readFileSync(path + ".json", "utf8"));
+        const { restoreDeletedCampaign } = await import("../cloudflare/campaign-recovery.mjs");
+        const restored = await restoreDeletedCampaign(globalThis.__env__.DB, backup.user, { id: backup.id, requestKey: `measure-restore-${process.pid}-${i}` }, { id: backup.session }, 1_000);
+        return JSON.stringify(restored).length;
       }
       if (op === "whole") {
         const room = await readRoom(seats[0].code);
