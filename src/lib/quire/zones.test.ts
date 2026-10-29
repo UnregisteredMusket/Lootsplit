@@ -343,3 +343,25 @@ test("B4: projecting an already projected table keeps the tally and the voter's 
   const mover = projectRecord(projectRecord(t, { ...mira }), { ...mira }).journal!.world!.zoneRequests![0];
   assert.deepEqual(mover.tally, { yes: 1, no: 0, waiting: 2, mine: "yes" });
 });
+
+// Re-review 2026-10-29: a token on a map the player can't open never shapes a claim's answer.
+test("B6: Place my token never reveals a token or combat on a hidden map", () => {
+  const hidden = (combat: boolean) => {
+    const t = fixture();
+    t.journal!.market!.currentLocationId = null;
+    const w = t.journal!.world!;
+    mapOf(t, "city").tokens = mapOf(t, "city").tokens!.filter((x) => x.entityId !== "mira");
+    w.maps.push({ ...mapOf(t, "farbury"), id: "vault", name: "Lich Vault", visible: false, connected: { parentMapId: "city", links: [], placements: [] }, tokens: [{ ...ch("mira", 1, 1), visibility: "dm" }] });
+    if (combat) w.combat = { id: "b", encounterId: "e", encounterRevision: 0, mapId: "vault", returnMapId: "vault", returnCamera: { x: 0.5, y: 0.5, zoom: 1 }, mode: "theatre", phase: "active", scaleConfirmed: false, showPlayers: false };
+    return t;
+  };
+  for (const combat of [false, true]) {
+    let message = "";
+    try {
+      applyCommand(hidden(combat), mira, commandSchema.parse({ id: `hc-${++n}`, kind: "map-token-claim", mapId: "city", grid: g, purseId: "mira", tokenId: `h-${n}`, at: { column: 6, row: 6 } }), { source: "server", playerSeats: seats });
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    assert.doesNotMatch(message, /Lich Vault|Farbury|trip takes/, message);
+  }
+});
