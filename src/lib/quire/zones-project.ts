@@ -18,6 +18,12 @@ export function projectZones(world: World, seat: Pick<CloudSeat, "role" | "purse
     if (zones.length) world.zones = zones;
     else delete world.zones;
   }
+  // "Ask the DM" moves (PR 8): players see their own only.
+  if (world.moveRequests) {
+    const own = world.moveRequests.filter((r) => seat.purseIds.includes(r.purseId) && maps.has(r.mapId));
+    if (own.length) world.moveRequests = own;
+    else delete world.moveRequests;
+  }
   if (world.zoneRequests) {
     const requests = world.zoneRequests
       .filter((r) => maps.has(r.toMapId) && (r.status === "open" || seat.purseIds.includes(r.purseId)))

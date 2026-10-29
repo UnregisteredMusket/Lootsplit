@@ -4,7 +4,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
-import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
+import { readMapTabletop, readTabletopSession, canMoveMapToken, canRequestMove, movementMode } from "@/lib/quire/tabletop";
 import {
   alignedGrid,
   freeTokenPosition,
@@ -270,9 +270,10 @@ export function useMapTabletopTools(
       const box = tokenBox(token),
         at = map.grid ? gridPoint(map.grid, point) : { x: box.left + 0.5, y: box.top + 0.5 };
       // During combat a player moves only the token whose turn it is (the server checks too).
+      // "Ask the DM" maps (PR 8): the drag becomes a request the DM approves.
       const allowed =
         !disabled &&
-        canMoveMapToken(table, map, token, seat) &&
+        (canMoveMapToken(table, map, token, seat) || canRequestMove(table, map, token, seat)) &&
         (!movement?.combat || movement.acting?.tokenId === token.id);
       if (!allowed && movement?.combat && canMoveMapToken(table, map, token, seat)) {
         setNotTurn(token.id);
@@ -536,6 +537,17 @@ export function useMapTabletopTools(
       })
     ) {
       setError("Keep every selected token inside the grid.");
+      return;
+    }
+    if (!dm && movementMode(map) === "approval") {
+      // Each move waits for the DM; the token stays where it is until approved.
+      movePreview.current = [];
+      setMoves([]);
+      for (const move of next)
+        void act(
+          { kind: "map-move-request", requestId: crypto.randomUUID(), mapId: map.id, grid, tokenId: move.tokenId, before: move.before, after: move.after },
+          () => resultToast("Move sent to the DM"),
+        );
       return;
     }
     movePreview.current = next;

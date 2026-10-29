@@ -384,6 +384,9 @@ jobs:
       - name: dev-map-zones
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-map-zones 300 node scripts/map-zones-browser-audit.mjs
+      - name: dev-map-move-approval
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-move-approval 240 node scripts/map-move-approval-browser-audit.mjs
       - name: dev-quest-log
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-quest-log 300 node scripts/quest-log-browser-audit.mjs

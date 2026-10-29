@@ -38,6 +38,7 @@ const featureAudits = {
   "map-party-move": "scripts/map-party-move-browser-audit.mjs",
   "map-follow-view": "scripts/map-follow-view-browser-audit.mjs",
   "map-zones": "scripts/map-zones-browser-audit.mjs",
+  "map-move-approval": "scripts/map-move-approval-browser-audit.mjs",
   "review-inbox": "scripts/review-inbox-browser-audit.mjs",
   "command-palette": "scripts/command-palette-browser-audit.mjs",
   "player-onboarding": "scripts/player-onboarding-browser-audit.mjs",

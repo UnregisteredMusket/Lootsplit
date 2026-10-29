@@ -471,6 +471,25 @@ export const zoneRequestSchema = z
   })
   .strict();
 export type ZoneRequest = z.infer<typeof zoneRequestSchema>;
+/**
+ * "Ask the DM" movement (map tokens PR 8): a player's move on a map whose movement is
+ * `approval` waits here until the DM approves or denies it (history kept).
+ */
+export const moveRequestSchema = z
+  .object({
+    id,
+    mapId: id,
+    purseId: id,
+    tokenId: id,
+    before: tile,
+    after: tile,
+    status: z.enum(["pending", "approved", "denied", "withdrawn", "cancelled"]),
+    reason: z.string().max(300).optional(),
+    createdAt: z.number(),
+    decidedAt: z.number().optional(),
+  })
+  .strict();
+export type MoveRequest = z.infer<typeof moveRequestSchema>;
 export const partyGroupSchema = z
   .object({
     id,
@@ -551,6 +570,8 @@ export const worldSchema = z
     zones: z.array(zoneSchema).max(200).optional(),
     splitRule: splitRuleSettingsSchema.optional(),
     zoneRequests: z.array(zoneRequestSchema).max(2000).optional(),
+    /** "Ask the DM" token moves (tabletop protocol 18), history kept. */
+    moveRequests: z.array(moveRequestSchema).max(5000).optional(),
     npcs: z.array(npcSchema).max(500).default([]),
     trades: z.array(tradeSchema).default([]),
     conversations: z.array(conversationSchema).default([]),
@@ -675,6 +696,10 @@ export const worldCommands = [
    * any time ("approve" applies it, "reject"/"decline" closes it).
    */
   z.object({ id, kind: z.literal("zone-request-resolve"), requestId: id, action: z.enum(["approve", "reject", "decline", "settle"]) }),
+  /** "Ask the DM" movement (map tokens PR 8): a player's move waiting for the DM. */
+  z.object({ id, kind: z.literal("map-move-request"), requestId: id, mapId: id, grid: z.string().max(1000), tokenId: id, before: tile, after: tile }),
+  z.object({ id, kind: z.literal("map-move-request-review"), requestId: id, approve: z.boolean(), reason: z.string().trim().max(300).optional() }),
+  z.object({ id, kind: z.literal("map-move-request-withdraw"), requestId: id }),
   /** Group commands (map tokens PR 3): hide/show, lock, size, controllers, initiative links. */
   z.object({
     id,

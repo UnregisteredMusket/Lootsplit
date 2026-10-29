@@ -88,6 +88,14 @@ export function canMoveMapToken(table: CloudTable, map: CampaignMap, token: MapT
       table.purses.some((p) => p.id === id && p.kind === "character" && characterVisible(table, p)),
   );
 }
+/**
+ * "Ask the DM" (map tokens PR 8): on a map whose movement is `approval`, a player may propose a
+ * move for exactly the tokens they could move under Automatic.
+ */
+export function canRequestMove(table: CloudTable, map: CampaignMap, token: MapToken, seat: Seat) {
+  if (seat.role === "dm" || movementMode(map) !== "approval") return false;
+  return canMoveMapToken(table, { ...map, tabletop: { ...readMapTabletop(map), movement: "auto" } }, token, seat);
+}
 /** The tracker's turn for the encounter bound to a map (read by the server per batch). */
 export type MapCombatTurn = { encounterId: string; status: string; activeId: string | null };
 /** The active combat binding when it is on this map. */
@@ -113,7 +121,7 @@ export function tokenTakesTurn(
  * blocked. The server fails closed when it could not read the turn; a device preview, which has
  * no turn, leaves the check to the room.
  */
-function assertCombatTurn(
+export function assertCombatTurn(
   table: CloudTable,
   map: CampaignMap,
   tokens: readonly MapToken[],

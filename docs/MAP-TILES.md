@@ -284,6 +284,14 @@ Grids have a fourth diagonal rule, `alternating`: straight steps cost one tile, 
 - **Protocol 17** (`ZONES_PROTOCOL`): `zones`, `splitRule` and `zoneRequests` are stripped for protocols 0–16 (and kept on their world saves); drafts with zone commands ask them to finish on the updated website; the server applies the zone rules to every follow.
 - Tests: `zones.test.ts`, `follow-view.test.ts`. Audit: `map-zones` (editor on a device campaign; the party vote in a live room).
 
+## "Ask the DM" movement (map tokens PR 8, 2026-10-29)
+
+- **Player movement › Ask the DM** (Inspector › Scene permissions & vision, and the group bar's Movement menu): `movement: "approval"` (`playerMovement` stays true for older clients, which can't move tokens on such a map).
+- A player's drag on their own (or delegated, unlocked) token becomes a `map-move-request` instead of a move: the same rules as Automatic are checked when it is asked (a visible, snapped square inside the grid; the combat turn). The token stays; a dashed ghost "Waiting for the DM" shows the destination to the player and the DM; the chip "Ask the DM: your moves wait for approval" lists waiting moves with Withdraw. One waiting move per token (a new one replaces it).
+- **The DM** approves or denies in the Review Inbox (Token moves): approving moves the token if it hasn't moved since (else the request is cancelled with the reason); denying keeps it, with an optional reason. Players see only their own requests.
+- **Protocol 18** (`MOVE_APPROVAL_PROTOCOL`): `moveRequests` is stripped for protocols 0–17 (kept on their world saves); drafts with the new commands ask them to finish on the updated website.
+- Tests: `move-requests.test.ts`. Audit: `map-move-approval`.
+
 ## Planned: player tokens, footprints, map menus, group placement and zones (approved 2026-10-29)
 
 The owner approved the plan and mockups in `docs/plans/MAP-TOKENS.md` and `docs/previews/map-tokens/` on 2026-10-29. They are built as stacked PRs in the plan's order (section 7): footprints and server-checked snapping (1), the grid mode switch (1b), player movement that is free outside combat and turn-based during it (2), group placement and group commands (3), the desktop right-click menu (4), the phone press-and-hold radial (5), moving the party to a submap (6), tokens following the player's map view (7), zones and the DM's split rule (7A) and "Ask the DM" movement (8). Until each lands, the sections above describe what is live. Each PR updates this file when it ships.

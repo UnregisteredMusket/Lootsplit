@@ -419,6 +419,7 @@ export function SceneConfiguration({ map }: { map: CampaignMap }) {
           >
             <option value="auto">Automatic: free, taking turns in combat</option>
             <option value="off">Off: the DM moves tokens</option>
+            <option value="approval">Ask the DM: players' moves wait for your approval</option>
           </select>
         </label>
         <fieldset>

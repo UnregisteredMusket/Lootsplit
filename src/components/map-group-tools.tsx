@@ -247,7 +247,7 @@ export function GroupBar({
   onInitiative: () => void;
   onSize: (size: MapToken["sizeClass"]) => void;
   onSend: (mapId: string) => void;
-  onMovement: (mode: "auto" | "off") => void;
+  onMovement: (mode: "auto" | "off" | "approval") => void;
   onClear: () => void;
 }) {
   const [menu, setMenu] = useState<"" | "size" | "send" | "movement">("");
@@ -333,7 +333,7 @@ export function GroupBar({
               <p>No other map with a grid.</p>
             ))}
           {menu === "movement" &&
-            (["auto", "off"] as const).map((mode) => (
+            (["auto", "off", "approval"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -343,7 +343,9 @@ export function GroupBar({
               >
                 {mode === "auto"
                   ? "Automatic: free, taking turns in combat"
-                  : "Off: the DM moves tokens"}
+                  : mode === "off"
+                    ? "Off: the DM moves tokens"
+                    : "Ask the DM: moves wait for your approval"}
               </button>
             ))}
         </div>

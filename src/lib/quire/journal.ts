@@ -410,6 +410,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
             ...(current.world?.zones ? { zones: current.world.zones } : {}),
             ...(current.world?.splitRule ? { splitRule: current.world.splitRule } : {}),
             ...(current.world?.zoneRequests ? { zoneRequests: current.world.zoneRequests } : {}),
+            ...(current.world?.moveRequests ? { moveRequests: current.world.moveRequests } : {}),
             characterPositions: keepGroups(
               next.world.characterPositions ?? [],
               current.world?.characterPositions ?? [],

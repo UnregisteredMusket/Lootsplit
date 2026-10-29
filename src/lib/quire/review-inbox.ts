@@ -22,6 +22,7 @@ export type ReviewType =
   | "pool"
   | "training"
   | "groups"
+  | "moves"
   | "imports";
 
 /** Chip labels, in the order the chips appear. */
@@ -34,6 +35,7 @@ export const REVIEW_TYPES: ReadonlyArray<{ type: ReviewType; label: string }> = 
   { type: "pool", label: "Pool" },
   { type: "training", label: "Training" },
   { type: "groups", label: "Group moves" },
+  { type: "moves", label: "Token moves" },
   { type: "property", label: "Property" },
   { type: "ships", label: "Ships" },
   { type: "imports", label: "Imports" },
@@ -55,6 +57,7 @@ export type ReviewKind =
   | "training"
   | "group"
   | "zone"
+  | "move"
   | "imports";
 
 export type ReviewItem = {
@@ -197,6 +200,19 @@ export function reviewItems(t: ReviewTable, imports: number | null = null): Revi
         count: 1,
       });
 
+  // "Ask the DM" token moves (map tokens PR 8).
+  for (const r of journal?.world?.moveRequests ?? [])
+    if (r.status === "pending")
+      items.push({
+        key: `move:${r.id}`,
+        type: "moves",
+        kind: "move",
+        id: r.id,
+        who: purseName(t, r.purseId, "A player"),
+        what: `Move a token on ${journal?.world?.maps.find((m) => m.id === r.mapId)?.name ?? "a map"}`,
+        at: r.createdAt,
+        count: 1,
+      });
   // Party-split requests (map tokens PR 7A): votes and moves queued for the session's end.
   for (const r of journal?.world?.zoneRequests ?? [])
     if (r.status === "open")
@@ -388,6 +404,10 @@ export function reviewOutcome(t: ReviewTable, item: Pick<ReviewItem, "kind" | "i
         return j?.world?.journeys?.find((x) => x.id === item.id)?.status;
       case "group":
         return j?.world?.groupRequests?.find((r) => r.id === item.id)?.status;
+      case "move": {
+        const status = j?.world?.moveRequests?.find((r) => r.id === item.id)?.status;
+        return status === "approved" ? "approved" : status;
+      }
       case "zone": {
         const status = j?.world?.zoneRequests?.find((r) => r.id === item.id)?.status;
         return status === "open" ? "pending" : status === "rejected" || status === "declined" || status === "failed" ? "denied" : status === "applied" ? "approved" : status;
@@ -439,6 +459,8 @@ export function reviewReceiptHref(item: Pick<ReviewItem, "kind" | "id" | "proper
     case "group":
     case "zone":
       return "/party?section=characters";
+    case "move":
+      return "/maps";
     default:
       return undefined;
   }

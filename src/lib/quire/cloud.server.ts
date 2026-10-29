@@ -960,7 +960,7 @@ export async function submitCommands(input: {
     // initiative still applies (tabletop.ts).
     const playerToken = (c: (typeof commands)[number]) =>
       seat.role === "player" &&
-      (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-token-follow" || c.kind.startsWith("zone-"));
+      (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-token-follow" || c.kind.startsWith("zone-") || c.kind.startsWith("map-move-request"));
     const messagesOnly =
       commands.length > 0 &&
       commands.every(
@@ -1018,7 +1018,7 @@ export async function submitCommands(input: {
       seat.role !== "dm" &&
       binding?.phase === "active" &&
       applied.some(
-        (c) => (c.kind === "map-token-move" || c.kind === "map-token-claim") && c.mapId === binding.mapId,
+        (c) => (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-move-request") && c.mapId === binding.mapId,
       )
         ? await readMapCombatTurn(room.code, binding.encounterId)
         : undefined;
