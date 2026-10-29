@@ -7,7 +7,7 @@ import {
   ROOM_ROW_LIMIT,
   ROOM_IMAGE_SOURCES,
 } from "../../../cloudflare/room-images.mjs";
-import { ROOM_LIVE_LIMIT, ROOM_TOTAL_LIMIT } from "./room-size.ts";
+import { ROOM_LIVE_LIMIT, ROOM_TOTAL_LIMIT, ROOM_TOTAL_REFUSAL } from "./room-size.ts";
 import {
   HISTORY_KEY,
   readRoomSectionHashes,
@@ -51,6 +51,16 @@ export function database(): Database | undefined {
 }
 const STORED_BODY = Symbol("authoritative-room-body");
 const READ_VERSION = Symbol("room-read-version");
+/** Stored size of the live campaign a read came from (working set plus history pages), in bytes. */
+const STORED_LIVE_BYTES = Symbol("room-stored-live-bytes");
+/**
+ * The stored live size of a room read (as the size guard measures it), or null when unknown (a
+ * room built in memory). Map images and resource packs restored by a read are not counted, as
+ * they are not in the cap either.
+ */
+export function storedLiveBytes(room: CloudRoom): number | null {
+  return (room as CloudRoom & { [STORED_LIVE_BYTES]?: number })[STORED_LIVE_BYTES] ?? null;
+}
 /**
  * The storage version (revision and `write_id`) a room was read at, or `null` for a derived or
  * local room. Internal and non-enumerable; used only to key the per-seat projected section cache
@@ -74,6 +84,8 @@ export function keepStoredBody<T extends CloudRoom>(source: CloudRoom, derived: 
   if (stored) Object.defineProperty(derived, STORED_BODY, stored);
   const version = Object.getOwnPropertyDescriptor(source, READ_VERSION);
   if (version) Object.defineProperty(derived, READ_VERSION, version);
+  const live = Object.getOwnPropertyDescriptor(source, STORED_LIVE_BYTES);
+  if (live) Object.defineProperty(derived, STORED_LIVE_BYTES, live);
   const sources = roomImageSources(source);
   if (sources.size)
     Object.defineProperty(derived, ROOM_IMAGE_SOURCES, { value: sources, configurable: true });
@@ -216,6 +228,7 @@ export async function readRoom(code: string, options: ReadRoomOptions = {}): Pro
       Object.defineProperty(hydrated, READ_VERSION, {
         value: { revision: read.version.revision, writeId: read.version.writeId },
       });
+    if (typeof read.liveBytes === "number") Object.defineProperty(hydrated, STORED_LIVE_BYTES, { value: read.liveBytes });
     ensureCityExchanges(hydrated.table);
     return hydrated;
   }
@@ -409,7 +422,7 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
           ? `Part of this campaign is too large to save online (${mb(sizes.rowBytes)} MB in one piece; the limit is ${(ROOM_ROW_LIMIT / 1e6).toFixed(1)} MB). ${end} Export the campaign and ask for help.`
           : refusal === "live"
             ? `This campaign's current session history is too large to save online (${mb(Math.max(sizes.liveBytes, largestReport))} MB; the limit is ${(ROOM_LIVE_LIMIT / 1e6).toFixed(1)} MB). ${end} The DM can end the session to archive the current messages and ledger.`
-            : `This campaign has reached its online storage limit (${mb(total ?? 0)} MB with its archived sessions; the limit is ${(ROOM_TOTAL_LIMIT / 1e6).toFixed(0)} MB). ${end} Download a copy to keep the whole campaign, including every archived session.`,
+            : `${ROOM_TOTAL_REFUSAL} (${mb(total ?? 0)} MB with its archived sessions; the limit is ${(ROOM_TOTAL_LIMIT / 1e6).toFixed(0)} MB), so this session cannot be archived. ${end} Download a copy (My account → Campaigns) keeps the whole campaign, including every archived session, and each archived session can also be saved on its own with Download session report. Archived sessions cannot be removed from an online campaign yet; play continues in the current session.`,
     ),
     { status: 413 },
   );

@@ -40,7 +40,7 @@ import { createHash } from "node:crypto";
  * @typedef {{ path: string[]; hash: string; parts: number; bytes: number }} SectionEntry
  * @typedef {{ readonly code: string; readonly revision: number; readonly writeId: string | null;
  *   readonly sections: readonly SectionEntry[] | null }} RoomVersion
- * @typedef {{ room: any; readonly body: string; version: RoomVersion }} StoredRoom
+ * @typedef {{ room: any; readonly body: string; version: RoomVersion; liveBytes?: number }} StoredRoom
  * @typedef {{ sql: string; args: unknown[] }} SqlGuard
  */
 
@@ -159,9 +159,25 @@ function sectionHash(text) {
 const plainObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 
 /**
- * @typedef {{ path: string[]; page: number; items: number; hash: string; parts: number; bytes: number }} PageEntry
+ * @typedef {{ path: string[]; page: number; items: number; hash: string; parts: number; bytes: number; keys?: string[] }} PageEntry
  * A sealed history page: `path` is `[HISTORY_KEY, ...arrayPath]`, `page` its position (0 first).
+ * `keys` (server-side only, never sent to a browser): the distinct visibility keys of its lines
+ * (`pageVisibilityKeys`), so a seat's history walk skips pages it can read nothing of without
+ * reading them and without telling the seat they exist.
  */
+/**
+ * The visibility keys of a history page's lines: a ledger line is read by purse (`purseId`), a
+ * chat line by its audience (`to`, `purseId`, `recipientId`), exactly the fields the view's
+ * projection rules look at (cloud.server.ts `historyProjector`).
+ * @param {readonly string[]} path @param {any[]} items @returns {string[]}
+ */
+export function pageVisibilityKeys(path, items) {
+  const keys = new Set();
+  const notes = arrayKey(path) === "table.notes";
+  for (const item of items)
+    keys.add(notes ? JSON.stringify([item?.to ?? "", item?.purseId ?? "", item?.recipientId ?? ""]) : JSON.stringify([item?.purseId ?? ""]));
+  return [...keys].sort();
+}
 /** @param {any} entry @returns {entry is PageEntry} */
 export const isPageEntry = (entry) => Array.isArray(entry?.path) && entry.path[0] === HISTORY_KEY;
 /** `"table.ledger"`: the descriptor key of a paged list. @param {readonly string[]} path */
@@ -203,7 +219,8 @@ function historyDescriptor(descriptor) {
         entry.items < 1 ||
         !HASH.test(entry.hash) ||
         !Number.isSafeInteger(entry.parts) ||
-        entry.parts < 1
+        entry.parts < 1 ||
+        (entry.keys !== undefined && (!Array.isArray(entry.keys) || entry.keys.some((k) => typeof k !== "string")))
       )
         throw broken();
     });
@@ -270,12 +287,13 @@ function sectionBodyOnce(body) {
     }
     let start = 0;
     while (list.length - start >= 2 * pageItems) {
-      const text = JSON.stringify(list.slice(start, start + pageItems));
+      const items = list.slice(start, start + pageItems);
+      const text = JSON.stringify(items);
       const hash = sectionHash(text);
       const parts = sections.get(hash)?.parts ?? chunk(text, size);
       sections.set(hash, { hash, parts });
       const bytes = utf8Bytes(text);
-      pages.push({ path: [HISTORY_KEY, ...path], page: pages.length, items: pageItems, hash, parts: parts.length, bytes });
+      pages.push({ path: [HISTORY_KEY, ...path], page: pages.length, items: pageItems, hash, parts: parts.length, bytes, keys: pageVisibilityKeys(path, items) });
       if (arrayKey(path) === "table.ledger") ledgerPages.add(hash);
       historyBytes += bytes;
       start += pageItems;
@@ -413,12 +431,19 @@ function storedFrom(row, parts, options) {
   const assembled = assemble(row.body, parts, options);
   if (!assembled) return null;
   let body = /** @type {string | undefined} */ (undefined);
+  const manifest = /** @type {{ bytes?: number }[] | null} */ (assembled.sections ?? null);
+  // The stored live campaign (working set plus history pages), measured as the size guard
+  // measures it (`roomStorageSizes`): the row without its manifest, plus every section.
+  const liveBytes = manifest
+    ? utf8Bytes(row.body) - utf8Bytes(JSON.stringify(manifest)) + manifest.reduce((sum, entry) => sum + Number(entry.bytes ?? 0), 0)
+    : utf8Bytes(row.body);
   return {
     room: assembled.room,
     get body() {
       return (body ??= assembled.body());
     },
     version: version(row.code, row.revision, row.write_id, assembled.sections),
+    liveBytes,
   };
 }
 

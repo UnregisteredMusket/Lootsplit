@@ -35,4 +35,11 @@ export function isDeferredSnapshot(snapshot: unknown): boolean {
  * the seat, naming the newest page the client does not hold; absent when it holds the whole list.
  * A cursor says nothing about how many lines exist or whose they are.
  */
-export type HistoryCursors = Partial<Record<HistoryList, string>>;
+export type HistoryCursors = Partial<Record<HistoryList, string>> & {
+  /**
+   * The seat's projection fingerprint: changes whenever what the seat may read changes (its
+   * characters, the party, companion funds, its role). A browser drops the history it loaded
+   * under another fingerprint (room-history.ts).
+   */
+  projection?: string;
+};
