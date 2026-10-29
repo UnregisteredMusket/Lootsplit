@@ -178,3 +178,35 @@ test("records hold one archived session at a time", async () => {
     db.prepare = realPrepare;
   }
 });
+
+test("a missing resource pack, inside a session or in the working campaign, refuses before anything is sent", async () => {
+  // Integrity review of #388: a pack missing from inside an archived session was found only while
+  // the response was already streaming (HTTP 200 and part of the body, then an error).
+  const dmUser = await user(), playerUser = await user();
+  const { dm } = await campaign(dmUser, playerUser, 2);
+  const room = await readRoom(dm.code);
+  const base = room.table.journal.reports.at(-1);
+  const snap = JSON.parse(base.snapshot);
+  snap.resourceLibrary = { packs: [{ format: "lootsplit.resource-pack", name: "Bestiary", items: [] }] };
+  room.table.journal.reports.push({ ...base, id: "packed", name: "Packed", snapshot: JSON.stringify(snap) });
+  room.revision++;
+  await updateRoom(room, room.revision - 1);
+  assert.ok((await db.prepare("SELECT COUNT(*) AS n FROM campaign_resource_documents WHERE code=?").bind(dm.code).first()).n > 0, "the pack is stored by reference");
+  assert.equal(await streamed(dmUser), await wholeRecords(dmUser), "intact: identical");
+  await db.prepare("DELETE FROM campaign_resource_documents WHERE code=?").bind(dm.code).run();
+  for (const who of [dmUser, playerUser]) {
+    const old = await wholeRecords(who).then(() => null, (e) => e.message);
+    assert.match(old ?? "", /resource pack is missing/);
+    await assert.rejects(campaignRecordsStream(db, who), (e) => e.message === old);
+  }
+  // A pack in the working campaign only (sessions without packs).
+  const other = await campaign(dmUser, await user(), 1);
+  const live = await readRoom(other.dm.code);
+  live.table.journal.resourceLibrary = { packs: [{ format: "lootsplit.resource-pack", name: "Live pack", items: [] }] };
+  live.revision++;
+  await updateRoom(live, live.revision - 1);
+  await db.prepare("DELETE FROM campaign_resource_documents WHERE code=?").bind(other.dm.code).run();
+  const old = await wholeRecords(dmUser).then(() => null, (e) => e.message);
+  assert.match(old ?? "", /resource pack is missing/);
+  await assert.rejects(campaignRecordsStream(db, dmUser), (e) => e.message === old);
+});
