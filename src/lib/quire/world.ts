@@ -17,8 +17,9 @@ import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
 import { legacyServiceKinds, serviceKinds } from "./services-schema.ts";
-import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
+import { applyTabletopCommand, applyTokenFollow, keepMovement, validateTabletop, readTabletopSession, type TabletopExecution } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
+import { tokenInsideGrid } from "./tabletop-geometry.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
 import { actingGroups, groupPlace, groupRefs, MAIN_GROUP, resolveGroup } from "./party-groups.ts";
@@ -142,7 +143,7 @@ export function validateWorld(t: CloudTable, projected = false) {
       "combat entity",
     );
     for (const token of map.tokens ?? []) {
-      if (!map.grid || token.column >= map.grid.columns || token.row >= map.grid.rows)
+      if (!map.grid || !tokenInsideGrid(map.grid, token))
         throw Error("Combat tokens must fit inside the configured grid.");
       if (
         !projected &&
@@ -363,11 +364,15 @@ export function settleExchange(
   moveItems(t, leftSide, right.id, receipt + "-left", at);
   moveItems(t, rightSide, left.id, receipt + "-right", at);
 }
-export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldCommand, at: number) {
+export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldCommand, at: number, execution: TabletopExecution = {}) {
   const journal = t.journal!,
     w = (journal.world = readWorld(journal.world));
   if (tabletopCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
-    applyTabletopCommand(t, seat, cmd as TabletopCommand, at);
+    applyTabletopCommand(t, seat, cmd as TabletopCommand, at, execution);
+    return;
+  }
+  if (cmd.kind === "map-token-follow") {
+    applyTokenFollow(t, seat, cmd, at);
     return;
   }
   if (applyCharacterPosition(t, seat, cmd, at)) return;
@@ -473,12 +478,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
         if (crew.kind === "character" && aboard.has(crew.entityId!)) {
           crew.column += cmd.token.column - current.column;
           crew.row += cmd.token.row - current.row;
-          if (
-            crew.column < 0 ||
-            crew.row < 0 ||
-            crew.column >= cmd.grid.columns ||
-            crew.row >= cmd.grid.rows
-          )
+          if (!tokenInsideGrid(cmd.grid, crew))
             throw Error("Moving this ship would place an aboard character outside the grid.");
         }
     }
@@ -488,6 +488,57 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     ];
     if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
     event("Combat map tokens updated");
+  } else if (cmd.kind === "map-tokens-place") {
+    dm();
+    if (!cmd.place.length && !cmd.remove?.length) throw Error("Choose tokens to place.");
+    const map = w.maps.find((m) => m.id === cmd.mapId);
+    if (!map || !same(map.grid, cmd.grid)) throw Error("The combat grid changed. Reload before placing tokens.");
+    if (new Set(cmd.place.map((p) => p.tokenId)).size !== cmd.place.length)
+      throw Error("Place each token only once.");
+    // Removals first (Send to map / Move party to), so a token can change maps in one action.
+    for (const r of cmd.remove ?? []) {
+      const from = w.maps.find((m) => m.id === r.mapId);
+      if (!from || !same(from.grid, r.grid)) throw Error("A map's combat grid changed. Reload before moving tokens.");
+      const current = from.tokens?.find((t) => t.id === r.tokenId);
+      if (!current || !same(current, r.before))
+        throw Error("A token moved or changed. Refresh before placing.");
+      from.tokens = from.tokens!.filter((t) => t.id !== r.tokenId);
+      if (from.tabletop && from.tabletop.vision !== "off") from.tabletop.revision++;
+    }
+    const next = [...(map.tokens ?? [])];
+    for (const p of cmd.place) {
+      if (p.token.id !== p.tokenId) throw Error("Token identity cannot change.");
+      const index = next.findIndex((t) => t.id === p.tokenId);
+      const current = index >= 0 ? next[index] : null;
+      if (!same(current, p.before)) throw Error("A token moved or changed. Refresh before placing.");
+      if (current && (current.kind !== p.token.kind || current.entityId !== p.token.entityId))
+        throw Error("Token identity cannot change.");
+      if (index >= 0) next[index] = p.token;
+      else next.push(p.token);
+    }
+    map.tokens = next;
+    if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
+    // Generic, like "Combat map tokens updated": players see every event without a purse, so it
+    // never names a map or counts tokens they may not see (privacy review, 2026-10-29).
+    event("Map tokens updated");
+  } else if (cmd.kind === "map-tokens-edit") {
+    dm();
+    const map = w.maps.find((m) => m.id === cmd.mapId);
+    if (!map) throw Error("This map is unavailable.");
+    if (new Set(cmd.edits.map((e) => e.tokenId)).size !== cmd.edits.length)
+      throw Error("Choose each token only once.");
+    const next = [...(map.tokens ?? [])];
+    for (const e of cmd.edits) {
+      const index = next.findIndex((t) => t.id === e.tokenId);
+      if (index < 0 || !same(next[index], e.before))
+        throw Error("A token moved or changed. Refresh before changing it.");
+      if (e.token.id !== e.tokenId || e.token.kind !== e.before.kind || e.token.entityId !== e.before.entityId)
+        throw Error("Token identity cannot change.");
+      next[index] = e.token;
+    }
+    map.tokens = next;
+    if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
+    event("Map tokens updated");
   } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;
@@ -553,6 +604,8 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       if (w.tabletop.activeMapId === cmd.mapId) w.tabletop.activeMapId = null;
       if (w.tabletop.camera?.mapId === cmd.mapId) w.tabletop.camera = null;
     }
+    // Player movement (protocol 15): a save without the movement choice keeps the stored one.
+    if (cmd.map) keepMovement(cmd.map, current?.tabletop);
     w.maps = w.maps.filter((m) => m.id !== cmd.mapId);
     if (cmd.map) w.maps.push(cmd.map);
     event(cmd.map ? "Campaign map saved" : "Campaign map removed");

@@ -1,6 +1,8 @@
 import type { CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
 import { expandTabletopHistory, tabletopHasFogDiffs } from "./fog-history.ts";
+import { canonicalJson } from "./canonical-json.ts";
+import { placeFromBox, tokenBox, tokenFootprint } from "./tabletop-geometry.ts";
 
 /**
  * The current tabletop table shape; 3 added compact fog history, continued brush strokes, fog
@@ -80,8 +82,53 @@ export const VIEW_SECTIONS_PROTOCOL = 11;
  * campaign as before.
  */
 export { HISTORY_PROTOCOL } from "./history-pages.ts";
+/**
+ * Protocol 13 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
+ * `footprint` and `anchor: "corner"` (stored by their top-left square). Older clients have a strict
+ * token schema, so protocols 0-12 receive footprint tokens in the centre form they know (the
+ * centre square plus a half-square offset for even sizes) without those fields
+ * (`centreFormToken`). Their token moves, token saves and map saves come back in that form and the
+ * server converts them to the stored form before applying them (`upgradeFootprintCommands`);
+ * their saves keep the fields. Pending drafts with footprint fields ask them to finish on the
+ * updated website.
+ */
+export const FOOTPRINT_PROTOCOL = 13;
+/**
+ * Protocol 14 (2026-10-29, map tokens: grid mode): a map's tabletop settings may carry
+ * `gridHidden` (the automatic grid of an ungridded map). Older clients have a strict tabletop
+ * schema, so protocols 0-13 receive settings without it; their scene saves and map saves keep it
+ * (`upgradeOldClientCommands`). Pending `map-grid-snap` drafts ask them to finish on the updated
+ * website.
+ */
+export const GRID_MODE_PROTOCOL = 14;
+/**
+ * Protocol 15 (2026-10-29, map tokens: player movement): a map's tabletop settings may carry
+ * `movement` ("auto" | "off" | "approval") and `lockedPurseIds`, and players may send
+ * `map-token-claim`. Protocols 0-14 receive settings without the new fields (`playerMovement` is
+ * kept in step with `movement`); their scene and map saves compare without them, keep them, and a
+ * change to "Allow assigned-player token movement" sets Automatic or Off. Pending drafts with the
+ * new fields or claims ask them to finish on the updated website. The movement rules, including
+ * turns during combat, are enforced by the server for every protocol.
+ */
+export const PLAYER_MOVEMENT_PROTOCOL = 15;
+/**
+ * Protocol 16 (2026-10-29, map tokens: group placement): the tabletop session may carry the
+ * party's default formation (`partyFormation`), and the DM may send `map-tokens-place` and
+ * `map-tokens-edit`. Protocols 0-15 receive the session without it; their session saves compare
+ * without it and keep it. Pending drafts with the new commands ask them to finish on the updated
+ * website.
+ */
+export const GROUP_COMMANDS_PROTOCOL = 16;
+/**
+ * Protocol 17 (2026-10-29, map tokens: token follows view): the tabletop session may carry
+ * `followView` ("Character tokens follow players' map view"), and players may send
+ * `map-token-follow`. Protocols 0-16 receive the session without it; their session saves compare
+ * without it and keep it. Pending drafts with the new command ask them to finish on the updated
+ * website.
+ */
+export const FOLLOW_VIEW_PROTOCOL = 17;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = 12;
+export const CURRENT_TABLETOP_PROTOCOL = FOLLOW_VIEW_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -92,6 +139,9 @@ const commands = new Set([
   "map-fog",
   "map-template",
   "map-render",
+  "map-grid-snap",
+  "map-token-claim",
+  "map-token-follow",
 ]);
 /**
  * Tabletop protocol 2 and older apps (Android 1.10.0 and earlier) have no `alternating` diagonal
@@ -118,7 +168,7 @@ export function legacyDiagonals<T>(value: T): T {
   return walk(value) as T;
 }
 export function legacyTabletopToken(token: MapToken): MapToken {
-  const result = { ...token };
+  const result = { ...centreFormToken(token) };
   delete result.locked;
   delete result.controllerPurseIds;
   delete result.offsetX;
@@ -564,7 +614,453 @@ export function refuseOldClientGroupActions(
     }
   }
 }
+// Protocol 13 (footprints and snapping).
+const footprintFields = ["sizeClass", "footprint", "anchor"] as const;
+const hasFootprint = (token: Partial<MapToken> | null | undefined) =>
+  !!token && footprintFields.some((key) => token[key] !== undefined);
+const footprinted = (text: string) => /"(sizeClass|footprint|anchor)":/.test(text);
+/**
+ * A token as protocols 0-12 read it: without its size fields, and a corner-anchored footprint
+ * token at its centre square (plus half a square for even sizes), so older apps draw it at its
+ * true centre. The same object when the token has no footprint fields.
+ */
+export function centreFormToken(token: MapToken): MapToken {
+  if (!hasFootprint(token)) return token;
+  const result = { ...token };
+  for (const key of footprintFields) delete result[key];
+  delete result.offsetX;
+  delete result.offsetY;
+  const box = tokenBox(token),
+    n = tokenFootprint(token),
+    x = box.left + (n - 1) / 2,
+    y = box.top + (n - 1) / 2,
+    column = Math.floor(x + 0.5 - 1e-9),
+    row = Math.floor(y + 0.5 - 1e-9),
+    offsetX = Math.round((x - column) * 1e6) / 1e6,
+    offsetY = Math.round((y - row) * 1e6) / 1e6;
+  if (n < 1 || n === 1) {
+    if (token.offsetX !== undefined) result.offsetX = token.offsetX;
+    if (token.offsetY !== undefined) result.offsetY = token.offsetY;
+    return result;
+  }
+  return {
+    ...result,
+    column,
+    row,
+    ...(offsetX ? { offsetX } : {}),
+    ...(offsetY ? { offsetY } : {}),
+  };
+}
+/** Whether a table (or a stored backup body) holds footprint tokens. */
+export function hasFootprintTokens(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.tokens?.some(hasFootprint)) ||
+    !!table.journal?.reports?.some((r) => footprinted(r.snapshot ?? ""))
+  );
+}
+function footprintFreeTable(table: CloudTable): CloudTable {
+  if (!hasFootprintTokens(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!footprinted(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(footprintFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world
+        ? {
+            world: {
+              ...world,
+              maps: world.maps.map((m) =>
+                m.tokens?.some(hasFootprint) ? { ...m, tokens: m.tokens.map(centreFormToken) } : m,
+              ),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
+/** Whether a pending command (as JSON) carries footprint fields older apps can't read. */
+export function footprintCommandText(c: unknown) {
+  return footprinted(JSON.stringify(c));
+}
+type Place = { column: number; row: number; offsetX?: number; offsetY?: number };
+const samePlace = (a: Place, b: Place) =>
+  a.column === b.column &&
+  a.row === b.row &&
+  (a.offsetX ?? 0) === (b.offsetX ?? 0) &&
+  (a.offsetY ?? 0) === (b.offsetY ?? 0);
+const sameJson = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
+/** A centre-form position (older apps) of a stored footprint token, in its stored form. */
+function storedPlace(stored: MapToken, centre: Place, snap: boolean): Place {
+  const n = tokenFootprint(stored);
+  if (stored.anchor !== "corner" || n <= 1) return centre;
+  const left = centre.column + (centre.offsetX ?? 0) - (n - 1) / 2,
+    top = centre.row + (centre.offsetY ?? 0) - (n - 1) / 2;
+  // An even footprint has no centre square: with grid mode on an older app cannot express a
+  // snapped position for it, and the server never picks a square on its behalf.
+  if (snap && (Math.abs(left - Math.round(left)) > 1e-6 || Math.abs(top - Math.round(top)) > 1e-6))
+    throw Error(`Update Lootsplitter to move ${stored.label} on this map.`);
+  const place = placeFromBox(stored, left, top);
+  return {
+    column: place.column,
+    row: place.row,
+    ...(place.offsetX ? { offsetX: place.offsetX } : {}),
+    ...(place.offsetY ? { offsetY: place.offsetY } : {}),
+  };
+}
+/** The token an older app saved (centre form, maybe without tabletop fields), in stored form. */
+function storedToken(stored: MapToken, sent: MapToken, snap: boolean): MapToken {
+  if (sent.anchor !== undefined || sent.kind !== stored.kind || sent.entityId !== stored.entityId)
+    return sent;
+  const result: MapToken = { ...sent };
+  delete result.offsetX;
+  delete result.offsetY;
+  for (const key of footprintFields) if (stored[key] !== undefined) Object.assign(result, { [key]: stored[key] });
+  return { ...result, ...storedPlace(stored, sent, snap) };
+}
+/**
+ * Protocols 0-12 send footprint tokens in their centre form. Before a batch from such a client is
+ * applied, the server rewrites its token moves, token saves and map saves into the stored form
+ * (against the current table). Nothing else changes; commands about other tokens are untouched.
+ */
+export function upgradeFootprintCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
+  const maps = table.journal?.world?.maps ?? [];
+  if (!maps.some((m) => m.tokens?.some(hasFootprint))) return commands;
+  return commands.map((command) => {
+    const c = command as C & Record<string, unknown>;
+    const map = maps.find((m) => m.id === c.mapId);
+    const snap = (map?.tabletop as { snap?: boolean } | undefined)?.snap ?? true;
+    if (!map?.tokens?.some(hasFootprint)) return command;
+    const stored = (id: unknown) => map.tokens!.find((t) => t.id === id && hasFootprint(t));
+    if (c.kind === "map-token-move") {
+      const moves = (c.moves as { tokenId: string; before: Place; after: Place }[]).map((move) => {
+        const token = stored(move.tokenId);
+        if (!token || !samePlace(centreFormToken(token), move.before)) return move;
+        const before: Place = { column: token.column, row: token.row };
+        if (token.offsetX !== undefined) before.offsetX = token.offsetX;
+        if (token.offsetY !== undefined) before.offsetY = token.offsetY;
+        return { ...move, before, after: storedPlace(token, move.after, snap) };
+      });
+      return { ...c, moves };
+    }
+    if (c.kind === "map-token") {
+      const token = stored(c.tokenId);
+      if (!token) return command;
+      const before = c.before as MapToken | null;
+      // Protocols 1-12 sent the centre form; protocol 0 the centre form without tabletop fields,
+      // which world.ts already accepts as legacyTabletopToken(current) and merges.
+      const fromCentre = sameJson(centreFormToken(token), before);
+      if (!fromCentre && !sameJson(legacyTabletopToken(token), before)) return command;
+      const sent = c.token as MapToken | null;
+      return { ...c, before: fromCentre ? token : before, token: sent && storedToken(token, sent, snap) };
+    }
+    if (c.kind === "map-save") {
+      const before = c.before as CampaignMap | null,
+        sent = c.map as CampaignMap | null;
+      const restore = (list: MapToken[] | undefined, previous: boolean) =>
+        list?.map((t) => {
+          const s = stored(t.id);
+          if (!s) return t;
+          if (previous) return sameJson(centreFormToken(s), t) ? s : t;
+          return storedToken(s, t, snap);
+        });
+      return {
+        ...c,
+        ...(before?.tokens ? { before: { ...before, tokens: restore(before.tokens, true) } } : {}),
+        ...(sent?.tokens ? { map: { ...sent, tokens: restore(sent.tokens, false) } } : {}),
+      };
+    }
+    return command;
+  });
+}
+// Protocol 14 (grid mode).
+const gridHiddenText = (text: string) => text.includes('"gridHidden":');
+/** Tabletop settings without the hidden-grid flag (protocols 0-13). The same object without it. */
+export function withoutGridHidden<T>(settings: T): T {
+  if (!settings || typeof settings !== "object" || !("gridHidden" in settings)) return settings;
+  const plain = { ...settings } as T & { gridHidden?: boolean };
+  delete plain.gridHidden;
+  return plain;
+}
+/** Whether a table (or a stored backup body) holds hidden automatic grids. */
+export function hasHiddenGrids(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.tabletop?.gridHidden !== undefined) ||
+    !!table.journal?.reports?.some((r) => gridHiddenText(r.snapshot ?? ""))
+  );
+}
+function gridHiddenFreeTable(table: CloudTable): CloudTable {
+  if (!hasHiddenGrids(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!gridHiddenText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(gridHiddenFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world
+        ? {
+            world: {
+              ...world,
+              maps: world.maps.map((m) =>
+                m.tabletop?.gridHidden !== undefined ? { ...m, tabletop: withoutGridHidden(m.tabletop) } : m,
+              ),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
+/**
+ * Older clients can't see some tabletop settings fields: their scene saves (`map-tabletop`) and
+ * map saves are compared against the settings without them (`strip`) and keep them (`restore`).
+ * Commands about other maps are untouched.
+ */
+function upgradeSettingsCommands<C extends { kind: string }>(
+  table: CloudTable,
+  commands: C[],
+  hidden: (settings: NonNullable<CampaignMap["tabletop"]>) => boolean,
+  strip: <T>(settings: T) => T,
+  restore: (sent: Record<string, unknown>, current: NonNullable<CampaignMap["tabletop"]>) => Record<string, unknown>,
+): C[] {
+  const maps = table.journal?.world?.maps ?? [];
+  if (!maps.some((m) => m.tabletop && hidden(m.tabletop))) return commands;
+  return commands.map((command) => {
+    const c = command as C & Record<string, unknown>;
+    const map = maps.find((m) => m.id === c.mapId);
+    const current = map?.tabletop;
+    if (!current || !hidden(current)) return command;
+    // Protocol 2 sent full-snapshot fog history; tabletop.ts accepts either form.
+    const forms = [current, expandTabletopHistory(current)];
+    const match = (sent: unknown) => forms.find((form) => sameJson(strip(form), sent));
+    const keep = (next: unknown) =>
+      next && typeof next === "object" ? restore(next as Record<string, unknown>, current) : next;
+    if (c.kind === "map-tabletop") {
+      const before = match(c.before);
+      return before ? { ...c, before, settings: keep(c.settings) } : command;
+    }
+    if (c.kind === "map-save") {
+      const before = c.before as CampaignMap | null,
+        sent = c.map as CampaignMap | null;
+      const found = before?.tabletop && match(before.tabletop);
+      if (!found) return command;
+      return {
+        ...c,
+        before: { ...before, tabletop: found },
+        ...(sent?.tabletop ? { map: { ...sent, tabletop: keep(sent.tabletop) } } : {}),
+      };
+    }
+    return command;
+  });
+}
+const upgradeGridHiddenCommands = <C extends { kind: string }>(table: CloudTable, commands: C[]) =>
+  upgradeSettingsCommands(
+    table,
+    commands,
+    (t) => t.gridHidden !== undefined,
+    withoutGridHidden,
+    (sent, current) => ("gridHidden" in sent ? sent : { ...sent, gridHidden: current.gridHidden }),
+  );
+// Protocol 15 (player movement).
+const movementText = (text: string) => /"movement":"(auto|off|approval)"|"lockedPurseIds":\[/.test(text);
+/** Tabletop settings without `movement` and `lockedPurseIds` (protocols 0-14). */
+export function withoutMovement<T>(settings: T): T {
+  if (!settings || typeof settings !== "object" || (!("movement" in settings) && !("lockedPurseIds" in settings)))
+    return settings;
+  const plain = { ...settings } as T & { movement?: unknown; lockedPurseIds?: unknown };
+  delete plain.movement;
+  delete plain.lockedPurseIds;
+  return plain;
+}
+const hasMovementFields = (t: NonNullable<CampaignMap["tabletop"]>) =>
+  t.movement !== undefined || t.lockedPurseIds !== undefined;
+/** Whether a table (or a stored backup body) holds the movement choice or movement locks. */
+export function hasMovementSettings(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.tabletop && hasMovementFields(m.tabletop)) ||
+    !!table.journal?.reports?.some((r) => movementText(r.snapshot ?? ""))
+  );
+}
+function movementFreeTable(table: CloudTable): CloudTable {
+  if (!hasMovementSettings(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!movementText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(movementFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world
+        ? {
+            world: {
+              ...world,
+              maps: world.maps.map((m) =>
+                m.tabletop && hasMovementFields(m.tabletop) ? { ...m, tabletop: withoutMovement(m.tabletop) } : m,
+              ),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
+const upgradeMovementCommands = <C extends { kind: string }>(table: CloudTable, commands: C[]) =>
+  upgradeSettingsCommands(table, commands, hasMovementFields, withoutMovement, (sent, current) => {
+    if ("movement" in sent || "lockedPurseIds" in sent) return sent;
+    // "Allow assigned-player token movement" changed on an older client: Automatic or Off.
+    const was = current.movement ? current.movement !== "off" : current.playerMovement;
+    const movement =
+      typeof sent.playerMovement === "boolean" && sent.playerMovement !== was
+        ? sent.playerMovement
+          ? "auto"
+          : "off"
+        : current.movement;
+    return {
+      ...sent,
+      ...(movement ? { movement } : {}),
+      ...(current.lockedPurseIds ? { lockedPurseIds: current.lockedPurseIds } : {}),
+    };
+  });
+// Protocol 16 (group placement).
+const formationText = (text: string) => text.includes('"partyFormation":');
+/** Whether a table (or a stored backup body) holds a party formation default. */
+export function hasPartyFormation(table: CloudTable): boolean {
+  return (
+    table.journal?.world?.tabletop?.partyFormation !== undefined ||
+    !!table.journal?.reports?.some((r) => formationText(r.snapshot ?? ""))
+  );
+}
+function formationFreeTable(table: CloudTable): CloudTable {
+  if (!hasPartyFormation(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!formationText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(formationFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world?.tabletop?.partyFormation !== undefined) {
+    const tabletop = { ...world.tabletop };
+    delete tabletop.partyFormation;
+    plainWorld = { ...world, tabletop };
+  }
+  return {
+    ...table,
+    journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
+  };
+}
+// Protocol 17 (token follows view): the same treatment as the formation default, for `followView`.
+const followText = (text: string) => text.includes('"followView":');
+/** Whether a table (or a stored backup body) holds the follow-view setting. */
+export function hasFollowView(table: CloudTable): boolean {
+  return (
+    table.journal?.world?.tabletop?.followView !== undefined ||
+    !!table.journal?.reports?.some((r) => followText(r.snapshot ?? ""))
+  );
+}
+function followFreeTable(table: CloudTable): CloudTable {
+  if (!hasFollowView(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!followText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(followFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world?.tabletop?.followView !== undefined) {
+    const tabletop = { ...world.tabletop };
+    delete tabletop.followView;
+    plainWorld = { ...world, tabletop };
+  }
+  return {
+    ...table,
+    journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
+  };
+}
+/** The newer session fields (and the protocol that introduced each), newest first. */
+const SESSION_FIELDS = [
+  ["followView", FOLLOW_VIEW_PROTOCOL],
+  ["partyFormation", GROUP_COMMANDS_PROTOCOL],
+] as const;
+/**
+ * An older client's `tabletop-session` save: it saw the session without every field newer than its
+ * protocol, so `before` is compared without all of them at once (with or without `presentation`,
+ * which protocol 2 and older never send) and the save keeps the stored values it couldn't see.
+ */
+function upgradeSessionCommands<C extends { kind: string }>(table: CloudTable, commands: C[], protocol: number): C[] {
+  const current = table.journal?.world?.tabletop as Record<string, unknown> | undefined;
+  if (!current) return commands;
+  const hidden = SESSION_FIELDS.filter(([field, since]) => protocol < since && current[field] !== undefined).map(([field]) => field);
+  if (!hidden.length) return commands;
+  const plain = { ...current };
+  for (const field of hidden) delete plain[field];
+  const withoutPresentation = { ...plain };
+  delete withoutPresentation.presentation;
+  return commands.map((command) => {
+    const c = command as C & Record<string, unknown>;
+    if (c.kind !== "tabletop-session") return command;
+    const exact = sameJson(plain, c.before);
+    if (!exact && !sameJson(withoutPresentation, c.before)) return command;
+    const before = { ...current };
+    if (!exact) delete before.presentation;
+    const session = { ...(c.session as Record<string, unknown>) };
+    for (const field of hidden) if (!(field in session)) session[field] = current[field];
+    return { ...c, before, session };
+  });
+}
+/** Every older-client conversion, applied to a batch before it runs (cloud.server.ts). */
+export function upgradeOldClientCommands<C extends { kind: string }>(
+  table: CloudTable,
+  commands: C[],
+  protocol = 0,
+): C[] {
+  let result = commands;
+  // The session fields a client can't see (privacy review 2026-10-29): stripped in one pass, so a
+  // client older than several of them still matches `before` (it never sees any of them).
+  if (protocol < FOLLOW_VIEW_PROTOCOL) result = upgradeSessionCommands(table, result, protocol);
+  if (protocol < PLAYER_MOVEMENT_PROTOCOL) result = upgradeMovementCommands(table, result);
+  if (protocol < GRID_MODE_PROTOCOL) result = upgradeGridHiddenCommands(table, result);
+  if (protocol < FOOTPRINT_PROTOCOL) result = upgradeFootprintCommands(table, result);
+  return result;
+}
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= FOLLOW_VIEW_PROTOCOL) return table;
+  table = followFreeTable(table);
+  if (protocol >= GROUP_COMMANDS_PROTOCOL) return table;
+  table = formationFreeTable(table);
+  if (protocol >= PLAYER_MOVEMENT_PROTOCOL) return table;
+  table = movementFreeTable(table);
+  if (protocol >= GRID_MODE_PROTOCOL) return table;
+  table = gridHiddenFreeTable(table);
+  if (protocol >= FOOTPRINT_PROTOCOL) return table;
+  table = footprintFreeTable(table);
   if (protocol >= PARTY_GROUPS_PROTOCOL) return table;
   table = groupFreeTable(table);
   if (protocol >= SERVICES_WAVE2_PROTOCOL) return table;
@@ -644,12 +1140,28 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= FOLLOW_VIEW_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 17: token follows and the follow-view setting.
+      if (c.kind === "map-token-follow" || followText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= GROUP_COMMANDS_PROTOCOL) return false;
+      // Protocol 16: group placement commands and the formation default.
+      if (c.kind === "map-tokens-place" || c.kind === "map-tokens-edit" || formationText(JSON.stringify(c)))
+        return true;
+      if (protocol && protocol >= PLAYER_MOVEMENT_PROTOCOL) return false;
+      // Protocol 15: token claims and the movement fields.
+      if (c.kind === "map-token-claim" || movementText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= GRID_MODE_PROTOCOL) return false;
+      // Protocol 14: grid mode commands and the hidden-grid flag.
+      if (c.kind === "map-grid-snap" || gridHiddenText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= FOOTPRINT_PROTOCOL) return false;
+      // Protocol 13: footprint fields older apps cannot read.
+      if (footprintCommandText(c)) return true;
+      if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return false;
       // Protocol 10: split-the-party commands and group fields older apps cannot read.
       if (groupCommandText(c)) return true;
       if (protocol && protocol >= SERVICES_WAVE2_PROTOCOL) return false;

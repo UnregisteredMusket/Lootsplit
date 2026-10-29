@@ -2927,7 +2927,12 @@ const financeKind = (kind: string) =>
   kind.startsWith("downtime-") ||
   kind === "session";
 const groupBatchKind = (kind: string) =>
-  partyGroupKinds.has(kind) || kind === "party-location" || kind === "party-map-position";
+  partyGroupKinds.has(kind) ||
+  kind === "party-location" ||
+  kind === "party-map-position" ||
+  // "Move party to ▸" (map tokens PR 4): the place, the players' scene and the tokens together.
+  kind === "tabletop-session" ||
+  kind === "map-tokens-place";
 /** Read, calculate and commit campaign finances under one IndexedDB write lock. */
 export async function executeFinanceCommand(
   input: CommandRequest,

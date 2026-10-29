@@ -42,8 +42,11 @@ export function MapWorkspaceChrome({
   onBack,
   closePanel,
   compactSearch = false,
+  subtitle,
 }: {
   map?: CampaignMap;
+  /** Context under the title capsule's name (mockups: the map's place, e.g. "Testville"). */
+  subtitle?: string;
   /** The parent map, only when this viewer can open it (otherwise no Back button). */
   parent?: CampaignMap;
   onBack?: () => void;
@@ -209,6 +212,7 @@ export function MapWorkspaceChrome({
               <span>
                 {parent && <small className="map-title-parent">{parent.name} › </small>}
                 {map?.name || "Maps"}
+                {subtitle && <small className="map-title-context"> {subtitle}</small>}
               </span>
               <ChevronDown size={16} />
             </button>

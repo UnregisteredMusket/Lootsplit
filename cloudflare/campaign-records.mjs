@@ -21,7 +21,7 @@ import { hydrateRoomResources } from "./room-resources.mjs";
 import { readMemberRooms } from "./room-storage.mjs";
 import { readArchivedSnapshot } from "../src/lib/quire/journal.ts";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
-import { tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
+import { CURRENT_TABLETOP_PROTOCOL, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 const IMAGE_REFERENCE = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
 const UNREADABLE = "This archived report cannot be read. Keep its original backup for recovery.";
@@ -45,8 +45,8 @@ async function checkImages(/** @type {any} */ db, /** @type {string} */ code, /*
 }
 
 /**
- * The account's archived reports as text chunks of `{"reports":[...]}`. `protocol` below 10
- * converts each snapshot for older apps (`tableForProtocol`), as the route did.
+ * The account's archived reports as text chunks of `{"reports":[...]}`. `protocol` below the
+ * current tabletop protocol converts each snapshot for older apps (`tableForProtocol`), as the route did.
  * @param {any} db @param {string} user @param {number} [protocol]
  * @returns {Promise<{ chunks: () => AsyncGenerator<string>; reports: number }>}
  */
@@ -92,7 +92,7 @@ export async function campaignRecordsStream(db, user, protocol = Infinity) {
     } catch {
       error = UNREADABLE;
     }
-    if (snapshot && protocol < 10) snapshot = tableForProtocol(snapshot, protocol);
+    if (snapshot && protocol < CURRENT_TABLETOP_PROTOCOL) snapshot = tableForProtocol(snapshot, protocol);
     return JSON.stringify({
       id: r.id,
       code: item.code,

@@ -360,6 +360,30 @@ jobs:
       - name: dev-map-controls
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-map-controls 240 node --experimental-strip-types scripts/map-controls-browser-audit.mjs
+      - name: dev-map-tokens-footprint
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-tokens-footprint 240 node scripts/map-tokens-footprint-browser-audit.mjs
+      - name: dev-map-grid-mode
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-grid-mode 240 node scripts/map-grid-mode-browser-audit.mjs
+      - name: dev-map-player-move
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-player-move 240 node scripts/map-player-move-browser-audit.mjs
+      - name: dev-map-group-place
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-group-place 240 node scripts/map-group-place-browser-audit.mjs
+      - name: dev-map-context-menu
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-context-menu 240 node scripts/map-context-menu-browser-audit.mjs
+      - name: dev-map-radial
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-radial 300 node scripts/map-radial-browser-audit.mjs
+      - name: dev-map-party-move
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-party-move 300 node scripts/map-party-move-browser-audit.mjs
+      - name: dev-map-follow-view
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-follow-view 240 node scripts/map-follow-view-browser-audit.mjs
       - name: dev-quest-log
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-quest-log 300 node scripts/quest-log-browser-audit.mjs

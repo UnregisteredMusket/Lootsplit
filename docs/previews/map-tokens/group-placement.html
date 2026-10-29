@@ -1,0 +1,156 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Group placement</title><style>
+:root{
+  --color-bg:#0c1424;--color-elevated:#18243c;--color-subtle:#1c2c4c;--color-border:#3a4d72;
+  --color-lead:#c8a96b;--color-fg:#f6f1e6;--color-muted:#cbbfae;--color-faint:#8e8798;
+  --color-accent:#e0a04a;--color-danger:#9a3044;--color-positive:#7d9a6a;--color-negative:#c46a62;
+  --font-display:"Cormorant Garamond","Source Serif 4",Palatino,"Palatino Linotype",serif;
+  --font-sans:"Source Sans 3","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --map-panel:color-mix(in srgb,var(--color-elevated) 92%,transparent);
+  --map-edge:color-mix(in srgb,var(--color-fg) 16%,transparent);
+  --map-shadow:0 3px 15px #0003;
+  --select:#4d8fe0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(--font-sans);font-size:14px}
+.page{padding:24px 0 32px}
+.caption{max-width:1232px;margin:0 auto 10px;padding:0 24px;display:flex;gap:12px;align-items:baseline}
+.caption h1{font-family:var(--font-display);font-weight:600;font-size:26px;margin:0;color:var(--color-lead)}
+.caption p{margin:0;color:var(--color-muted);font-size:13px}
+.frame{position:relative;width:1280px;height:800px;overflow:hidden;margin:0 auto 28px;border-top:1px solid var(--map-edge);border-bottom:1px solid var(--map-edge)}
+.frame.short{height:720px}
+.map{position:absolute;inset:0}
+.glass{background:var(--map-panel);color:var(--color-fg);border:1px solid var(--map-edge);border-radius:18px;box-shadow:var(--map-shadow);backdrop-filter:blur(14px)}
+.capsule{position:absolute;top:14px;left:14px;display:flex;align-items:center;height:46px;border-radius:16px;z-index:5}
+.capsule .back{width:44px;height:44px;display:grid;place-items:center;border-right:1px solid var(--map-edge)}
+.capsule .title{font-family:var(--font-display);font-size:21px;font-weight:600;padding:0 14px 0 12px;display:flex;align-items:center;gap:8px}
+.capsule .title small{font-family:var(--font-sans);font-size:12px;color:var(--color-muted);font-weight:400}
+.rail{position:absolute;display:flex;flex-direction:column;gap:2px;padding:4px;border-radius:22px;z-index:5}
+.rail.right{right:14px;top:84px}
+.rail.left{left:14px;top:84px}
+.tool{width:44px;height:44px;display:grid;place-items:center;border-radius:13px;color:var(--color-fg);position:relative}
+.tool.on{background:color-mix(in srgb,var(--color-accent) 26%,transparent);color:#ffd99a}
+.tool .badge{position:absolute;top:3px;right:3px;min-width:16px;height:16px;border-radius:8px;background:var(--color-accent);color:#1a1422;font:700 10px/16px var(--font-sans);text-align:center;padding:0 4px}
+.cap{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-faint);text-align:center;padding:6px 0 2px}
+.sep{height:1px;background:var(--map-edge);margin:4px 6px}
+.zoom{position:absolute;right:14px;bottom:16px;display:flex;border-radius:16px;z-index:5}
+.zoom span{width:44px;height:40px;display:grid;place-items:center;color:var(--color-fg)}
+.zoom span+span{border-left:1px solid var(--map-edge)}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+svg.i.s{width:16px;height:16px}
+.token{position:absolute;border-radius:50%;display:grid;place-items:center;font:700 15px var(--font-sans);color:var(--color-fg);
+  background:radial-gradient(circle at 35% 30%,#3b4d72,#18243c 70%);border:2px solid var(--color-lead);box-shadow:0 2px 6px #000a;z-index:3}
+.token.enemy{background:radial-gradient(circle at 35% 30%,#7a3340,#3a1620 70%);border-color:#e08a7a}
+.token.ally{background:radial-gradient(circle at 35% 30%,#3e5e3a,#1b2c19 70%);border-color:#a9c48f}
+.token.mine{border-color:#ffd99a;box-shadow:0 0 0 3px color-mix(in srgb,var(--color-accent) 45%,transparent),0 2px 6px #000a}
+.token.sel{box-shadow:0 0 0 3px var(--select),0 0 14px color-mix(in srgb,var(--select) 70%,transparent)}
+.token.ghost{opacity:.55;border-style:dashed;box-shadow:none}
+.token.hidden{opacity:.55}
+.token.dim{filter:saturate(.4) brightness(.8)}
+.token .lbl{position:absolute;top:100%;margin-top:3px;left:50%;transform:translateX(-50%);white-space:nowrap;font:600 11.5px var(--font-sans);
+  background:color-mix(in srgb,var(--color-bg) 78%,transparent);padding:1px 7px;border-radius:8px;color:var(--color-fg)}
+.token .lbl.top{top:auto;bottom:100%;margin:0 0 3px}
+.token .tag{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--color-elevated);border:1px solid var(--map-edge);display:grid;place-items:center}
+.foot{position:absolute;border:2px solid color-mix(in srgb,var(--color-lead) 80%,transparent);background:color-mix(in srgb,var(--color-lead) 14%,transparent);border-radius:6px;z-index:2}
+.foot.target{border-color:#9fd28a;background:color-mix(in srgb,#9fd28a 22%,transparent)}
+.foot.bad{border-color:#e08a7a;background:color-mix(in srgb,#e08a7a 20%,transparent)}
+.menu{position:absolute;z-index:20;min-width:268px;padding:6px;border-radius:14px;background:color-mix(in srgb,var(--color-elevated) 96%,transparent);
+  border:1px solid var(--map-edge);box-shadow:0 10px 34px #000a;backdrop-filter:blur(16px)}
+.menu .hd{display:flex;justify-content:space-between;align-items:center;padding:6px 10px 8px;border-bottom:1px solid var(--map-edge);margin-bottom:4px}
+.menu .hd b{font-family:var(--font-display);font-size:17px;font-weight:600}
+.menu .hd span{font-size:11.5px;color:var(--color-muted)}
+.menu .grp{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-faint);padding:7px 10px 3px}
+.mi{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:9px;color:var(--color-fg);font-size:13.5px}
+.mi svg{color:var(--color-lead)}
+.mi kbd{margin-left:auto;font:600 10.5px var(--font-sans);color:var(--color-muted);border:1px solid var(--map-edge);border-radius:5px;padding:1px 5px}
+.mi .arr{margin-left:auto;color:var(--color-muted)}
+.mi.focus{background:color-mix(in srgb,var(--color-accent) 22%,transparent);outline:2px solid color-mix(in srgb,var(--color-accent) 70%,transparent);outline-offset:-2px}
+.mi.danger{color:#f0a49a}.mi.danger svg{color:#f0a49a}
+.mi.dis{color:var(--color-faint)}.mi.dis svg{color:var(--color-faint)}
+.mi small{color:var(--color-muted);font-size:11.5px;margin-left:auto}
+.msep{height:1px;background:var(--map-edge);margin:4px 6px}
+.note{position:absolute;z-index:6;max-width:300px;padding:10px 12px;border-radius:12px;font-size:12.5px;line-height:1.4;color:var(--color-fg);
+  background:color-mix(in srgb,#0c1424 88%,transparent);border:1px dashed color-mix(in srgb,var(--color-accent) 70%,transparent)}
+.note b{color:#ffd99a}
+.pointer{position:absolute;z-index:21;width:22px;height:22px}
+.toast{position:absolute;z-index:12;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:14px;font-size:13.5px}
+.toast button,.btn{font:600 13px var(--font-sans);color:#1a1422;background:var(--color-accent);border:0;border-radius:10px;padding:8px 12px}
+.btn.ghost{background:transparent;color:var(--color-fg);border:1px solid var(--map-edge)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12.5px;border:1px solid var(--map-edge);background:var(--map-panel)}
+.chip.on{background:color-mix(in srgb,var(--color-accent) 24%,transparent);border-color:color-mix(in srgb,var(--color-accent) 60%,transparent);color:#ffe0aa}
+.hud{position:absolute;z-index:6;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:8px 16px;border-radius:16px}
+.hud .r{font-family:var(--font-display);font-size:19px;font-weight:600;color:var(--color-lead)}
+
+  .panel{position:absolute;z-index:8;left:76px;top:84px;width:300px;padding:14px;border-radius:18px}
+  .panel h2{font-family:var(--font-display);font-size:21px;font-weight:600;margin:0 0 4px}
+  .panel p{margin:0 0 10px;color:var(--color-muted);font-size:12.5px}
+  .row{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--map-edge);font-size:13.5px}
+  .row .av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;background:radial-gradient(circle at 35% 30%,#3b4d72,#18243c 70%);border:2px solid var(--color-lead)}
+  .row small{margin-left:auto;color:var(--color-muted);font-size:11.5px}
+  .cb{width:18px;height:18px;border-radius:5px;background:var(--color-accent);display:grid;place-items:center;color:#1a1422}
+  .seg{display:flex;border:1px solid var(--map-edge);border-radius:12px;overflow:hidden;margin:10px 0}
+  .seg span{flex:1;text-align:center;padding:8px 0;font-size:13px;display:flex;gap:6px;justify-content:center;align-items:center}
+  .seg span.on{background:color-mix(in srgb,var(--color-accent) 26%,transparent);color:#ffe0aa}
+  .lab{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-faint);margin-top:10px}
+  .bar{position:absolute;z-index:9;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:6px;border-radius:18px}
+  .bar .cnt{white-space:nowrap;padding:0 12px 0 8px;font-weight:700;color:#bcd6ff;border-right:1px solid var(--map-edge);margin-right:4px;display:flex;align-items:center;gap:6px}
+  .bb{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:62px;padding:6px 6px;border-radius:12px;font-size:11.5px;color:var(--color-fg)}
+  .bb svg{color:var(--color-lead)}
+  .bb.on{background:color-mix(in srgb,var(--color-accent) 22%,transparent)}
+  .box{position:absolute;z-index:4;border:2px dashed var(--select);background:color-mix(in srgb,var(--select) 12%,transparent);border-radius:4px}
+  .hint{position:absolute;z-index:9;left:50%;top:76px;transform:translateX(-50%);padding:8px 14px;border-radius:14px;font-size:13px}</style></head><body><main class="page"><div class="caption"><h1>Place party and group commands</h1><p>four party tokens box-selected · cluster formation preview by the trapdoor · group command bar</p></div><div class="frame"><svg class="map" viewBox="0 0 1280 800" width="1280" height="800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#4a5a35"/><stop offset=".6" stop-color="#36452a"/><stop offset="1" stop-color="#1e2818"/></radialGradient>
+    <radialGradient id="v" cx="50%" cy="50%" r="70%"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+    <radialGradient id="fire"><stop offset="0" stop-color="#ffcf80" stop-opacity=".9"/><stop offset=".35" stop-color="#e0a04a" stop-opacity=".35"/><stop offset="1" stop-color="#e0a04a" stop-opacity="0"/></radialGradient>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#0b1018"/><line x1="0" y1="0" x2="0" y2="10" stroke="#1a2333" stroke-width="4"/></pattern>
+  </defs>
+  <rect width="1280" height="800" fill="url(#g)"/>
+  <rect width="1280" height="800" filter="url(#n)" fill="#000"/>
+  <path d="M-20 610 C 200 560, 320 470, 440 420 L 880 420 C 1000 400, 1120 300, 1300 260" stroke="#8a7350" stroke-width="58" fill="none" stroke-linecap="round" opacity=".9"/>
+  <path d="M-20 610 C 200 560, 320 470, 440 420 L 880 420 C 1000 400, 1120 300, 1300 260" stroke="#a48b62" stroke-width="40" fill="none" stroke-linecap="round" opacity=".55"/>
+  <path d="M1010 -10 C 980 120, 1050 220, 990 330 S 960 560, 1040 820" stroke="#2c5566" stroke-width="44" fill="none"/>
+  <path d="M1010 -10 C 980 120, 1050 220, 990 330 S 960 560, 1040 820" stroke="#3f7788" stroke-width="26" fill="none" opacity=".8"/>
+    <rect x="430" y="210" width="460" height="372" fill="#3d3b37"/>
+  ${flag}
+  <path d="M430 210 H 890 V 582 H 700 M 610 582 H 430 Z" fill="none" stroke="#24221f" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M430 400 H 600 M 660 400 H 720" stroke="#24221f" stroke-width="12"/>
+  <rect x="760" y="250" width="88" height="66" fill="#2a2724" stroke="#191715" stroke-width="3"/>
+  ${[0,1,2,3,4,5].map(i=>`<rect x="${762+i*14}" y="252" width="12" height="62" fill="${i%2?"#4c4843":"#3b3834"}"/>`).join("")}
+  <rect x="512" y="470" width="44" height="44" fill="#4b3622" stroke="#2a1d10" stroke-width="3"/><path d="M512 492h44M534 470v44" stroke="#2a1d10" stroke-width="2"/>
+  <circle cx="660" cy="300" r="120" fill="url(#fire)"/>
+  <circle cx="660" cy="300" r="12" fill="#ffb347"/><circle cx="660" cy="300" r="6" fill="#fff1c4"/>
+  ${[[300,300],[350,340],[1150,380],[1210,420]].map(([x,y])=>`<ellipse cx="${x}" cy="${y}" rx="26" ry="18" fill="#6e6b63" stroke="#4a4842" stroke-width="3"/>`).join("")}
+
+  
+  
+  <circle cx="94" cy="126" r="46" fill="#0d140b" opacity=".55"/><circle cx="90" cy="120" r="46" fill="#22361f"/><circle cx="78.5" cy="108.5" r="25.3" fill="#2f4a29"/><circle cx="154" cy="96" r="38" fill="#0d140b" opacity=".55"/><circle cx="150" cy="90" r="38" fill="#22361f"/><circle cx="140.5" cy="80.5" r="20.900000000000002" fill="#2f4a29"/><circle cx="64" cy="236" r="42" fill="#0d140b" opacity=".55"/><circle cx="60" cy="230" r="42" fill="#22361f"/><circle cx="49.5" cy="219.5" r="23.1" fill="#2f4a29"/><circle cx="204" cy="186" r="30" fill="#0d140b" opacity=".55"/><circle cx="200" cy="180" r="30" fill="#22361f"/><circle cx="192.5" cy="172.5" r="16.5" fill="#2f4a29"/><circle cx="1124" cy="656" r="48" fill="#0d140b" opacity=".55"/><circle cx="1120" cy="650" r="48" fill="#22361f"/><circle cx="1108" cy="638" r="26.400000000000002" fill="#2f4a29"/><circle cx="1194" cy="566" r="40" fill="#0d140b" opacity=".55"/><circle cx="1190" cy="560" r="40" fill="#22361f"/><circle cx="1180" cy="550" r="22" fill="#2f4a29"/><circle cx="1064" cy="726" r="36" fill="#0d140b" opacity=".55"/><circle cx="1060" cy="720" r="36" fill="#22361f"/><circle cx="1051" cy="711" r="19.8" fill="#2f4a29"/><circle cx="244" cy="696" r="44" fill="#0d140b" opacity=".55"/><circle cx="240" cy="690" r="44" fill="#22361f"/><circle cx="229" cy="679" r="24.200000000000003" fill="#2f4a29"/><circle cx="164" cy="626" r="36" fill="#0d140b" opacity=".55"/><circle cx="160" cy="620" r="36" fill="#22361f"/><circle cx="151" cy="611" r="19.8" fill="#2f4a29"/><circle cx="334" cy="746" r="30" fill="#0d140b" opacity=".55"/><circle cx="330" cy="740" r="30" fill="#22361f"/><circle cx="322.5" cy="732.5" r="16.5" fill="#2f4a29"/><circle cx="984" cy="96" r="40" fill="#0d140b" opacity=".55"/><circle cx="980" cy="90" r="40" fill="#22361f"/><circle cx="970" cy="80" r="22" fill="#2f4a29"/><circle cx="1064" cy="146" r="34" fill="#0d140b" opacity=".55"/><circle cx="1060" cy="140" r="34" fill="#22361f"/><circle cx="1051.5" cy="131.5" r="18.700000000000003" fill="#2f4a29"/><circle cx="1184" cy="96" r="46" fill="#0d140b" opacity=".55"/><circle cx="1180" cy="90" r="46" fill="#22361f"/><circle cx="1168.5" cy="78.5" r="25.3" fill="#2f4a29"/>
+  
+  <g stroke="#f6f1e6" stroke-opacity="0.32" stroke-width="1"><line x1="0" y1="0" x2="0" y2="800"/><line x1="44" y1="0" x2="44" y2="800"/><line x1="88" y1="0" x2="88" y2="800"/><line x1="132" y1="0" x2="132" y2="800"/><line x1="176" y1="0" x2="176" y2="800"/><line x1="220" y1="0" x2="220" y2="800"/><line x1="264" y1="0" x2="264" y2="800"/><line x1="308" y1="0" x2="308" y2="800"/><line x1="352" y1="0" x2="352" y2="800"/><line x1="396" y1="0" x2="396" y2="800"/><line x1="440" y1="0" x2="440" y2="800"/><line x1="484" y1="0" x2="484" y2="800"/><line x1="528" y1="0" x2="528" y2="800"/><line x1="572" y1="0" x2="572" y2="800"/><line x1="616" y1="0" x2="616" y2="800"/><line x1="660" y1="0" x2="660" y2="800"/><line x1="704" y1="0" x2="704" y2="800"/><line x1="748" y1="0" x2="748" y2="800"/><line x1="792" y1="0" x2="792" y2="800"/><line x1="836" y1="0" x2="836" y2="800"/><line x1="880" y1="0" x2="880" y2="800"/><line x1="924" y1="0" x2="924" y2="800"/><line x1="968" y1="0" x2="968" y2="800"/><line x1="1012" y1="0" x2="1012" y2="800"/><line x1="1056" y1="0" x2="1056" y2="800"/><line x1="1100" y1="0" x2="1100" y2="800"/><line x1="1144" y1="0" x2="1144" y2="800"/><line x1="1188" y1="0" x2="1188" y2="800"/><line x1="1232" y1="0" x2="1232" y2="800"/><line x1="1276" y1="0" x2="1276" y2="800"/><line x1="0" y1="0" x2="1280" y2="0"/><line x1="0" y1="44" x2="1280" y2="44"/><line x1="0" y1="88" x2="1280" y2="88"/><line x1="0" y1="132" x2="1280" y2="132"/><line x1="0" y1="176" x2="1280" y2="176"/><line x1="0" y1="220" x2="1280" y2="220"/><line x1="0" y1="264" x2="1280" y2="264"/><line x1="0" y1="308" x2="1280" y2="308"/><line x1="0" y1="352" x2="1280" y2="352"/><line x1="0" y1="396" x2="1280" y2="396"/><line x1="0" y1="440" x2="1280" y2="440"/><line x1="0" y1="484" x2="1280" y2="484"/><line x1="0" y1="528" x2="1280" y2="528"/><line x1="0" y1="572" x2="1280" y2="572"/><line x1="0" y1="616" x2="1280" y2="616"/><line x1="0" y1="660" x2="1280" y2="660"/><line x1="0" y1="704" x2="1280" y2="704"/><line x1="0" y1="748" x2="1280" y2="748"/><line x1="0" y1="792" x2="1280" y2="792"/></g>
+  <rect width="1280" height="800" fill="url(#v)"/>
+</svg>
+    <div class="box" style="left:510.4px;top:294.8px;width:127.6px;height:121px"></div>
+    <div class="token sel" style="left:532px;top:312px;width:36px;height:36px;font-size:13px">M<span class="lbl top">Mira</span></div><div class="token sel" style="left:576px;top:312px;width:36px;height:36px;font-size:13px">T<span class="lbl top">Torvald</span></div><div class="token sel" style="left:532px;top:356px;width:36px;height:36px;font-size:13px">S<span class="lbl">Sela</span></div><div class="token sel" style="left:576px;top:356px;width:36px;height:36px;font-size:13px">B<span class="lbl">Bram</span></div><div class="token enemy " style="left:752px;top:400px;width:80px;height:80px;font-size:29px">O<span class="lbl">Ogre</span></div><div class="token enemy" style="left:708px;top:268px;width:36px;height:36px;font-size:13px">g<span class="lbl">Goblin 1</span></div><div class="token enemy" style="left:796px;top:268px;width:36px;height:36px;font-size:13px">g<span class="lbl">Goblin 2</span></div><div class="foot target" style="left:573px;top:485px;width:42px;height:42px"></div><div class="token ghost" style="left:576px;top:488px;width:36px;height:36px;font-size:13px">M</div><div class="foot target" style="left:617px;top:485px;width:42px;height:42px"></div><div class="token ghost" style="left:620px;top:488px;width:36px;height:36px;font-size:13px">T</div><div class="foot target" style="left:573px;top:529px;width:42px;height:42px"></div><div class="token ghost" style="left:576px;top:532px;width:36px;height:36px;font-size:13px">S</div><div class="foot target" style="left:617px;top:529px;width:42px;height:42px"></div><div class="token ghost" style="left:620px;top:532px;width:36px;height:36px;font-size:13px">B</div><div class="capsule glass"><span class="back"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></span><span class="title">The Old Keep <small>Testville</small> <svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div><div class="rail left glass"><div class="cap">Place</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.3a3.2 3.2 0 0 1 0 6.2M21 20a6 6 0 0 0-4-5.6"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M3 20h11V3L6 5v15"/><circle cx="10" cy="12" r=".6"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l2-5h14l2 5M4 9v11h16V9M3 9h18M9 20v-6h6v6"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><div class="sep"></div><div class="cap">Reveal</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9.1 14.9l-4 1.1L3 21l5-2.1 1.1-4z"/><path d="M21 3L10 14l-1.5-1.5L19.5 1.5z" transform="translate(0 1)"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.3 1 2.2h5.2c0-.9.4-1.7 1-2.2A6 6 0 0 0 12 3z"/></svg></span><div class="sep"></div><div class="cap">Combat</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span></div><div class="rail right glass"><div class="cap">Move</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8l-1.6-1.6a2 2 0 0 0-2.8 2.8L6 19.5A6 6 0 0 0 10.2 21H14a6 6 0 0 0 6-6v-3a2 2 0 0 0-4 0"/></svg></span><span class="tool on"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l16 7-7 2-2 7z"/></svg></span><div class="sep"></div><div class="cap">Play</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg></span><div class="sep"></div><div class="cap">Table</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"/><path d="M18 3v6M15 6h6"/></svg></span><span class="tool"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg><span class="badge">3</span></span><div class="sep"></div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></span></div><div class="zoom glass"><span><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></span><span><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span></div>
+    <svg class="pointer" style="left:622px;top:532px" viewBox="0 0 24 24"><path d="M3 2l17 8-7.5 2.2L10 20z" fill="#fff" stroke="#111" stroke-width="1.5"/></svg><section class="panel glass" role="dialog" aria-label="Place party">
+    <h2>Place party</h2><p>Ghosts follow the pointer and snap square by square. Click once to place. One action, with Undo.</p>
+    <div class="row"><span class="cb"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span><span class="av">M</span>Mira<small>on map · will move</small></div><div class="row"><span class="cb"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span><span class="av">T</span>Torvald<small>on map · will move</small></div><div class="row"><span class="cb"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span><span class="av">S</span>Sela<small>on map · will move</small></div><div class="row"><span class="cb"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span><span class="av">B</span>Bram<small>on map · will move</small></div>
+    <div class="row" style="opacity:.6"><span class="cb" style="background:transparent;border:1px solid var(--map-edge)"></span><span class="av">K</span>Kett<small>Group B · Forest</small></div>
+    <div class="lab">Formation</div>
+    <div class="seg"><span class="on"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="7" r="2.2"/><circle cx="12" cy="13" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="19" r="2.2"/></svg> Cluster</span><span><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7M15 6h6"/></svg> Line</span><span><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Circle</span></div>
+    <div class="row" style="border:0">Spacing<small>0 squares · Alt+wheel</small></div>
+    <div class="row" style="border:0">Rotate<small>R</small></div>
+    <div class="row" style="border:0"><span class="cb"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Make this the party's default</div>
+  </section><div class="bar glass" role="toolbar" aria-label="4 tokens selected">
+    <span class="cnt"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /></svg> 4 selected</span>
+    <span class="bb on"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="7" r="2.2"/><circle cx="12" cy="13" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="19" r="2.2"/></svg>Place</span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/></svg>Move</span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.9 9.9 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>Hide</span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Lock</span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"/><path d="M18 3v6M15 6h6"/></svg>Initiative</span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v6h6M20 10V4h-6M4 20l7-7M20 4l-7 7"/></svg>Size</span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h12M12 6l6 6-6 6"/><path d="M20 4v16"/></svg>Send to</span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.3a3.2 3.2 0 0 1 0 6.2M21 20a6 6 0 0 0-4-5.6"/></svg>Movement<small style="color:var(--color-muted)">Auto ▾</small></span>
+    <span class="bb"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>Clear</span></div>
+    <div class="hint glass">Placing 4 at column 14, row 12 · cluster · all squares free · <b style="color:#ffd99a">Click to place</b> · Esc cancels</div>
+    <div class="note" style="left:660px;top:600px;width:300px"><b>Multi-select:</b> Shift+drag draws a box (a plain drag still pans), Shift-click toggles, Ctrl/⌘+A selects all visible. <b>Phones:</b> a Select toggle in the bar makes taps toggle tokens.</div>
+    <div class="note" style="left:960px;top:470px;width:230px">Each bar action is <b>one</b> authoritative command (<code>map-tokens-place</code> / <code>map-tokens-edit</code> / <code>map-token-move</code>) with before-states and an idempotent ID.</div></div></main></body></html>

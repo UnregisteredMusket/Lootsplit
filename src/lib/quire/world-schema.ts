@@ -4,7 +4,8 @@ import { mapCombatBindingSchema } from "./map-combat-schema.ts";
 import { connectedMapSchema } from "./connected-maps-schema.ts";
 import { artworkSchema } from "./artwork.ts";
 import { npcBarterConfigSchema, npcBarterStateSchema } from "./npc-barter-schema.ts";
-import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tokenTabletopFields } from "./tabletop-schema.ts";
+import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tile, tokenTabletopFields } from "./tabletop-schema.ts";
+import { tokenFootprint } from "./tabletop-geometry.ts";
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
 const copper = z.number().int().min(0).max(1e12);
@@ -161,6 +162,8 @@ export const mapTokenSchema = z
       ctx.addIssue({ code: "custom", message: "Choose an existing character or ship." });
     if (t.kind === "creature" && (!t.encounterId || !t.combatantId))
       ctx.addIssue({ code: "custom", message: "Choose an encounter combatant." });
+    if (tokenFootprint(t) > 1 && t.anchor !== "corner")
+      ctx.addIssue({ code: "custom", message: "A token wider than one square is placed by its top-left square." });
   });
 export const campaignMapSchema = z
   .object({
@@ -526,6 +529,56 @@ export const worldCommands = [
     tokenId: id,
     before: mapTokenSchema.nullable(),
     token: mapTokenSchema.nullable(),
+  }),
+  /**
+   * Group placement (map tokens PR 3): place or move several tokens on one map in one DM action
+   * (Place party, formations, Send to map), optionally removing tokens from other maps in the same
+   * action. Every token's before-state is checked; new tokens have `before: null`.
+   */
+  z.object({
+    id,
+    kind: z.literal("map-tokens-place"),
+    mapId: id,
+    grid: mapGridSchema,
+    place: z
+      .array(z.object({ tokenId: id, before: mapTokenSchema.nullable(), token: mapTokenSchema }).strict())
+      .max(50),
+    remove: z
+      .array(z.object({ mapId: id, grid: mapGridSchema, tokenId: id, before: mapTokenSchema }).strict())
+      .max(50)
+      .optional(),
+  }),
+  /**
+   * A character's token follows the player's map view (map tokens PR 7): the token leaves the map
+   * it was on and arrives on the map being viewed, in one command. Only when the DM turned
+   * following on, for a character the seat controls, onto a shared gridded map in the
+   * character's zone (or the map with the party marker while travelling), never during combat on
+   * either map, with movement on and the character unlocked on both. An existing token on the
+   * destination is used.
+   */
+  z
+    .object({
+      id,
+      kind: z.literal("map-token-follow"),
+      mapId: id,
+      grid: z.string().max(1000),
+      purseId: id,
+      fromMapId: id.nullable(),
+      beforeFrom: mapTokenSchema.nullable(),
+      beforeTo: mapTokenSchema.nullable(),
+      tokenId: id,
+      at: tile,
+    })
+    .strict(),
+  /** Group commands (map tokens PR 3): hide/show, lock, size, controllers, initiative links. */
+  z.object({
+    id,
+    kind: z.literal("map-tokens-edit"),
+    mapId: id,
+    edits: z
+      .array(z.object({ tokenId: id, before: mapTokenSchema, token: mapTokenSchema }).strict())
+      .min(1)
+      .max(100),
   }),
   z.object({
     id,

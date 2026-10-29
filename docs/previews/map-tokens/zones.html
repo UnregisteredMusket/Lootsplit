@@ -1,0 +1,229 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Map zones editor</title><style>
+:root{
+  --color-bg:#0c1424;--color-elevated:#18243c;--color-subtle:#1c2c4c;--color-border:#3a4d72;
+  --color-lead:#c8a96b;--color-fg:#f6f1e6;--color-muted:#cbbfae;--color-faint:#8e8798;
+  --color-accent:#e0a04a;--color-danger:#9a3044;--color-positive:#7d9a6a;--color-negative:#c46a62;
+  --font-display:"Cormorant Garamond","Source Serif 4",Palatino,"Palatino Linotype",serif;
+  --font-sans:"Source Sans 3","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --map-panel:color-mix(in srgb,var(--color-elevated) 92%,transparent);
+  --map-edge:color-mix(in srgb,var(--color-fg) 16%,transparent);
+  --map-shadow:0 3px 15px #0003;
+  --select:#4d8fe0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(--font-sans);font-size:14px}
+.page{padding:24px 0 32px}
+.caption{max-width:1232px;margin:0 auto 10px;padding:0 24px;display:flex;gap:12px;align-items:baseline}
+.caption h1{font-family:var(--font-display);font-weight:600;font-size:26px;margin:0;color:var(--color-lead)}
+.caption p{margin:0;color:var(--color-muted);font-size:13px}
+.frame{position:relative;width:1280px;height:800px;overflow:hidden;margin:0 auto 28px;border-top:1px solid var(--map-edge);border-bottom:1px solid var(--map-edge)}
+.frame.short{height:720px}
+.map{position:absolute;inset:0}
+.glass{background:var(--map-panel);color:var(--color-fg);border:1px solid var(--map-edge);border-radius:18px;box-shadow:var(--map-shadow);backdrop-filter:blur(14px)}
+.capsule{position:absolute;top:14px;left:14px;display:flex;align-items:center;height:46px;border-radius:16px;z-index:5}
+.capsule .back{width:44px;height:44px;display:grid;place-items:center;border-right:1px solid var(--map-edge)}
+.capsule .title{font-family:var(--font-display);font-size:21px;font-weight:600;padding:0 14px 0 12px;display:flex;align-items:center;gap:8px}
+.capsule .title small{font-family:var(--font-sans);font-size:12px;color:var(--color-muted);font-weight:400}
+.rail{position:absolute;display:flex;flex-direction:column;gap:2px;padding:4px;border-radius:22px;z-index:5}
+.rail.right{right:14px;top:84px}
+.rail.left{left:14px;top:84px}
+.tool{width:44px;height:44px;display:grid;place-items:center;border-radius:13px;color:var(--color-fg);position:relative}
+.tool.on{background:color-mix(in srgb,var(--color-accent) 26%,transparent);color:#ffd99a}
+.tool .badge{position:absolute;top:3px;right:3px;min-width:16px;height:16px;border-radius:8px;background:var(--color-accent);color:#1a1422;font:700 10px/16px var(--font-sans);text-align:center;padding:0 4px}
+.cap{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-faint);text-align:center;padding:6px 0 2px}
+.sep{height:1px;background:var(--map-edge);margin:4px 6px}
+.zoom{position:absolute;right:14px;bottom:16px;display:flex;border-radius:16px;z-index:5}
+.zoom span{width:44px;height:40px;display:grid;place-items:center;color:var(--color-fg)}
+.zoom span+span{border-left:1px solid var(--map-edge)}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+svg.i.s{width:16px;height:16px}
+.token{position:absolute;border-radius:50%;display:grid;place-items:center;font:700 15px var(--font-sans);color:var(--color-fg);
+  background:radial-gradient(circle at 35% 30%,#3b4d72,#18243c 70%);border:2px solid var(--color-lead);box-shadow:0 2px 6px #000a;z-index:3}
+.token.enemy{background:radial-gradient(circle at 35% 30%,#7a3340,#3a1620 70%);border-color:#e08a7a}
+.token.ally{background:radial-gradient(circle at 35% 30%,#3e5e3a,#1b2c19 70%);border-color:#a9c48f}
+.token.mine{border-color:#ffd99a;box-shadow:0 0 0 3px color-mix(in srgb,var(--color-accent) 45%,transparent),0 2px 6px #000a}
+.token.sel{box-shadow:0 0 0 3px var(--select),0 0 14px color-mix(in srgb,var(--select) 70%,transparent)}
+.token.ghost{opacity:.55;border-style:dashed;box-shadow:none}
+.token.hidden{opacity:.55}
+.token.dim{filter:saturate(.4) brightness(.8)}
+.token .lbl{position:absolute;top:100%;margin-top:3px;left:50%;transform:translateX(-50%);white-space:nowrap;font:600 11.5px var(--font-sans);
+  background:color-mix(in srgb,var(--color-bg) 78%,transparent);padding:1px 7px;border-radius:8px;color:var(--color-fg)}
+.token .lbl.top{top:auto;bottom:100%;margin:0 0 3px}
+.token .tag{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--color-elevated);border:1px solid var(--map-edge);display:grid;place-items:center}
+.foot{position:absolute;border:2px solid color-mix(in srgb,var(--color-lead) 80%,transparent);background:color-mix(in srgb,var(--color-lead) 14%,transparent);border-radius:6px;z-index:2}
+.foot.target{border-color:#9fd28a;background:color-mix(in srgb,#9fd28a 22%,transparent)}
+.foot.bad{border-color:#e08a7a;background:color-mix(in srgb,#e08a7a 20%,transparent)}
+.menu{position:absolute;z-index:20;min-width:268px;padding:6px;border-radius:14px;background:color-mix(in srgb,var(--color-elevated) 96%,transparent);
+  border:1px solid var(--map-edge);box-shadow:0 10px 34px #000a;backdrop-filter:blur(16px)}
+.menu .hd{display:flex;justify-content:space-between;align-items:center;padding:6px 10px 8px;border-bottom:1px solid var(--map-edge);margin-bottom:4px}
+.menu .hd b{font-family:var(--font-display);font-size:17px;font-weight:600}
+.menu .hd span{font-size:11.5px;color:var(--color-muted)}
+.menu .grp{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-faint);padding:7px 10px 3px}
+.mi{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:9px;color:var(--color-fg);font-size:13.5px}
+.mi svg{color:var(--color-lead)}
+.mi kbd{margin-left:auto;font:600 10.5px var(--font-sans);color:var(--color-muted);border:1px solid var(--map-edge);border-radius:5px;padding:1px 5px}
+.mi .arr{margin-left:auto;color:var(--color-muted)}
+.mi.focus{background:color-mix(in srgb,var(--color-accent) 22%,transparent);outline:2px solid color-mix(in srgb,var(--color-accent) 70%,transparent);outline-offset:-2px}
+.mi.danger{color:#f0a49a}.mi.danger svg{color:#f0a49a}
+.mi.dis{color:var(--color-faint)}.mi.dis svg{color:var(--color-faint)}
+.mi small{color:var(--color-muted);font-size:11.5px;margin-left:auto}
+.msep{height:1px;background:var(--map-edge);margin:4px 6px}
+.note{position:absolute;z-index:6;max-width:300px;padding:10px 12px;border-radius:12px;font-size:12.5px;line-height:1.4;color:var(--color-fg);
+  background:color-mix(in srgb,#0c1424 88%,transparent);border:1px dashed color-mix(in srgb,var(--color-accent) 70%,transparent)}
+.note b{color:#ffd99a}
+.pointer{position:absolute;z-index:21;width:22px;height:22px}
+.toast{position:absolute;z-index:12;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:14px;font-size:13.5px}
+.toast button,.btn{font:600 13px var(--font-sans);color:#1a1422;background:var(--color-accent);border:0;border-radius:10px;padding:8px 12px}
+.btn.ghost{background:transparent;color:var(--color-fg);border:1px solid var(--map-edge)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12.5px;border:1px solid var(--map-edge);background:var(--map-panel)}
+.chip.on{background:color-mix(in srgb,var(--color-accent) 24%,transparent);border-color:color-mix(in srgb,var(--color-accent) 60%,transparent);color:#ffe0aa}
+.hud{position:absolute;z-index:6;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:8px 16px;border-radius:16px}
+.hud .r{font-family:var(--font-display);font-size:19px;font-weight:600;color:var(--color-lead)}
+
+  .scrim{position:absolute;inset:0;background:#0009;z-index:15}
+  .zed{position:absolute;z-index:20;left:50%;top:50%;transform:translate(-50%,-50%);width:1060px;height:820px;display:grid;grid-template-columns:300px 1fr;border-radius:20px;overflow:hidden;background:color-mix(in srgb,var(--color-elevated) 98%,transparent);border:1px solid var(--map-edge);box-shadow:0 18px 60px #000c}
+  .zl{border-right:1px solid var(--map-edge);padding:18px;background:color-mix(in srgb,var(--color-bg) 40%,var(--color-elevated))}
+  .zl h2,.zr h2{font-family:var(--font-display);font-size:26px;margin:0 0 4px;font-weight:600}
+  .zl p{color:var(--color-muted);font-size:12.5px;margin:0 0 14px;line-height:1.45}
+  .zi{padding:10px 12px;border-radius:12px;margin-bottom:6px;border:1px solid transparent}
+  .zi b{display:block;font-size:14.5px}.zi small{color:var(--color-muted);font-size:12px}
+  .zi.on{background:color-mix(in srgb,var(--color-accent) 18%,transparent);border-color:color-mix(in srgb,var(--color-accent) 60%,transparent)}
+  .zr{padding:20px 22px;overflow:hidden}
+  .zr .sub{color:var(--color-muted);font-size:13px;margin:0 0 14px}
+  .mrow{display:grid;grid-template-columns:28px 1fr 190px 110px;gap:10px;align-items:center;padding:9px 10px;border-radius:12px;border:1px solid var(--map-edge);margin-bottom:6px;font-size:13.5px;background:var(--color-subtle)}
+  .mrow small{color:var(--color-muted);font-size:12px}
+  .tagx{font:700 10.5px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;padding:3px 7px;border-radius:6px;border:1px solid var(--map-edge);color:var(--color-muted);justify-self:start}
+  .tagx.added{color:#ffe0aa;border-color:#e0a04a88}
+  .h3{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-faint);margin:16px 0 8px}
+  .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .rule{padding:10px 12px;border-radius:12px;border:1px dashed var(--map-edge);font-size:12.5px;line-height:1.45;color:var(--color-muted)}
+  .rule b{color:var(--color-fg);display:block;margin-bottom:2px}
+  .foot2{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+  .sets{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px}
+  .sets label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--color-muted)}
+  .sets small{font-size:11.5px;color:var(--color-faint)}
+  .sel2{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:10px;border:1px solid var(--map-edge);background:var(--color-subtle);color:var(--color-fg);font-size:13.5px}
+  .tg2{display:inline-block;width:40px;height:24px;border-radius:12px;background:var(--color-accent);position:relative}
+  .tg2::after{content:"";position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#1a1422}
+  .tg2.off{background:#3a4d72}.tg2.off::after{left:3px;right:auto;background:#cbbfae}
+  .zed .mrow{padding:7px 10px;margin-bottom:5px}
+  .wide{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--color-muted);margin-top:10px}
+  .wide small{font-size:11.5px;color:var(--color-faint)}
+  .seg2{display:flex;border:1px solid var(--map-edge);border-radius:10px;overflow:hidden}
+  .seg2>span{flex:1;text-align:center;padding:7px 4px;font-size:12.5px;color:var(--color-fg);border-right:1px solid var(--map-edge);display:flex;flex-direction:column;justify-content:center}
+  .seg2>span:last-child{border-right:0}
+  .seg2 small{font-size:10.5px;color:var(--color-muted)}
+  .seg2 .on{background:color-mix(in srgb,var(--color-accent) 26%,transparent);color:#ffe0aa;font-weight:600}
+  .frame.tall{height:860px}
+  .cards{position:absolute;inset:60px 90px 40px 90px;z-index:20;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;align-content:start}
+  .card{border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+  .card .who{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-faint)}
+  .card h3{margin:0;font-family:var(--font-display);font-size:22px;font-weight:600}
+  .card p{margin:0;color:var(--color-muted);font-size:13px;line-height:1.45}
+  .tally{display:flex;gap:6px;align-items:center;font-size:12.5px}
+  .tally i{width:22px;height:8px;border-radius:4px;background:#3a4d72;display:inline-block}
+  .tally i.y{background:#9fd28a}.tally i.n{background:#e08a7a}
+  .row2{display:flex;gap:8px;align-items:center;margin-top:4px}
+  .timer{margin-left:auto;font:600 12.5px var(--font-sans);color:#ffd99a;display:flex;gap:6px;align-items:center}</style></head><body><main class="page"><div class="caption"><h1>DM zones editor</h1><p>Testville zone (City-Testville + The Commons + an added sewer map); the forest is an adjacent Wilderness zone; zone settings set travel rules</p></div><div class="frame tall"><svg class="map" viewBox="0 0 1280 800" width="1280" height="800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#4a5a35"/><stop offset=".6" stop-color="#36452a"/><stop offset="1" stop-color="#1e2818"/></radialGradient>
+    <radialGradient id="v" cx="50%" cy="50%" r="70%"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+    <radialGradient id="fire"><stop offset="0" stop-color="#ffcf80" stop-opacity=".9"/><stop offset=".35" stop-color="#e0a04a" stop-opacity=".35"/><stop offset="1" stop-color="#e0a04a" stop-opacity="0"/></radialGradient>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#0b1018"/><line x1="0" y1="0" x2="0" y2="10" stroke="#1a2333" stroke-width="4"/></pattern>
+  </defs>
+  <rect width="1280" height="800" fill="url(#g)"/>
+  <rect width="1280" height="800" filter="url(#n)" fill="#000"/>
+  <path d="M-20 610 C 200 560, 320 470, 440 420 L 880 420 C 1000 400, 1120 300, 1300 260" stroke="#8a7350" stroke-width="58" fill="none" stroke-linecap="round" opacity=".9"/>
+  <path d="M-20 610 C 200 560, 320 470, 440 420 L 880 420 C 1000 400, 1120 300, 1300 260" stroke="#a48b62" stroke-width="40" fill="none" stroke-linecap="round" opacity=".55"/>
+  <path d="M1010 -10 C 980 120, 1050 220, 990 330 S 960 560, 1040 820" stroke="#2c5566" stroke-width="44" fill="none"/>
+  <path d="M1010 -10 C 980 120, 1050 220, 990 330 S 960 560, 1040 820" stroke="#3f7788" stroke-width="26" fill="none" opacity=".8"/>
+    <rect x="430" y="210" width="460" height="372" fill="#3d3b37"/>
+  ${flag}
+  <path d="M430 210 H 890 V 582 H 700 M 610 582 H 430 Z" fill="none" stroke="#24221f" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M430 400 H 600 M 660 400 H 720" stroke="#24221f" stroke-width="12"/>
+  <rect x="760" y="250" width="88" height="66" fill="#2a2724" stroke="#191715" stroke-width="3"/>
+  ${[0,1,2,3,4,5].map(i=>`<rect x="${762+i*14}" y="252" width="12" height="62" fill="${i%2?"#4c4843":"#3b3834"}"/>`).join("")}
+  <rect x="512" y="470" width="44" height="44" fill="#4b3622" stroke="#2a1d10" stroke-width="3"/><path d="M512 492h44M534 470v44" stroke="#2a1d10" stroke-width="2"/>
+  <circle cx="660" cy="300" r="120" fill="url(#fire)"/>
+  <circle cx="660" cy="300" r="12" fill="#ffb347"/><circle cx="660" cy="300" r="6" fill="#fff1c4"/>
+  ${[[300,300],[350,340],[1150,380],[1210,420]].map(([x,y])=>`<ellipse cx="${x}" cy="${y}" rx="26" ry="18" fill="#6e6b63" stroke="#4a4842" stroke-width="3"/>`).join("")}
+
+  
+  
+  <circle cx="94" cy="126" r="46" fill="#0d140b" opacity=".55"/><circle cx="90" cy="120" r="46" fill="#22361f"/><circle cx="78.5" cy="108.5" r="25.3" fill="#2f4a29"/><circle cx="154" cy="96" r="38" fill="#0d140b" opacity=".55"/><circle cx="150" cy="90" r="38" fill="#22361f"/><circle cx="140.5" cy="80.5" r="20.900000000000002" fill="#2f4a29"/><circle cx="64" cy="236" r="42" fill="#0d140b" opacity=".55"/><circle cx="60" cy="230" r="42" fill="#22361f"/><circle cx="49.5" cy="219.5" r="23.1" fill="#2f4a29"/><circle cx="204" cy="186" r="30" fill="#0d140b" opacity=".55"/><circle cx="200" cy="180" r="30" fill="#22361f"/><circle cx="192.5" cy="172.5" r="16.5" fill="#2f4a29"/><circle cx="1124" cy="656" r="48" fill="#0d140b" opacity=".55"/><circle cx="1120" cy="650" r="48" fill="#22361f"/><circle cx="1108" cy="638" r="26.400000000000002" fill="#2f4a29"/><circle cx="1194" cy="566" r="40" fill="#0d140b" opacity=".55"/><circle cx="1190" cy="560" r="40" fill="#22361f"/><circle cx="1180" cy="550" r="22" fill="#2f4a29"/><circle cx="1064" cy="726" r="36" fill="#0d140b" opacity=".55"/><circle cx="1060" cy="720" r="36" fill="#22361f"/><circle cx="1051" cy="711" r="19.8" fill="#2f4a29"/><circle cx="244" cy="696" r="44" fill="#0d140b" opacity=".55"/><circle cx="240" cy="690" r="44" fill="#22361f"/><circle cx="229" cy="679" r="24.200000000000003" fill="#2f4a29"/><circle cx="164" cy="626" r="36" fill="#0d140b" opacity=".55"/><circle cx="160" cy="620" r="36" fill="#22361f"/><circle cx="151" cy="611" r="19.8" fill="#2f4a29"/><circle cx="334" cy="746" r="30" fill="#0d140b" opacity=".55"/><circle cx="330" cy="740" r="30" fill="#22361f"/><circle cx="322.5" cy="732.5" r="16.5" fill="#2f4a29"/><circle cx="984" cy="96" r="40" fill="#0d140b" opacity=".55"/><circle cx="980" cy="90" r="40" fill="#22361f"/><circle cx="970" cy="80" r="22" fill="#2f4a29"/><circle cx="1064" cy="146" r="34" fill="#0d140b" opacity=".55"/><circle cx="1060" cy="140" r="34" fill="#22361f"/><circle cx="1051.5" cy="131.5" r="18.700000000000003" fill="#2f4a29"/><circle cx="1184" cy="96" r="46" fill="#0d140b" opacity=".55"/><circle cx="1180" cy="90" r="46" fill="#22361f"/><circle cx="1168.5" cy="78.5" r="25.3" fill="#2f4a29"/>
+  
+  <g stroke="#f6f1e6" stroke-opacity="0.32" stroke-width="1"><line x1="0" y1="0" x2="0" y2="800"/><line x1="44" y1="0" x2="44" y2="800"/><line x1="88" y1="0" x2="88" y2="800"/><line x1="132" y1="0" x2="132" y2="800"/><line x1="176" y1="0" x2="176" y2="800"/><line x1="220" y1="0" x2="220" y2="800"/><line x1="264" y1="0" x2="264" y2="800"/><line x1="308" y1="0" x2="308" y2="800"/><line x1="352" y1="0" x2="352" y2="800"/><line x1="396" y1="0" x2="396" y2="800"/><line x1="440" y1="0" x2="440" y2="800"/><line x1="484" y1="0" x2="484" y2="800"/><line x1="528" y1="0" x2="528" y2="800"/><line x1="572" y1="0" x2="572" y2="800"/><line x1="616" y1="0" x2="616" y2="800"/><line x1="660" y1="0" x2="660" y2="800"/><line x1="704" y1="0" x2="704" y2="800"/><line x1="748" y1="0" x2="748" y2="800"/><line x1="792" y1="0" x2="792" y2="800"/><line x1="836" y1="0" x2="836" y2="800"/><line x1="880" y1="0" x2="880" y2="800"/><line x1="924" y1="0" x2="924" y2="800"/><line x1="968" y1="0" x2="968" y2="800"/><line x1="1012" y1="0" x2="1012" y2="800"/><line x1="1056" y1="0" x2="1056" y2="800"/><line x1="1100" y1="0" x2="1100" y2="800"/><line x1="1144" y1="0" x2="1144" y2="800"/><line x1="1188" y1="0" x2="1188" y2="800"/><line x1="1232" y1="0" x2="1232" y2="800"/><line x1="1276" y1="0" x2="1276" y2="800"/><line x1="0" y1="0" x2="1280" y2="0"/><line x1="0" y1="44" x2="1280" y2="44"/><line x1="0" y1="88" x2="1280" y2="88"/><line x1="0" y1="132" x2="1280" y2="132"/><line x1="0" y1="176" x2="1280" y2="176"/><line x1="0" y1="220" x2="1280" y2="220"/><line x1="0" y1="264" x2="1280" y2="264"/><line x1="0" y1="308" x2="1280" y2="308"/><line x1="0" y1="352" x2="1280" y2="352"/><line x1="0" y1="396" x2="1280" y2="396"/><line x1="0" y1="440" x2="1280" y2="440"/><line x1="0" y1="484" x2="1280" y2="484"/><line x1="0" y1="528" x2="1280" y2="528"/><line x1="0" y1="572" x2="1280" y2="572"/><line x1="0" y1="616" x2="1280" y2="616"/><line x1="0" y1="660" x2="1280" y2="660"/><line x1="0" y1="704" x2="1280" y2="704"/><line x1="0" y1="748" x2="1280" y2="748"/><line x1="0" y1="792" x2="1280" y2="792"/></g>
+  <rect width="1280" height="800" fill="url(#v)"/>
+</svg><div class="token " style="left:532px;top:312px;width:36px;height:36px;font-size:13px">M<span class="lbl top">Mira</span></div><div class="token " style="left:576px;top:312px;width:36px;height:36px;font-size:13px">T<span class="lbl top">Torvald</span></div><div class="token " style="left:532px;top:356px;width:36px;height:36px;font-size:13px">S<span class="lbl">Sela</span></div><div class="token " style="left:576px;top:356px;width:36px;height:36px;font-size:13px">B<span class="lbl">Bram</span></div><div class="capsule glass"><span class="back"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></span><span class="title">City-Testville <small>Settings › Places & party</small> <svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div><div class="rail left glass"><div class="cap">Place</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.3a3.2 3.2 0 0 1 0 6.2M21 20a6 6 0 0 0-4-5.6"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M3 20h11V3L6 5v15"/><circle cx="10" cy="12" r=".6"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l2-5h14l2 5M4 9v11h16V9M3 9h18M9 20v-6h6v6"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><div class="sep"></div><div class="cap">Reveal</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9.1 14.9l-4 1.1L3 21l5-2.1 1.1-4z"/><path d="M21 3L10 14l-1.5-1.5L19.5 1.5z" transform="translate(0 1)"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.3 1 2.2h5.2c0-.9.4-1.7 1-2.2A6 6 0 0 0 12 3z"/></svg></span><div class="sep"></div><div class="cap">Combat</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span></div><div class="rail right glass"><div class="cap">Move</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8l-1.6-1.6a2 2 0 0 0-2.8 2.8L6 19.5A6 6 0 0 0 10.2 21H14a6 6 0 0 0 6-6v-3a2 2 0 0 0-4 0"/></svg></span><span class="tool on"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l16 7-7 2-2 7z"/></svg></span><div class="sep"></div><div class="cap">Play</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg></span><div class="sep"></div><div class="cap">Table</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"/><path d="M18 3v6M15 6h6"/></svg></span><span class="tool"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg><span class="badge">3</span></span><div class="sep"></div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></span></div><div class="zoom glass"><span><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></span><span><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span></div><div class="scrim"></div><section class="zed" role="dialog" aria-modal="true" aria-label="Zones">
+    <aside class="zl"><h2>Zones</h2><p>Maps in one zone count as the same place: moving between them never splits the party. Leaving for an adjacent zone follows your split rule; coming back merges them.</p>
+      <div class="zi"><b>Greenvale</b><small>Region · journeys · 2 maps</small></div><div class="zi on" style="margin-left:16px"><b>Testville</b><small>City · free travel · 3 maps</small></div>
+      <div class="zi" style="margin-left:16px"><b>Forest outside of Testville</b><small>Forest · journeys inside · 1 map</small></div>
+      <div class="zi" style="margin-left:16px"><b>Saltmarsh Road</b><small>Region · journeys · 2 maps</small></div>
+      <div class="zi"><b>Unzoned maps</b><small>2 maps: each counts as its own place</small></div>
+      <div style="margin-top:14px"><button class="btn ghost"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> New zone</button></div></aside>
+    <div class="zr"><h2>Testville</h2><p class="sub">Starts from your locations: the city Testville and its areas. Add maps that have no location, or join another place.</p><div class="h3" style="margin-top:0">Maps in this zone</div>
+      <div class="mrow"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span><b>City-Testville</b><br><small>Location: Testville (city)</small></span><span class="tagx ">From location</span><span style="justify-self:end;color:var(--color-muted);font-size:12px">Locked by location</span></div>
+      <div class="mrow"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span><b>City-Testville-The Commons</b><br><small>Location: The Commons (area of Testville)</small></span><span class="tagx ">From location</span><span style="justify-self:end;color:var(--color-muted);font-size:12px">Locked by location</span></div>
+      <div class="mrow"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span><b>Testville Sewers</b><br><small>No location · child of City-Testville</small></span><span class="tagx added">Added</span><span style="justify-self:end;color:var(--color-muted);font-size:12px">Remove</span></div>
+      <div style="display:flex;gap:8px;margin:8px 0 0"><button class="btn ghost"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add map…</button><button class="btn ghost"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg> Join another location…</button></div>
+      <div class="h3">Zone settings</div>
+      <div class="sets">
+        <label>Kind<span class="sel2">City <svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></label>
+        <label>Travel inside this zone<span class="sel2">Free during a session <svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span><small>Default for a city. Region and wilderness default to Journey.</small></label>
+        <label>Size<span class="sel2">About 3 miles across</span><small>From City-Testville's scale bar. Used to estimate trips only.</small></label>
+        <label>Inside zone<span class="sel2">Greenvale (region · journeys) <svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span><small>Different cities in Greenvale are a journey apart.</small></label>
+      </div>
+      <label class="wide">When a player's move would split the party<span class="seg2"><span>Use campaign setting<small>Party vote</small></span><span>Block</span><span>Wait until end of session</span><span class="on">Party vote</span><span>Allow freely</span></span><small>Leaving Testville: party vote · majority · 5 minutes · a tie keeps the party together · you can approve or reject any vote. The DM can always move anyone directly.</small></label>
+      <div class="h3">Adjacent zones: crossed freely, no journey</div>
+      <div class="mrow" style="grid-template-columns:28px 1fr 1fr 90px"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M3 20h11V3L6 5v15"/><circle cx="10" cy="12" r=".6"/></svg><span><b>Forest outside of Testville</b><br><small>Wilderness · via the North Gate entrance</small></span><span style="color:#ffd99a;font-size:12.5px">A split here follows the split rule · blocked in combat</span><span style="justify-self:end"><span class="tg2"></span></span></div>
+      <div class="mrow" style="grid-template-columns:28px 1fr 1fr 90px;opacity:.75"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg><span><b>Saltmarsh Road</b><br><small>Region · no link</small></span><span style="font-size:12.5px;color:var(--color-muted)">Not adjacent: about 2 days, needs a journey</span><span style="justify-self:end"><span class="tg2 off"></span></span></div>
+      <div class="foot2"><span style="color:var(--color-muted);font-size:12.5px">Changes save as one action with a revision check.</span><span><button class="btn ghost">Cancel</button> <button class="btn">Save zone</button></span></div></div>
+  </section></div><div class="caption"><h1>Split requests: player and DM views</h1><p>pending party vote (mover and voter) · waiting until the session ends · the DM's list</p></div><div class="frame"><svg class="map" viewBox="0 0 1280 800" width="1280" height="800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#4a5a35"/><stop offset=".6" stop-color="#36452a"/><stop offset="1" stop-color="#1e2818"/></radialGradient>
+    <radialGradient id="v" cx="50%" cy="50%" r="70%"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+    <filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+    <radialGradient id="fire"><stop offset="0" stop-color="#ffcf80" stop-opacity=".9"/><stop offset=".35" stop-color="#e0a04a" stop-opacity=".35"/><stop offset="1" stop-color="#e0a04a" stop-opacity="0"/></radialGradient>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#0b1018"/><line x1="0" y1="0" x2="0" y2="10" stroke="#1a2333" stroke-width="4"/></pattern>
+  </defs>
+  <rect width="1280" height="800" fill="url(#g)"/>
+  <rect width="1280" height="800" filter="url(#n)" fill="#000"/>
+  <path d="M-20 610 C 200 560, 320 470, 440 420 L 880 420 C 1000 400, 1120 300, 1300 260" stroke="#8a7350" stroke-width="58" fill="none" stroke-linecap="round" opacity=".9"/>
+  <path d="M-20 610 C 200 560, 320 470, 440 420 L 880 420 C 1000 400, 1120 300, 1300 260" stroke="#a48b62" stroke-width="40" fill="none" stroke-linecap="round" opacity=".55"/>
+  <path d="M1010 -10 C 980 120, 1050 220, 990 330 S 960 560, 1040 820" stroke="#2c5566" stroke-width="44" fill="none"/>
+  <path d="M1010 -10 C 980 120, 1050 220, 990 330 S 960 560, 1040 820" stroke="#3f7788" stroke-width="26" fill="none" opacity=".8"/>
+    <rect x="430" y="210" width="460" height="372" fill="#3d3b37"/>
+  ${flag}
+  <path d="M430 210 H 890 V 582 H 700 M 610 582 H 430 Z" fill="none" stroke="#24221f" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M430 400 H 600 M 660 400 H 720" stroke="#24221f" stroke-width="12"/>
+  <rect x="760" y="250" width="88" height="66" fill="#2a2724" stroke="#191715" stroke-width="3"/>
+  ${[0,1,2,3,4,5].map(i=>`<rect x="${762+i*14}" y="252" width="12" height="62" fill="${i%2?"#4c4843":"#3b3834"}"/>`).join("")}
+  <rect x="512" y="470" width="44" height="44" fill="#4b3622" stroke="#2a1d10" stroke-width="3"/><path d="M512 492h44M534 470v44" stroke="#2a1d10" stroke-width="2"/>
+  <circle cx="660" cy="300" r="120" fill="url(#fire)"/>
+  <circle cx="660" cy="300" r="12" fill="#ffb347"/><circle cx="660" cy="300" r="6" fill="#fff1c4"/>
+  ${[[300,300],[350,340],[1150,380],[1210,420]].map(([x,y])=>`<ellipse cx="${x}" cy="${y}" rx="26" ry="18" fill="#6e6b63" stroke="#4a4842" stroke-width="3"/>`).join("")}
+
+  
+  
+  <circle cx="94" cy="126" r="46" fill="#0d140b" opacity=".55"/><circle cx="90" cy="120" r="46" fill="#22361f"/><circle cx="78.5" cy="108.5" r="25.3" fill="#2f4a29"/><circle cx="154" cy="96" r="38" fill="#0d140b" opacity=".55"/><circle cx="150" cy="90" r="38" fill="#22361f"/><circle cx="140.5" cy="80.5" r="20.900000000000002" fill="#2f4a29"/><circle cx="64" cy="236" r="42" fill="#0d140b" opacity=".55"/><circle cx="60" cy="230" r="42" fill="#22361f"/><circle cx="49.5" cy="219.5" r="23.1" fill="#2f4a29"/><circle cx="204" cy="186" r="30" fill="#0d140b" opacity=".55"/><circle cx="200" cy="180" r="30" fill="#22361f"/><circle cx="192.5" cy="172.5" r="16.5" fill="#2f4a29"/><circle cx="1124" cy="656" r="48" fill="#0d140b" opacity=".55"/><circle cx="1120" cy="650" r="48" fill="#22361f"/><circle cx="1108" cy="638" r="26.400000000000002" fill="#2f4a29"/><circle cx="1194" cy="566" r="40" fill="#0d140b" opacity=".55"/><circle cx="1190" cy="560" r="40" fill="#22361f"/><circle cx="1180" cy="550" r="22" fill="#2f4a29"/><circle cx="1064" cy="726" r="36" fill="#0d140b" opacity=".55"/><circle cx="1060" cy="720" r="36" fill="#22361f"/><circle cx="1051" cy="711" r="19.8" fill="#2f4a29"/><circle cx="244" cy="696" r="44" fill="#0d140b" opacity=".55"/><circle cx="240" cy="690" r="44" fill="#22361f"/><circle cx="229" cy="679" r="24.200000000000003" fill="#2f4a29"/><circle cx="164" cy="626" r="36" fill="#0d140b" opacity=".55"/><circle cx="160" cy="620" r="36" fill="#22361f"/><circle cx="151" cy="611" r="19.8" fill="#2f4a29"/><circle cx="334" cy="746" r="30" fill="#0d140b" opacity=".55"/><circle cx="330" cy="740" r="30" fill="#22361f"/><circle cx="322.5" cy="732.5" r="16.5" fill="#2f4a29"/><circle cx="984" cy="96" r="40" fill="#0d140b" opacity=".55"/><circle cx="980" cy="90" r="40" fill="#22361f"/><circle cx="970" cy="80" r="22" fill="#2f4a29"/><circle cx="1064" cy="146" r="34" fill="#0d140b" opacity=".55"/><circle cx="1060" cy="140" r="34" fill="#22361f"/><circle cx="1051.5" cy="131.5" r="18.700000000000003" fill="#2f4a29"/><circle cx="1184" cy="96" r="46" fill="#0d140b" opacity=".55"/><circle cx="1180" cy="90" r="46" fill="#22361f"/><circle cx="1168.5" cy="78.5" r="25.3" fill="#2f4a29"/>
+  
+  <g stroke="#f6f1e6" stroke-opacity="0.32" stroke-width="1"><line x1="0" y1="0" x2="0" y2="800"/><line x1="44" y1="0" x2="44" y2="800"/><line x1="88" y1="0" x2="88" y2="800"/><line x1="132" y1="0" x2="132" y2="800"/><line x1="176" y1="0" x2="176" y2="800"/><line x1="220" y1="0" x2="220" y2="800"/><line x1="264" y1="0" x2="264" y2="800"/><line x1="308" y1="0" x2="308" y2="800"/><line x1="352" y1="0" x2="352" y2="800"/><line x1="396" y1="0" x2="396" y2="800"/><line x1="440" y1="0" x2="440" y2="800"/><line x1="484" y1="0" x2="484" y2="800"/><line x1="528" y1="0" x2="528" y2="800"/><line x1="572" y1="0" x2="572" y2="800"/><line x1="616" y1="0" x2="616" y2="800"/><line x1="660" y1="0" x2="660" y2="800"/><line x1="704" y1="0" x2="704" y2="800"/><line x1="748" y1="0" x2="748" y2="800"/><line x1="792" y1="0" x2="792" y2="800"/><line x1="836" y1="0" x2="836" y2="800"/><line x1="880" y1="0" x2="880" y2="800"/><line x1="924" y1="0" x2="924" y2="800"/><line x1="968" y1="0" x2="968" y2="800"/><line x1="1012" y1="0" x2="1012" y2="800"/><line x1="1056" y1="0" x2="1056" y2="800"/><line x1="1100" y1="0" x2="1100" y2="800"/><line x1="1144" y1="0" x2="1144" y2="800"/><line x1="1188" y1="0" x2="1188" y2="800"/><line x1="1232" y1="0" x2="1232" y2="800"/><line x1="1276" y1="0" x2="1276" y2="800"/><line x1="0" y1="0" x2="1280" y2="0"/><line x1="0" y1="44" x2="1280" y2="44"/><line x1="0" y1="88" x2="1280" y2="88"/><line x1="0" y1="132" x2="1280" y2="132"/><line x1="0" y1="176" x2="1280" y2="176"/><line x1="0" y1="220" x2="1280" y2="220"/><line x1="0" y1="264" x2="1280" y2="264"/><line x1="0" y1="308" x2="1280" y2="308"/><line x1="0" y1="352" x2="1280" y2="352"/><line x1="0" y1="396" x2="1280" y2="396"/><line x1="0" y1="440" x2="1280" y2="440"/><line x1="0" y1="484" x2="1280" y2="484"/><line x1="0" y1="528" x2="1280" y2="528"/><line x1="0" y1="572" x2="1280" y2="572"/><line x1="0" y1="616" x2="1280" y2="616"/><line x1="0" y1="660" x2="1280" y2="660"/><line x1="0" y1="704" x2="1280" y2="704"/><line x1="0" y1="748" x2="1280" y2="748"/><line x1="0" y1="792" x2="1280" y2="792"/></g>
+  <rect width="1280" height="800" fill="url(#v)"/>
+</svg><div class="token " style="left:532px;top:312px;width:36px;height:36px;font-size:13px">M<span class="lbl top">Mira</span></div><div class="token " style="left:576px;top:312px;width:36px;height:36px;font-size:13px">T<span class="lbl top">Torvald</span></div><div class="token " style="left:532px;top:356px;width:36px;height:36px;font-size:13px">S<span class="lbl">Sela</span></div><div class="token " style="left:576px;top:356px;width:36px;height:36px;font-size:13px">B<span class="lbl">Bram</span></div><div class="capsule glass"><span class="back"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></span><span class="title">City-Testville <small>Testville</small> <svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div><div class="rail right glass"><div class="cap">Move</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8l-1.6-1.6a2 2 0 0 0-2.8 2.8L6 19.5A6 6 0 0 0 10.2 21H14a6 6 0 0 0 6-6v-3a2 2 0 0 0-4 0"/></svg></span><span class="tool on"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l16 7-7 2-2 7z"/></svg></span><div class="sep"></div><div class="cap">Play</div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg></span><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg></span><div class="sep"></div><div class="cap">Table</div><span class="tool"><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg><span class="badge">3</span></span><div class="sep"></div><span class="tool "><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></span></div><div class="zoom glass"><span><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></span><span><svg class="i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span></div><div style="position:absolute;inset:0;background:#0007;z-index:15"></div><div class="cards">
+    <section class="card glass" role="status"><span class="who">Mover: Mira's player</span><h3>Asking the party…</h3>
+      <p>Going to <b style="color:var(--color-fg)">Forest outside of Testville</b> would split Mira off. Your DM set this to a party vote (majority).</p>
+      <span class="tally"><i class="y"></i><i class="y"></i><i class=""></i> 2 yes · 0 no · 1 waiting</span><div class="row2"><button class="btn ghost">Withdraw</button><span class="timer"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 3:41 left</span></div>
+      <p style="font-size:12px">Your token stays in Testville until the vote passes. A tie keeps the party together.</p></section>
+    <section class="card glass" role="alertdialog" aria-label="Party vote"><span class="who">Voter: Torvald's player</span><h3>Mira wants to leave Testville</h3>
+      <p>If the vote passes, Mira goes to Forest outside of Testville and is no longer with the party. You can merge again when you meet up.</p>
+      <span class="tally"><i class="y"></i><i class="y"></i><i class=""></i> 2 yes · 0 no · 1 waiting</span><div class="row2"><button class="btn">Let Mira go</button><button class="btn ghost">Keep together</button><span class="timer"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 3:41</span></div>
+      <p style="font-size:12px">The DM can approve or reject at any time. You can change your vote until it closes.</p></section>
+    <section class="card glass" role="status"><span class="who">Mover: rule is "Wait until end of session"</span><h3>Waiting for the session to end</h3>
+      <p>Mira will go to <b style="color:var(--color-fg)">Forest outside of Testville</b> when the DM ends the session, if it still makes sense then. The DM may also decide sooner.</p>
+      <div class="row2"><span class="chip"><svg class="i s" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Queued · Session 14</span><button class="btn ghost">Withdraw</button></div>
+      <p style="font-size:12px">If the party moves first, the DM sees whether this request still applies.</p></section>
+    <section class="card glass" role="status"><span class="who">DM: Review Inbox / End session dialog</span><h3>2 party-split requests</h3>
+      <div class="mrow" style="grid-template-columns:1fr auto;background:transparent"><span><b>Mira → Forest outside of Testville</b><br><small>Party vote · 2 yes, 0 no, 1 waiting · 3:41</small></span><span><button class="btn">Approve</button> <button class="btn ghost">Reject</button></span></div>
+      <div class="mrow" style="grid-template-columns:1fr auto;background:transparent"><span><b>Bram → Testville Sewers</b><br><small>Wait until end of session · still valid</small></span><span><button class="btn">Apply</button> <button class="btn ghost">Decline</button></span></div>
+      <p style="font-size:12px">"End session" lists queued requests ticked to apply. They run in the same batch, before the session ends.</p></section></div></div></main></body></html>

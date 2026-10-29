@@ -15,6 +15,8 @@ import { defaultLocationMap } from "@/lib/quire/connected-maps";
 import { readWorld, type CampaignMap } from "@/lib/quire/world-schema";
 import type { MapCombatBinding } from "@/lib/quire/map-combat-schema";
 import { encounterRequest } from "@/lib/encounters/client";
+import { blankEncounter } from "@/lib/encounters/model.mjs";
+import { requestPrompt } from "@/lib/quire/confirm-store";
 import { finishMapEncounter, type MapEncounterDetail } from "@/lib/encounters/map-transition";
 import { useDraftGuard, afterContextChange, allowContextChange } from "@/lib/quire/use-draft-guard";
 import { Button } from "./ui";
@@ -28,10 +30,16 @@ export function MapCombatWorkspace({
   map,
   camera,
   openMap,
+  here,
 }: {
   map: CampaignMap;
   camera: () => Camera;
   openMap: (id: string, entry?: Camera) => void;
+  /**
+   * "Start encounter here…" from the map menu (map tokens PR 6): this map is the encounter map
+   * and the return camera is the clicked point.
+   */
+  here?: { camera: Camera };
 }) {
   const t = useWorldTable(),
     seat = useSeat(),
@@ -45,6 +53,7 @@ export function MapCombatWorkspace({
     [encounterId, setEncounterId] = useState(binding?.encounterId ?? map.encounterId ?? ""),
     [target, setTarget] = useState(
       binding?.mapId ??
+        (here ? map.id : undefined) ??
         (map.locationId
           ? defaultLocationMap(world.maps, map.locationId, "battle")?.id
           : undefined) ??
@@ -167,7 +176,7 @@ export function MapCombatWorkspace({
         scaleConfirmed: mode === "grid" && scale,
         gridFingerprint: mode === "grid" ? canonicalJson(selected.grid) : undefined,
         returnMapId: map.id,
-        returnCamera: camera(),
+        returnCamera: here?.camera ?? camera(),
       };
       const result = await commandOutcome(
         {
@@ -185,6 +194,29 @@ export function MapCombatWorkspace({
         return;
       }
       await finish(prepared);
+    });
+  }
+  /** New encounter… (map tokens PR 6): a blank saved encounter for this campaign, selected here. */
+  async function createEncounter() {
+    const name = await requestPrompt({
+      title: "New encounter",
+      label: "Encounter name",
+      defaultValue: `${map.name} encounter`,
+      confirmLabel: "Create encounter",
+      validate: (v) => (v.trim() ? undefined : "Name the encounter."),
+    });
+    if (!name) return;
+    await execute(async () => {
+      const scope = captureMutationScope();
+      const { id } = await encounterRequest<{ id: string }>("encounters/create", {
+        code,
+        id: crypto.randomUUID(),
+        encounter: { ...blankEncounter(), name: name.trim().slice(0, 120) },
+      });
+      assertMutationScope(scope);
+      setRows((r) => [{ id, name: name.trim(), status: "draft", code }, ...r]);
+      setEncounterId(id);
+      setNotice(`Created ${name.trim()}. Add creatures in the tracker or with Add creatures here.`);
     });
   }
   async function returnToMap() {
@@ -322,6 +354,9 @@ export function MapCombatWorkspace({
           </p>
           <Button disabled={locked} onClick={() => void start()}>
             Start saved encounter here
+          </Button>
+          <Button disabled={locked} onClick={() => void createEncounter()}>
+            New encounter…
           </Button>
           <AppLink href="/encounters">Prepare or create an encounter →</AppLink>
         </>

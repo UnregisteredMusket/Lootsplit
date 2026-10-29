@@ -616,7 +616,13 @@ function receiptStatement(db: Database, code: string, receipts: RoomReceipt[], w
 export async function updateRoom(
   room: CloudRoom,
   baseRevision: number,
-  options: { receipts?: RoomReceipt[] } = {},
+  /**
+   * `guard`: an extra SQL condition the room row write also requires (map tokens, privacy review
+   * 2026-10-29: the combat turn read for a player's move must still hold when the row is written).
+   * When it fails the write changes nothing and throws "The table changed", so the write is retried
+   * on a fresh read. Local development rooms (no D1) do not evaluate it.
+   */
+  options: { receipts?: RoomReceipt[]; guard?: { where: string; args: unknown[] } } = {},
 ): Promise<void> {
   const db = database();
   if (db) {
@@ -630,6 +636,7 @@ export async function updateRoom(
     const write = roomWriteStatements(db, room, {
       expect: { revision: baseRevision },
       body: encoded.body,
+      ...(options.guard ? { extraWhere: options.guard.where, extraArgs: options.guard.args } : {}),
       ...(present ? { present } : {}),
     });
     const writeId = write.writeId;

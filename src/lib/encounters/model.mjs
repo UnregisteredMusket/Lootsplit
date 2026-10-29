@@ -18,6 +18,11 @@ export const combatantSchema = z
     xp: integer,
     source: z.string().max(2000),
     sourceKey: z.string().max(120),
+    /**
+     * Optional creature size (map tokens, 2026-10-29): SRD creatures keep their stat-block size, so
+     * their map tokens start at the right footprint. Absent means Medium.
+     */
+    size: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
   })
   .refine((c) => c.hp <= c.maxHp, "HP cannot exceed maximum HP.");
 export const lootSchema = z.object({

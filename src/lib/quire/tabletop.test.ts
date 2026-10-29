@@ -144,7 +144,9 @@ test("client display retains the server's visible tokens without recomputing fro
   if (archive.available) assert.equal(map(archive.snapshot).tokens!.length, 1);
 });
 test("only explicitly permitted assigned tokens move; wealth and source input stay unchanged", () => {
-  const denied = fixture();
+  // A map configured before player movement became a choice (protocol 15) keeps movement off; a
+  // map without tabletop settings now defaults to Automatic (owner, 2026-10-29).
+  const denied = fixture({});
   assert.throws(
     () =>
       act(

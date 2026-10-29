@@ -297,7 +297,9 @@ try {
     await closeMapSettings(page);
     await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
     await expect(guardIcon).toHaveAttribute("aria-pressed", "false");
-    await expect(page.locator('.map-record-icon[aria-pressed="true"]')).toHaveCount(1);
+    await expect(
+      page.locator('.map-record-icon[aria-pressed="true"], .map-token[aria-pressed="true"]'),
+    ).toHaveCount(1);
     await closeMapSettings(page);
     await checkFullscreenMap(page, output, width);
     await openMapSettings(page);

@@ -445,7 +445,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   } else if (npcBarterKinds.has(cmd.kind)) {
     applyNpcBarterCommand(t, seat, cmd as NpcBarterCommand, at, execution);
   } else if (worldCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
-    applyWorldCommand(t, seat, cmd as WorldCommand, at);
+    applyWorldCommand(t, seat, cmd as WorldCommand, at, execution);
   } else if (cmd.kind === "estate-import") {
     dm();
     if (finance().downtime.some((d) => d.status === "pending"))

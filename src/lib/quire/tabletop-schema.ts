@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mapMediaReferenceSchema, mapRenderedFrameSchema } from "./map-assets-schema.ts";
+import { TOKEN_SIZE_CLASSES } from "./tabletop-geometry.ts";
 
 const id = z.string().min(1).max(150);
 export const scenePointSchema = z
@@ -128,13 +129,36 @@ export const tokenTabletopFields = {
     })
     .strict()
     .optional(),
+  /**
+   * Tabletop protocol 13 (footprints): the creature size, the DM's custom squares per side (0.25
+   * is a Tiny-style quarter square) and `anchor: "corner"`, which stores the token by its
+   * top-left square. Tokens without `anchor` keep their centre square. Older clients receive
+   * footprint tokens in that centre form (tabletop-protocol.ts).
+   */
+  sizeClass: z.enum(TOKEN_SIZE_CLASSES).optional(),
+  footprint: z.union([z.literal(0.25), z.number().int().min(1).max(8)]).optional(),
+  anchor: z.literal("corner").optional(),
 };
 export const mapTabletopSchema = z
   .object({
     revision: z.number().int().nonnegative().default(0),
     playerMovement: z.boolean().default(false),
+    /**
+     * Tabletop protocol 15 (player movement, owner 2026-10-29): "auto" = players move their own
+     * tokens freely, taking turns while combat is active on this map; "off" = DM only; "approval"
+     * = players' moves wait for the DM. Absent: "auto" for maps without tabletop settings, else
+     * from `playerMovement` (kept in step for older clients). See `movementMode` (tabletop.ts).
+     */
+    movement: z.enum(["auto", "off", "approval"]).optional(),
+    /** Characters who may not move on this map, kept when their token is removed and placed again. */
+    lockedPurseIds: z.array(id).max(200).optional(),
     playerTemplates: z.boolean().default(false),
     snap: z.boolean().default(true),
+    /**
+     * Tabletop protocol 14 (grid mode): the automatic grid of an ungridded map is hidden until the
+     * DM shows it. Absent means the lines are drawn as before.
+     */
+    gridHidden: z.boolean().optional(),
     unitLabel: z.string().trim().min(1).max(20).default("ft"),
     unitsPerFoot: z.number().finite().positive().max(1000000).default(1),
     initialView: sceneCameraSchema.optional(),
@@ -158,6 +182,23 @@ export const tabletopSessionSchema = z
       .nullable()
       .optional(),
     tvEnabled: z.boolean().default(false),
+    /**
+     * Tabletop protocol 16 (group placement): the party's default formation for Place party.
+     * `spacing` is empty squares between members; `rotation` turns lines and clusters.
+     */
+    partyFormation: z
+      .object({
+        shape: z.enum(["cluster", "line", "circle"]),
+        spacing: z.number().int().min(0).max(4),
+        rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
+      })
+      .strict()
+      .optional(),
+    /**
+     * Tabletop protocol 17 (map tokens PR 7, owner 2026-10-29): "Character tokens follow players'
+     * map view", off by default. Players keep their own "Follow me" switch on their device.
+     */
+    followView: z.boolean().optional(),
     activeMapId: id.nullable().default(null),
     activationId: id.optional(),
     playerBrowsing: z.boolean().default(true),
@@ -168,7 +209,7 @@ export const tabletopSessionSchema = z
       .default(null),
   })
   .strict();
-const tile = z
+export const tile = z
   .object({
     column: z.number().int().min(0).max(199),
     row: z.number().int().min(0).max(199),
@@ -215,6 +256,40 @@ export const tabletopCommands = [
         .min(1)
         .max(100),
       ignoreWalls: z.boolean().default(false),
+    })
+    .strict(),
+  /**
+   * A player places their own character's token (map tokens PR 2): only on a map they can see,
+   * with player movement on, no token of that character there yet, a snapped visible square and,
+   * during combat on this map, on that character's turn. The server builds the token.
+   */
+  z
+    .object({
+      id,
+      kind: z.literal("map-token-claim"),
+      mapId: id,
+      grid: z.string().max(1000),
+      purseId: id,
+      tokenId: id,
+      at: tile,
+    })
+    .strict(),
+  /**
+   * Grid mode on with "Snap tokens to the nearest squares" (owner, 2026-10-29), and its Undo: one
+   * DM command that sets grid mode and moves the listed tokens, revision-checked by the map's
+   * settings and every token's position. Moves into grid mode must already be snapped.
+   */
+  z
+    .object({
+      id,
+      kind: z.literal("map-grid-snap"),
+      mapId: id,
+      grid: z.string().max(1000),
+      before: mapTabletopSchema.nullable(),
+      snap: z.boolean(),
+      moves: z
+        .array(z.object({ tokenId: id, before: tile, after: tile }).strict())
+        .max(200),
     })
     .strict(),
   z

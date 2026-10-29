@@ -66,6 +66,7 @@ import {
   ROOM_IMAGE_SOURCES_KEY,
   groupCommandText,
   refuseOldClientGroupActions,
+  upgradeOldClientCommands,
 } from "./tabletop-protocol.ts";
 
 /**
@@ -1124,9 +1125,15 @@ export async function submitCommands(input: {
     // Chat, treasure-pool claims and quest changes (which move nothing) may be sent outside the seat's turn
     // (owner decision, 2026-10-23).
     // Quest changes (DM only, nothing moves) are not bound to the turn either.
+    // Players move their own tokens outside their room turn too (owner, 2026-10-29); encounter
+    // initiative still applies (tabletop.ts).
+    const playerToken = (c: (typeof commands)[number]) =>
+      seat.role === "player" && (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-token-follow");
     const messagesOnly =
       commands.length > 0 &&
-      commands.every((c) => c.kind === "message" || c.kind === "loot-claim" || c.kind.startsWith("quest-"));
+      commands.every(
+        (c) => c.kind === "message" || c.kind === "loot-claim" || c.kind.startsWith("quest-") || playerToken(c),
+      );
     if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
     const seen = new Set(commandReceipts.keys());
@@ -1168,16 +1175,32 @@ export async function submitCommands(input: {
       selected.add(key);
       return true;
     });
-    const run = (base: CloudTable) =>
-      applyCommandBatch(base, seat, unapplied, (command) => ({
+    // Turn-based movement: a player's token command on the map with active combat needs the
+    // tracker's turn, read once per write attempt from the encounter store (fails closed).
+    const binding = room.table.journal?.world?.combat;
+    const mapCombat =
+      seat.role !== "dm" &&
+      binding?.phase === "active" &&
+      unapplied.some(
+        (c) => (c.kind === "map-token-move" || c.kind === "map-token-claim") && c.mapId === binding.mapId,
+      )
+        ? await readMapCombatTurn(room.code, binding.encounterId)
+        : undefined;
+    const run = (base: CloudTable) => {
+      // Map tokens (tabletop protocols 13+): older apps send footprint tokens in their centre form
+      // and scene settings without the fields they can't see; they are applied in stored form.
+      const applied = upgradeOldClientCommands(base, unapplied, input.tabletopProtocol ?? 0);
+      return applyCommandBatch(base, seat, applied, (command) => ({
         source: "server",
         manualRolls,
+        mapCombat,
         random: (draw) => {
           const key = command.id + ":" + draw;
           if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
           return seasonalRolls.get(key)!;
         },
       }));
+    };
     // The room the batch ran on: the working read, or the whole campaign when it needed history.
     // A staged batch is validated the same way (the merged draft), and nothing of it is stored.
     let source = room;
@@ -1287,7 +1310,18 @@ export async function submitCommands(input: {
           ? (room.turn + 1) % room.seats.length
           : room.turn,
     };
-    await updateRoom(next, room.revision, { receipts });
+    // The combat turn read above must still hold when the room row is written (privacy review
+    // 2026-10-29): a turn that advanced in between fails this guard, the write is retried on a fresh
+    // read, and the move is refused with "Not your turn".
+    const guard =
+      !input.stage && mapCombat && mapCombat !== "unavailable"
+        ? {
+            where:
+              "EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND code=? AND status=? AND json_extract(body,'$.activeId') IS ?)",
+            args: [mapCombat.encounterId, room.code, mapCombat.status, mapCombat.activeId],
+          }
+        : undefined;
+    await updateRoom(next, room.revision, { receipts, ...(guard ? { guard } : {}) });
     // Only after the successful write (a retried attempt that lost the race never notifies).
     if (!input.stage) {
       const fresh = next.table.notes.filter(
@@ -1631,6 +1665,31 @@ export async function manageRoom(input: {
   });
 }
 
+/**
+ * The bound encounter's turn for the movement check (map tokens PR 2): its status and the
+ * tracker's active combatant. "unavailable" when there is no encounter store or the read fails,
+ * so a player's move during combat is refused rather than let through.
+ */
+async function readMapCombatTurn(code: string, encounterId: string) {
+  const db = database();
+  if (!db) return "unavailable" as const;
+  try {
+    const row = await db
+      .prepare(
+        "SELECT status, json_extract(body,'$.activeId') AS active FROM dm_encounters WHERE id=? AND code=?",
+      )
+      .bind(encounterId, code)
+      .first<{ status: string; active: unknown }>();
+    if (!row) return "unavailable" as const;
+    return {
+      encounterId,
+      status: row.status,
+      activeId: typeof row.active === "string" ? row.active : null,
+    };
+  } catch {
+    return "unavailable" as const;
+  }
+}
 /**
  * The seat's projected combat map and the bound encounter's row, or null when this seat may not
  * see combat on `mapId` (map controls PR 6; audit 2026-10-28 F8). Gates: seated; an active

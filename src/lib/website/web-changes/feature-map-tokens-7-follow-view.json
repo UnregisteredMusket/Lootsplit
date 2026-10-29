@@ -1,0 +1,10 @@
+{
+  "title": "Tokens can follow players between maps",
+  "summary": "DMs can let players' character tokens follow them when they open another map in the same place.",
+  "items": [
+    "A new setting, off by default: Character tokens follow players' map view.",
+    "When it's on, opening another map in the same place moves your character's token there, with Undo.",
+    "Maps in other places are just for looking, and tokens stay put during combat.",
+    "Players can turn off Follow me to browse without moving their token."
+  ]
+}

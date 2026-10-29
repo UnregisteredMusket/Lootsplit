@@ -1,0 +1,11 @@
+{
+  "title": "Move the party, add creatures and start encounters from the map",
+  "summary": "The map's quick actions move the party between maps and set up encounters right where you clicked.",
+  "items": [
+    "Move party to shows what will happen before it moves the party's place, the players' scene and the party's tokens in one step.",
+    "When the party is split, choose which group moves.",
+    "Add creatures here searches the SRD, adds the creatures to an encounter and places them hidden from players.",
+    "Add characters here places any characters you tick, in the party's formation, with Undo.",
+    "Start encounter here uses this map, and New encounter creates one on the spot."
+  ]
+}

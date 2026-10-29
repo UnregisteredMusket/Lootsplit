@@ -3,6 +3,16 @@ import { combatantSchema } from "./model.mjs";
 const fail = (message, status = 503) => {
   throw Object.assign(new Error(message), { status });
 };
+const SIZES = ["tiny", "small", "medium", "large", "huge", "gargantuan"];
+/**
+ * The stat block's size key ("large"), from Open5e's `size` object or name.
+ * @param {unknown} size
+ */
+export function sizeKey(size) {
+  const raw = size && typeof size === "object" ? /** @type {{key?: unknown, name?: unknown}} */ (size).key ?? /** @type {{name?: unknown}} */ (size).name : size;
+  const key = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  return SIZES.includes(key) ? key : undefined;
+}
 /** @typedef {import("zod").infer<typeof combatantSchema> & {type: string, environments: string}} Creature */
 /** @type {{at: number, rows: Creature[]} | null} */
 let creatureCache = null;
@@ -41,6 +51,7 @@ export async function creatureIndex() {
         cr: Number(c.challenge_rating),
         xp: c.experience_points,
         sourceKey: c.key,
+        ...(sizeKey(c.size) ? { size: sizeKey(c.size) } : {}),
         source:
           "SRD 5.1 by Wizards of the Coast LLC · CC BY 4.0 · via Open5e · https://www.dndbeyond.com/srd · https://creativecommons.org/licenses/by/4.0/legalcode",
         notes: [...(c.traits || []), ...(c.actions || [])]

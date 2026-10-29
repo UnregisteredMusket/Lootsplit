@@ -11,7 +11,12 @@ import { mapGroupPins, type GroupPin } from "@/lib/quire/party-groups-map";
 import { HereGroupSwitch } from "./party-groups-map";
 import { useMapSketches } from "./map-sketch-tools";
 import { MapWorkspaceChrome, MapEmptyWorkspace } from "./map-workspace-chrome";
-import { captureMutationScope } from "@/lib/quire/cloud-client";
+import {
+  captureMutationScope,
+  getCloudTable,
+  getServerCloudTable,
+  subscribeCloudTable,
+} from "@/lib/quire/cloud-client";
 import {
   mapViewKey,
   readMapView,
@@ -51,12 +56,13 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { useSeat } from "@/lib/quire/seat";
-import { readWorld, mapTypes, type CampaignMap } from "@/lib/quire/world-schema";
+import { readWorld, mapTypes, type CampaignMap, type MapToken } from "@/lib/quire/world-schema";
 import { anchorFor, recognizedAnchors, npcAvailableHere, shopVisible } from "@/lib/quire/world";
 import { readMarketLocations, locationLabel, locationPath } from "@/lib/quire/shop-locations";
 import { recognizeMap } from "@/lib/quire/map-image";
@@ -64,12 +70,30 @@ import { prepareMapMedia } from "@/lib/quire/map-media";
 import { readMapInterchange, MAP_INTERCHANGE_LIMIT } from "@/lib/quire/map-import";
 import { cacheMapAsset, publishMapAsset, loadMapAsset, mapAssetBlob } from "@/lib/quire/map-assets";
 import { mapMediaReference, type MapAssetBundle } from "@/lib/quire/map-assets-schema";
-import { readMapTabletop, readTabletopSession } from "@/lib/quire/tabletop";
+import { combatOnMap, readMapTabletop, readTabletopSession } from "@/lib/quire/tabletop";
 import { MapArtwork } from "./map-artwork";
 import { MapBrowser, MapSessionBar } from "./map-session-bar";
 import { useMapTabletopTools } from "./map-tabletop-tools";
+import { MapTokenLayer } from "./map-token-layer";
+import { MovementNotice } from "./map-tabletop-inspector";
+import { GroupBar, PlacePartyPanel, PlacingHint, type PartyRow } from "./map-group-tools";
+import { groupMembers } from "@/lib/quire/party-groups";
+import { resizedToken } from "@/lib/quire/token-display";
+import { planFormation, DEFAULT_FORMATION } from "@/lib/quire/formation";
+import { addToInitiative } from "@/lib/quire/map-initiative-link";
+import { MapTurnStrip, MovementChips } from "./map-player-movement";
+import { useMapTurnOrder } from "@/lib/quire/use-map-turn-order";
+import { playerMovement, sheetSpeedFeet } from "@/lib/quire/map-movement";
+import { imageSize } from "@/lib/quire/image-size";
+import { discToken } from "@/lib/quire/token-display";
 import { MapPlayerPreview } from "./map-player-preview";
-import { sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
+import {
+  automaticGrid,
+  sceneTokenPoint,
+  SIZE_NAMES,
+  snapTokenPosition,
+  TOKEN_SIZE_CLASSES,
+} from "@/lib/quire/tabletop-geometry";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm, CommandButton } from "./world-tools";
 import { LocationOptions, MarketLocationsPanel } from "./market-locations";
@@ -110,7 +134,33 @@ import {
   ChevronDown,
   Menu,
   Route as RouteIcon,
+  Map as MapIcon,
+  MousePointerClick,
+  Ellipsis,
+  ChevronLeft,
 } from "lucide-react";
+import { MapRadial, RadialProgress, type RadialItem } from "./map-radial";
+import { longPress, RADIAL_SLOP_PX, radialGeometry, radialHit } from "@/lib/quire/radial-geometry";
+import { toast } from "sonner";
+import { MapContextMenu } from "./map-context-menu";
+import { MAP_ACTION_ICONS, menuFromActions } from "./map-action-items";
+import { mapActions, radialSlices, shortMapName } from "@/lib/quire/map-actions";
+import {
+  partyDestinations,
+  partyEntry,
+  partyMoveCommands,
+  partyMoveSummary,
+  type PartyDestination,
+  type PartyMoveOptions,
+} from "@/lib/quire/party-move";
+import { AddCharactersPanel, AddCreaturesPanel } from "./map-quick-flows";
+import { FollowViewSettings } from "./map-follow-view";
+import { useTokenFollow } from "@/lib/quire/use-token-follow";
+import { mapEncounterId, removeFromInitiative } from "@/lib/quire/map-initiative-link";
+import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
+import { requestConfirm } from "@/lib/quire/confirm-store";
+import { resultToast } from "@/lib/quire/result-toast";
+import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { useRoutePlanner } from "./map-route-planner";
 import {
   JourneyPlanActions,
@@ -246,6 +296,7 @@ const MAP_SHORTCUTS: [string, string, boolean][] = [
   ["H", "Hide or show the interface", false],
   ["+ / − / Home", "Zoom in, zoom out, fit the map", false],
   ["Esc", "Close a panel, then return to Pan", false],
+  ["Shift+F10 / Menu key", "Map actions here (also right-click)", false],
 ];
 
 /**
@@ -997,6 +1048,28 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                 ? "Combat tokens are placed and moved in tile mode."
                 : "This map has no combat grid yet. Add one in Grid & scale."}
             </p>
+            {!map.grid && (
+              // Ungridded maps get an automatic hidden grid (owner, 2026-10-29): grid mode off,
+              // so tokens move freely; show it later in Inspector › Scene permissions & vision.
+              <CommandForm
+                label="Add tokens with an automatic grid"
+                submit={async () => ({
+                  kind: "map-save",
+                  mapId: map.id,
+                  before: map,
+                  map: {
+                    ...map,
+                    grid: automaticGrid(await imageSize(map.image), map.scale),
+                    tabletop: { ...readMapTabletop(map), snap: false, gridHidden: true },
+                  },
+                })}
+              >
+                <p>
+                  Adds a hidden grid of 5 ft squares over the whole image (from the scale bar when
+                  the map has one). Grid mode stays off, so tokens move freely.
+                </p>
+              </CommandForm>
+            )}
             {tileToggle}
           </>
         )
@@ -1414,12 +1487,13 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               dm
                 ? {
                     tool: setupTool,
-                    arm: (tool) => {
+                    arm: (tool, at) => {
                       setSetupTool(tool);
                       setPlacement(
                         tool === "token" && !effectiveTileMode ? "" : SETUP_PLACEMENT[tool],
                       );
-                      setPoint(undefined);
+                      // The map menu arms a tool with its point already chosen (its panel opens).
+                      setPoint(at);
                     },
                     panel: setupPanel,
                     closePanel: () => setPoint(undefined),
@@ -1856,7 +1930,7 @@ function MapViewport({
   /** DM map setup rail (map controls): the armed tool, its panel once placed. */
   setup?: {
     tool: SetupTool | "";
-    arm: (tool: SetupTool) => void;
+    arm: (tool: SetupTool, point?: { x: number; y: number }) => void;
     panel?: ReactNode;
     closePanel: () => void;
   };
@@ -1951,9 +2025,110 @@ function MapViewport({
     }
   }, [placing, point, full, placementKind, setup?.tool]);
   const signals = useMapPings(map.id),
-    useDm = useSeat().role === "dm",
-    tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
+    seatNow = useSeat(),
+    useDm = seatNow.role === "dm",
+    // Player movement (map tokens PR 2): free outside combat, turns while the DM shows combat.
+    turnOrder = useMapTurnOrder(map, useDm),
+    movement = playerMovement(map, turnOrder),
+    tools = useMapTabletopTools(map, selectedToken, onTokenSelect, useDm ? undefined : movement);
+  const ownToken = useDm
+    ? undefined
+    : map.tokens?.find(
+        (t) => t.kind === "character" && !!t.entityId && seatNow.purseIds.includes(t.entityId),
+      );
+  const claimable =
+    !useDm && !!map.grid && movement.mode === "auto" && (!movement.combat || movement.myTurn)
+      ? recordTable.purses.find(
+          (p) =>
+            p.kind === "character" &&
+            seatNow.purseIds.includes(p.id) &&
+            !map.tokens?.some((t) => t.kind === "character" && t.entityId === p.id) &&
+            !map.tabletop?.lockedPurseIds?.includes(p.id),
+        )
+      : undefined;
+  const speedFeet = ownToken
+    ? sheetSpeedFeet(recordTable.sheets?.find((sheet) => sheet.purseId === ownToken.entityId)?.speed)
+    : undefined;
   const sketches = useMapSketches(viewScope, map.id);
+  const wheelSpacing = useRef<((e: WheelEvent) => boolean) | undefined>(undefined);
+  wheelSpacing.current = (e) => {
+    if (!tools.group.placing || !e.altKey) return false;
+    tools.group.spacing(e.deltaY > 0 ? -1 : 1);
+    return true;
+  };
+  // Place party (map tokens PR 3): the party's characters by group, ticked for the main group.
+  const [partyPanel, setPartyPanel] = useState(false),
+    [partyChecks, setPartyChecks] = useState<Record<string, boolean>>({}),
+    [makeDefault, setMakeDefault] = useState(true),
+    newTokenIds = useRef(new Map<string, string>());
+  const partyRows: PartyRow[] = useDm
+    ? groupRefs(recordTable).flatMap((ref) =>
+        groupMembers(recordTable, ref).map((person) => {
+          const token = map.tokens?.find((t) => t.kind === "character" && t.entityId === person.id);
+          const info = groupInfo(recordTable, ref);
+          const place = groupPlace(recordTable, ref).locationId;
+          const placeName = readMarketLocations(recordTable.journal?.market).locations.find((l) => l.id === place)?.name;
+          return {
+            purseId: person.id,
+            name: person.name,
+            status:
+              ref !== MAIN_GROUP
+                ? `Group ${info.letter}${placeName ? ` · ${placeName}` : ""}`
+                : token
+                  ? "on map · will move"
+                  : "not on this map",
+            checked: partyChecks[person.id] ?? ref === MAIN_GROUP,
+            order: token ? token.row * 1000 + token.column : 1e9,
+          };
+        }),
+      )
+        // Characters already on the map keep their reading order, so the formation keeps it too.
+        .sort((a, b) => a.order - b.order)
+    : [];
+  const partyMembers = (): { token: MapToken; before: MapToken | null }[] =>
+    membersFor(partyRows.filter((row) => row.checked));
+  /** Each character's token on this map (it moves), or a new one (it is placed). */
+  const membersFor = (rows: { purseId: string; name: string }[]): { token: MapToken; before: MapToken | null }[] =>
+    rows
+      .flatMap((row): { token: MapToken; before: MapToken | null }[] => {
+        const token = map.tokens?.find((t) => t.kind === "character" && t.entityId === row.purseId);
+        if (token) return [{ token, before: token }];
+        if (!newTokenIds.current.has(row.purseId)) newTokenIds.current.set(row.purseId, crypto.randomUUID());
+        return [
+          {
+            token: {
+              id: newTokenIds.current.get(row.purseId)!,
+              kind: "character" as const,
+              entityId: row.purseId,
+              label: row.name,
+              column: 0,
+              row: 0,
+              visibility: "party" as const,
+            },
+            before: null,
+          },
+        ];
+      });
+  const openPlaceParty = () => {
+    if (!map.grid) return;
+    setPartyPanel(true);
+    tools.group.startPlacing({ members: partyMembers(), mode: "formation", label: "party", makeDefault });
+  };
+  const closePlaceParty = () => {
+    setPartyPanel(false);
+    tools.group.setPlacing(null);
+  };
+  useEffect(() => {
+    // The panel follows the ticks; it closes once the party is placed.
+    if (!partyPanel) return;
+    if (!tools.group.placing) {
+      setPartyPanel(false);
+      return;
+    }
+    tools.group.setPlacing((current) => (current ? { ...current, members: partyMembers(), makeDefault } : current));
+    // partyMembers reads partyChecks and the map; rerun when they change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partyChecks, makeDefault, partyPanel, map.tokens]);
   useEffect(() => {
     if (full && tools.inspecting) setDrawerOpen(false);
   }, [full, tools.inspecting]);
@@ -1992,7 +2167,16 @@ function MapViewport({
         ? [{ id: "party", label: "Party", kind: "Party", point: party }]
         : []),
   ];
-  const groups = groupMapRecords(records, visible);
+  // Map tokens PR 1: characters, creatures and custom tokens are drawn at their footprint
+  // (MapTokenLayer); ships keep their record icon.
+  const discTokens =
+    tileMode && map.grid && visible.includes("Combatant")
+      ? (map.tokens ?? []).filter((t) => discToken(t) && (useDm || t.visibility === "party"))
+      : [];
+  const groups = groupMapRecords(
+    records.filter((r) => !(r.kind === "Combatant" && discTokens.some((t) => t.id === r.id))),
+    visible,
+  );
   const currentDetails = details.flatMap((d) => {
     const match = records.filter((r) => r.id === d.id && r.kind === d.kind);
     return match.length
@@ -2207,6 +2391,8 @@ function MapViewport({
     const el = root.current!;
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      // Place party: Alt+wheel changes the formation's spacing (map tokens PR 3).
+      if (wheelSpacing.current?.(e)) return;
       const rect = el.getBoundingClientRect(),
         v = viewRef.current,
         scale = Math.min(8, Math.max(0.5, v.scale * Math.exp(-e.deltaY * 0.002))),
@@ -2503,7 +2689,7 @@ function MapViewport({
     });
   };
   const setupPanelRef = useRef<HTMLElement>(null);
-  const armSetup = (tool: SetupTool) => {
+  const armSetup = (tool: SetupTool, at?: { x: number; y: number }) => {
     if (!setup) return;
     afterContextChange(() => {
       tools.cancel();
@@ -2512,7 +2698,7 @@ function MapViewport({
       setContextOpen(false);
       setMoreTools(false);
       if (planner.active) planner.close();
-      setup.arm(tool);
+      setup.arm(tool, at);
       root.current?.focus();
     });
   };
@@ -2634,6 +2820,7 @@ function MapViewport({
     const upper = key.toUpperCase();
     const tool = SETUP_TOOLS.find((t) => t.shortcut === upper);
     if (tool) armSetup(tool.tool);
+    else if (upper === "A" && map.grid) openPlaceParty();
     else {
       const reveal = REVEAL_TOOLS.find((t) => t.shortcut === upper);
       if (reveal) chooseTool(reveal.tool);
@@ -2919,6 +3106,17 @@ function MapViewport({
       </MapToolGroup>
       <MapToolGroup caption="View">
         <MapTool
+          // The map menu at the centre crosshair (map tokens PR 5): screen readers and anyone
+          // without right-click or a long press; phones get the bottom sheet.
+          icon={<MousePointerClick size={19} />}
+          label="Map actions"
+          keys="Shift+F10"
+          onClick={() => {
+            const box = root.current?.getBoundingClientRect();
+            if (box) openMapMenu(box.left + box.width / 2, box.top + box.height / 2, undefined, root.current, layout === "phone");
+          }}
+        />
+        <MapTool
           icon={<Layers size={19} />}
           label="Layers"
           shortcut="L"
@@ -2942,6 +3140,581 @@ function MapViewport({
       </MapToolGroup>
     </>
   );
+  // Group commands (map tokens PR 3), shared by the group bar and the map menu (PR 4): each is
+  // one authoritative command for the given tokens.
+  const groupActions = {
+    hide: (tokens: MapToken[], hide: boolean) =>
+      void tools.group.act({
+        kind: "map-tokens-edit",
+        mapId: map.id,
+        edits: tokens.map((t) => ({ tokenId: t.id, before: t, token: { ...t, visibility: hide ? "dm" : "party" } })),
+      }),
+    lock: (tokens: MapToken[], lock: boolean) =>
+      void tools.group.act({
+        kind: "map-tokens-edit",
+        mapId: map.id,
+        edits: tokens.map((t) => {
+          const token: MapToken = { ...t, locked: lock };
+          if (!lock) delete token.locked;
+          return { tokenId: t.id, before: t, token };
+        }),
+      }),
+    size: (tokens: MapToken[], size: MapToken["sizeClass"]) =>
+      void tools.group.act({
+        kind: "map-tokens-edit",
+        mapId: map.id,
+        edits: tokens.map((t) => ({ tokenId: t.id, before: t, token: resizedToken(t, { sizeClass: size }, map.grid!) })),
+      }),
+    send: (tokens: MapToken[], targetId: string) => {
+      const target = maps.find((m) => m.id === targetId);
+      if (!target?.grid) return;
+      const plan = planFormation(
+        target.grid,
+        target.tokens ?? [],
+        tokens,
+        { column: Math.floor(target.grid.columns / 2), row: Math.floor(target.grid.rows / 2) },
+        readTabletopSession(recordTable).partyFormation ?? DEFAULT_FORMATION,
+        readMapTabletop(target).walls,
+      );
+      void tools.group.act(
+        {
+          kind: "map-tokens-place",
+          mapId: target.id,
+          grid: target.grid,
+          place: plan.places.map((p) => {
+            const token = { ...tokens.find((t) => t.id === p.id)!, column: p.column, row: p.row };
+            delete token.offsetX;
+            delete token.offsetY;
+            return { tokenId: p.id, before: target.tokens?.find((t) => t.id === p.id) ?? null, token };
+          }),
+          remove: tokens.map((t) => ({ mapId: map.id, grid: map.grid!, tokenId: t.id, before: t })),
+        },
+        () => tools.group.clear(),
+      );
+    },
+    remove: async (tokens: MapToken[]) => {
+      const ok = await requestConfirm({
+        title: tokens.length === 1 ? `Remove ${tokens[0].label}?` : `Remove ${tokens.length} tokens?`,
+        body:
+          tokens.length === 1
+            ? "The token leaves this map. The character, creature or record it shows is kept."
+            : "The tokens leave this map. The characters, creatures and records they show are kept.",
+        tone: "danger",
+        confirmLabel: tokens.length === 1 ? "Remove token" : "Remove tokens",
+      });
+      if (!ok || !map.grid) return;
+      void tools.group.act(
+        { kind: "map-tokens-place", mapId: map.id, grid: map.grid, place: [], remove: tokens.map((t) => ({ mapId: map.id, grid: map.grid!, tokenId: t.id, before: t })) },
+        () => tools.group.clear(),
+      );
+    },
+  };
+  const sendTargets = maps.filter((m) => m.id !== map.id && m.grid).map((m) => ({ id: m.id, label: m.name }));
+  // The map menu (map tokens PR 4; mockup context-menu-desktop): right-click, Shift+F10 or the
+  // Menu key. It shows only what this seat can do; every item opens an existing flow or sends one
+  // authoritative command (the server checks each one again).
+  const { commandBatch } = useEconomy();
+  const [mapMenu, setMapMenu] = useState<{
+      x: number;
+      y: number;
+      point: { x: number; y: number };
+      tokenIds: string[];
+      returnTo?: HTMLElement | null;
+      /** Phones' More: the same menu as a bottom sheet, maybe opened at a submenu. */
+      sheet?: boolean;
+      submenu?: string;
+    }>(),
+    // The phone's press-and-hold radial (map tokens PR 5): where, on what, and which ring.
+    [radial, setRadial] = useState<{
+      /** The press point (client pixels); the wheel is centred there, kept inside the map. */
+      press: { x: number; y: number };
+      point: { x: number; y: number };
+      tokenIds: string[];
+      /** The finger that opened it is still down (slide-to-select). */
+      pointerId?: number;
+      hot?: number;
+      /** A submenu ring (Move party to, Size, Send to) replaces the main one. */
+      ring?: string;
+      /** The finger has slid since the wheel opened (a release then picks or closes). */
+      slid?: boolean;
+      /** Taps count only after this time: the lift that left it open must not tap a slice. */
+      tapsFrom?: number;
+    }>(),
+    [holding, setHolding] = useState<{ x: number; y: number }>(),
+    // Map menu quick flows (map tokens PR 6): Add creatures / Add characters at a point, and
+    // Start encounter here (this map as the encounter map, the point as the return camera).
+    [quickPanel, setQuickPanel] = useState<{ kind: "creatures" | "characters"; point: { x: number; y: number } }>(),
+    [encounterHere, setEncounterHere] = useState<{ nonce: string; camera: { x: number; y: number; zoom: number } }>(),
+    cloudNow = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable),
+    cloudCode = cloudNow.joined ? cloudNow.code : "device",
+    [partyMoveOptions, setPartyMoveOptions] = useState<PartyMoveOptions>({ follow: true, placeTokens: true }),
+    encounterId = useDm ? mapEncounterId(recordTable, map) : undefined,
+    [combatantIds, setCombatantIds] = useState<{ id: string; ids: Set<string> }>();
+  // Token follows the player's map view (map tokens PR 7): the DM's setting and the player's own switch.
+  const followScope = `${cloudCode}:${seatNow.purseIds.join(",")}`;
+  useTokenFollow({ map, maps, table: recordTable, seat: seatNow, scope: followScope, viewOnly: !!cloudNow.viewOnly });
+  const menuTokenCount = (mapMenu ?? radial)?.tokenIds.length ?? 0;
+  // "Start encounter here" applies to the panel it opened; the next opening starts plain.
+  useEffect(() => {
+    if (!combatOpen) setEncounterHere(undefined);
+  }, [combatOpen]);
+  const closeSidePanels = () => {
+    setPartyPanel(false);
+    if (tools.group.placing) tools.group.setPlacing(null);
+    setCombatOpen(false);
+    setDrawerOpen(false);
+    setLayersOpen(false);
+    setHereOpen(false);
+    tools.hideInspector();
+  };
+  useEffect(() => {
+    // While a token menu is open, the tracker says who is already in combat.
+    if (!menuTokenCount || !encounterId) return;
+    return encounterDetailPoller.subscribe(encounterId, {
+      intervalMs: 3000,
+      onResult: (row) =>
+        setCombatantIds({
+          id: encounterId,
+          ids: new Set(((row as { body?: { combatants?: { id: string }[] } }).body?.combatants ?? []).map((c) => c.id)),
+        }),
+      onError: () => undefined,
+    });
+  }, [menuTokenCount, encounterId]);
+  const menuSquare = (point: { x: number; y: number }) => {
+    if (!map.grid) return undefined;
+    const at = snapTokenPosition(map.grid, {}, point);
+    return at ? { column: at.column, row: at.row } : undefined;
+  };
+  /** The menu's target: the DM's token (or the selection it belongs to), a player's own token, else the point. */
+  const menuTargetAt = (clientX: number, clientY: number, tokenId?: string) => {
+    let tokenIds: string[] = [];
+    const token = tokenId ? map.tokens?.find((t) => t.id === tokenId) : undefined;
+    if (token && useDm) {
+      tokenIds = tools.selected.includes(token.id) && tools.selected.length > 1 ? tools.selected : [token.id];
+      if (!tools.selected.includes(token.id)) tools.menu.selectOnly([token.id]);
+    } else if (token?.kind === "character" && token.entityId && seatNow.purseIds.includes(token.entityId))
+      tokenIds = [token.id];
+    const point = tokenIds.length && token && map.grid ? sceneTokenPoint(map.grid, token) : mapPoint(clientX, clientY);
+    return { point, tokenIds };
+  };
+  const openMapMenu = (
+    clientX: number,
+    clientY: number,
+    tokenId?: string,
+    returnTo?: HTMLElement | null,
+    sheet = false,
+  ) => {
+    if (sketches.active || tools.group.placing || planner.active) return;
+    setRadial(undefined);
+    setMapMenu({ x: clientX, y: clientY, ...menuTargetAt(clientX, clientY, tokenId), returnTo: returnTo ?? root.current, sheet });
+  };
+  const closeMapMenu = (activated: boolean) => {
+    const back = mapMenu?.returnTo;
+    setMapMenu(undefined);
+    // Focus returns to the map (or the token) unless the action opened something else.
+    if (!activated || document.activeElement === document.body) (back?.isConnected ? back : root.current)?.focus({ preventScroll: true });
+  };
+  const centreOn = (point: { x: number; y: number }) =>
+    setView((v) => ({ ...v, x: size.w / 2 - point.x * w * v.scale, y: size.h / 2 - point.y * h * v.scale }));
+  const menuTarget = mapMenu ?? radial;
+  const menuTokens = (menuTarget?.tokenIds ?? []).flatMap((id) => map.tokens?.find((t) => t.id === id) ?? []);
+  const destinations = useDm ? partyDestinations(maps, map) : { submaps: [], connected: [] };
+  const moveParty = async (destinationId: string) => {
+    const to = maps.find((m) => m.id === destinationId);
+    if (!to) return;
+    const steps = partyMoveCommands(recordTable, map, to, partyMoveOptions);
+    if (!steps.length) {
+      selectMap(to.id, partyEntry(map, to));
+      return;
+    }
+    // What will happen, before anything is sent (plan section 3.1).
+    const ok = await requestConfirm({
+      title: `Move ${groupInfo(recordTable, partyMoveOptions.groupId ?? MAIN_GROUP).name.replace(/^The /, "the ")} to ${to.name}?`,
+      body: partyMoveSummary(recordTable, map, to, steps, partyMoveOptions.groupId),
+      confirmLabel: "Move party",
+    });
+    if (!ok) return;
+    try {
+      const outcome = await commandBatch(crypto.randomUUID(), steps);
+      resultToast(mutationNotice(outcome, `The party moved to ${to.name}`));
+      selectMap(to.id, partyEntry(map, to));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The party could not be moved. Nothing changed.");
+    }
+  };
+  const actionList = menuTarget
+    ? mapActions(
+        menuTokens.length ? { kind: "tokens", tokens: menuTokens } : { kind: "map", square: menuSquare(menuTarget.point) },
+        {
+          dm: useDm,
+          grid: !!map.grid,
+          selected: tools.selected.length,
+          purseIds: seatNow.purseIds,
+          canPlaceOwn: !!claimable,
+          canPing: !signals.viewOnly,
+          encounterId,
+          combatants: combatantIds?.id === encounterId ? combatantIds?.ids : undefined,
+          mapVisible: map.visible,
+          destinations: destinations.submaps.length + destinations.connected.length + sendTargets.length > 0,
+        },
+      )
+    : undefined;
+  useEffect(() => {
+    if (actionList) setPlaceAnnouncement(actionList.announce);
+    // Announced once per opened menu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapMenu, !!radial]);
+  const builtMenu = (() => {
+    if (!menuTarget || !actionList) return undefined;
+    const at = menuTarget.point,
+      tokens = menuTokens,
+      one = tokens[0];
+    const destinationItems = (list: PartyDestination[], submap: boolean) =>
+      list.map((d) => ({
+        id: `move-party:${d.mapId}`,
+        label: d.name,
+        icon: submap ? <DoorOpen size={16} /> : <MapIcon size={16} />,
+        hint: d.hint,
+        run: () => void moveParty(d.mapId),
+      }));
+    const menu = menuFromActions(
+      actionList,
+      {
+        "start-encounter": () => {
+          setEncounterHere({ nonce: crypto.randomUUID(), camera: { x: at.x, y: at.y, zoom: view.scale } });
+          centreOn(at);
+          openCombat();
+        },
+        "add-creatures": map.grid ? () => (closeSidePanels(), setQuickPanel({ kind: "creatures", point: at })) : undefined,
+        "add-characters": map.grid ? () => (closeSidePanels(), setQuickPanel({ kind: "characters", point: at })) : undefined,
+        "place-party": map.grid
+          ? () => tools.menu.placeAt({ members: partyMembers(), mode: "formation", label: "party" }, at)
+          : undefined,
+        "place-selected": () =>
+          tools.menu.placeAt(
+            { members: tools.group.selectedTokens.map((token) => ({ token, before: token })), mode: "formation", label: "selection" },
+            at,
+          ),
+        "party-position": setup ? () => armSetup("party", at) : undefined,
+        "place-record": setup ? () => armSetup("record", at) : undefined,
+        marker: setup ? () => armSetup("marker", at) : undefined,
+        entrance: setup ? () => armSetup("entrance", at) : undefined,
+        ping: () => void signals.send(at, color),
+        measure: () => {
+          chooseTool("measure");
+          tools.menu.measureFrom(at);
+        },
+        "share-view": () => void tools.shareCamera({ x: at.x, y: at.y, zoom: view.scale }),
+        reveal: () => tools.menu.revealAround(at),
+        light: () => tools.menu.addLightAt(at),
+        "place-mine": claimable ? () => tools.menu.claimAt(claimable.id, at) : undefined,
+        "open-tracker": encounterId || one?.encounterId
+          ? () => void navigate({ href: `/encounters?encounter=${encodeURIComponent(one?.encounterId ?? encounterId!)}` })
+          : undefined,
+        "open-sheet": one?.entityId ? () => void navigate({ to: "/characters", search: { id: one.entityId } }) : undefined,
+        "my-sheet": one?.entityId ? () => void navigate({ to: "/characters", search: { id: one.entityId } }) : undefined,
+        centre: () => centreOn(at),
+        "move-to": () =>
+          tools.group.startPlacing({ members: tokens.map((token) => ({ token, before: token })), mode: "keep", label: tokens.length === 1 ? one.label : "selection" }),
+        hide: () => groupActions.hide(tokens, true),
+        show: () => groupActions.hide(tokens, false),
+        lock: () => groupActions.lock(tokens, true),
+        unlock: () => groupActions.lock(tokens, false),
+        "add-initiative": () => void addToInitiative(recordTable, map, tokens, tools.group.act),
+        "remove-combat": () => void removeFromInitiative(recordTable, map, tokens),
+        controllers: () => (tools.menu.selectOnly([one.id]), tools.openInspector()),
+        remove: () => void groupActions.remove(tokens),
+      },
+      {
+        "move-party": {
+          groups: [
+            ...(destinations.submaps.length ? [{ label: `Submaps of ${map.name}`, items: destinationItems(destinations.submaps, true) }] : []),
+            ...(destinations.connected.length ? [{ label: "Connected", items: destinationItems(destinations.connected, false) }] : []),
+            // A split party: choose which group moves (plan: "Move Group B to…").
+            ...(partySplit(recordTable)
+              ? [
+                  {
+                    label: "Who moves",
+                    items: groupRefs(recordTable).map((ref) => ({
+                      id: `group:${ref}`,
+                      label: groupInfo(recordTable, ref).name,
+                      checked: (partyMoveOptions.groupId ?? MAIN_GROUP) === ref,
+                      run: () => setPartyMoveOptions((o) => ({ ...o, groupId: ref === MAIN_GROUP ? undefined : ref })),
+                      keepOpen: true,
+                    })),
+                  },
+                ]
+              : []),
+            {
+              items: [
+                {
+                  id: "follow",
+                  label: "Players' scene follows",
+                  checked: partyMoveOptions.follow,
+                  run: () => setPartyMoveOptions((o) => ({ ...o, follow: !o.follow })),
+                  keepOpen: true,
+                },
+                {
+                  id: "place-tokens",
+                  label: "Place party tokens at the entry",
+                  checked: partyMoveOptions.placeTokens,
+                  run: () => setPartyMoveOptions((o) => ({ ...o, placeTokens: !o.placeTokens })),
+                  keepOpen: true,
+                },
+              ],
+            },
+          ],
+        },
+        size: {
+          groups: [
+            {
+              items: TOKEN_SIZE_CLASSES.map((size) => ({
+                id: `size:${size}`,
+                label: SIZE_NAMES[size],
+                checked: tokens.length > 0 && tokens.every((t) => t.sizeClass === size || (!t.sizeClass && size === "medium" && !t.footprint)),
+                run: () => groupActions.size(tokens, size),
+              })),
+            },
+          ],
+        },
+        "send-to": { groups: [{ items: sendTargets.map((m) => ({ id: `send:${m.id}`, label: m.label, icon: <MapIcon size={16} />, run: () => groupActions.send(tokens, m.id) })) }] },
+      },
+    );
+    return menu;
+  })();
+  const viewportBox = () => {
+    const box = root.current?.getBoundingClientRect();
+    return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  };
+  const menuElement =
+    mapMenu && builtMenu ? (
+      <MapContextMenu
+        key={mapMenu.sheet ? "sheet" : "menu"}
+        menu={
+          mapMenu.sheet
+            ? {
+                // The sheet keeps the desktop groups; Table and Reveal share one heading (mockup).
+                ...builtMenu,
+                groups: builtMenu.groups.flatMap((g, i, all) =>
+                  g.label === "Reveal" && all[i - 1]?.label === "Table"
+                    ? []
+                    : g.label === "Table" && all[i + 1]?.label === "Reveal"
+                      ? [{ label: "Table · Reveal", items: [...g.items, ...all[i + 1].items] }]
+                      : [g],
+                ),
+              }
+            : builtMenu
+        }
+        x={mapMenu.x}
+        y={mapMenu.y}
+        bounds={viewportBox()}
+        close={closeMapMenu}
+        sheet={mapMenu.sheet}
+        initialSubmenu={mapMenu.submenu}
+      />
+    ) : null;
+  // The phone's press-and-hold radial (map tokens PR 5; mockups radial-mobile, radial-mobile-320).
+  const tick = () => {
+    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) navigator.vibrate?.(10);
+  };
+  const lastTouch = useRef(0),
+    pressAt = useRef<{ x: number; y: number; tokenId?: string }>(undefined),
+    fireRadial = useRef<(pointerId: number) => void>(() => undefined);
+  fireRadial.current = (pointerId) => {
+    const at = pressAt.current;
+    setHolding(undefined);
+    if (!at) return;
+    // The hold wins over a drag that never started and over the pan.
+    tools.cancel();
+    toolPointer.current = undefined;
+    pointers.current.clear();
+    moved.current = true;
+    tick();
+    setMapMenu(undefined);
+    setRadial({ press: { x: at.x, y: at.y }, ...menuTargetAt(at.x, at.y, at.tokenId), pointerId });
+  };
+  const press = useRef<ReturnType<typeof longPress>>(undefined);
+  press.current ??= longPress((id) => fireRadial.current(id));
+  const radialEligible = () =>
+    ["pan", "select"].includes(tools.tool) &&
+    !placing &&
+    !pinging &&
+    !sketches.active &&
+    !planner.active &&
+    !tools.group.placing &&
+    !tools.claim.purseId &&
+    !radial &&
+    !mapMenu;
+  const radialView = (() => {
+    if (!radial || !builtMenu || !actionList) return undefined;
+    const all = builtMenu.groups.flatMap((g) => g.items);
+    type Item = RadialItem & { run?: () => void; submenu?: boolean };
+    let items: Item[],
+      hub: ReactNode,
+      hubLabel = "Close map actions",
+      ringLabel = "Map actions";
+    const parent = radial.ring ? all.find((i) => i.id === radial.ring) : undefined;
+    if (parent?.submenu) {
+      // A submenu replaces the ring (the desktop submenu's items, without its options), then Back.
+      const options = parent.submenu.groups.flatMap((g) => g.items).filter((i) => radial.ring === "size" || i.checked === undefined);
+      items = [
+        ...options.map((i) => ({
+          id: i.id,
+          label: radial.ring === "size" ? i.label : shortMapName(i.label),
+          pill: [i.label, i.hint, radial.ring === "move-party" && partyMoveOptions.follow ? "players follow" : undefined].filter(Boolean).join(" · "),
+          icon: i.icon,
+          disabled: i.disabled,
+          run: i.run,
+        })),
+        { id: "back", label: "Back", pill: "Back", icon: <ChevronLeft size={20} /> },
+      ];
+      hub = (
+        <>
+          {parent.icon}
+          <small>{parent.label}</small>
+        </>
+      );
+      ringLabel = parent.label;
+      hubLabel = `Close ${parent.label}`;
+    } else {
+      const slices = radialSlices(actionList, {
+        dm: useDm,
+        tokens: menuTokens.length > 0,
+        purseIds: seatNow.purseIds,
+        pills: {
+          "place-party": `${(readTabletopSession(recordTable).partyFormation ?? DEFAULT_FORMATION).shape}, ${partyRows.filter((r) => r.checked).length} tokens`,
+          ...(claimable ? { "place-mine": claimable.name } : {}),
+        },
+      });
+      items = slices.map((slice) => {
+        const item = all.find((i) => i.id === slice.id);
+        const run =
+          slice.id === "my-sheet" && !item
+            ? () => void navigate({ to: "/characters", search: { id: seatNow.purseIds[0] } })
+            : item?.run;
+        return {
+          ...slice,
+          icon: slice.id === "more" ? <Ellipsis size={20} /> : MAP_ACTION_ICONS[slice.id],
+          disabled: slice.id === "more" ? false : slice.disabled || (!slice.submenu && !run) || (slice.submenu && item?.disabled),
+          run,
+        };
+      });
+      hub = menuTokens.length ? (
+        <>
+          <b>{actionList.title}</b>
+          <small>{actionList.subtitle.split(" · ")[0]}</small>
+        </>
+      ) : (
+        <>
+          <X size={20} />
+          <small>{actionList.subtitle}</small>
+        </>
+      );
+    }
+    const geometry = radialGeometry(radial.press, items.length, viewportBox(), {
+      player: !useDm,
+      moreLast: !radial.ring && items.at(-1)?.id === "more",
+    });
+    return { items, hub, hubLabel, ringLabel, geometry };
+  })();
+  const closeRadial = () => {
+    setRadial(undefined);
+    root.current?.focus({ preventScroll: true });
+  };
+  const pickRadial = (index: number) => {
+    const view = radialView,
+      item = view?.items[index];
+    if (!radial || !view || !item || item.disabled) return;
+    if (item.id === "more") {
+      setRadial(undefined);
+      setMapMenu({ x: radial.press.x, y: radial.press.y, point: radial.point, tokenIds: radial.tokenIds, returnTo: root.current, sheet: true });
+      return;
+    }
+    if (item.id === "back") {
+      setRadial({ ...radial, ring: undefined, hot: undefined, pointerId: undefined });
+      return;
+    }
+    if (item.submenu) {
+      const count = builtMenu?.groups.flatMap((g) => g.items).find((i) => i.id === item.id)?.submenu?.groups.flatMap((g) => g.items).length ?? 0;
+      // Up to seven choices fit a ring (with Back); more open in the sheet.
+      if (count > 7) {
+        setRadial(undefined);
+        setMapMenu({ x: radial.press.x, y: radial.press.y, point: radial.point, tokenIds: radial.tokenIds, returnTo: root.current, sheet: true, submenu: item.id });
+      } else setRadial({ ...radial, ring: item.id, hot: 0, pointerId: undefined });
+      return;
+    }
+    setRadial(undefined);
+    item.run?.();
+  };
+  /** Pointer handling for the radial: true when the event belonged to it. */
+  const radialPointer = {
+    down(e: React.PointerEvent) {
+      if (e.pointerType === "mouse") return;
+      lastTouch.current = Date.now();
+      const eligible = radialEligible() && (e.pointerType === "touch" || e.pointerType === "pen");
+      if (eligible && !press.current!.pending)
+        pressAt.current = {
+          x: e.clientX,
+          y: e.clientY,
+          tokenId: (e.target as Element).closest<HTMLElement>("[data-map-token]")?.dataset.mapToken,
+        };
+      press.current!.down(e.pointerId, e.clientX, e.clientY, eligible);
+      setHolding(press.current!.pending ? { x: e.clientX, y: e.clientY } : undefined);
+    },
+    move(e: React.PointerEvent) {
+      if (radial && radialView && radial.pointerId === e.pointerId) {
+        const hit = radialHit(radialView.geometry, e.clientX, e.clientY);
+        const hot = typeof hit === "number" && !radialView.items[hit]?.disabled ? hit : undefined;
+        const slid = radial.slid || Math.hypot(e.clientX - radial.press.x, e.clientY - radial.press.y) > RADIAL_SLOP_PX;
+        if (hot !== radial.hot || slid !== radial.slid) {
+          // Until the finger slides, the wheel (moved inward near an edge) highlights nothing.
+          setRadial({ ...radial, hot: slid ? hot : undefined, slid });
+          if (slid && hot !== undefined && hot !== radial.hot) tick();
+        }
+        return true;
+      }
+      press.current!.move(e.pointerId, e.clientX, e.clientY);
+      if (holding && !press.current!.pending) setHolding(undefined);
+      return false;
+    },
+    up(e: React.PointerEvent) {
+      press.current!.up(e.pointerId);
+      if (holding) setHolding(undefined);
+      if (radial && radialView && radial.pointerId === e.pointerId) {
+        pointers.current.delete(e.pointerId);
+        const hit = radialHit(radialView.geometry, e.clientX, e.clientY);
+        // Slide-to-select releases on a slice; lifting without sliding or in the centre keeps it
+        // open for a tap; sliding off the wheel and releasing closes it.
+        if (radial.slid && typeof hit === "number") pickRadial(hit);
+        else if (radial.slid && hit === "outside") closeRadial();
+        else setRadial({ ...radial, pointerId: undefined, hot: undefined, slid: false, tapsFrom: Date.now() + 300 });
+        return true;
+      }
+      return false;
+    },
+    cancel(e: React.PointerEvent) {
+      press.current!.cancel();
+      setHolding(undefined);
+      if (radial?.pointerId === e.pointerId) setRadial({ ...radial, pointerId: undefined, hot: undefined });
+    },
+  };
+  const radialElement =
+    radial && radialView ? (
+      <MapRadial
+        geometry={radialView.geometry}
+        items={radialView.items}
+        hub={radialView.hub}
+        hubLabel={radialView.hubLabel}
+        label={radialView.ringLabel}
+        hot={radial.hot}
+        pill={radial.hot !== undefined ? radialView.items[radial.hot]?.pill : undefined}
+        pick={pickRadial}
+        close={closeRadial}
+        tapsFrom={radial.tapsFrom}
+      />
+    ) : holding ? (
+      <RadialProgress x={holding.x} y={holding.y} />
+    ) : null;
   return (
     <MapFrame title={map.name} interfaceHidden={interfaceHidden}>
       <MapWorkspaceChrome
@@ -2961,6 +3734,11 @@ function MapViewport({
           });
         }}
         compactSearch={!!setup}
+        subtitle={
+          (useDm ? combatOnMap(recordTable, map.id) : movement.combat)
+            ? "Combat"
+            : readMarketLocations(recordTable.journal?.market).locations.find((l) => l.id === map?.locationId)?.name
+        }
         settingsOpen={drawerOpen}
         toggleSettings={openSettings}
         parent={parentMap}
@@ -3086,6 +3864,13 @@ function MapViewport({
             )}
           </SettingsGroup>
           <SettingsGroup id="players" title="Players & display">
+            {useDm && <MovementNotice map={map} />}
+            <FollowViewSettings
+              table={recordTable}
+              dm={useDm}
+              scope={followScope}
+              character={recordTable.purses.find((p) => p.kind === "character" && seatNow.purseIds.includes(p.id))?.name}
+            />
             {setupSettings.players}
             <div className="map-tile-control-area">{controls.session}</div>
             {tools.sceneControls}
@@ -3362,6 +4147,16 @@ function MapViewport({
                   </MapToolGroup>
                   <MapToolGroup caption="Combat">
                     {SETUP_TOOLS.slice(5).map(setupButton)}
+                    {map.grid && (
+                      <MapTool
+                        icon={<Users size={19} />}
+                        label="Place party"
+                        shortcut="⇧A"
+                        keys="Shift+A"
+                        expanded={partyPanel}
+                        onClick={() => (partyPanel ? closePlaceParty() : openPlaceParty())}
+                      />
+                    )}
                   </MapToolGroup>
                   <MapToolGroup caption="Objects">
                     <MapTool
@@ -3576,8 +4371,140 @@ function MapViewport({
                   <span>{tileMode && (gridLocked || gridVisible) ? "On" : "Off"}</span>
                 </button>
               )}
+              {map.grid && useDm && (
+                // Grid mode (map tokens 1b): the shared snap setting, for everyone at the table.
+                <button
+                  className="map-layer-toggle"
+                  aria-label="Grid mode"
+                  aria-pressed={tools.gridMode.on}
+                  disabled={tools.busy}
+                  onClick={() => tools.gridMode.set(!tools.gridMode.on)}
+                >
+                  <Grid3X3 size={18} aria-hidden="true" />
+                  Grid mode
+                  <span>{tools.gridMode.on ? "On" : "Off"}</span>
+                </button>
+              )}
             </aside>
           )}
+          {tools.gridMode.dialog}
+          {quickPanel?.kind === "creatures" && useDm && (
+            <AddCreaturesPanel
+              map={map}
+              table={recordTable}
+              code={cloudCode}
+              point={quickPanel.point}
+              act={tools.group.act}
+              close={() => (setQuickPanel(undefined), root.current?.focus({ preventScroll: true }))}
+            />
+          )}
+          {quickPanel?.kind === "characters" && useDm && (
+            <AddCharactersPanel
+              rows={recordTable.purses
+                .filter((p) => p.kind === "character")
+                .map((p) => {
+                  const ref = groupRefs(recordTable).find((g) => groupMembers(recordTable, g).some((m) => m.id === p.id));
+                  return {
+                    purseId: p.id,
+                    name: p.name,
+                    status: map.tokens?.some((t) => t.kind === "character" && t.entityId === p.id)
+                      ? "on map · will move"
+                      : ref
+                        ? groupInfo(recordTable, ref).name
+                        : "not in the party",
+                  };
+                })}
+              place={(ids) => {
+                const point = quickPanel.point;
+                setQuickPanel(undefined);
+                tools.menu.placeAt(
+                  {
+                    members: membersFor(ids.map((id) => ({ purseId: id, name: recordTable.purses.find((p) => p.id === id)?.name ?? id }))),
+                    mode: "formation",
+                    label: "characters",
+                  },
+                  point,
+                );
+              }}
+              close={() => (setQuickPanel(undefined), root.current?.focus({ preventScroll: true }))}
+            />
+          )}
+          {partyPanel && tools.group.placing && (
+            <PlacePartyPanel
+              rows={partyRows}
+              toggle={(purseId) =>
+                setPartyChecks((checks) => ({
+                  ...checks,
+                  [purseId]: !(partyRows.find((r) => r.purseId === purseId)?.checked ?? false),
+                }))
+              }
+              formation={tools.group.placing.formation}
+              setFormation={(formation) =>
+                tools.group.setPlacing((current) => (current ? { ...current, formation } : current))
+              }
+              makeDefault={makeDefault}
+              setMakeDefault={setMakeDefault}
+              close={closePlaceParty}
+            />
+          )}
+          {tools.group.placing && (
+            <PlacingHint
+              count={tools.group.placing.members.length}
+              at={tools.group.plan?.places[0] && tools.group.anchor ? {
+                column: Math.min(...tools.group.plan.places.map((p) => p.column)),
+                row: Math.min(...tools.group.plan.places.map((p) => p.row)),
+              } : undefined}
+              shape={tools.group.placing.mode === "keep" ? "same shape" : tools.group.placing.formation.shape}
+              displaced={tools.group.plan?.displaced ?? 0}
+              unplaced={tools.group.plan?.unplaced ?? 0}
+            />
+          )}
+          {useDm &&
+            map.grid &&
+            !partyPanel &&
+            (tools.group.selectedTokens.length >= 2 ||
+              (layout === "phone" && tools.group.selectedTokens.length >= 1) ||
+              tools.group.selectMode) && (
+              <GroupBar
+                tokens={tools.group.selectedTokens}
+                placing={!!tools.group.placing}
+                busy={tools.busy}
+                phone={layout === "phone"}
+                raised={layout === "phone" && tools.inspecting}
+                selectMode={tools.group.selectMode}
+                setSelectMode={tools.group.setSelectMode}
+                movement={movement.mode}
+                maps={sendTargets}
+                onPlace={() =>
+                  tools.group.startPlacing({
+                    members: tools.group.selectedTokens.map((token) => ({ token, before: token })),
+                    mode: "formation",
+                    label: "selection",
+                  })
+                }
+                onMove={() =>
+                  tools.group.startPlacing({
+                    members: tools.group.selectedTokens.map((token) => ({ token, before: token })),
+                    mode: "keep",
+                    label: "selection",
+                  })
+                }
+                onHide={(hide) => groupActions.hide(tools.group.selectedTokens, hide)}
+                onLock={(lock) => groupActions.lock(tools.group.selectedTokens, lock)}
+                onSize={(size) => groupActions.size(tools.group.selectedTokens, size)}
+                onSend={(targetId) => groupActions.send(tools.group.selectedTokens, targetId)}
+                onMovement={(mode) =>
+                  void tools.group.act({
+                    kind: "map-tabletop",
+                    mapId: map.id,
+                    before: map.tabletop ?? null,
+                    settings: { ...readMapTabletop(map), movement: mode, playerMovement: mode !== "off" },
+                  })
+                }
+                onInitiative={() => void addToInitiative(recordTable, map, tools.group.selectedTokens, tools.group.act)}
+                onClear={tools.group.clear}
+              />
+            )}
           {contextOpen && !drawerOpen && (
             <aside
               className={`map-tool-context map-glass${revealTool ? " map-tool-context-setup" : ""}`}
@@ -3700,8 +4627,15 @@ function MapViewport({
           </div>
         </>
       )}
-      {!interfaceHidden && <MapCombatHud map={map} />}
+      {!interfaceHidden &&
+        (!useDm && movement.combat && turnOrder ? (
+          <MapTurnStrip map={map} movement={movement} order={turnOrder} />
+        ) : (
+          <MapCombatHud map={map} />
+        ))}
       <MapAnnouncer map={map} pings={signals.pings} />
+      {menuElement}
+      {radialElement}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {placeAnnouncement}
       </p>
@@ -3733,6 +4667,33 @@ function MapViewport({
             {tools.measurement && ` · ${tools.measurement}`}
           </p>
         )}
+        {!useDm && tileMode && map.grid && (
+          <>
+            <MovementChips
+              movement={movement}
+              speed={speedFeet}
+              hasToken={!!ownToken}
+              fog={readMapTabletop(map).fog.enabled || readMapTabletop(map).vision !== "off"}
+            />
+            {claimable &&
+              (tools.claim.purseId ? (
+                <p role="status" className="map-claim-bar">
+                  Tap a square to place {claimable.name}.{" "}
+                  <button type="button" onClick={tools.claim.cancel}>
+                    Cancel
+                  </button>
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="map-move-chip lead map-claim-chip"
+                  onClick={() => tools.claim.start(claimable.id)}
+                >
+                  Place my token
+                </button>
+              ))}
+          </>
+        )}
         {tools.feedback}
         {pinging && (
           <p role="status">
@@ -3759,12 +4720,29 @@ function MapViewport({
         <div className="tabletop-surface">
           <div
             ref={root}
-            className={`map-viewport ${placing || pinging ? "placing" : ""}`}
+            className={`map-viewport ${placing || pinging ? "placing" : ""}${radial ? " radial-open" : ""}`}
             role="region"
             aria-label="Interactive campaign map"
+            aria-keyshortcuts="Shift+F10 ContextMenu"
             tabIndex={0}
+            onContextMenu={(e) => {
+              // The map's own menu replaces the browser's inside the map (map tokens PR 4).
+              e.preventDefault();
+              // A long press on a phone fires contextmenu too: the radial handles touch.
+              if (Date.now() - lastTouch.current < 1500 || radial) return;
+              const token = (e.target as Element).closest<HTMLElement>("[data-map-token]");
+              openMapMenu(e.clientX, e.clientY, token?.dataset.mapToken, token);
+            }}
             onKeyDown={(e) => {
               if (fogHistoryKey(e)) return;
+              if ((e.key === "F10" && e.shiftKey) || e.key === "ContextMenu") {
+                // At the focused token, else the keyboard crosshair (the view centre).
+                e.preventDefault();
+                const token = (e.target as Element).closest<HTMLElement>("[data-map-token]");
+                const box = (token ?? root.current!).getBoundingClientRect();
+                openMapMenu(box.left + box.width / 2, box.top + box.height / 2, token?.dataset.mapToken, token ?? root.current);
+                return;
+              }
               if (!e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey && setupShortcut(e.key)) {
                 e.preventDefault();
                 return;
@@ -3843,6 +4821,7 @@ function MapViewport({
             }}
             onPointerDown={(e) => {
               if (e.button !== 0) return;
+              radialPointer.down(e);
               if (sketches.active) {
                 sketches.down(mapPoint(e.clientX, e.clientY));
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -3871,6 +4850,9 @@ function MapViewport({
               } else moved.current = true;
             }}
             onPointerMove={(e) => {
+              if (radialPointer.move(e)) return;
+              if (tools.group.placing && toolPointer.current !== e.pointerId)
+                tools.group.hover(mapPoint(e.clientX, e.clientY));
               if (toolPointer.current === e.pointerId) {
                 moved.current = true;
                 if (sketches.active) sketches.move(mapPoint(e.clientX, e.clientY));
@@ -3909,6 +4891,7 @@ function MapViewport({
               }
             }}
             onPointerUp={(e) => {
+              if (radialPointer.up(e)) return;
               if (toolPointer.current === e.pointerId) {
                 if (sketches.active) sketches.up(mapPoint(e.clientX, e.clientY));
                 else tools.pointerUp(mapPoint(e.clientX, e.clientY));
@@ -3945,6 +4928,7 @@ function MapViewport({
               pointers.current.delete(e.pointerId);
             }}
             onPointerCancel={(e) => {
+              radialPointer.cancel(e);
               pointers.current.delete(e.pointerId);
               if (toolPointer.current === e.pointerId) {
                 toolPointer.current = undefined;
@@ -4018,7 +5002,12 @@ function MapViewport({
                   })}
                 </svg>
               )}
-              {tileMode && (gridLocked || gridVisible) && map.grid && (
+              {/* Grid mode (map tokens 1b): lines are drawn while grid mode is on, unless the
+                  map's automatic grid is hidden; an encounter's grid presentation always shows them. */}
+              {tileMode &&
+                (gridLocked ||
+                  (gridVisible && !map.tabletop?.gridHidden && readMapTabletop(map).snap)) &&
+                map.grid && (
                 <svg
                   className="map-tile-grid"
                   viewBox="0 0 1000 1000"
@@ -4048,6 +5037,43 @@ function MapViewport({
               {tools.overlay}
             </div>
             {planner.handles}
+            <MapTokenLayer
+              map={map}
+              tokens={discTokens}
+              view={view}
+              width={w}
+              height={h}
+              selected={tools.selected}
+              moves={tools.moves}
+              movement={useDm ? undefined : movement}
+              ghosts={tools.group.ghosts}
+              box={tools.group.box}
+              notTurn={tools.notTurn}
+              speedFeet={speedFeet}
+              onActivate={(token, event) => {
+                if (planner.active && !moved.current && !placing && !pinging) {
+                  if (!planner.calibrating) planner.addAt(sceneTokenPoint(map.grid!, token));
+                  return;
+                }
+                // A keyboard press (detail 0) is never the end of a drag.
+                if (
+                  (moved.current && event.detail !== 0) ||
+                  pinging ||
+                  sketches.active ||
+                  !["pan", "select"].includes(tools.tool)
+                )
+                  return;
+                const openToken = () => {
+                  setService(undefined);
+                  setCombatOpen(false);
+                  setHereOpen(false);
+                  setDetails([]);
+                  // Pointer presses select through the tools; keyboard activation selects here.
+                  if (event.detail === 0) tools.choose(token.id, event.shiftKey);
+                };
+                if (!(service || combatOpen) || allowContextChange(openToken)) openToken();
+              }}
+            />
             {groups.map((group) => (
               <div
                 key={group.id}
@@ -4289,7 +5315,13 @@ function MapViewport({
                 </Button>
               </div>
               <Suspense fallback={<p>Opening encounter controls…</p>}>
-                <MapCombatWorkspace map={map} camera={currentCamera} openMap={selectMap} />
+                <MapCombatWorkspace
+                  key={encounterHere?.nonce ?? "map"}
+                  map={map}
+                  camera={currentCamera}
+                  openMap={selectMap}
+                  here={encounterHere}
+                />
               </Suspense>
             </section>
           )}

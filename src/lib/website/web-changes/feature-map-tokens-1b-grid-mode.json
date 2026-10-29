@@ -1,0 +1,11 @@
+{
+  "title": "Grid mode for map tokens",
+  "summary": "DMs can switch a map's grid mode on and off, and line tokens up with the grid in one step when they turn it on.",
+  "items": [
+    "Grid mode (in Layers and the Inspector) snaps tokens to squares for everyone and draws the grid lines. Turning it off lets tokens move freely and never moves a token.",
+    "Turning grid mode on with tokens between squares asks how to line them up: snap them to the nearest squares (recommended, one action with Undo) or shift the grid under them so they stay exactly where they are.",
+    "Just turn it on leaves tokens where they are.",
+    "Maps without a grid can get an automatic hidden grid in one tap from the Combat token tool, so you can place tokens anywhere and show the grid later.",
+    "The map title now shows its place (for example the city it belongs to)."
+  ]
+}
