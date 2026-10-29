@@ -60,7 +60,9 @@ export function projectZones(world: World, seat: Pick<CloudSeat, "role" | "purse
       .filter(
         (r) =>
           seat.purseIds.includes(r.purseId) ||
-          (r.status === "open" && !!seat.id && !!r.votes?.some((v) => v.seatId === seat.id && v.seatId !== r.seatId)),
+          (r.status === "open" &&
+            // A ballot on it (or, on an already projected table, the player's own `tally.mine`).
+            ((!!seat.id && !!r.votes?.some((v) => v.seatId === seat.id && v.seatId !== r.seatId)) || (!r.votes && r.tally?.mine !== undefined))),
       )
       .map((r): ZoneRequest => {
         const mine = seat.id ? r.votes?.find((v) => v.seatId === seat.id) : undefined;
@@ -79,7 +81,7 @@ export function projectZones(world: World, seat: Pick<CloudSeat, "role" | "purse
           ...(r.reason !== undefined ? { reason: r.reason } : {}),
           ...(r.deadline !== undefined ? { deadline: r.deadline } : {}),
           ...(r.majority !== undefined ? { majority: r.majority } : {}),
-          ...(r.votes ? { tally: { ...voteTally(r), ...(mine ? { mine: mine.vote } : {}) } } : {}),
+          ...(r.votes ? { tally: { ...voteTally(r), ...(mine ? { mine: mine.vote } : {}) } } : r.tally ? { tally: r.tally } : {}),
           ...(r.sessionId !== undefined ? { sessionId: r.sessionId } : {}),
           ...(r.decidedAt !== undefined ? { decidedAt: r.decidedAt } : {}),
         };

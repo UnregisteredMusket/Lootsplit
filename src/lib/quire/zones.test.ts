@@ -334,3 +334,12 @@ test("B9: zone-request checks both maps first and answers generically", () => {
   assert.throws(() => from("nowhere"), (e: Error) => e.message === "This map is unavailable.");
   assert.throws(() => run(t, { kind: "zone-request", requestId: "x", purseId: "mira", fromMapId: "city", toMapId: "commons", grid: g, at: { column: 5, row: 5 } }), (e: Error) => e.message === "This move can't be requested now. Refresh and try again.");
 });
+
+test("B4: projecting an already projected table keeps the tally and the voter's request", () => {
+  const t = ask(fixture());
+  const once = projectRecord(t, { ...torv });
+  const twice = projectRecord(once, { ...torv });
+  assert.deepEqual(twice.journal!.world!.zoneRequests, once.journal!.world!.zoneRequests);
+  const mover = projectRecord(projectRecord(t, { ...mira }), { ...mira }).journal!.world!.zoneRequests![0];
+  assert.deepEqual(mover.tally, { yes: 1, no: 0, waiting: 2, mine: "yes" });
+});
