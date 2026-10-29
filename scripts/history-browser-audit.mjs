@@ -4,7 +4,9 @@
 // "Load earlier entries" adds older ones; a search covers earlier entries (loaded as it runs); an
 // archived session is listed without its contents until "Load this session"; a player's chat at
 // 320 px offers "Load earlier messages" at its oldest end; Download a copy holds the whole
-// history; nothing scrolls sideways; no page errors. Never targets a real campaign.
+// history; closing the room to Local Mode from a fresh tab keeps the whole campaign on the
+// device, and hosting it again uploads it complete (a partial table is refused); nothing scrolls
+// sideways; no page errors. Never targets a real campaign.
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
@@ -127,7 +129,7 @@ try {
     return { ledger: view.table.ledger.length, notes: view.table.notes.length, cursors: Object.keys(view.history ?? {}), report: view.table.journal.reports[0] };
   });
   assert.ok(held.ledger < 1024 && held.notes < 1024, `the view holds the newest lines (${held.ledger}, ${held.notes})`);
-  assert.deepEqual(held.cursors.sort(), ["ledger", "notes"]);
+  assert.deepEqual(held.cursors.sort(), ["ledger", "notes", "projection"]);
   assert.equal(held.report.deferred, true);
   assert.equal(held.report.snapshot, "");
 
@@ -234,6 +236,63 @@ try {
   assert.ok(copy.notes >= LINES, `the copy holds every message (${copy.notes})`);
   assert.deepEqual(copy.reports.map(([deferred]) => deferred), [false]);
   assert.ok(copy.reports[0][1] > 1000, "the archived session is complete in the copy");
+
+  // 5. Review finding 1: the DM closes the room to Local Mode from a fresh tab (nothing loaded
+  // yet). The device keeps the whole campaign: every line and the archived session's contents.
+  await openApplication(dm.page, origin + "/party");
+  const local = await dm.page.evaluate(async () => {
+    const c = await import("/src/lib/quire/cloud-client.ts");
+    const { pullCloudTable } = await import("/src/lib/quire/room-transport.ts");
+    const { applyCloudTable, economySnapshot: deviceTable } = await import("/src/lib/quire/economy.ts");
+    // This device holds only the room's working view (as a DM's second device does): the newest
+    // lines and archived sessions without their contents.
+    const s = c.roomCredentials();
+    const working = await pullCloudTable({ data: { tabletopProtocol: 12, code: s.code, token: s.token } });
+    await applyCloudTable(working.table);
+    const before = (await deviceTable()).ledger.length;
+    await c.chooseTableMode("local");
+    const { economySnapshot } = await import("/src/lib/quire/economy.ts");
+    const t = await economySnapshot();
+    return {
+      before,
+      joined: c.getCloudTable().joined,
+      ledger: t.ledger.length,
+      notes: t.notes.length,
+      reports: t.journal.reports.map((r) => [r.deferred ?? false, r.snapshot.length]),
+      notice: t.notes.some((n) => n.id === c.DEVICE_HISTORY_NOTICE_ID),
+    };
+  });
+  assert.ok(local.before < 1024, `the device held the working view only (${local.before} ledger lines)`);
+  assert.equal(local.joined, false, "the room is closed");
+  assert.ok(local.ledger >= LINES, `the local campaign holds every ledger line (${local.ledger})`);
+  assert.ok(local.notes >= LINES, `the local campaign holds every message (${local.notes})`);
+  assert.ok(local.reports.length >= 1 && local.reports.every(([deferred, length]) => !deferred && length > 1000), "every archived session, complete");
+  assert.equal(local.notice, false, "complete: no incomplete-copy notice");
+  // Hosting it again uploads the whole campaign; the new room serves it complete.
+  const rehosted = await dm.page.evaluate(async () => {
+    const c = await import("/src/lib/quire/cloud-client.ts");
+    await c.chooseTableMode("live");
+    const { pullCloudTable } = await import("/src/lib/quire/room-transport.ts");
+    const s = c.roomCredentials();
+    const old = await pullCloudTable({ data: { tabletopProtocol: 11, code: s.code, token: s.token } });
+    return { ledger: old.table.ledger.length, notes: old.table.notes.length, reports: old.table.journal.reports.map((r) => r.snapshot.length) };
+  });
+  assert.ok(rehosted.ledger >= LINES && rehosted.notes >= LINES, `the new room holds every line (${rehosted.ledger}, ${rehosted.notes})`);
+  assert.ok(rehosted.reports.every((length) => length > 1000), "archived sessions uploaded complete");
+  // A table whose archived sessions are not loaded is never uploaded.
+  const refused = await dm.page.evaluate(async () => {
+    const { openCloudTable } = await import("/src/lib/quire/room-transport.ts");
+    const { economySnapshot } = await import("/src/lib/quire/economy.ts");
+    const t = await economySnapshot();
+    t.journal.reports = t.journal.reports.map((r) => ({ ...r, snapshot: "", deferred: true }));
+    try {
+      await openCloudTable({ data: { name: "Partial", table: t } });
+      return "accepted";
+    } catch (error) {
+      return String(error.message);
+    }
+  });
+  assert.match(refused, /not loaded on this device/);
 
   assert.deepEqual(errors, []);
   console.log(`History on demand audit passed; screenshots in ${output}`);

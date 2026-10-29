@@ -254,8 +254,9 @@ export async function readHistory(
     if (result.length && chars + projectedText.length > HISTORY_BATCH_CHARS) break;
     const hash = await projectedHash(room.code, seat.id, `${list}\n${projectedText}`);
     result.unshift({
-      cursor: await cursorOf(room.code, seat.id, list, page),
-      prev: index > 0 ? await cursorOf(room.code, seat.id, list, pages[index - 1]!) : null,
+      cursor: await cursorOf(room.code, seat.id, list, page, project.fingerprint),
+      // The next older page this seat may read (pages it can read nothing of are never named).
+      prev: await nextCursor(room.code, seat.id, list, pages, index - 1, project),
       hash,
       ...(held.has(hash) ? {} : { items: visible }),
     });

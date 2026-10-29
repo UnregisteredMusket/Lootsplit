@@ -57,6 +57,8 @@ export function connectRoomHistory(read: Reader) {
 let scopeKey = "";
 let scope: Scope | null = null;
 let cursors: HistoryCursors = {};
+/** The seat's projection fingerprint of the latest view (server-side `historyProjector`). */
+let projection: string | null = null;
 let pages: Record<HistoryList, Map<string, Page>> = { ledger: new Map(), notes: new Map() };
 let reports = new Map<string, { hash: string; value: ArchivedReport }>();
 let deferredIds: string[] = [];
@@ -124,6 +126,7 @@ function reset(next: Scope | null) {
   scope = next;
   scopeKey = next ? `${next.code.trim().toUpperCase()}\n${next.token}` : "";
   cursors = {};
+  projection = null;
   pages = { ledger: new Map(), notes: new Map() };
   reports = new Map();
   deferredIds = [];
@@ -146,6 +149,16 @@ export function clearRoomHistory() {
 export function noteRoomView(seat: Scope, view: { history?: HistoryCursors; table: CloudTable }) {
   const key = `${seat.code.trim().toUpperCase()}\n${seat.token}`;
   if (key !== scopeKey) reset(seat);
+  // What this seat may read changed (its characters, the party, companion funds): lines and
+  // sessions loaded under the old rules are dropped, and load again on request under the new ones.
+  const nextProjection = view.history?.projection ?? null;
+  if (nextProjection !== projection && (pages.ledger.size || pages.notes.size || reports.size)) {
+    pages = { ledger: new Map(), notes: new Map() };
+    reports = new Map();
+    for (const list of HISTORY_LISTS) errors[list] = null;
+    reportError = null;
+  }
+  projection = nextProjection;
   cursors = { ...(view.history ?? {}) };
   deferredIds = (view.table.journal?.reports ?? []).filter((r) => r.deferred).map((r) => r.id);
   for (const id of [...reports.keys()]) if (!(view.table.journal?.reports ?? []).some((r) => r.id === id)) reports.delete(id);
@@ -203,8 +216,11 @@ export function loadEarlier(list: HistoryList, options: { bulk?: boolean } = {})
     changed(false);
     try {
       const held = [...pages[list].values()].map((page) => page.hash).slice(-512);
+      const under = projection;
       const result = await read({ list, before: start, held, ...(options.bulk ? { bulk: true } : {}) });
       if (key !== scopeKey) return false;
+      // Read under rules that changed meanwhile: dropped (the view's new cursors start over).
+      if (under !== projection) return !!chain(list).next;
       if ("missing" in result) throw Error(MOVED);
       if (!("pages" in result)) throw Error(MOVED);
       for (const page of result.pages) {
@@ -238,8 +254,9 @@ export async function openReport(id: string): Promise<void> {
   reportError = null;
   changed(false);
   try {
+    const under = projection;
     const result = await read({ report: id });
-    if (key !== scopeKey) return;
+    if (key !== scopeKey || under !== projection) return;
     if ("missing" in result || !("report" in result) || !result.value) throw Error(MOVED);
     reports.set(id, { hash: result.hash, value: result.value });
   } catch (error) {

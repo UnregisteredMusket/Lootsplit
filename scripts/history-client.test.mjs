@@ -150,3 +150,50 @@ test("a protocol 12 write whose sections cannot be fetched reads its own working
   assert.equal(result.viewSections, undefined);
   assert.deepEqual(result.table.notes, (await view(seats.dm)).table.notes);
 });
+
+test("when what the seat may read changes, loaded history is dropped and loads again under the new rules", async () => {
+  const seats = await room();
+  for (let i = 0; i < 600; i += 50)
+    await submitCommands({
+      ...seats.dm,
+      batchId: `give-${i}`,
+      commands: Array.from({ length: 50 }, (_, n) => ({ id: `give-${i + n}`, kind: "give", fromId: "a", toId: "b", copper: 1, holdingId: null, quantity: 0 })),
+    });
+  const { readRoom, updateRoom } = await import("../src/lib/quire/room-store.server.ts");
+  const setBriarAway = async (away) => {
+    const stored = await readRoom(seats.dm.code);
+    stored.table.purses.find((p) => p.id === "b").nonParty = away;
+    stored.revision++;
+    await updateRoom(stored, stored.revision - 1);
+  };
+  const loadAll = async () => {
+    const current = await view(seats.a);
+    history.noteRoomView(seats.a, current);
+    return current;
+  };
+  history.clearRoomHistory();
+  let current = await loadAll();
+  while (history.getRoomHistory().ledger.more) await history.loadEarlier("ledger");
+  let merged = history.mergeHistory(current.table).ledger;
+  assert.deepEqual(merged, (await complete(seats.a)).ledger);
+  assert.ok(merged.some((l) => l.purseId === "b"), "Arden reads Briar's lines while Briar travels with the party");
+  // Access lost: the next view's projection differs; nothing loaded before is merged any more.
+  await setBriarAway(true);
+  current = await loadAll();
+  assert.equal(history.roomHistoryForTests().pages.ledger.size, 0, "loaded pages dropped");
+  assert.deepEqual(history.mergeHistory(current.table).ledger, current.table.ledger);
+  assert.equal(history.historyIncomplete(), true);
+  while (history.getRoomHistory().ledger.more) await history.loadEarlier("ledger");
+  merged = history.mergeHistory(current.table).ledger;
+  assert.deepEqual(merged, (await complete(seats.a)).ledger);
+  assert.ok(!merged.some((l) => l.purseId === "b"), "none of Briar's lines remain");
+  // Access gained: Briar is back with the party.
+  await setBriarAway(false);
+  current = await loadAll();
+  assert.equal(history.roomHistoryForTests().pages.ledger.size, 0);
+  while (history.getRoomHistory().ledger.more) await history.loadEarlier("ledger");
+  merged = history.mergeHistory(current.table).ledger;
+  assert.deepEqual(merged, (await complete(seats.a)).ledger);
+  assert.ok(merged.some((l) => l.purseId === "b"));
+  assert.equal(history.getRoomHistory().ledger.more, false);
+});

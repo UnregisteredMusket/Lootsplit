@@ -734,6 +734,7 @@ async function refresh(conditional = false) {
       )
     ) {
       if (s.pending.length) rememberRevokedRecovery(s, isEphemeralCampaign());
+      if (s.role !== "player") await noteIncompleteDeviceCopy();
       await detachTable(s.role === "player");
       notify(
         "Campaign access ended",
@@ -794,14 +795,64 @@ export function captureDeviceBackup() {
       }
       // History on demand: a copy holds every older line and archived session this seat may
       // read, as before, so they are loaded (with progress) and merged first.
-      await loadAllHistory();
-      if (historyIncomplete())
-        throw new Error(
-          "Part of this campaign's earlier history could not be loaded, so the copy would be incomplete. Nothing was saved; try again.",
-        );
-      await applyLoadedHistory();
+      await loadWholeCampaign("the copy would be incomplete. Nothing was saved");
     }
     return snapshot();
+  });
+}
+/**
+ * History on demand (protocol 12): this device's copy of a shared campaign holds the newest
+ * ledger and chat lines, plus the older lines and archived sessions loaded in this tab. Before
+ * the copy becomes the whole campaign (a backup or download, the DM's local campaign after
+ * closing or leaving the room, signing out or deleting the room while keeping the DM's copy,
+ * a safety save before joining another room), every older line and archived session is loaded
+ * and merged. When that fails, the caller stops and nothing changes (the room stays open).
+ */
+async function loadWholeCampaign(failure: string) {
+  if (!session()) return assertWholeDeviceCampaign(failure);
+  await refresh();
+  if (session()) {
+    await loadAllHistory();
+    if (historyIncomplete())
+      throw new Error(`Part of this campaign's earlier history could not be loaded, so ${failure}. Check the connection and try again.`);
+    await applyLoadedHistory();
+  }
+  await assertWholeDeviceCampaign(failure);
+}
+async function assertWholeDeviceCampaign(failure: string) {
+  if ((await economySnapshot()).journal?.reports?.some((r) => r.deferred))
+    throw new Error(`Part of this campaign's earlier history is not loaded on this device, so ${failure}. Open the shared campaign and try again.`);
+}
+/**
+ * For account flows that end this device's room access while keeping the DM's copy (signing
+ * out, deleting the shared campaign): loads the whole campaign onto the device first, or throws.
+ */
+export function keepWholeCampaignOnDevice() {
+  return serial(() => loadWholeCampaign("nothing was changed"));
+}
+export const DEVICE_HISTORY_NOTICE_ID = "lootsplit-history-device-notice";
+/**
+ * When the room ended before its whole history reached this device (closed elsewhere, access
+ * revoked) and the DM keeps the device's copy: the copy says so in its chat, so it never passes
+ * silently for the whole campaign. The whole campaign stays with the shared campaign online.
+ */
+async function noteIncompleteDeviceCopy() {
+  const table = await economySnapshot();
+  const partial = historyIncomplete() || (table.journal?.reports ?? []).some((r) => r.deferred);
+  if (!partial || table.notes.some((n) => n.id === DEVICE_HISTORY_NOTICE_ID)) return;
+  await applyCloudTable({
+    ...table,
+    notes: [
+      {
+        id: DEVICE_HISTORY_NOTICE_ID,
+        at: table.notes[0]?.at ?? Date.now(),
+        from: "dm",
+        to: "party",
+        purseId: "",
+        text: "Lootsplitter: this device's copy ended before all of the shared campaign's earlier messages, ledger lines and archived sessions were loaded. The whole campaign is kept online with the shared campaign: My account → Campaigns (Download a copy). Nothing was deleted.",
+      },
+      ...table.notes,
+    ],
   });
 }
 /** The campaign name the DM's device would send to this room (undefined: a device default). */
@@ -865,6 +916,8 @@ export async function joinTable(
     if (hasPendingChanges())
       throw new Error("Resolve pending changes before joining another campaign.");
     if (!isEphemeralCampaign() && !(await loadSeatLock())?.protectSaves) {
+      // A safety save is a whole campaign (history on demand).
+      if (session()) await loadWholeCampaign("you did not join and nothing was changed");
       await rememberSave({
         name: `Before joining room ${code.trim().toUpperCase()}`,
         campaignId: activeCampaignId(),
@@ -1232,6 +1285,8 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
     if (mode === "local") {
       const s = session();
       if (s) {
+        // The DM's device keeps the campaign: load all of it while the room can still serve it.
+        await loadWholeCampaign("the room was not closed and nothing was changed");
         await closeCloudTable({ data: { code: s.code, token: s.token } });
         await detachTable(false);
       }
@@ -1263,6 +1318,7 @@ export function leaveViewableRoom() {
       throw Error("End the session and resolve pending actions before leaving the room online.");
     await refresh();
     if (!view.viewOnly) throw Error("The session has resumed. End it before leaving.");
+    await loadWholeCampaign("you are still in the room and nothing was changed");
     await detachTable(false);
   });
 }
@@ -1335,6 +1391,7 @@ export async function disconnectClosedRoom() {
   const s = requireSession();
   s.pending = [];
   remember(s);
+  if (s.role !== "player") await noteIncompleteDeviceCopy();
   await detachTable(s.role === "player");
 }
 export function resumeTable() {
@@ -1552,6 +1609,7 @@ export async function resumeAccountMembership(
 }
 
 export async function clearAccountRoom(preserveDmCopy = false) {
+  if (preserveDmCopy && session()?.role === "dm") await noteIncompleteDeviceCopy();
   await detachTable(!(preserveDmCopy && session()?.role === "dm"));
 }
 

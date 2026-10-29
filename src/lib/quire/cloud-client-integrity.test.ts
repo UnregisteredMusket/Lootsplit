@@ -336,6 +336,7 @@ async function recoveryHarness(ephemeral = true, owner?: string) {
     const session=()=>playerSession,key=()=>"quire.cloud.v2.main",isEphemeralCampaign=()=>ephemeral;
     const stopPolling=()=>{},forgetRoomImages=()=>{},polling=false,publish=()=>{},initialView={},PLAYER_TICKET="lootsplit.player.reconnect.v1";
     const warnUnsentPlayerActions=()=>{},applyCloudTable=async()=>{},setSeat=()=>{},notify=()=>{};
+    const noteIncompleteDeviceCopy=async()=>{}; // history on demand: covered by history-browser-audit
     const {rememberRevokedRecovery,revokedRecoveryCopy,discardRevokedRecovery,hasRevokedMemoryWork}=recovery;
     const pullCloudTable=async()=>{throw Error("This room is closed.");};
     ${detach}
