@@ -21,10 +21,25 @@
  *   `["i", id]` (identical to the base element with that id), `["d", id, node]` (an object node
  *   against that base element) or a literal node.
  * Objects and id-keyed arrays are diffed to `MAX_DEPTH` levels; deeper values are literal unless
- * equal.
+ * equal. Encoding is bounded (`MAX_SNAPSHOT_CHARS`, `MAX_NODES`): past either, the snapshot is
+ * stored in full instead.
+ *
+ * Invariants:
+ * - A report row named as a delta's base must never be deleted while the room exists. Rows of
+ *   campaign_room_reports (migration 0019) and their parts (0029) are immutable and only removed
+ *   with their room (ON DELETE CASCADE); no cleanup deletes them, even when no stored room still
+ *   references them (test mode, a session removed by a restore). scripts/report-delta.test.mjs
+ *   fails if any code deletes from these tables.
+ * - Release order: readers that decode deltas ship before any Worker writes them
+ *   (room-reports.mjs `REPORT_DELTA_WRITES`).
  */
 export const REPORT_DELTA_KEY = "$reportDelta";
 const MAX_DEPTH = 6;
+/** Snapshots (or bases) longer than this are stored in full, without trying a delta. */
+const MAX_SNAPSHOT_CHARS = 8_000_000;
+/** At most this many nodes are compared per snapshot; past it, the snapshot is stored in full. */
+const MAX_NODES = 200_000;
+class OverBudget extends Error {}
 
 const plain = (/** @type {unknown} */ value) => !!value && typeof value === "object" && !Array.isArray(value);
 /** @param {unknown} value */
@@ -42,13 +57,17 @@ function idArray(value) {
  * @param {any} value @param {unknown} base @param {number} depth @param {string} [text] value's JSON
  * @returns {unknown[]}
  */
-function encodeNode(value, base, depth, text) {
+function encodeNode(value, base, depth, text, budget = { nodes: 0 }) {
+  if (++budget.nodes > MAX_NODES) throw new OverBudget();
   const own = text ?? JSON.stringify(value);
   if (base !== undefined && own === JSON.stringify(base)) return ["s"];
   if (depth >= MAX_DEPTH) return ["v", value];
   if (plain(value) && plain(base)) {
     const source = /** @type {Record<string, unknown>} */ (base);
-    const entries = Object.entries(/** @type {Record<string, unknown>} */ (value)).map(([key, child]) => [key, encodeNode(child, source[key], depth + 1)]);
+    const entries = Object.entries(/** @type {Record<string, unknown>} */ (value)).map(([key, child]) => [
+      key,
+      encodeNode(child, Object.prototype.hasOwnProperty.call(source, key) ? source[key] : undefined, depth + 1, undefined, budget),
+    ]);
     return ["o", entries];
   }
   const baseIds = idArray(base);
@@ -59,7 +78,7 @@ function encodeNode(value, base, depth, text) {
       /** @type {any[]} */ (value).map((item) => {
         const previous = baseIds.get(item.id);
         if (!previous) return ["v", item];
-        const node = encodeNode(item, previous, depth + 1);
+        const node = encodeNode(item, previous, depth + 1, undefined, budget);
         return node[0] === "s" ? ["i", item.id] : node[0] === "o" ? ["d", item.id, node] : node;
       }),
     ];
@@ -84,7 +103,14 @@ function decodeNode(node, base) {
       const result = {};
       for (const entry of node[1]) {
         if (!Array.isArray(entry) || typeof entry[0] !== "string") throw broken();
-        result[entry[0]] = decodeNode(entry[1], source[entry[0]]);
+        const key = entry[0];
+        // Own properties only (a key such as "__proto__" is data, as JSON.parse makes it).
+        Object.defineProperty(result, key, {
+          value: decodeNode(entry[1], Object.prototype.hasOwnProperty.call(source, key) ? source[key] : undefined),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
       }
       return result;
     }
@@ -117,6 +143,7 @@ function decodeNode(node, base) {
  * @returns {string | null}
  */
 export function encodeReportDelta(text, reference, baseText, baseReference) {
+  if (text.length > MAX_SNAPSHOT_CHARS || baseText.length > MAX_SNAPSHOT_CHARS) return null;
   let value, base;
   try {
     value = JSON.parse(text);
@@ -125,7 +152,13 @@ export function encodeReportDelta(text, reference, baseText, baseReference) {
     return null;
   }
   if (!plain(value) || !plain(base)) return null;
-  const node = encodeNode(value, base, 0, text);
+  let node;
+  try {
+    node = encodeNode(value, base, 0, text);
+  } catch (error) {
+    if (error instanceof OverBudget) return null;
+    throw error;
+  }
   const body = JSON.stringify({ [REPORT_DELTA_KEY]: { v: 1, reference, base: baseReference, bytes: new TextEncoder().encode(text).length, node } });
   // Worth storing only when it saves at least a fifth of the snapshot.
   if (body.length * 5 > text.length * 4) return null;

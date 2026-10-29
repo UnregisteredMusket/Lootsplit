@@ -196,7 +196,10 @@ async function joinReportDeltas(db, code, texts) {
     if (base === undefined || reportDeltaMarker(base))
       throw Error("An archived session report is incomplete. Keep the original recovery export; the campaign was not changed.");
     const text = decodeReportDelta(marker, base);
-    if ("session-report:" + (await sha256(text)) !== marker.reference)
+    // Verified against the row's own reference (the snapshot this row stands for). A row whose
+    // text merely begins like a delta (an import, or an older Worker that stored a delta's text as
+    // a snapshot) does not decode to its own reference and is refused, never shown as history.
+    if (marker.reference !== reference || "session-report:" + (await sha256(text)) !== reference)
       throw Error("An archived session report is damaged. Keep the original recovery export; the campaign was not changed.");
     result.set(reference, text);
   }
@@ -273,7 +276,9 @@ export async function roomReportStatements(db, room, encoded, writeId) {
   const docs = [];
   for (const doc of fresh) {
     const delta = base && base.reference !== doc.reference ? encodeReportDelta(doc.body, doc.reference, base.text, base.reference) : null;
-    if (delta && delta.length <= REPORT_INLINE_BYTES) docs.push({ reference: doc.reference, body: delta });
+    // Measured in UTF-8 bytes (D1's row limit); a larger delta is stored as a full snapshot,
+    // which is split into parts when it needs to be.
+    if (delta && encoder.encode(delta).length <= REPORT_INLINE_BYTES) docs.push({ reference: doc.reference, body: delta });
     else {
       docs.push(doc);
       base = { reference: doc.reference, text: doc.body };
@@ -319,13 +324,22 @@ async function latestFullReport(db, code) {
   return typeof text === "string" && !reportDeltaMarker(text) ? { reference: row.reference, text } : null;
 }
 /**
- * SQL for the stored logical size of a room's archived sessions (bytes of the snapshots they stand
- * for: a delta counts its whole snapshot), for the total-size warning (room-store.server.ts).
+ * SQL for the logical size of a room's archived sessions in UTF-8 bytes (of the snapshots they
+ * stand for: a delta counts its whole snapshot's bytes, a full row or part its own bytes), for the
+ * total-size warning (room-store.server.ts).
  */
-export const ARCHIVED_BYTES_SQL = `SELECT COALESCE(SUM(CASE WHEN substr(body,1,${REPORT_DELTA_KEY.length + 4})='{"${REPORT_DELTA_KEY}":' THEN json_extract(body,'$."${REPORT_DELTA_KEY}".bytes') ELSE length(body) END),0)+(SELECT COALESCE(SUM(length(body)),0) FROM campaign_room_report_parts WHERE code=?1) AS n FROM campaign_room_reports WHERE code=?1`;
+export const ARCHIVED_BYTES_SQL = `SELECT COALESCE(SUM(CASE WHEN substr(body,1,${REPORT_DELTA_KEY.length + 4})='{"${REPORT_DELTA_KEY}":' THEN json_extract(body,'$."${REPORT_DELTA_KEY}".bytes') ELSE length(CAST(body AS BLOB)) END),0)+(SELECT COALESCE(SUM(length(CAST(body AS BLOB))),0) FROM campaign_room_report_parts WHERE code=?1) AS n FROM campaign_room_reports WHERE code=?1`;
 
-let reportDeltas = true;
-/** Test-only: store new snapshots in full (as before delta storage) while false. */
+/**
+ * Release order (integrity review of #382). Reading deltas ships first, with writes still full:
+ * an older Worker (deploy overlap, or a revert) reads a delta row's body as if it were the
+ * snapshot, so delta rows may only be written once every Worker that can serve this database
+ * decodes them. `REPORT_DELTA_WRITES` is false in the reader release and turned on by the next
+ * release (the writer PR), after the reader is live.
+ */
+export const REPORT_DELTA_WRITES = false;
+let reportDeltas = REPORT_DELTA_WRITES;
+/** Test-only: write new snapshots as deltas (true) or in full (false). */
 export function setReportDeltasForTests(/** @type {boolean} */ on) {
   reportDeltas = on;
 }

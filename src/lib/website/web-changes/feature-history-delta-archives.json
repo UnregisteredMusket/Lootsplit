@@ -1,8 +1,8 @@
 {
-  "title": "Archived sessions take far less space online",
-  "summary": "Each archived session now stores only what changed since an earlier one, instead of a full copy of the campaign.",
+  "title": "Groundwork for smaller archived sessions",
+  "summary": "The server can now read archived sessions stored in a compact form, ready for the next update to start saving them that way.",
   "items": [
-    "Ending a session used to store a full copy of the whole campaign each time. Archived sessions are now stored as the changes against an earlier archived copy, which in a typical campaign uses about a fifth of the space.",
-    "Nothing changes in how archived sessions look, open or download: every one is rebuilt exactly and checked before it is shown. Archived sessions stored before this change stay as they are and remain readable."
+    "Archived sessions are still saved exactly as before. This update only teaches the server to read the compact form, where a session stores what changed since an earlier one, and to check every session it rebuilds before showing it.",
+    "Nothing changes in how campaigns look, play, download or restore."
   ]
 }
