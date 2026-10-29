@@ -5,6 +5,7 @@ import {
   inParty,
   seatInParty,
 } from "./character-position.ts";
+import { fairnessEligible } from "./loot-fairness.ts";
 import {
   readRoom,
   readRoomAccess,
@@ -16,8 +17,12 @@ import {
   lookupReceipts,
   recentAcknowledged,
   roomReadVersion,
+  withRoomHistory,
   type RoomReceipt,
 } from "./room-store.server.ts";
+import { HISTORY_PROTOCOL, type HistoryCursors } from "./history-pages.ts";
+import { ROOM_BODY_LIMIT } from "./room-size.ts";
+import { roomHistoryIdsTaken } from "../../../cloudflare/room-storage.mjs";
 import { VIEW_VERSION_KEY } from "./view-sections.server.ts";
 import { syncTimer } from "./sync-timing.server.ts";
 import { retryRoomWrite } from "./room-write-retry.ts";
@@ -31,6 +36,16 @@ import {
   type CloudTable,
 } from "./cloud.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
+import { HistoryNeeded, runOnWorkingSet } from "./history-window.server.ts";
+import {
+  historyCursors,
+  historyOffsets,
+  questReceiptResolver,
+  readHistory,
+  roomHasHistory,
+  roomPages,
+  type HistoryProjector,
+} from "./history.server.ts";
 import { npcController } from "./world.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { roomCampaignName } from "./campaign-name.ts";
@@ -38,7 +53,7 @@ import { characterControl, type Purse } from "./types.ts";
 import type { BillFile } from "./table.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
-import { manualCharacterRolls, database } from "./room-store.server.ts";
+import { manualCharacterRolls, database, storedLiveBytes } from "./room-store.server.ts";
 import { referenceAccess, referenceSection } from "./reference-access.ts";
 import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
 import { SUBMIT_LIMIT_MESSAGE, takeSubmitAllowance } from "./room-submit-limit.ts";
@@ -112,7 +127,9 @@ async function characterRollOnce(input: {
   before?: number;
   [key: string]: unknown;
 }) {
-  const room = await must(input.code);
+  // A shared room's rolls live in play_rolls: the room itself is only read here (its working set
+  // is enough; history on demand). A local development room (no D1) is read whole and written.
+  const room = await must(input.code, { working: !!database() });
   const seat = room.seats.find((s) => s.token === input.token);
   const p = room.table.purses.find((p) => p.id === input.purseId && p.kind === "character");
   if (
@@ -374,18 +391,62 @@ export async function roomState(input: {
   const timer = syncTimer("full-read");
   try {
     // Protocol 4 clients load map artwork by reference: this read-only view skips those rasters.
-    const room = await timer.measure("hydrate", () =>
-      must(input.code, { mapImageReferences: wantsImageReferences(input.tabletopProtocol) }),
+    // History on demand (step 4): every read loads only the working set; older clients get the
+    // complete view they expect (`legacyView`).
+    const working = await timer.measure("hydrate", () =>
+      must(input.code, { mapImageReferences: wantsImageReferences(input.tabletopProtocol), working: true }),
     );
-    const seat = room.seats.find((item) => item.token === input.token);
+    const seat = working.seats.find((item) => item.token === input.token);
     if (!seat) throw new Error("This browser is not seated at that table.");
-    const result = await timer.measure("projection", () => view(room, seat));
+    const room = historyClient(input.tabletopProtocol) ? working : await legacyView(working);
+    const result = await timer.measure("projection", () => view(room, seat, room));
     timer.finish("full");
     return result;
   } catch (error) {
     timer.finish("failed");
     throw error;
   }
+}
+/** Clients from tabletop protocol 12 load history on demand (history-pages.ts). */
+function historyClient(protocol?: number) {
+  return (protocol ?? 0) >= HISTORY_PROTOCOL;
+}
+/**
+ * The room as an older client (tabletop protocol 11 or earlier) sees it: the whole campaign, with
+ * every older ledger and chat line and every archived session, exactly as before step 4. A live
+ * campaign larger than such a client could load before step 4 (`ROOM_BODY_LIMIT`, the cap of
+ * that time) can only exist once history is paged; then the older client gets the newest lines
+ * and a chat notice saying where the rest is (nothing is deleted). Archived sessions are always
+ * complete. Never written back.
+ */
+export const LEGACY_HISTORY_NOTICE_ID = "lootsplit-history-notice";
+async function legacyView(working: CloudRoom): Promise<CloudRoom> {
+  if (!roomHasHistory(working)) return working;
+  const pages = roomPages(working);
+  // Measured on the stored campaign, as the size caps measure it (room-size.ts): map images and
+  // resource packs restored for older clients are stored separately and never counted.
+  const live = storedLiveBytes(working);
+  if (!pages.size || live === null || live <= ROOM_BODY_LIMIT) return withRoomHistory(working, { reports: true });
+  const { $history: _pages, ...newest } = working as CloudRoom & { $history?: unknown };
+  const complete = await withRoomHistory(newest as CloudRoom, { reports: true });
+  const first = working.table.notes[0]?.at ?? Date.now();
+  return {
+    ...complete,
+    table: {
+      ...complete.table,
+      notes: [
+        {
+          id: LEGACY_HISTORY_NOTICE_ID,
+          at: first,
+          from: "dm",
+          to: "party",
+          purseId: "",
+          text: "Lootsplitter: earlier messages and ledger lines of this campaign are kept online but are not shown in this version of the app. Update Lootsplitter to open them. Nothing was deleted.",
+        },
+        ...complete.table.notes,
+      ],
+    },
+  };
 }
 export type RoomPollInput = {
   tabletopProtocol?: number;
@@ -563,6 +624,13 @@ export async function passTurn(input: { code: string; token: string }): Promise<
 }
 
 export type RoomView = {
+  /**
+   * History on demand (protocol 12): where the ledger and chat continue further back, for
+   * `readCloudHistory`. Absent when the view holds every line.
+   */
+  history?: HistoryCursors;
+  /** DM only: the campaign's total with archived sessions passed `ROOM_TOTAL_LIMIT` (a notice). */
+  storageWarning?: { totalBytes: number; limit: number };
   encounterActive?: boolean;
   userId?: string;
   viewOnly?: boolean;
@@ -623,10 +691,16 @@ async function must(
   });
 }
 
-/** The seat's projected campaign table: exactly what `view` sends that seat. */
+/**
+ * The seat's projected campaign table: exactly what `view` sends that seat. For a working read
+ * (history on demand), quest reward receipts are resolved over the whole campaign first, so the
+ * projection equals the one of the whole campaign.
+ */
 async function seatTable(room: CloudRoom, seat: CloudSeat) {
+  const questReceipt = await questReceiptResolver(room, seat);
   const record = projectRecord({ ...room.table, journal: room.table.journal }, seat, {
     directory: true,
+    ...(questReceipt ? { questReceipt } : {}),
   });
   const journal = record.journal;
   // Map posters come from the owner's account assets, which the room version does not cover.
@@ -694,6 +768,12 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
     table,
   });
+  // The campaign passed the total size at which whole-campaign operations fit comfortably
+  // (room-size.ts `ROOM_TOTAL_LIMIT`): a notice for the DM only, recommending Download a copy.
+  if (seat.role === "dm" && room.storageWarning) result.storageWarning = { ...room.storageWarning };
+  // History on demand: where this seat's ledger and chat continue (absent for a whole room).
+  const history = await historyCursors(room, seat, await historyProjector(room.table, seat, room.code));
+  if (history) result.history = history;
   // The storage version this view projects (only when it is the room as read, not a derived next
   // state): keys the per-seat projected section cache (view-sections.server.ts). Non-enumerable.
   // A view with map posters is never cached: posters follow the owner's account assets, which
@@ -738,7 +818,7 @@ export async function authorizedRoomImage(input: {
   if (!db) return { status: 404 };
   let room: CloudRoom;
   try {
-    room = await must(input.code, { mapImageReferences: true });
+    room = await must(input.code, { mapImageReferences: true, working: true });
   } catch {
     return { status: 404 };
   }
@@ -760,6 +840,91 @@ export async function authorizedRoomImage(input: {
  * purses the seat does not control never carry editing permissions. Owner decision (2026-10-22):
  * the DM may share party companion NPC funds with party players (off by default).
  */
+/**
+ * Which ledger lines a player's view holds (owner decision 2026-10-22, see `playerTable`): lines
+ * of purses the seat controls (and delegated NPCs), and of party balances or shared companion
+ * funds this seat may read. Also used for older ledger pages (`readCloudHistory`).
+ */
+function playerLedgerLine(table: CloudTable, seat: CloudSeat) {
+  const npcs = table.journal?.world?.npcs ?? [];
+  const npcIds = new Set(npcs.map((n) => n.id));
+  const controlled = new Set([
+    ...seat.purseIds,
+    ...npcs.filter((n) => npcController(n, seat)).map((n) => n.id),
+  ]);
+  const treasuries = new Set((table.journal?.tradeEconomy?.exchanges ?? []).map((e) => e.purseId));
+  const partyPlayer = (p: Purse) =>
+    characterVisible(table, p) &&
+    !p.nonParty &&
+    !npcIds.has(p.id) &&
+    !treasuries.has(p.id) &&
+    (p.kind === "party" || characterControl(p) === "player");
+  const viewerInParty = seatInParty(table, seat);
+  const byId = new Map(table.purses.map((p) => [p.id, p]));
+  return (l: CloudTable["ledger"][number]) => {
+    if (controlled.has(l.purseId)) return true;
+    const p = byId.get(l.purseId);
+    return !!p && ((viewerInParty && partyPlayer(p) && inParty(table, p)) || companionFundsReadable(table, p, seat));
+  };
+}
+/**
+ * The view's rules for older history lines of one seat (`readCloudHistory`): the DM reads every
+ * ledger line and the messages `canReadNote` allows; a player the ledger lines `playerLedgerLine`
+ * allows and the messages `projectRecord` keeps (for the seat's visible characters).
+ *
+ * `visible` answers the same rules for a whole page from its visibility keys (room-storage.mjs
+ * `pageVisibilityKeys`), so pages the seat can read nothing of are skipped unread. `fingerprint`
+ * digests everything these rules and archived-session projection read from the current table for
+ * this seat (its role, visible characters, the purses whose ledger lines it reads, whether it
+ * compares party totals and the eligible party's names), salted with room and seat: it changes
+ * whenever what the seat may read changes, and the browser then drops what it loaded before.
+ */
+async function historyProjector(table: CloudTable, seat: CloudSeat, code: string): Promise<HistoryProjector> {
+  const dm = seat.role === "dm";
+  const visible = dm
+    ? seat
+    : {
+        ...seat,
+        purseIds: seat.purseIds.filter((id) => {
+          const p = table.purses.find((p) => p.id === id);
+          return p && characterVisible(table, p);
+        }),
+      };
+  const line = dm ? () => true : playerLedgerLine(table, seat);
+  const readNote = (note: Pick<CloudTable["notes"][number], "to" | "purseId" | "recipientId">) =>
+    canReadNote(note as CloudTable["notes"][number], visible);
+  const ledgerPurses = dm
+    ? ["*"]
+    : [...new Set([...table.purses.map((p) => p.id), ...seat.purseIds, ...(table.journal?.world?.npcs ?? []).map((n) => n.id)])]
+        .filter((purseId) => line({ purseId } as CloudTable["ledger"][number]))
+        .sort();
+  const compares = !dm && seatInParty(table, visible);
+  const party = compares
+    ? table.purses.filter((p) => fairnessEligible(table, p)).map((p) => [p.id, p.name]).sort()
+    : [];
+  const fingerprint = (
+    await sha256Hex(
+      JSON.stringify(["lootsplit-history-projection-v1", code, seat.id, seat.role, [...visible.purseIds].sort(), ledgerPurses, compares, party]),
+    )
+  ).slice(0, 32);
+  return {
+    ledger: (lines) => lines.filter(line),
+    notes: (notes) => notes.filter((note) => readNote(note)),
+    visible: (list, keys) => {
+      if (!keys) return true;
+      if (list === "ledger") return dm || keys.some((key) => line({ purseId: JSON.parse(key)[0] } as CloudTable["ledger"][number]));
+      return keys.some((key) => {
+        const [to, purseId, recipientId] = JSON.parse(key) as string[];
+        return readNote({ to, purseId, recipientId: recipientId || undefined } as CloudTable["notes"][number]);
+      });
+    },
+    fingerprint,
+  };
+}
+async function sha256Hex(text: string) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
+}
 function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): CloudTable {
   const npcs = table.journal?.world?.npcs ?? [];
   const npcIds = new Set(npcs.map((n) => n.id));
@@ -789,11 +954,7 @@ function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): Cl
   const byId = new Map(table.purses.map((p) => [p.id, p]));
   return {
     ...record,
-    ledger: table.ledger.filter((l) => {
-      if (controlled.has(l.purseId)) return true;
-      const p = byId.get(l.purseId);
-      return !!p && (sharedBalance(p) || companion(p));
-    }),
+    ledger: table.ledger.filter(playerLedgerLine(table, seat)),
     purses: record.purses.map((projected) => {
       const p = byId.get(projected.id)!;
       if (!characterVisible(table, p)) return projected;
@@ -897,8 +1058,13 @@ export async function submitCommands(input: {
   const batchHash = "v2:" + (await digest(canonicalJson(commands)));
   // Revision conflicts re-run everything below on a fresh read, after a jittered pause
   // (room-write-retry.ts); receipts keep every action applied once however often it is retried.
+  // History on demand (step 4): the batch runs on the working set; whatever needs older history
+  // runs again on the whole campaign (`runOnWorkingSet`). The response is the view the client's
+  // protocol expects.
+  const respond = async (state: CloudRoom, seat: CloudSeat, read: CloudRoom) =>
+    historyClient(input.tabletopProtocol) ? view(state, seat, read) : view(await legacyView(state), seat, read);
   return retryRoomWrite(async () => {
-    const room = await must(input.code),
+    const room = await must(input.code, { working: true }),
       seat = room.seats.find((s) => s.token === input.token);
     if (!seat)
       throw new Error("This session is no longer assigned. Ask the DM to release your character.");
@@ -950,7 +1116,7 @@ export async function submitCommands(input: {
         throw Error(
           "This batch ID was already used for different actions. Export your pending actions before retrying.",
         );
-      return view(room, seat);
+      return respond(room, seat, room);
     }
     // Chat, treasure-pool claims and quest changes (which move nothing) may be sent outside the seat's turn
     // (owner decision, 2026-10-23).
@@ -989,7 +1155,6 @@ export async function submitCommands(input: {
         );
       drafts[seat.id] = pending;
     }
-    let table = room.table;
     const receipts: RoomReceipt[] = [];
     // Validate the entire merged draft against the authoritative table. Two
     // individually valid device queues may overspend when combined.
@@ -1000,15 +1165,39 @@ export async function submitCommands(input: {
       selected.add(key);
       return true;
     });
-    table = applyCommandBatch(table, seat, unapplied, (command) => ({
-      source: "server",
-      manualRolls,
-      random: (draw) => {
-        const key = command.id + ":" + draw;
-        if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
-        return seasonalRolls.get(key)!;
-      },
-    }));
+    const run = (base: CloudTable) =>
+      applyCommandBatch(base, seat, unapplied, (command) => ({
+        source: "server",
+        manualRolls,
+        random: (draw) => {
+          const key = command.id + ":" + draw;
+          if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
+          return seasonalRolls.get(key)!;
+        },
+      }));
+    // The room the batch ran on: the working read, or the whole campaign when it needed history.
+    // A staged batch is validated the same way (the merged draft), and nothing of it is stored.
+    let source = room;
+    let table = room.table;
+    let pages = historyNeedsPages(unapplied),
+      sessions = historyNeedsSessions(unapplied);
+    for (let attempt = 0; ; attempt++) {
+      if (pages || sessions) source = await withRoomHistory(source, { reports: sessions });
+      try {
+        const result = runOnWorkingSet(source.table, historyOffsets(source), run);
+        // Ledger lines added on the working set must have IDs no older (unloaded) line has.
+        if (result.pendingIds.ledger && (await ledgerIdsTaken(source, result.pendingIds.ledger)))
+          throw new HistoryNeeded("ledger-id");
+        table = result.table;
+        break;
+      } catch (error) {
+        if (!(error instanceof HistoryNeeded) || attempt >= 2) throw error;
+        historyEngineStats.fallbacks.push({ kinds: unapplied.map((c) => c.kind), reason: error.reason });
+        if (historyEngineStats.fallbacks.length > 50) historyEngineStats.fallbacks.shift();
+        if (error.reason === "reports") sessions = true;
+        else pages = true;
+      }
+    }
     for (const command of unapplied) {
       const key = seat.id + ":" + command.id;
       seen.add(key);
@@ -1025,7 +1214,7 @@ export async function submitCommands(input: {
         "Another device has saved unfinished actions. Refresh and submit the complete turn, or export and resolve those actions before ending it.",
       );
     const next: CloudRoom = {
-      ...room,
+      ...(input.stage ? room : source),
       table: input.stage ? room.table : table,
       viewOnly:
         !input.stage && seat.role === "dm" && commands.some((c) => c.kind === "session" && !c.end)
@@ -1050,7 +1239,7 @@ export async function submitCommands(input: {
     // Only after the successful write (a retried attempt that lost the race never notifies).
     if (!input.stage) {
       const fresh = next.table.notes.filter(
-        (note) => !room.table.notes.some((old) => old.id === note.id),
+        (note) => !source.table.notes.some((old) => old.id === note.id),
       );
       if (fresh.length) {
         // After the response on a Worker (waitUntil), so a slow push service never holds the
@@ -1066,8 +1255,60 @@ export async function submitCommands(input: {
         });
       }
     }
-    return view(next, seat, room);
+    return respond(next, seat, room);
   });
+}
+
+/**
+ * Command kinds that read the whole live ledger or chat (older pages) or archived sessions, so
+ * their batch starts on the whole campaign instead of finding out on the working set. Only a
+ * shortcut: any other command that needs history is detected (history-window.server.ts).
+ */
+/** Whether a working read's sealed ledger pages already hold any of `ids` (history on demand). */
+async function ledgerIdsTaken(room: CloudRoom, ids: string[]) {
+  const pages = roomPages(room).get("ledger") ?? [];
+  const db = database();
+  if (!pages.length || !db) return false;
+  return roomHistoryIdsTaken(db, room.code, pages.map((page) => page.hash), ids);
+}
+/** Diagnostics for tests: the latest batches (at most 50) that needed history after starting on the working set. */
+export const historyEngineStats: { fallbacks: { kinds: string[]; reason: string }[] } = { fallbacks: [] };
+const PAGE_KINDS = new Set(["ledger-void", "session", "downtime-apply"]);
+function historyNeedsPages(commands: { kind: string }[]) {
+  return commands.some((c) => PAGE_KINDS.has(c.kind));
+}
+function historyNeedsSessions(commands: { kind: string; changes?: { store: string; id: string }[] }[]) {
+  return commands.some(
+    (c) =>
+      c.kind === "ledger-void" ||
+      (c.kind === "loot-resolve" && "favour" in c && !!(c as { favour?: unknown }).favour) ||
+      c.kind === "quest-link-reward" ||
+      (c.kind === "patch" &&
+        (c.changes ?? []).some((change) => change.store === "journal" && (change.id === "journal" || change.id.startsWith('journal:["reports"')))),
+  );
+}
+
+/**
+ * History on demand (tabletop protocol 12; history-pages.ts): older ledger or chat lines from the
+ * cursor the view or a previous call gave, or one archived session, for this seat only. Authorized
+ * exactly like a room read (open room, seat token); projected by the view's own rules
+ * (`historyProjector`, `projectArchivedReport`); pages and sessions are read from this room only.
+ */
+export async function readRoomHistory(input: {
+  code: string;
+  token: string;
+  tabletopProtocol?: number;
+  list?: unknown;
+  before?: unknown;
+  report?: unknown;
+  held?: unknown;
+  bulk?: unknown;
+}) {
+  if (!historyClient(input.tabletopProtocol)) throw Error("Reload Lootsplitter to open earlier history.");
+  const room = await must(input.code, { working: true });
+  const seat = room.seats.find((s) => s.token === input.token);
+  if (!seat) throw Error("This browser is not seated at that table.");
+  return readHistory(room, seat, await historyProjector(room.table, seat, room.code), input);
 }
 
 /** NPC barter quote for one seat. Players get the public quote only: no valuation or rules. */

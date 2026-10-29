@@ -328,6 +328,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Party chat, journals and alerts",
         paragraphs: [
           "Campaign → Chat supports party and permitted private messages. The conversation fills the tab and the message box stays above the bottom navigation; after scrolling up, Jump to latest returns to the newest message. Connection & recovery, device backups and manual sharing are on the Room tab. Home → Journal opens visible campaign entries; visibility determines who can read each entry. Campaign → Rolls and Alerts show recorded results and room/message notices.",
+          "In a long campaign, Chat and the ledger open with their newest lines. Load earlier messages or Load earlier entries fetches older ones you are allowed to see, and an archived session shows Load this session. Loading never changes anything, and you only ever receive the history your own view includes.",
           "Browser notifications depend on your device and permission. Supported browsers can enable background new-message web push without message text. This is not email delivery or native Android push.",
         ],
         links: [

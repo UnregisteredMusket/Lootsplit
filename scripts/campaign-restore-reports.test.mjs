@@ -5,6 +5,7 @@ import { localAccountDb } from "./account-dev-db.mjs";
 import { openRoom, roomState } from "../src/lib/quire/cloud.server.ts";
 import { readCloudTableForImport } from "../src/lib/quire/cloud.ts";
 import { readRoom, updateRoom, ROOM_BODY_LIMIT } from "../src/lib/quire/room-store.server.ts";
+import { ROOM_LIVE_LIMIT } from "../src/lib/quire/room-size.ts";
 import { archiveSession } from "../src/lib/quire/session-records.ts";
 import { tradeFixture } from "../src/lib/quire/test-fixtures/trade-economy.ts";
 import { campaignAction } from "../cloudflare/account-campaigns.mjs";
@@ -173,9 +174,18 @@ test("a legacy backup (inline snapshots without seat lists, or no history) still
   await assertHydratesIdentically(plain.membership, plain.row, empty.payload);
 });
 
-test("a single snapshot above the row budget is refused with nothing created and the backup kept", async () => {
+test("a single snapshot above the row budget restores in parts (step 4) and hydrates identically", async () => {
+  const { backupId, payload } = await deletedCampaign([["lima", 20]]);
+  payload.journal.reports.push({ ...archivedSession("mike", 1_900), seatIds: payload.journal.reports[0].seatIds });
+  await db.prepare("UPDATE library_backups SET body=? WHERE id=?").bind(JSON.stringify(payload), backupId).run();
+  const { membership, row } = await restore(backupId);
+  assert.ok(await count("SELECT COUNT(*) AS n FROM campaign_room_report_parts WHERE code=?", membership.code) >= 2);
+  await assertHydratesIdentically(membership, row, payload);
+});
+
+test("a single snapshot above the live campaign budget is refused with nothing created and the backup kept", async () => {
   const { backupId, payload } = await deletedCampaign([["juliet", 20]]);
-  payload.journal.reports.push({ ...archivedSession("kilo", 1_900), seatIds: payload.journal.reports[0].seatIds });
+  payload.journal.reports.push({ ...archivedSession("kilo", ROOM_LIVE_LIMIT / 1000 + 200), seatIds: payload.journal.reports[0].seatIds });
   const body = JSON.stringify(payload);
   await db.prepare("UPDATE library_backups SET body=? WHERE id=?").bind(body, backupId).run();
   const rooms = await count("SELECT COUNT(*) AS n FROM campaign_rooms"),
