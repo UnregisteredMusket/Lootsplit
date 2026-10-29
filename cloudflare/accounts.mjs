@@ -12,7 +12,8 @@ import { campaignBackupKey } from "../src/lib/account/campaign-backups.ts";
 import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
-import { campaignRecords } from "./campaign-records.mjs";
+import { campaignRecordsStream } from "./campaign-records.mjs";
+import { streamedJson } from "./campaign-file-stream.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
 import { libraryMemberRoom } from "./library-member-room.mjs";
 import {
@@ -556,12 +557,9 @@ export async function handleAccounts(request, env, context = null) {
     if (path === "/api/account/map-assets" && request.method === "POST")
       return cors(json(await accountMapAsset(db, userId, body)));
     if (path === "/api/account/records" && request.method === "GET") {
-      const result = await campaignRecords(db, userId);
-      const protocol = tabletopHeader(request);
-      if (protocol < 10)
-        for (const report of result.reports)
-          if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, protocol);
-      return cors(json(result));
+      // Streamed one archived session at a time (campaign-records.mjs); refusals come first.
+      const records = await campaignRecordsStream(db, userId, tabletopHeader(request));
+      return cors(streamedJson(records.chunks));
     }
     if (path === "/api/account/library" && request.method === "GET") {
       const [members, backups, characters, recovery] = await Promise.all([
