@@ -413,3 +413,48 @@ test("the overall account limits still apply after rotation", async () => {
     DB.close();
   }
 });
+
+test("Download a copy (campaign export) is for the linked DM only and leaks no seat or recovery data", async () => {
+  const { DB, call, signup, ids, room } = setup();
+  try {
+    const dm = await signup("export-dm@example.com"),
+      player = await signup("export-player@example.com"),
+      other = await signup("export-other@example.com");
+    await room("EXPORT01", dm, player);
+    const stored = JSON.parse((await DB.prepare("SELECT body FROM campaign_rooms WHERE code='EXPORT01'").first()).body);
+    stored.table.notes = [
+      { id: "to-player", to: "player", text: "Private player message" },
+      { id: "to-party", to: "party", text: "Party message" },
+    ];
+    await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code='EXPORT01'").bind(JSON.stringify(stored)).run();
+    const exportAs = (cookie) => call("campaign", { action: "export", code: "EXPORT01" }, cookie);
+    const before = (await DB.prepare("SELECT revision FROM campaign_rooms WHERE code='EXPORT01'").first()).revision;
+
+    const asDm = await exportAs(dm.cookie);
+    assert.equal(asDm.response.status, 200, JSON.stringify(asDm.data));
+    const text = JSON.stringify(asDm.data);
+    assert.equal(asDm.data.payload.kind, "quire");
+    for (const secret of ["EXPORT01-dm", "EXPORT01-player"]) assert.ok(!text.includes(secret), `no seat token ${secret}`);
+    assert.ok(!text.includes("campaignRecovery"), "no recovery records");
+    assert.ok(!text.includes("Private player message"), "a to:player note is filtered out");
+    assert.deepEqual(asDm.data.payload.notes.map((n) => n.id), ["to-party"]);
+
+    const asPlayer = await exportAs(player.cookie);
+    assert.equal(asPlayer.response.status, 403);
+    assert.match(asPlayer.data.error, /Only the linked dungeon master can download/);
+    assert.equal((await exportAs(other.cookie)).response.status, 404, "another account has no membership");
+    assert.equal((await exportAs("")).response.status, 401, "signed out");
+
+    // A banned or departed player keeps the membership row but no current seat: refused.
+    stored.seats = stored.seats.filter((s) => s.role === "dm");
+    stored.departed = [{ id: "player-seat", token: "EXPORT01-player", role: "player", purseIds: [], status: "banned" }];
+    await DB.prepare("UPDATE campaign_rooms SET body=?,revision=revision+1 WHERE code='EXPORT01'").bind(JSON.stringify(stored)).run();
+    assert.equal((await exportAs(player.cookie)).response.status, 403);
+
+    // Exporting is read-only: no backup, no room change.
+    assert.deepEqual(await ids(dm.id), []);
+    assert.equal((await DB.prepare("SELECT revision FROM campaign_rooms WHERE code='EXPORT01'").first()).revision, before + 1);
+  } finally {
+    DB.close();
+  }
+});
