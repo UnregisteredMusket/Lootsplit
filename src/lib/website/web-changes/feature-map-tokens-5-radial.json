@@ -1,0 +1,11 @@
+{
+  "title": "Press and hold the map on your phone",
+  "summary": "Holding a finger on the map opens a wheel of quick actions at that spot.",
+  "items": [
+    "Press and hold the map for half a second to open the map actions wheel; moving your finger still pans and drags tokens.",
+    "DMs get Encounter, Creatures, Characters, Place party, Move party, Ping, Reveal and More; holding a token gives its own wheel.",
+    "Slide onto an action and let go, or lift and tap. More lists every map action in a sheet.",
+    "Players get Place me, Ping, Measure and My sheet.",
+    "Map actions in the map tools opens the same actions without a long press."
+  ]
+}

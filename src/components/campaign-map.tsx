@@ -129,11 +129,16 @@ import {
   Menu,
   Route as RouteIcon,
   Map as MapIcon,
+  MousePointerClick,
+  Ellipsis,
+  ChevronLeft,
 } from "lucide-react";
+import { MapRadial, RadialProgress, type RadialItem } from "./map-radial";
+import { longPress, RADIAL_SLOP_PX, radialGeometry, radialHit } from "@/lib/quire/radial-geometry";
 import { toast } from "sonner";
 import { MapContextMenu } from "./map-context-menu";
-import { menuFromActions } from "./map-action-items";
-import { mapActions } from "@/lib/quire/map-actions";
+import { MAP_ACTION_ICONS, menuFromActions } from "./map-action-items";
+import { mapActions, radialSlices, shortMapName } from "@/lib/quire/map-actions";
 import { partyDestinations, partyEntry, partyMoveCommands, type PartyDestination } from "@/lib/quire/party-move";
 import { mapEncounterId, removeFromInitiative } from "@/lib/quire/map-initiative-link";
 import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
@@ -3083,6 +3088,17 @@ function MapViewport({
       </MapToolGroup>
       <MapToolGroup caption="View">
         <MapTool
+          // The map menu at the centre crosshair (map tokens PR 5): screen readers and anyone
+          // without right-click or a long press; phones get the bottom sheet.
+          icon={<MousePointerClick size={19} />}
+          label="Map actions"
+          keys="Shift+F10"
+          onClick={() => {
+            const box = root.current?.getBoundingClientRect();
+            if (box) openMapMenu(box.left + box.width / 2, box.top + box.height / 2, undefined, root.current, layout === "phone");
+          }}
+        />
+        <MapTool
           icon={<Layers size={19} />}
           label="Layers"
           shortcut="L"
@@ -3186,13 +3202,34 @@ function MapViewport({
       point: { x: number; y: number };
       tokenIds: string[];
       returnTo?: HTMLElement | null;
+      /** Phones' More: the same menu as a bottom sheet, maybe opened at a submenu. */
+      sheet?: boolean;
+      submenu?: string;
     }>(),
+    // The phone's press-and-hold radial (map tokens PR 5): where, on what, and which ring.
+    [radial, setRadial] = useState<{
+      /** The press point (client pixels); the wheel is centred there, kept inside the map. */
+      press: { x: number; y: number };
+      point: { x: number; y: number };
+      tokenIds: string[];
+      /** The finger that opened it is still down (slide-to-select). */
+      pointerId?: number;
+      hot?: number;
+      /** A submenu ring (Move party to, Size, Send to) replaces the main one. */
+      ring?: string;
+      /** The finger has slid since the wheel opened (a release then picks or closes). */
+      slid?: boolean;
+      /** Taps count only after this time: the lift that left it open must not tap a slice. */
+      tapsFrom?: number;
+    }>(),
+    [holding, setHolding] = useState<{ x: number; y: number }>(),
     [partyMoveOptions, setPartyMoveOptions] = useState({ follow: true, placeTokens: true }),
     encounterId = useDm ? mapEncounterId(recordTable, map) : undefined,
     [combatantIds, setCombatantIds] = useState<{ id: string; ids: Set<string> }>();
+  const menuTokenCount = (mapMenu ?? radial)?.tokenIds.length ?? 0;
   useEffect(() => {
     // While a token menu is open, the tracker says who is already in combat.
-    if (!mapMenu?.tokenIds.length || !encounterId) return;
+    if (!menuTokenCount || !encounterId) return;
     return encounterDetailPoller.subscribe(encounterId, {
       intervalMs: 3000,
       onResult: (row) =>
@@ -3202,14 +3239,14 @@ function MapViewport({
         }),
       onError: () => undefined,
     });
-  }, [mapMenu?.tokenIds.length, encounterId]);
+  }, [menuTokenCount, encounterId]);
   const menuSquare = (point: { x: number; y: number }) => {
     if (!map.grid) return undefined;
     const at = snapTokenPosition(map.grid, {}, point);
     return at ? { column: at.column, row: at.row } : undefined;
   };
-  const openMapMenu = (clientX: number, clientY: number, tokenId?: string, returnTo?: HTMLElement | null) => {
-    if (sketches.active || tools.group.placing || planner.active) return;
+  /** The menu's target: the DM's token (or the selection it belongs to), a player's own token, else the point. */
+  const menuTargetAt = (clientX: number, clientY: number, tokenId?: string) => {
     let tokenIds: string[] = [];
     const token = tokenId ? map.tokens?.find((t) => t.id === tokenId) : undefined;
     if (token && useDm) {
@@ -3217,8 +3254,19 @@ function MapViewport({
       if (!tools.selected.includes(token.id)) tools.menu.selectOnly([token.id]);
     } else if (token?.kind === "character" && token.entityId && seatNow.purseIds.includes(token.entityId))
       tokenIds = [token.id];
-    const point = token && map.grid ? sceneTokenPoint(map.grid, token) : mapPoint(clientX, clientY);
-    setMapMenu({ x: clientX, y: clientY, point, tokenIds, returnTo: returnTo ?? root.current });
+    const point = tokenIds.length && token && map.grid ? sceneTokenPoint(map.grid, token) : mapPoint(clientX, clientY);
+    return { point, tokenIds };
+  };
+  const openMapMenu = (
+    clientX: number,
+    clientY: number,
+    tokenId?: string,
+    returnTo?: HTMLElement | null,
+    sheet = false,
+  ) => {
+    if (sketches.active || tools.group.placing || planner.active) return;
+    setRadial(undefined);
+    setMapMenu({ x: clientX, y: clientY, ...menuTargetAt(clientX, clientY, tokenId), returnTo: returnTo ?? root.current, sheet });
   };
   const closeMapMenu = (activated: boolean) => {
     const back = mapMenu?.returnTo;
@@ -3228,7 +3276,8 @@ function MapViewport({
   };
   const centreOn = (point: { x: number; y: number }) =>
     setView((v) => ({ ...v, x: size.w / 2 - point.x * w * v.scale, y: size.h / 2 - point.y * h * v.scale }));
-  const menuTokens = (mapMenu?.tokenIds ?? []).flatMap((id) => map.tokens?.find((t) => t.id === id) ?? []);
+  const menuTarget = mapMenu ?? radial;
+  const menuTokens = (menuTarget?.tokenIds ?? []).flatMap((id) => map.tokens?.find((t) => t.id === id) ?? []);
   const destinations = useDm ? partyDestinations(maps, map) : { submaps: [], connected: [] };
   const moveParty = async (destinationId: string) => {
     const to = maps.find((m) => m.id === destinationId);
@@ -3246,9 +3295,9 @@ function MapViewport({
       toast.error(error instanceof Error ? error.message : "The party could not be moved. Nothing changed.");
     }
   };
-  const actionList = mapMenu
+  const actionList = menuTarget
     ? mapActions(
-        menuTokens.length ? { kind: "tokens", tokens: menuTokens } : { kind: "map", square: menuSquare(mapMenu.point) },
+        menuTokens.length ? { kind: "tokens", tokens: menuTokens } : { kind: "map", square: menuSquare(menuTarget.point) },
         {
           dm: useDm,
           grid: !!map.grid,
@@ -3267,10 +3316,10 @@ function MapViewport({
     if (actionList) setPlaceAnnouncement(actionList.announce);
     // Announced once per opened menu.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapMenu]);
-  const menuElement = (() => {
-    if (!mapMenu || !actionList) return null;
-    const at = mapMenu.point,
+  }, [mapMenu, !!radial]);
+  const builtMenu = (() => {
+    if (!menuTarget || !actionList) return undefined;
+    const at = menuTarget.point,
       tokens = menuTokens,
       one = tokens[0];
     const destinationItems = (list: PartyDestination[], submap: boolean) =>
@@ -3366,17 +3415,241 @@ function MapViewport({
         "send-to": { groups: [{ items: sendTargets.map((m) => ({ id: `send:${m.id}`, label: m.label, icon: <MapIcon size={16} />, run: () => groupActions.send(tokens, m.id) })) }] },
       },
     );
+    return menu;
+  })();
+  const viewportBox = () => {
     const box = root.current?.getBoundingClientRect();
-    return (
+    return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  };
+  const menuElement =
+    mapMenu && builtMenu ? (
       <MapContextMenu
-        menu={menu}
+        key={mapMenu.sheet ? "sheet" : "menu"}
+        menu={
+          mapMenu.sheet
+            ? {
+                // The sheet keeps the desktop groups; Table and Reveal share one heading (mockup).
+                ...builtMenu,
+                groups: builtMenu.groups.flatMap((g, i, all) =>
+                  g.label === "Reveal" && all[i - 1]?.label === "Table"
+                    ? []
+                    : g.label === "Table" && all[i + 1]?.label === "Reveal"
+                      ? [{ label: "Table · Reveal", items: [...g.items, ...all[i + 1].items] }]
+                      : [g],
+                ),
+              }
+            : builtMenu
+        }
         x={mapMenu.x}
         y={mapMenu.y}
-        bounds={box ? { left: box.left, top: box.top, width: box.width, height: box.height } : { left: 0, top: 0, width: innerWidth, height: innerHeight }}
+        bounds={viewportBox()}
         close={closeMapMenu}
+        sheet={mapMenu.sheet}
+        initialSubmenu={mapMenu.submenu}
       />
-    );
+    ) : null;
+  // The phone's press-and-hold radial (map tokens PR 5; mockups radial-mobile, radial-mobile-320).
+  const tick = () => {
+    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) navigator.vibrate?.(10);
+  };
+  const lastTouch = useRef(0),
+    pressAt = useRef<{ x: number; y: number; tokenId?: string }>(undefined),
+    fireRadial = useRef<(pointerId: number) => void>(() => undefined);
+  fireRadial.current = (pointerId) => {
+    const at = pressAt.current;
+    setHolding(undefined);
+    if (!at) return;
+    // The hold wins over a drag that never started and over the pan.
+    tools.cancel();
+    toolPointer.current = undefined;
+    pointers.current.clear();
+    moved.current = true;
+    tick();
+    setMapMenu(undefined);
+    setRadial({ press: { x: at.x, y: at.y }, ...menuTargetAt(at.x, at.y, at.tokenId), pointerId });
+  };
+  const press = useRef<ReturnType<typeof longPress>>(undefined);
+  press.current ??= longPress((id) => fireRadial.current(id));
+  const radialEligible = () =>
+    ["pan", "select"].includes(tools.tool) &&
+    !placing &&
+    !pinging &&
+    !sketches.active &&
+    !planner.active &&
+    !tools.group.placing &&
+    !tools.claim.purseId &&
+    !radial &&
+    !mapMenu;
+  const radialView = (() => {
+    if (!radial || !builtMenu || !actionList) return undefined;
+    const all = builtMenu.groups.flatMap((g) => g.items);
+    type Item = RadialItem & { run?: () => void; submenu?: boolean };
+    let items: Item[],
+      hub: ReactNode,
+      hubLabel = "Close map actions",
+      ringLabel = "Map actions";
+    const parent = radial.ring ? all.find((i) => i.id === radial.ring) : undefined;
+    if (parent?.submenu) {
+      // A submenu replaces the ring (the desktop submenu's items, without its options), then Back.
+      const options = parent.submenu.groups.flatMap((g) => g.items).filter((i) => radial.ring === "size" || i.checked === undefined);
+      items = [
+        ...options.map((i) => ({
+          id: i.id,
+          label: radial.ring === "size" ? i.label : shortMapName(i.label),
+          pill: [i.label, i.hint, radial.ring === "move-party" && partyMoveOptions.follow ? "players follow" : undefined].filter(Boolean).join(" · "),
+          icon: i.icon,
+          disabled: i.disabled,
+          run: i.run,
+        })),
+        { id: "back", label: "Back", pill: "Back", icon: <ChevronLeft size={20} /> },
+      ];
+      hub = (
+        <>
+          {parent.icon}
+          <small>{parent.label}</small>
+        </>
+      );
+      ringLabel = parent.label;
+      hubLabel = `Close ${parent.label}`;
+    } else {
+      const slices = radialSlices(actionList, {
+        dm: useDm,
+        tokens: menuTokens.length > 0,
+        purseIds: seatNow.purseIds,
+        pills: {
+          "place-party": `${(readTabletopSession(recordTable).partyFormation ?? DEFAULT_FORMATION).shape}, ${partyRows.filter((r) => r.checked).length} tokens`,
+          ...(claimable ? { "place-mine": claimable.name } : {}),
+        },
+      });
+      items = slices.map((slice) => {
+        const item = all.find((i) => i.id === slice.id);
+        const run =
+          slice.id === "my-sheet" && !item
+            ? () => void navigate({ to: "/characters", search: { id: seatNow.purseIds[0] } })
+            : item?.run;
+        return {
+          ...slice,
+          icon: slice.id === "more" ? <Ellipsis size={20} /> : MAP_ACTION_ICONS[slice.id],
+          disabled: slice.id === "more" ? false : slice.disabled || (!slice.submenu && !run) || (slice.submenu && item?.disabled),
+          run,
+        };
+      });
+      hub = menuTokens.length ? (
+        <>
+          <b>{actionList.title}</b>
+          <small>{actionList.subtitle.split(" · ")[0]}</small>
+        </>
+      ) : (
+        <>
+          <X size={20} />
+          <small>{actionList.subtitle}</small>
+        </>
+      );
+    }
+    const geometry = radialGeometry(radial.press, items.length, viewportBox(), {
+      player: !useDm,
+      moreLast: !radial.ring && items.at(-1)?.id === "more",
+    });
+    return { items, hub, hubLabel, ringLabel, geometry };
   })();
+  const closeRadial = () => {
+    setRadial(undefined);
+    root.current?.focus({ preventScroll: true });
+  };
+  const pickRadial = (index: number) => {
+    const view = radialView,
+      item = view?.items[index];
+    if (!radial || !view || !item || item.disabled) return;
+    if (item.id === "more") {
+      setRadial(undefined);
+      setMapMenu({ x: radial.press.x, y: radial.press.y, point: radial.point, tokenIds: radial.tokenIds, returnTo: root.current, sheet: true });
+      return;
+    }
+    if (item.id === "back") {
+      setRadial({ ...radial, ring: undefined, hot: undefined, pointerId: undefined });
+      return;
+    }
+    if (item.submenu) {
+      const count = builtMenu?.groups.flatMap((g) => g.items).find((i) => i.id === item.id)?.submenu?.groups.flatMap((g) => g.items).length ?? 0;
+      // Up to seven choices fit a ring (with Back); more open in the sheet.
+      if (count > 7) {
+        setRadial(undefined);
+        setMapMenu({ x: radial.press.x, y: radial.press.y, point: radial.point, tokenIds: radial.tokenIds, returnTo: root.current, sheet: true, submenu: item.id });
+      } else setRadial({ ...radial, ring: item.id, hot: 0, pointerId: undefined });
+      return;
+    }
+    setRadial(undefined);
+    item.run?.();
+  };
+  /** Pointer handling for the radial: true when the event belonged to it. */
+  const radialPointer = {
+    down(e: React.PointerEvent) {
+      if (e.pointerType === "mouse") return;
+      lastTouch.current = Date.now();
+      const eligible = radialEligible() && (e.pointerType === "touch" || e.pointerType === "pen");
+      if (eligible && !press.current!.pending)
+        pressAt.current = {
+          x: e.clientX,
+          y: e.clientY,
+          tokenId: (e.target as Element).closest<HTMLElement>("[data-map-token]")?.dataset.mapToken,
+        };
+      press.current!.down(e.pointerId, e.clientX, e.clientY, eligible);
+      setHolding(press.current!.pending ? { x: e.clientX, y: e.clientY } : undefined);
+    },
+    move(e: React.PointerEvent) {
+      if (radial && radialView && radial.pointerId === e.pointerId) {
+        const hit = radialHit(radialView.geometry, e.clientX, e.clientY);
+        const hot = typeof hit === "number" && !radialView.items[hit]?.disabled ? hit : undefined;
+        const slid = radial.slid || Math.hypot(e.clientX - radial.press.x, e.clientY - radial.press.y) > RADIAL_SLOP_PX;
+        if (hot !== radial.hot || slid !== radial.slid) {
+          // Until the finger slides, the wheel (moved inward near an edge) highlights nothing.
+          setRadial({ ...radial, hot: slid ? hot : undefined, slid });
+          if (slid && hot !== undefined && hot !== radial.hot) tick();
+        }
+        return true;
+      }
+      press.current!.move(e.pointerId, e.clientX, e.clientY);
+      if (holding && !press.current!.pending) setHolding(undefined);
+      return false;
+    },
+    up(e: React.PointerEvent) {
+      press.current!.up(e.pointerId);
+      if (holding) setHolding(undefined);
+      if (radial && radialView && radial.pointerId === e.pointerId) {
+        pointers.current.delete(e.pointerId);
+        const hit = radialHit(radialView.geometry, e.clientX, e.clientY);
+        // Slide-to-select releases on a slice; lifting without sliding or in the centre keeps it
+        // open for a tap; sliding off the wheel and releasing closes it.
+        if (radial.slid && typeof hit === "number") pickRadial(hit);
+        else if (radial.slid && hit === "outside") closeRadial();
+        else setRadial({ ...radial, pointerId: undefined, hot: undefined, slid: false, tapsFrom: Date.now() + 300 });
+        return true;
+      }
+      return false;
+    },
+    cancel(e: React.PointerEvent) {
+      press.current!.cancel();
+      setHolding(undefined);
+      if (radial?.pointerId === e.pointerId) setRadial({ ...radial, pointerId: undefined, hot: undefined });
+    },
+  };
+  const radialElement =
+    radial && radialView ? (
+      <MapRadial
+        geometry={radialView.geometry}
+        items={radialView.items}
+        hub={radialView.hub}
+        hubLabel={radialView.hubLabel}
+        label={radialView.ringLabel}
+        hot={radial.hot}
+        pill={radial.hot !== undefined ? radialView.items[radial.hot]?.pill : undefined}
+        pick={pickRadial}
+        close={closeRadial}
+        tapsFrom={radial.tapsFrom}
+      />
+    ) : holding ? (
+      <RadialProgress x={holding.x} y={holding.y} />
+    ) : null;
   return (
     <MapFrame title={map.name} interfaceHidden={interfaceHidden}>
       <MapWorkspaceChrome
@@ -4250,6 +4523,7 @@ function MapViewport({
         ))}
       <MapAnnouncer map={map} pings={signals.pings} />
       {menuElement}
+      {radialElement}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {placeAnnouncement}
       </p>
@@ -4334,7 +4608,7 @@ function MapViewport({
         <div className="tabletop-surface">
           <div
             ref={root}
-            className={`map-viewport ${placing || pinging ? "placing" : ""}`}
+            className={`map-viewport ${placing || pinging ? "placing" : ""}${radial ? " radial-open" : ""}`}
             role="region"
             aria-label="Interactive campaign map"
             aria-keyshortcuts="Shift+F10 ContextMenu"
@@ -4342,6 +4616,8 @@ function MapViewport({
             onContextMenu={(e) => {
               // The map's own menu replaces the browser's inside the map (map tokens PR 4).
               e.preventDefault();
+              // A long press on a phone fires contextmenu too: the radial handles touch.
+              if (Date.now() - lastTouch.current < 1500 || radial) return;
               const token = (e.target as Element).closest<HTMLElement>("[data-map-token]");
               openMapMenu(e.clientX, e.clientY, token?.dataset.mapToken, token);
             }}
@@ -4433,6 +4709,7 @@ function MapViewport({
             }}
             onPointerDown={(e) => {
               if (e.button !== 0) return;
+              radialPointer.down(e);
               if (sketches.active) {
                 sketches.down(mapPoint(e.clientX, e.clientY));
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -4461,6 +4738,7 @@ function MapViewport({
               } else moved.current = true;
             }}
             onPointerMove={(e) => {
+              if (radialPointer.move(e)) return;
               if (tools.group.placing && toolPointer.current !== e.pointerId)
                 tools.group.hover(mapPoint(e.clientX, e.clientY));
               if (toolPointer.current === e.pointerId) {
@@ -4501,6 +4779,7 @@ function MapViewport({
               }
             }}
             onPointerUp={(e) => {
+              if (radialPointer.up(e)) return;
               if (toolPointer.current === e.pointerId) {
                 if (sketches.active) sketches.up(mapPoint(e.clientX, e.clientY));
                 else tools.pointerUp(mapPoint(e.clientX, e.clientY));
@@ -4537,6 +4816,7 @@ function MapViewport({
               pointers.current.delete(e.pointerId);
             }}
             onPointerCancel={(e) => {
+              radialPointer.cancel(e);
               pointers.current.delete(e.pointerId);
               if (toolPointer.current === e.pointerId) {
                 toolPointer.current = undefined;

@@ -372,6 +372,9 @@ jobs:
       - name: dev-map-context-menu
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-map-context-menu 240 node scripts/map-context-menu-browser-audit.mjs
+      - name: dev-map-radial
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-radial 300 node scripts/map-radial-browser-audit.mjs
       - name: dev-quest-log
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-quest-log 300 node scripts/quest-log-browser-audit.mjs

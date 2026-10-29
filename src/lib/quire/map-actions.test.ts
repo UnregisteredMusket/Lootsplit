@@ -130,3 +130,23 @@ test("size hints name the footprint", () => {
   assert.equal(sizeHint(mira), "Medium 1×1");
   assert.equal(sizeHint({ ...mira, sizeClass: "tiny", footprint: 0.25 }), "Tiny ¼");
 });
+
+test("radial: the mockup's DM, token and player slices, clockwise from the top", async () => {
+  const { radialSlices, shortMapName } = await import("./map-actions.ts");
+  const dmMap = radialSlices(mapActions({ kind: "map", square: { column: 11, row: 9 } }, base), { dm: true, tokens: false, purseIds: [], pills: { "place-party": "cluster, 4 tokens" } });
+  assert.deepEqual(dmMap.map((s) => s.label), ["Encounter", "Creatures", "Characters", "Place party", "Move party ▸", "Ping", "Reveal", "More"]);
+  assert.equal(dmMap[3].pill, "Place party here · cluster, 4 tokens");
+  assert.equal(dmMap[4].submenu, true);
+  const token = radialSlices(mapActions({ kind: "tokens", tokens: [ogre] }, { ...base, encounterId: "fight", combatants: new Set() }), { dm: true, tokens: true, purseIds: [] });
+  assert.deepEqual(token.map((s) => s.label), ["Tracker", "Hide", "Lock", "Initiative", "Size ▸", "Send to ▸", "Remove", "More"]);
+  assert.equal(token[3].id, "add-initiative");
+  const fighting = radialSlices(mapActions({ kind: "tokens", tokens: [ogre] }, { ...base, encounterId: "fight", combatants: new Set(["ogre"]) }), { dm: true, tokens: true, purseIds: [] });
+  assert.equal(fighting[3].id, "remove-combat");
+  const player = { ...base, dm: false, purseIds: ["mira"], canPlaceOwn: true };
+  const p = radialSlices(mapActions({ kind: "map" }, player), { dm: false, tokens: false, purseIds: ["mira"] });
+  assert.deepEqual(p.map((s) => s.label), ["Place me", "Ping", "Measure", "My sheet"]);
+  assert.ok(p.every((s) => !DM_ONLY.has(s.id)));
+  assert.deepEqual(radialSlices(mapActions({ kind: "map" }, { ...player, canPlaceOwn: false }), { dm: false, tokens: false, purseIds: ["mira"] }).map((s) => s.label), ["Ping", "Measure", "My sheet"]);
+  assert.deepEqual(radialSlices(mapActions({ kind: "tokens", tokens: [mira] }, player), { dm: false, tokens: true, purseIds: ["mira"] }).map((s) => s.label), ["My sheet", "Ping", "Centre"]);
+  assert.deepEqual(["The Cellar", "Keep — Upper floor", "City-Testville", "Forest outside of Testville"].map(shortMapName), ["The Cellar", "Upper floor", "Testville", "Forest"]);
+});

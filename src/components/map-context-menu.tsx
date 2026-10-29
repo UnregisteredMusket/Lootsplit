@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { registerBackOverlay } from "@/lib/mobile/back-handlers";
 
 /** One map action (map tokens PR 4): the right-click menu, the phone radial and its More sheet. */
 export type MapAction = {
@@ -38,6 +39,8 @@ export function MapContextMenu({
   y,
   bounds,
   close,
+  sheet = false,
+  initialSubmenu,
 }: {
   menu: MapActionMenu;
   x: number;
@@ -45,9 +48,13 @@ export function MapContextMenu({
   /** The visible area the menu must stay inside (the map viewport). */
   bounds: { left: number; top: number; width: number; height: number };
   close: (activated: boolean) => void;
+  /** Phones' More (map tokens PR 5): a bottom sheet; a submenu replaces the list, with Back. */
+  sheet?: boolean;
+  /** Open at this submenu (the radial's More for a long list). */
+  initialSubmenu?: string;
 }) {
   const root = useRef<HTMLDivElement>(null),
-    [submenu, setSubmenu] = useState<string>(),
+    [submenu, setSubmenu] = useState<string | undefined>(initialSubmenu),
     submenuByKey = useRef(false),
     [place, setPlace] = useState({ left: x, top: y, flip: false }),
     items = flat(menu.groups).filter((i) => !i.disabled);
@@ -68,6 +75,17 @@ export function MapContextMenu({
   useEffect(() => {
     root.current?.querySelector<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])')?.focus();
   }, []);
+  // Android Back closes the menu (or its submenu first).
+  const latest = useRef({ submenu, close });
+  latest.current = { submenu, close };
+  useEffect(
+    () =>
+      registerBackOverlay({
+        close: () => (latest.current.submenu ? setSubmenu(undefined) : latest.current.close(false)),
+        element: () => root.current,
+      }),
+    [],
+  );
   useEffect(() => {
     const away = (event: PointerEvent) => {
       if (!(event.target as Element).closest(".map-context-menu")) close(false);
@@ -91,7 +109,7 @@ export function MapContextMenu({
     item.run?.();
   };
   const keys = (event: KeyboardEvent<HTMLElement>, list: MapAction[], inSub: boolean) => {
-    const focusable = [...(event.currentTarget.querySelectorAll<HTMLElement>(':scope > [role="group"] > [role^="menuitem"]:not([aria-disabled="true"]), :scope > [role^="menuitem"]:not([aria-disabled="true"])'))];
+    const focusable = [...(event.currentTarget.querySelectorAll<HTMLElement>(':scope > [role="group"] > [role^="menuitem"]:not([aria-disabled="true"]), :scope > .map-action-sheet-body > [role="group"] > [role^="menuitem"]:not([aria-disabled="true"]), :scope > [role^="menuitem"]:not([aria-disabled="true"])'))];
     const index = focusable.indexOf(document.activeElement as HTMLElement);
     const go = (i: number) => focusable[(i + focusable.length) % focusable.length]?.focus();
     if (event.key === "ArrowDown") go(index + 1);
@@ -180,6 +198,52 @@ export function MapContextMenu({
         ))}
       </div>
     ));
+  if (sheet)
+    return (
+      <div
+        ref={root}
+        className="map-context-menu map-action-sheet map-glass"
+        role="menu"
+        aria-label={open ? open.label : `${menu.title} · ${menu.subtitle}`}
+        onKeyDown={(e) => keys(e, open?.submenu ? flat(open.submenu.groups) : items, !!open)}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <div className="map-sheet-grab" aria-hidden="true" />
+        <div className="map-menu-header" aria-hidden="true">
+          <b>{open ? open.label : menu.title}</b>
+          <span>{menu.subtitle}</span>
+        </div>
+        <div className="map-action-sheet-body" key={open?.id ?? "main"} ref={(el) => {
+          if (el && !el.dataset.ready) {
+            el.dataset.ready = "1";
+            el.querySelector<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])')?.focus({ preventScroll: true });
+          }
+        }}>
+          {open?.submenu ? (
+            <>
+              <div role="group" className="map-menu-group plain">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-action="back"
+                  tabIndex={-1}
+                  className="map-menu-item"
+                  onClick={() => setSubmenu(undefined)}
+                >
+                  <span className="map-menu-icon" aria-hidden="true">
+                    <ChevronLeft size={16} />
+                  </span>
+                  <span className="map-menu-label">Back</span>
+                </button>
+              </div>
+              {renderItems(open.submenu.groups, true)}
+            </>
+          ) : (
+            renderItems(menu.groups, false)
+          )}
+        </div>
+      </div>
+    );
   return (
     <div
       ref={root}

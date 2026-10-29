@@ -232,3 +232,84 @@ function tokenActions(tokens: MapToken[], c: MapMenuContext): MapActionList {
 /** Every enabled item, in menu order (tests, the radial's More sheet). */
 export const enabledActions = (list: MapActionList) =>
   list.sections.flatMap((s) => s.items).filter((i) => !i.disabled);
+
+/** One slice of the phone's press-and-hold radial (map tokens PR 5; mockup radial-mobile). */
+export type RadialSlice = {
+  id: MapActionId | "more";
+  /** The short label under the icon ("Place party", "Move party ▸"). */
+  label: string;
+  /** The pill above the wheel while the slice is under the finger ("Place party here · …"). */
+  pill: string;
+  disabled?: boolean;
+  submenu?: boolean;
+};
+
+const SHORT: Partial<Record<MapActionId, string>> = {
+  "start-encounter": "Encounter",
+  "add-creatures": "Creatures",
+  "add-characters": "Characters",
+  "place-party": "Place party",
+  "move-party": "Move party ▸",
+  ping: "Ping",
+  reveal: "Reveal",
+  "place-mine": "Place me",
+  measure: "Measure",
+  "my-sheet": "My sheet",
+  centre: "Centre",
+  "open-tracker": "Tracker",
+  "open-sheet": "Sheet",
+  hide: "Hide",
+  show: "Show",
+  lock: "Lock",
+  unlock: "Unlock",
+  "add-initiative": "Initiative",
+  "remove-combat": "Initiative",
+  size: "Size ▸",
+  "send-to": "Send to ▸",
+  remove: "Remove",
+};
+/** Slice order, clockwise from the top (the mockup's): alternatives share a position. */
+const RADIAL_ORDER: { dmMap: MapActionId[][]; dmToken: MapActionId[][]; playerMap: MapActionId[][]; playerToken: MapActionId[][] } = {
+  dmMap: [["start-encounter"], ["add-creatures"], ["add-characters"], ["place-party"], ["move-party"], ["ping"], ["reveal"]],
+  dmToken: [["open-tracker", "open-sheet"], ["hide", "show"], ["lock", "unlock"], ["add-initiative", "remove-combat"], ["size"], ["send-to"], ["remove"]],
+  playerMap: [["place-mine"], ["ping"], ["measure"], ["my-sheet"]],
+  playerToken: [["my-sheet"], ["ping"], ["centre"]],
+};
+
+/**
+ * The radial's slices for a menu (8 at most): the DM's seven most used items and More (every
+ * item, in a bottom sheet); players' three or four. "Initiative" is Add or Remove, whichever
+ * applies. `pills` adds detail to an item's pill ("cluster, 4 tokens").
+ */
+export function radialSlices(
+  list: MapActionList,
+  { dm, tokens, purseIds, pills = {} }: { dm: boolean; tokens: boolean; purseIds: readonly string[]; pills?: Partial<Record<MapActionId, string>> },
+): RadialSlice[] {
+  const items = list.sections.flatMap((s) => s.items);
+  if (!dm && !tokens && purseIds.length && !items.some((i) => i.id === "my-sheet"))
+    items.push({ id: "my-sheet", label: "Open my sheet" });
+  const order = dm ? (tokens ? RADIAL_ORDER.dmToken : RADIAL_ORDER.dmMap) : tokens ? RADIAL_ORDER.playerToken : RADIAL_ORDER.playerMap;
+  const slices = order.flatMap((choices): RadialSlice[] => {
+    const found = choices.map((id) => items.find((i) => i.id === id)).filter((i) => !!i);
+    const item = found.find((i) => !i.disabled) ?? found[0];
+    if (!item) return [];
+    const base = item.label.replace(/…$/, "");
+    const detail = pills[item.id] ?? (item.disabled ? item.hint : undefined);
+    return [
+      {
+        id: item.id,
+        label: SHORT[item.id] ?? base,
+        pill: detail ? `${base} · ${detail}` : base,
+        ...(item.disabled ? { disabled: true } : {}),
+        ...(item.submenu ? { submenu: true } : {}),
+      },
+    ];
+  });
+  return dm ? [...slices, { id: "more", label: "More", pill: "Every map action" }] : slices;
+}
+
+/** A short name for a ring slice: "Keep — Upper floor" → "Upper floor", "City-Testville" → "Testville". */
+export function shortMapName(name: string) {
+  const tail = name.split(/\s+[—–-]\s+|-(?=\p{Lu})/u).pop()!.trim();
+  return tail.length > 12 ? tail.split(/\s+/)[0] : tail;
+}
