@@ -38,6 +38,18 @@ const books = (page) =>
     };
   });
 const toast = (page, text) => page.locator("[data-sonner-toast]").filter({ hasText: text }).first();
+// Clear earlier toasts through sonner itself: close the front live toast until none is left,
+// then wait for every toast (including ones already animating out) to unmount. Never remove
+// toast nodes from the DOM directly: React still owns them, and sonner inserts each new toast
+// before the current first one, so a detached node makes that insertBefore throw and the next
+// toast never renders (the flaky "Purchase recorded." wait on main 40955099666).
+const dismissToasts = async (page) => {
+  const live = page.locator('[data-sonner-toast]:not([data-removed="true"])');
+  // A toast can time out between the count and the click; the next pass re-counts.
+  for (let pass = 0; pass < 10 && (await live.count()) > 0; pass++)
+    await live.first().getByRole("button", { name: "Close toast", exact: true }).click({ timeout: 5000 }).catch(() => undefined);
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+};
 const noOverflow = async (page, label) =>
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
@@ -95,9 +107,10 @@ try {
     );
 
     // --- Buy again, then Undo: the existing ledger void restores coins, stock and items once.
-    await page.locator("[data-sonner-toast]").evaluateAll((all) => all.forEach((t) => t.remove()));
+    await dismissToasts(page);
     await rowFor(page, "Hempen rope").getByRole("button", { name: /^Buy / }).click();
     bought = toast(page, "Purchase recorded.");
+    await expect(bought.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
     // Rest the pointer on the toast so its 10 s Undo window pauses (as it does for a player
     // reading it) while the ledger check runs; slow runners took longer than 10 s here.
     await bought.hover();
@@ -135,7 +148,7 @@ try {
     await expect(page.locator("#purse-mira .saved-tick")).toHaveText(/Name saved/);
 
     // --- Give one entry: View receipt with both legs, no Undo.
-    await page.locator("[data-sonner-toast]").evaluateAll((all) => all.forEach((t) => t.remove()));
+    await dismissToasts(page);
     await page.getByRole("button", { name: "Select", exact: true }).click();
     await page.getByLabel("Select Dwarven ale (Bram Stoneward)", { exact: true }).check();
     await page.getByRole("region", { name: "Selected items" }).getByRole("button", { name: "Give", exact: true }).click();
