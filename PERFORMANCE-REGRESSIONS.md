@@ -21,7 +21,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / lint | open | 7 | 5s → 21s | +16s | +320% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 5 | 21s → 566s | +545s | +2595.24% |
 | Development / gameplay / Start disposable development server | open | 3 | 4s → 10s | +6s | +150% |
-| Code checks and immutable builds / web-build | open | 2 | 4s → 9s | +5s | +125% |
+| Code checks and immutable builds / web-build | open | 3 | 4s → 11s | +7s | +175% |
 | Development / desktop / Start disposable development server | open | 3 | 6s → 11s | +5s | +83.33% |
 | Code checks and immutable builds / Run node scripts/release-artifact.mjs prepare | open | 6 | 2s → 92s | +90s | +4500% |
 | Code checks and immutable builds / mobile-build | open | 4 | 3s → 9s | +6s | +200% |
@@ -620,7 +620,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-loot | open | 3 | 8s → 14s | +6s | +75% |
 | Development / economy / dev-game-analytics | open | 5 | 5s → 14s | +9s | +180% |
 | Development / economy | open | 2 | 448s → 921s | +473s | +105.58% |
-| Development / accounts / dev-sound | open | 2 | 33s → 48s | +15s | +45.45% |
+| Development / accounts / dev-sound | open | 3 | 33s → 57s | +24s | +72.73% |
 | Capture product screenshots | open | 2 | 91s → 168s | +77s | +84.62% |
 | Product screenshots | open | 2 | 91s → 168s | +77s | +84.62% |
 | Development / world | open | 5 | 396s → 1140s | +744s | +187.88% |
@@ -886,6 +886,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts-2 / dev-release | open | 2 | 47s → 65s | +18s | +38.3% |
 | Development / gameplay / dev-coin-split | open | 3 | 23s → 40s | +17s | +73.91% |
 | Development / gameplay / dev-loot-fairness | open | 2 | 26s → 43s | +17s | +65.38% |
+| Development / accounts / dev-account-1 | open | 2 | 99s → 145s | +46s | +46.46% |
 | Development / world / dev-party-split | open | 2 | 28s → 60s | +32s | +114.29% |
 | Development / world / Start disposable development server | open | 2 | 8s → 14s | +6s | +75% |
 | Development / world / dev-party-split | open | 2 | 43s → 63s | +20s | +46.51% |
@@ -912,6 +913,11 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-29T10:40:19Z | step: Code checks and immutable builds / web-build | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166992904/job/114551600974) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40858827103/job/123396537976) |
+| 2026-10-29T10:18:33Z | step: Development / world / dev-map-player-move | 19s → 25s | +6s | +31.58% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40849588966/job/123365503893) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40855200398/job/123384378435) |
+| 2026-10-29T10:18:08Z | step: Development / world / dev-map-grid-mode | 10s → 14s | +4s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40844433199/job/123348413936) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40855200398/job/123384378435) |
+| 2026-10-29T10:17:41Z | step: Development / accounts / dev-sound | 48s → 57s | +9s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40085021554/job/120846100791) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40855200398/job/123384378352) |
+| 2026-10-29T10:12:29Z | step: Development / accounts / dev-account-1 | 114s → 145s | +31s | +27.19% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40190487767/job/121160280362) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40855200398/job/123384378352) |
 | 2026-10-29T09:59:00Z | step: backup / Export consistently and encrypt before writing to disk | 14s → 21s | +7s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40303116798/job/121505562883) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40853768063/job/123379474309) |
 | 2026-10-29T09:58:21Z | step: backup / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39579238668/job/119152419342) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40853768063/job/123379474309) |
 | 2026-10-29T09:57:29Z | job: publish-apk | 15s → 18s | +3s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119808297170) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40849851166/job/123379042722) |
