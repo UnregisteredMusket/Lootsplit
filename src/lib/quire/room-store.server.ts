@@ -378,7 +378,7 @@ async function logRoomStorage(
     const summary =
       entry.kind === "refusal"
         ? `A shared room write was refused before reaching D1: its ${entry.refusal} size exceeds the ${{ working: ROOM_BODY_LIMIT, row: ROOM_ROW_LIMIT, live: ROOM_LIVE_LIMIT }[entry.refusal]}-byte budget (${measured}). The stored campaign was not changed. Later refusals for this room in the same half-hour share this entry.`
-        : `Warning (nothing refused): a shared room archived a session and its total with archived sessions passed ${ROOM_TOTAL_LIMIT} bytes, the size at which whole-campaign operations (exports, Download a copy, deletion copies, Undo of archived lines) fit comfortably in a Worker (${measured}). The session was archived; the DM is shown a notice recommending Download a copy. Later warnings for this room in the same half-hour share this entry.`;
+        : `Warning (nothing refused): a shared room archived a session and its total with archived sessions passed ${ROOM_TOTAL_LIMIT} bytes, the size at which the operations that still read the whole campaign (restoring a deletion copy, the complete view older app versions load, commands that fall back to every archived session) fit comfortably in a Worker (${measured}). The session was archived; the DM is shown a notice recommending Download a copy. Later warnings for this room in the same half-hour share this entry.`;
     await recordLog(
       db,
       {

@@ -14,16 +14,19 @@
  *   session, some idempotency checks) loads this, and so do older apps' complete views, exports
  *   and backups.
  * - **Total** (`ROOM_TOTAL_LIMIT`): the live campaign plus every archived session snapshot. A room
- *   read never loads it, but whole-campaign operations do: Download a copy and other exports,
- *   deletion copies, account records, older apps' complete views, and commands that read archived
- *   sessions (Undo of an archived line, favour, quest reward links). This is a **warning
+ *   read never loads it. Download a copy, deletion copies, account records, favour and Undo of
+ *   an archived line read archived sessions one at a time (bounded); what still holds the whole
+ *   campaign is older apps' complete views (tabletop protocol 11, Android 1.14.x), restoring a
+ *   deletion copy, and commands that fall back to every archived session. This is a **warning
  *   threshold, never a refusal** (owner rule: no feature is reduced; a session can always be
  *   archived): the largest total at which each of those still fits comfortably in a 128 MB Worker
  *   isolate, two at once (measured with scripts/room-memory-measure.mjs, documented and checked by
  *   scripts/room-memory-warning.test.mjs). Past it, the archive goes ahead, the owner monitor gets
  *   a `room-storage` warning and the DM a notice recommending Download a copy; a whole-campaign
- *   operation that cannot fit fails loudly with nothing changed. Streaming exports, delta session
- *   archives and an archived-ledger index are what let it rise.
+ *   operation that cannot fit fails loudly with nothing changed. 5 MB until 2026-10-29; 12 MB
+ *   since (owner decision) once those paths became bounded: the rest need about 2.8 bytes of heap
+ *   per total byte plus 21 MB. A protocol-12 Android release and a restore that parses backups
+ *   part by part are what let it rise further.
  *
  * `ROOM_ROW_LIMIT` caps every single D1 row a room write stores (D1 rejects rows above 2,000,000
  * bytes): the room row of a sectioned campaign. Section parts, history pages and archived
@@ -31,7 +34,7 @@
  */
 export const ROOM_BODY_LIMIT = 4_000_000;
 export const ROOM_LIVE_LIMIT = 4_000_000;
-export const ROOM_TOTAL_LIMIT = 5_000_000;
+export const ROOM_TOTAL_LIMIT = 12_000_000;
 export const ROOM_ROW_LIMIT = 1_800_000;
 const mb = (bytes: number) => `${bytes / 1_000_000} MB`;
 /** "4 MB": the working-set cap as the app states it to people. */

@@ -1,0 +1,8 @@
+{
+  "title": "Shared campaigns can keep more history before the size notice",
+  "summary": "The dungeon master's notice about a large campaign now appears at 12 MB with archived sessions, up from 5 MB.",
+  "items": [
+    "Downloads, recovery copies, session records and Undo of old entries now read archived sessions one at a time, so campaigns can keep much more history online before the notice recommends Download a copy.",
+    "Nothing is ever refused at this size: sessions still end as usual, and the notice is only a reminder to keep a copy."
+  ]
+}
