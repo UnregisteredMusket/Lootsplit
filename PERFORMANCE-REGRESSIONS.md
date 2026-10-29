@@ -497,7 +497,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 4 | 1s → 13s | +12s | +1200% |
 | Development / world / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 5 | 4s → 15s | +11s | +275% |
 | Development / gameplay / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 16s | +15s | +1500% |
-| Development / accounts-2 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 12s | +8s | +200% |
+| Development / accounts-2 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 4 | 4s → 15s | +11s | +275% |
 | Development / gameplay / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 4 | 4s → 34s | +30s | +750% |
 | Development / desktop / dev-ships | open | 2 | 55s → 80s | +25s | +45.45% |
 | Development / accounts-2 / dev-bug | open | 3 | 5s → 9s | +4s | +80% |
@@ -918,11 +918,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / world / dev-player-onboarding | open | 2 | 18s → 33s | +15s | +83.33% |
 | Development / gameplay / dev-landscape | open | 2 | 22s → 39s | +17s | +77.27% |
 | Dependency vulnerabilities (OSV-Scanner) / osv-scan / Upload to code-scanning | open | 2 | 8s → 18s | +10s | +125% |
+| Development / world / dev-map-follow-view | open | 2 | 22s → 34s | +12s | +54.55% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-29T21:21:06Z | step: Development / world / dev-map-follow-view | 26s → 34s | +8s | +30.77% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40949280884/job/123712852682) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40955099666/job/123733116429) |
+| 2026-10-29T21:08:23Z | step: Development / accounts-2 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 12s → 15s | +3s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40714954211/job/122910703618) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40955099666/job/123733116342) |
 | 2026-10-29T20:51:18.000Z | workflow: Report workflow failure | 38s → 54s | +16s | +42.11% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40766244486) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40952562412) |
 | 2026-10-29T20:51:18Z | job: report | 38s → 54s | +16s | +42.11% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40766244486/job/123091048431) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40952562412/job/123724198682) |
 | 2026-10-29T20:49:26Z | step: Development / economy / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 10s → 42s | +32s | +320% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40296612554/job/121484154498) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40949785498/job/123714602368) |
