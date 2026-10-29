@@ -10,6 +10,7 @@ import {
   ROOM_BODY_LIMIT,
   ROOM_ROW_LIMIT,
 } from "./room-images.mjs";
+import { ROOM_LIVE_LIMIT, ROOM_TOTAL_LIMIT } from "../src/lib/quire/room-size.ts";
 import {
   assertCanHost,
   hostedCampaignGuardArgs,
@@ -324,14 +325,28 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
   // Store the restored room exactly as every other room write does: archived session snapshots
   // (and map images/resource packs) go to their own tables, so a backup with large history fits
   // D1's row limit and the restored row is already in its current shape.
-  const encoded = await encodeRoomImages(room);
-  const { bytes, largestReport } = encodedRoomBytes(encoded);
-  const rowBytes = bytes > ROOM_ROW_LIMIT ? roomStorageSizes(encoded.body).rowBytes : bytes;
-  if (bytes > ROOM_BODY_LIMIT || largestReport > ROOM_ROW_LIMIT || rowBytes > ROOM_ROW_LIMIT)
+  delete room.storageWarning;
+  let encoded = await encodeRoomImages(room);
+  // The limits of every room write (room-size.ts; step 4): working set, room row and live campaign
+  // (with its history pages). The total with archived sessions is never refused: past
+  // ROOM_TOTAL_LIMIT the restored room carries the DM's notice recommending Download a copy.
+  const { largestReport } = encodedRoomBytes(encoded);
+  const sizes = roomStorageSizes(encoded.body);
+  const total = sizes.liveBytes + (encoded.reports ?? []).reduce((sum, r) => sum + new TextEncoder().encode(r.body).length, 0);
+  if (
+    sizes.workingBytes > ROOM_BODY_LIMIT ||
+    sizes.rowBytes > ROOM_ROW_LIMIT ||
+    sizes.liveBytes > ROOM_LIVE_LIMIT ||
+    largestReport > ROOM_LIVE_LIMIT
+  )
     fail(
-      `This campaign is too large to restore online (${(Math.max(bytes, largestReport) / 1e6).toFixed(2)} MB; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB, and ${(ROOM_ROW_LIMIT / 1e6).toFixed(1)} MB for one archived session). No campaign was created and your backup is still safe; download it for recovery.`,
+      `This campaign is too large to restore online (${(Math.max(sizes.workingBytes, sizes.liveBytes, largestReport) / 1e6).toFixed(2)} MB; online campaigns hold up to ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB of current records and ${(ROOM_LIVE_LIMIT / 1e6).toFixed(1)} MB with the current session's history). No campaign was created and your backup is still safe; download it for recovery.`,
       413,
     );
+  if (total > ROOM_TOTAL_LIMIT) {
+    room.storageWarning = { totalBytes: total, limit: ROOM_TOTAL_LIMIT };
+    encoded = await encodeRoomImages(room);
+  }
   const committed = "EXISTS(SELECT 1 FROM campaign_recoveries WHERE id=? AND user_id=?)";
   const roomWrite = roomWriteStatements(db, room, {
     create: true,

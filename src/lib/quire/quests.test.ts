@@ -22,7 +22,7 @@ import type { QuestDraft } from "./quests-schema.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
 const sql = new DatabaseSync(":memory:");
-for (const file of ["0001_campaign_rooms.sql", "0024_campaign_room_receipts.sql", "0026_campaign_room_sections.sql", "0003_accounts.sql", "0007_character_play.sql", "0008_encounters.sql"])
+for (const file of ["0001_campaign_rooms.sql", "0024_campaign_room_receipts.sql", "0026_campaign_room_sections.sql", "0029_campaign_room_report_parts.sql", "0003_accounts.sql", "0007_character_play.sql", "0008_encounters.sql"])
   sql.exec(readFileSync(new URL(`../../../cloudflare/migrations/${file}`, import.meta.url), "utf8"));
 (globalThis as any).__env__ = {
   DB: {

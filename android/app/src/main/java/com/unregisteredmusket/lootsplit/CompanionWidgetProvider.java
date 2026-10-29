@@ -47,8 +47,8 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
         } else {
         // Status glyph: same rules as the main widget; filled ✓ when healthy, muted "–" when signed out.
         OwnerWidgetProvider.glyph(view,R.id.companion_light,snapshot==null&&!connected?"":status,light,true);
-        view.setContentDescription(R.id.companion_light,snapshot==null&&!connected?"Owner sign-in needed. Open My account":WidgetRows.statusWord(status)+" status; open diagnostics for the reason");
-        view.setOnClickPendingIntent(R.id.companion_light,WidgetActions.pending(context,id,snapshot==null&&!connected?"account":"diagnostics",true));
+        view.setContentDescription(R.id.companion_light,snapshot==null&&!connected?"Owner sign-in needed. Open the widget's Connect screen":WidgetRows.statusWord(status)+" status; open diagnostics for the reason");
+        view.setOnClickPendingIntent(R.id.companion_light,WidgetActions.pending(context,id,snapshot==null&&!connected?OwnerWidgetProvider.CONNECT:"diagnostics",true));
         }
         boolean firstTimer="timer".equals(first)&&task!=null, secondTimer="timer".equals(second)&&task!=null;
         String warning=snapshot==null?"":snapshot.optString("warning");
@@ -56,11 +56,12 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
             // Signed out or awaiting a reading: both lines lead to My account.
             view.setTextViewText(R.id.companion_first,connected?"Awaiting owner reading":"Owner sign-in needed");
             view.setTextColor(R.id.companion_first,ink);
-            String detail=connected?(message.isEmpty()?"Tap Refresh to check now":message):(message.isEmpty()||"Connect in My account".equals(message)?"Tap to connect in My account":message);
+            // Disconnected: "Not connected — tap Sign in" with the recorded reason; both lines open the Connect screen.
+            String detail=connected?(message.isEmpty()?"Tap Refresh to check now":message):OwnerWidgetProvider.disconnectedLine(context);
             view.setTextViewText(R.id.companion_second,detail);
-            view.setTextColor(R.id.companion_second,!message.isEmpty()&&!"Connect in My account".equals(message)?OwnerWidgetProvider.color("yellow",light):muted);
-            view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,"account",true));
-            view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,"account",true));
+            view.setTextColor(R.id.companion_second,connected&&!message.isEmpty()?OwnerWidgetProvider.color("yellow",light):muted);
+            view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,OwnerWidgetProvider.CONNECT,true));
+            view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,OwnerWidgetProvider.CONNECT,true));
             view.setContentDescription(R.id.companion_first,"OWNER · SIGN IN. "+(connected?"Awaiting owner reading":"Owner sign-in needed"));
             view.setContentDescription(R.id.companion_second,detail);
             view.setViewVisibility(R.id.companion_timer,View.GONE);
@@ -180,5 +181,7 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
     @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){ renderAll(context);OwnerWidgetJob.schedule(context); }
     @Override public void onAppWidgetOptionsChanged(Context context,AppWidgetManager manager,int id,Bundle options){ renderAll(context); }
     @Override public void onDeleted(Context context,int[] ids){ for(int id:ids)CompanionSettings.remove(context,id); WidgetRefresh.scheduleActivity(context); }
-    @Override public void onDisabled(Context context){ WidgetRefresh.cancelActivity(context); if(OwnerWidgetProvider.ids(context).length==0){OwnerWidgetJob.cancel(context);WidgetStore.clear(context,null);} }
+    @Override public void onEnabled(Context context){ OwnerWidgetProvider.restart(context,this); }
+    /** Last companion removed: stop background work when no Field monitor remains; the owner connection is kept (see OwnerWidgetProvider.onDisabled). */
+    @Override public void onDisabled(Context context){ WidgetRefresh.cancelActivity(context); if(OwnerWidgetProvider.ids(context).length==0)OwnerWidgetJob.cancel(context); }
 }

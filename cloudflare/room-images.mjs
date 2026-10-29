@@ -5,6 +5,7 @@ import {
   roomResourceStatements,
 } from "./room-resources.mjs";
 import { encodeRoomReports, hydrateRoomReports, roomReportStatements } from "./room-reports.mjs";
+import { DEFERRED_REPORT_PREFIX } from "../src/lib/quire/history-pages.ts";
 /**
  * The campaign size cap (assembled stored room) and the single-row limit (each archived snapshot
  * row and a sectioned room's own row; D1 rejects rows above 2,000,000 bytes with an opaque error):
@@ -98,7 +99,10 @@ export async function encodeRoomImages(value) {
   for (const asset of assets) body = body.split(asset.image).join(asset.reference);
   // Archived session snapshots (already image-encoded above) move to campaign_room_reports.
   const reports = await encodeRoomReports(JSON.parse(body));
-  if (reports.reports.length) body = JSON.stringify(reports.value);
+  if (reports.changed) body = JSON.stringify(reports.value);
+  // A deferred archived session (a working read's marker, history-pages.ts) is never stored.
+  if (body.includes(JSON.stringify(DEFERRED_REPORT_PREFIX).slice(1, -1)))
+    throw Error("An archived session was not read with this campaign. Nothing was changed; try again.");
   return { body, assets, documents: resources.documents, reports: reports.reports };
 }
 /** Exact stored map image reference (`/art/room-image-<sha256>.webp`). */
@@ -121,12 +125,15 @@ function liveMaps(value) {
  * read from D1 nor sent on the wire. Everything else (drafts, archived snapshots, resource packs)
  * is hydrated exactly as before. Exports, backups, recovery, account records, writes and older
  * protocols never pass this option.
+ *
+ * `deferReports` (history on demand, step 4): archived session snapshots are not read; each
+ * report carries a deferred marker instead (room-reports.mjs), for working-set reads only.
  * @template T @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
- * @param {string} code @param {T} value @param {{keepMapImageReferences?: boolean}} [options]
+ * @param {string} code @param {T} value @param {{keepMapImageReferences?: boolean; deferReports?: boolean}} [options]
  * @returns {Promise<T>} */
 export async function hydrateRoomImages(db, code, value, options = {}) {
   // Snapshots first: they may contain image and resource references of their own.
-  value = await hydrateRoomReports(db, code, value);
+  value = await hydrateRoomReports(db, code, value, { defer: options.deferReports === true });
   /** @type {(string | undefined)[]} */
   let kept = [];
   if (options.keepMapImageReferences && liveMaps(value)) {
