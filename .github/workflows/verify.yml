@@ -363,6 +363,9 @@ jobs:
       - name: dev-map-grid-mode
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-map-grid-mode 240 node scripts/map-grid-mode-browser-audit.mjs
+      - name: dev-map-player-move
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-player-move 240 node scripts/map-player-move-browser-audit.mjs
       - name: dev-quest-log
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-quest-log 300 node scripts/quest-log-browser-audit.mjs

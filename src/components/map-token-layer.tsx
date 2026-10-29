@@ -1,9 +1,14 @@
 import type { CSSProperties, MouseEvent } from "react";
+import { Lock } from "lucide-react";
+import type { PlayerMovement } from "@/lib/quire/map-movement";
+import { actorName } from "@/lib/quire/map-movement";
+import { NotYourTurnCard } from "./map-player-movement";
 import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import type { CampaignMap, MapToken } from "@/lib/quire/world-schema";
 import { discToken, tokenSizeText } from "@/lib/quire/token-display";
 import {
+  diagonalTiles,
   footprintLabel,
   sceneDistance,
   sceneTokenPoint,
@@ -46,6 +51,9 @@ export function MapTokenLayer({
   moves,
   highlighted,
   onActivate,
+  movement,
+  notTurn,
+  speedFeet,
 }: {
   map: CampaignMap;
   tokens: MapToken[];
@@ -56,6 +64,12 @@ export function MapTokenLayer({
   moves: readonly TokenMove[];
   highlighted?: string;
   onActivate: (token: MapToken, event: MouseEvent<HTMLButtonElement>) => void;
+  /** A player's movement (map tokens PR 2); undefined for the DM. */
+  movement?: PlayerMovement;
+  /** The player's own token whose press was refused because it isn't their turn. */
+  notTurn?: string;
+  /** The player's speed from their sheet: the reach guide on their turn. */
+  speedFeet?: number;
 }) {
   const table = useWorldTable(),
     seat = useSeat(),
@@ -98,9 +112,37 @@ export function MapTokenLayer({
   const label = (token: MapToken, isSelected: boolean) =>
     token.style?.labels === "never" || (token.style?.labels === "selected" && !isSelected)
       ? undefined
-      : token.label;
+      : mine(token) && token.kind === "character" && seat.purseIds.includes(token.entityId ?? "")
+        ? movement?.combat
+          ? "You"
+          : `${token.label} (you)`
+        : token.label;
+  const waiting = !!movement?.combat && !movement.myTurn;
+  // The reach guide on the player's turn: squares within their speed (a guide; the DM rules).
+  const acting = movement?.combat && movement.myTurn ? tokens.find((t) => t.id === movement.acting?.tokenId) : undefined;
+  const reach: { c: number; r: number }[] = [];
+  if (acting && speedFeet && !moves.length) {
+    const box = tokenBox(acting),
+      n = Math.max(1, Math.round(box.size)),
+      steps = Math.floor(speedFeet / grid.feetPerTile + 1e-9);
+    const c0 = Math.round(box.left),
+      r0 = Math.round(box.top);
+    for (let c = Math.max(0, c0 - steps); c <= Math.min(grid.columns - n, c0 + steps); c++)
+      for (let r = Math.max(0, r0 - steps); r <= Math.min(grid.rows - n, r0 + steps); r++)
+        if (diagonalTiles(c - c0, r - r0, grid.diagonal ?? "equal").tiles * grid.feetPerTile <= speedFeet + 1e-9)
+          reach.push({ c, r });
+  }
   return (
     <>
+      {reach.length > 0 && (
+        <svg className="map-token-reach" aria-hidden="true">
+          {reach.map(({ c, r }) => {
+            const left = view.x + grid.x * width * view.scale + c * square.w,
+              top = view.y + grid.y * height * view.scale + r * square.h;
+            return <rect key={`${c},${r}`} x={left} y={top} width={square.w} height={square.h} />;
+          })}
+        </svg>
+      )}
       {tokens.map((token) => {
         const move = moving.get(token.id),
           isSelected = selected.includes(token.id),
@@ -108,6 +150,17 @@ export function MapTokenLayer({
           portrait = portraits(token),
           text = label(token, isSelected);
         const showFoot = !move && (sized(token) || isSelected);
+        // A token directly below would cover the name: put it above instead (as in the mockups).
+        const box = tokenBox(token),
+          below = tokens.some((other) => {
+            if (other === token) return false;
+            const o = tokenBox(other);
+            return (
+              Math.abs(o.top - (box.top + box.size)) < 0.01 &&
+              o.left < box.left + box.size - 0.01 &&
+              o.left + o.size > box.left + 0.01
+            );
+          });
         return (
           <div key={token.id} className="map-token-slot">
             {showFoot && (
@@ -153,11 +206,28 @@ export function MapTokenLayer({
                 <span aria-hidden="true">{initial(token)}</span>
               )}
               {text && (
-                <span className="map-token-label" aria-hidden="true">
-                  {move ? `${text} · ${tokenSizeText(token)} (moving)` : text}
+                <span className={`map-token-label${below ? " top" : ""}`} aria-hidden="true">
+                  {move ? (dm ? `${text} · ${tokenSizeText(token)} (moving)` : text) : text}
+                </span>
+              )}
+              {waiting && mine(token) && (
+                <span className="map-token-lock" aria-hidden="true">
+                  <Lock size={11} />
                 </span>
               )}
             </button>
+            {notTurn === token.id && waiting && (
+              <NotYourTurnCard
+                left={r.left + r.width / 2 - 40}
+                top={r.top + r.height + 18}
+                acting={
+                  movement.acting
+                    ? actorName(movement.acting.label, map.tokens?.find((t) => t.id === movement.acting!.tokenId))
+                    : "another combatant"
+                }
+                name={token.label}
+              />
+            )}
           </div>
         );
       })}
@@ -174,7 +244,7 @@ export function MapTokenLayer({
             ) * perFoot,
           where = footprintLabel({ ...token, ...move.after });
         return (
-          <div key={`move-${move.tokenId}`} className="map-token-drag" aria-hidden="true">
+          <div key={`move-${move.tokenId}`} className={`map-token-drag${dm ? "" : " player"}`} aria-hidden="true">
             <svg className="map-token-path">
               <line x1={from.cx} y1={from.cy} x2={to.cx} y2={to.cy} />
             </svg>
@@ -194,12 +264,24 @@ export function MapTokenLayer({
             >
               <span>{initial(token)}</span>
             </span>
-            <span
-              className="map-token-drop"
-              style={{ left: to.r.left, top: to.r.top + to.r.height + 6 }}
-            >
-              Drop: {where} · {Math.round(feet * 10) / 10} {units}
-            </span>
+            {dm ? (
+              <span
+                className="map-token-drop"
+                style={{ left: to.r.left, top: to.r.top + to.r.height + 6 }}
+              >
+                Drop: {where} · {Math.round(feet * 10) / 10} {units}
+              </span>
+            ) : (
+              <span
+                className="map-token-drop-card map-glass"
+                style={{ left: to.r.left + to.r.width + 10, top: to.r.top - 4 }}
+              >
+                <b>
+                  {Math.round(feet * 10) / 10} {units} · {where}
+                </b>
+                <small>Release to move</small>
+              </span>
+            )}
           </div>
         );
       })}

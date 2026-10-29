@@ -64,11 +64,15 @@ import { prepareMapMedia } from "@/lib/quire/map-media";
 import { readMapInterchange, MAP_INTERCHANGE_LIMIT } from "@/lib/quire/map-import";
 import { cacheMapAsset, publishMapAsset, loadMapAsset, mapAssetBlob } from "@/lib/quire/map-assets";
 import { mapMediaReference, type MapAssetBundle } from "@/lib/quire/map-assets-schema";
-import { readMapTabletop, readTabletopSession } from "@/lib/quire/tabletop";
+import { combatOnMap, readMapTabletop, readTabletopSession } from "@/lib/quire/tabletop";
 import { MapArtwork } from "./map-artwork";
 import { MapBrowser, MapSessionBar } from "./map-session-bar";
 import { useMapTabletopTools } from "./map-tabletop-tools";
 import { MapTokenLayer } from "./map-token-layer";
+import { MovementNotice } from "./map-tabletop-inspector";
+import { MapTurnStrip, MovementChips } from "./map-player-movement";
+import { useMapTurnOrder } from "@/lib/quire/use-map-turn-order";
+import { playerMovement, sheetSpeedFeet } from "@/lib/quire/map-movement";
 import { imageSize } from "@/lib/quire/image-size";
 import { discToken } from "@/lib/quire/token-display";
 import { MapPlayerPreview } from "./map-player-preview";
@@ -1976,8 +1980,30 @@ function MapViewport({
     }
   }, [placing, point, full, placementKind, setup?.tool]);
   const signals = useMapPings(map.id),
-    useDm = useSeat().role === "dm",
-    tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
+    seatNow = useSeat(),
+    useDm = seatNow.role === "dm",
+    // Player movement (map tokens PR 2): free outside combat, turns while the DM shows combat.
+    turnOrder = useMapTurnOrder(map, useDm),
+    movement = playerMovement(map, turnOrder),
+    tools = useMapTabletopTools(map, selectedToken, onTokenSelect, useDm ? undefined : movement);
+  const ownToken = useDm
+    ? undefined
+    : map.tokens?.find(
+        (t) => t.kind === "character" && !!t.entityId && seatNow.purseIds.includes(t.entityId),
+      );
+  const claimable =
+    !useDm && !!map.grid && movement.mode === "auto" && (!movement.combat || movement.myTurn)
+      ? recordTable.purses.find(
+          (p) =>
+            p.kind === "character" &&
+            seatNow.purseIds.includes(p.id) &&
+            !map.tokens?.some((t) => t.kind === "character" && t.entityId === p.id) &&
+            !map.tabletop?.lockedPurseIds?.includes(p.id),
+        )
+      : undefined;
+  const speedFeet = ownToken
+    ? sheetSpeedFeet(recordTable.sheets?.find((sheet) => sheet.purseId === ownToken.entityId)?.speed)
+    : undefined;
   const sketches = useMapSketches(viewScope, map.id);
   useEffect(() => {
     if (full && tools.inspecting) setDrawerOpen(false);
@@ -2996,7 +3022,9 @@ function MapViewport({
         }}
         compactSearch={!!setup}
         subtitle={
-          readMarketLocations(recordTable.journal?.market).locations.find((l) => l.id === map?.locationId)?.name
+          (useDm ? combatOnMap(recordTable, map.id) : movement.combat)
+            ? "Combat"
+            : readMarketLocations(recordTable.journal?.market).locations.find((l) => l.id === map?.locationId)?.name
         }
         settingsOpen={drawerOpen}
         toggleSettings={openSettings}
@@ -3123,6 +3151,7 @@ function MapViewport({
             )}
           </SettingsGroup>
           <SettingsGroup id="players" title="Players & display">
+            {useDm && <MovementNotice map={map} />}
             {setupSettings.players}
             <div className="map-tile-control-area">{controls.session}</div>
             {tools.sceneControls}
@@ -3752,7 +3781,12 @@ function MapViewport({
           </div>
         </>
       )}
-      {!interfaceHidden && <MapCombatHud map={map} />}
+      {!interfaceHidden &&
+        (!useDm && movement.combat && turnOrder ? (
+          <MapTurnStrip map={map} movement={movement} order={turnOrder} />
+        ) : (
+          <MapCombatHud map={map} />
+        ))}
       <MapAnnouncer map={map} pings={signals.pings} />
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {placeAnnouncement}
@@ -3784,6 +3818,33 @@ function MapViewport({
                   : tools.toolLabel}
             {tools.measurement && ` · ${tools.measurement}`}
           </p>
+        )}
+        {!useDm && tileMode && map.grid && (
+          <>
+            <MovementChips
+              movement={movement}
+              speed={speedFeet}
+              hasToken={!!ownToken}
+              fog={readMapTabletop(map).fog.enabled || readMapTabletop(map).vision !== "off"}
+            />
+            {claimable &&
+              (tools.claim.purseId ? (
+                <p role="status" className="map-claim-bar">
+                  Tap a square to place {claimable.name}.{" "}
+                  <button type="button" onClick={tools.claim.cancel}>
+                    Cancel
+                  </button>
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="map-move-chip lead map-claim-chip"
+                  onClick={() => tools.claim.start(claimable.id)}
+                >
+                  Place my token
+                </button>
+              ))}
+          </>
         )}
         {tools.feedback}
         {pinging && (
@@ -4113,6 +4174,9 @@ function MapViewport({
               height={h}
               selected={tools.selected}
               moves={tools.moves}
+              movement={useDm ? undefined : movement}
+              notTurn={tools.notTurn}
+              speedFeet={speedFeet}
               onActivate={(token, event) => {
                 if (planner.active && !moved.current && !placing && !pinging) {
                   if (!planner.calibrating) planner.addAt(sceneTokenPoint(map.grid!, token));

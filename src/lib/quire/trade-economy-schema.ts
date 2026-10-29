@@ -193,6 +193,8 @@ export type TradeExecution = {
   preview?: boolean;
   /** Treasure pool: the campaign's manual-roll policy allows Pen & Paper totals from the DM. */
   manualRolls?: boolean;
+  /** Map tokens: the bound encounter's turn, read by the room server (tabletop.ts). */
+  mapCombat?: { encounterId: string; status: string; activeId: string | null } | "unavailable";
 };
 export const readTradeEconomy = (raw?: unknown): TradeEconomy =>
   tradeEconomySchema.parse(raw ?? {});

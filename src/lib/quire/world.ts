@@ -17,7 +17,7 @@ import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
 import { legacyServiceKinds, serviceKinds } from "./services-schema.ts";
-import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
+import { applyTabletopCommand, keepMovement, validateTabletop, readTabletopSession, type TabletopExecution } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
 import { tokenInsideGrid } from "./tabletop-geometry.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
@@ -364,11 +364,11 @@ export function settleExchange(
   moveItems(t, leftSide, right.id, receipt + "-left", at);
   moveItems(t, rightSide, left.id, receipt + "-right", at);
 }
-export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldCommand, at: number) {
+export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldCommand, at: number, execution: TabletopExecution = {}) {
   const journal = t.journal!,
     w = (journal.world = readWorld(journal.world));
   if (tabletopCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
-    applyTabletopCommand(t, seat, cmd as TabletopCommand, at);
+    applyTabletopCommand(t, seat, cmd as TabletopCommand, at, execution);
     return;
   }
   if (applyCharacterPosition(t, seat, cmd, at)) return;
@@ -549,6 +549,8 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       if (w.tabletop.activeMapId === cmd.mapId) w.tabletop.activeMapId = null;
       if (w.tabletop.camera?.mapId === cmd.mapId) w.tabletop.camera = null;
     }
+    // Player movement (protocol 14): a save without the movement choice keeps the stored one.
+    if (cmd.map) keepMovement(cmd.map, current?.tabletop);
     w.maps = w.maps.filter((m) => m.id !== cmd.mapId);
     if (cmd.map) w.maps.push(cmd.map);
     event(cmd.map ? "Campaign map saved" : "Campaign map removed");

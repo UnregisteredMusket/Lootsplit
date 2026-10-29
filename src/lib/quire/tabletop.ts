@@ -44,26 +44,108 @@ export function mapAccessible(table: CloudTable, map: CampaignMap, seat: Seat) {
       (session.playerBrowsing || !session.activeMapId || session.activeMapId === map.id))
   );
 }
+/** How players may move tokens on this map (owner, 2026-10-29). */
+export type MovementMode = "auto" | "off" | "approval";
+/**
+ * The map's player movement: its explicit `movement`, else "auto" for a map without tabletop
+ * settings (new maps), else `playerMovement` (maps configured before protocol 14 keep their "off").
+ */
+export function movementMode(map: Pick<CampaignMap, "tabletop">): MovementMode {
+  const settings = map.tabletop;
+  if (!settings) return "auto";
+  return settings.movement ?? (settings.playerMovement ? "auto" : "off");
+}
+/** A map whose movement is off only because it predates the choice: the DM's one-tap notice. */
+export const legacyMovementOff = (map: Pick<CampaignMap, "tabletop">) =>
+  !!map.tabletop && map.tabletop.movement === undefined && !map.tabletop.playerMovement;
+/** The seat's characters that the DM has not locked on this map. */
+function unlockedPurseIds(map: CampaignMap, seat: Seat) {
+  const locked = map.tabletop?.lockedPurseIds ?? [];
+  return seat.purseIds.filter((id) => !locked.includes(id));
+}
+/** Movement rules that hold in and out of combat; the combat turn is checked separately. */
 export function canMoveMapToken(table: CloudTable, map: CampaignMap, token: MapToken, seat: Seat) {
   if (seat.role === "dm") return true;
   if (
     !mapAccessible(table, map, seat) ||
-    !readMapTabletop(map).playerMovement ||
+    movementMode(map) !== "auto" ||
     token.locked ||
     token.visibility !== "party"
   )
     return false;
+  const own = unlockedPurseIds(map, seat);
   if (token.kind === "character") {
     const person = table.purses.find((p) => p.id === token.entityId && p.kind === "character");
     if (!person || !characterVisible(table, person)) return false;
-    if (seat.purseIds.includes(person.id)) return true;
+    if (own.includes(person.id)) return true;
+    if (seat.purseIds.includes(person.id)) return false;
   }
   return !!token.controllerPurseIds?.some(
     (id) =>
-      seat.purseIds.includes(id) &&
+      own.includes(id) &&
       table.purses.some((p) => p.id === id && p.kind === "character" && characterVisible(table, p)),
   );
 }
+/** The tracker's turn for the encounter bound to a map (read by the server per batch). */
+export type MapCombatTurn = { encounterId: string; status: string; activeId: string | null };
+/** The active combat binding when it is on this map. */
+export function combatOnMap(table: Pick<CloudTable, "journal">, mapId: string) {
+  const combat = table.journal?.world?.combat;
+  return combat?.phase === "active" && combat.mapId === mapId ? combat : undefined;
+}
+/** Whether a token is the tracker's active combatant (map-combat.ts uses the same rule). */
+export function tokenTakesTurn(
+  token: Pick<MapToken, "kind" | "entityId" | "encounterId" | "combatantId">,
+  encounterId: string,
+  activeId: string | null | undefined,
+) {
+  if (!activeId) return false;
+  return (
+    (token.encounterId === encounterId && token.combatantId === activeId) ||
+    (token.kind === "character" && token.entityId === activeId && !token.combatantId)
+  );
+}
+/**
+ * Turn-based movement during combat (owner, 2026-10-29): while an encounter is active on this
+ * map, a player moves only the token whose combatant has the tracker's turn. The DM is never
+ * blocked. The server fails closed when it could not read the turn; a device preview, which has
+ * no turn, leaves the check to the room.
+ */
+function assertCombatTurn(
+  table: CloudTable,
+  map: CampaignMap,
+  tokens: readonly MapToken[],
+  seat: Seat,
+  execution: TabletopExecution,
+) {
+  if (seat.role === "dm") return;
+  const combat = combatOnMap(table, map.id);
+  if (!combat) return;
+  const turn = execution.mapCombat;
+  if (!turn && execution.preview) return;
+  if (!turn || turn === "unavailable" || turn.encounterId !== combat.encounterId)
+    throw Error("The turn order is unavailable — ask the DM.");
+  if (turn.status !== "active") return;
+  for (const token of tokens) {
+    if (tokenTakesTurn(token, combat.encounterId, turn.activeId)) continue;
+    // Only a combatant this seat can already see is named.
+    const visible = mapPointVisibleTo(table, map, seat);
+    const acting = (map.tokens ?? []).find(
+      (t) =>
+        t.visibility === "party" &&
+        tokenTakesTurn(t, combat.encounterId, turn.activeId) &&
+        !!map.grid &&
+        visible(sceneTokenPoint(map.grid, t)),
+    );
+    throw Error(`Not your turn — ${acting ? acting.label : "another combatant"} is acting.`);
+  }
+}
+/** What the room server supplies to tabletop commands (cloud.server.ts submitCommands). */
+export type TabletopExecution = {
+  preview?: boolean;
+  /** The bound encounter's turn, or "unavailable" when the server could not read it. */
+  mapCombat?: MapCombatTurn | "unavailable";
+};
 export function sceneViewers(
   table: Pick<CloudTable, "journal" | "purses">,
   map: CampaignMap,
@@ -136,6 +218,11 @@ export function projectTabletopMap(
   const projected = mapTabletopSchema.parse({
     revision: settings.revision,
     playerMovement: settings.playerMovement,
+    ...(map.tabletop?.movement ? { movement: map.tabletop.movement } : {}),
+    // Only the seat's own characters' locks reach a player.
+    ...(settings.lockedPurseIds?.some((id) => seat.purseIds.includes(id))
+      ? { lockedPurseIds: settings.lockedPurseIds.filter((id) => seat.purseIds.includes(id)) }
+      : {}),
     playerTemplates: settings.playerTemplates,
     snap: settings.snap,
     ...(settings.gridHidden ? { gridHidden: true } : {}),
@@ -237,6 +324,7 @@ export function applyTabletopCommand(
   seat: CloudSeat,
   command: TabletopCommand,
   at: number,
+  execution: TabletopExecution = {},
 ) {
   const world = table.journal!.world!;
   const dm = () => {
@@ -261,6 +349,7 @@ export function applyTabletopCommand(
   }
   const map = world.maps.find((m) => m.id === command.mapId);
   if (!map || !mapAccessible(table, map, seat)) throw Error("This map is unavailable.");
+  const previousSettings = map.tabletop;
   const settings = readMapTabletop(map);
   if (command.kind === "map-render") {
     dm();
@@ -390,6 +479,50 @@ export function applyTabletopCommand(
       throw Error("A map supports up to 200 saved area templates.");
     map.tabletop = settings;
     event("Map area template updated");
+  } else if (command.kind === "map-token-claim") {
+    if (!map.grid) throw Error("Configure a combat grid before placing tokens.");
+    if (
+      canonicalJson(map.grid) !== command.grid &&
+      canonicalJson(legacyDiagonals(map.grid)) !== command.grid
+    )
+      throw Error("The combat grid changed. Refresh before placing your token.");
+    const person = table.purses.find((p) => p.id === command.purseId && p.kind === "character");
+    if (!person || !characterVisible(table, person)) throw Error("This character is unavailable.");
+    if (seat.role !== "dm") {
+      if (!seat.purseIds.includes(person.id))
+        throw Error("You can only place your own character's token.");
+      if (movementMode(map) !== "auto") throw Error("The DM moves the tokens on this map.");
+      if (settings.lockedPurseIds?.includes(person.id))
+        throw Error(`The DM has locked ${person.name}'s movement on this map.`);
+    }
+    if ((map.tokens ?? []).some((t) => t.kind === "character" && t.entityId === person.id))
+      throw Error(`${person.name} already has a token on this map.`);
+    if ((map.tokens ?? []).some((t) => t.id === command.tokenId))
+      throw Error("Choose a new token. Refresh and try again.");
+    const token: MapToken = {
+      id: command.tokenId,
+      kind: "character",
+      entityId: person.id,
+      label: person.name,
+      column: command.at.column,
+      row: command.at.row,
+      ...(command.at.offsetX !== undefined ? { offsetX: command.at.offsetX } : {}),
+      ...(command.at.offsetY !== undefined ? { offsetY: command.at.offsetY } : {}),
+      visibility: "party",
+    };
+    if (!tokenInsideGrid(map.grid, token)) throw Error("Keep tokens inside the combat grid.");
+    if (settings.snap && !tokenSnapped(token))
+      throw Error("This map requires movement snapped to the grid.");
+    if (
+      seat.role !== "dm" &&
+      !scenePointVisible(sceneTokenPoint(map.grid, token), settings, map.grid, sceneViewers(table, map, seat))
+    )
+      throw Error("Choose a visible square.");
+    assertCombatTurn(table, map, [token], seat, execution);
+    map.tokens = [...(map.tokens ?? []), token];
+    if (map.tabletop && settings.vision !== "off")
+      map.tabletop = { ...settings, revision: settings.revision + 1 };
+    event(`${person.name}'s token placed`);
   } else if (command.kind === "map-grid-snap") {
     dm();
     if (!map.grid) throw Error("Configure a combat grid before turning on grid mode.");
@@ -453,6 +586,7 @@ export function applyTabletopCommand(
         throw Error("Choose a visible destination.");
       if (!command.ignoreWalls && blocked(a, b, settings.walls, true))
         throw Error("A configured map barrier blocks this move; the DM can override it.");
+      assertCombatTurn(table, map, [token], seat, execution);
       Object.assign(token, move.after);
       if (move.after.offsetX === undefined) delete token.offsetX;
       if (move.after.offsetY === undefined) delete token.offsetY;
@@ -482,5 +616,23 @@ export function applyTabletopCommand(
       map.tabletop = { ...settings, revision: settings.revision + 1 };
     event("Combat map tokens moved");
   }
+  keepMovement(map, previousSettings);
   validateTabletop(table);
+}
+/**
+ * After any write to a map's tabletop settings: settings that leave out `movement` or
+ * `lockedPurseIds` keep the stored ones (older clients and tools that only change fog, walls or
+ * lights), a map getting its first settings keeps the default "auto", and `playerMovement`
+ * follows `movement` so older clients read it sensibly. Also used by map saves (world.ts).
+ */
+export function keepMovement(map: CampaignMap, previous: CampaignMap["tabletop"]) {
+  const next = map.tabletop;
+  if (!next) return;
+  if (next.movement === undefined) {
+    if (previous?.movement) next.movement = previous.movement;
+    else if (!previous) next.movement = "auto";
+  }
+  if (next.lockedPurseIds === undefined && previous?.lockedPurseIds?.length)
+    next.lockedPurseIds = previous.lockedPurseIds;
+  if (next.movement) next.playerMovement = next.movement !== "off";
 }

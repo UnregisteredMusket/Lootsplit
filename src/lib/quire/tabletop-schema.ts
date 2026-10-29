@@ -143,6 +143,15 @@ export const mapTabletopSchema = z
   .object({
     revision: z.number().int().nonnegative().default(0),
     playerMovement: z.boolean().default(false),
+    /**
+     * Tabletop protocol 14 (player movement, owner 2026-10-29): "auto" = players move their own
+     * tokens freely, taking turns while combat is active on this map; "off" = DM only; "approval"
+     * = players' moves wait for the DM. Absent: "auto" for maps without tabletop settings, else
+     * from `playerMovement` (kept in step for older clients). See `movementMode` (tabletop.ts).
+     */
+    movement: z.enum(["auto", "off", "approval"]).optional(),
+    /** Characters who may not move on this map, kept when their token is removed and placed again. */
+    lockedPurseIds: z.array(id).max(200).optional(),
     playerTemplates: z.boolean().default(false),
     snap: z.boolean().default(true),
     /**
@@ -230,6 +239,22 @@ export const tabletopCommands = [
         .min(1)
         .max(100),
       ignoreWalls: z.boolean().default(false),
+    })
+    .strict(),
+  /**
+   * A player places their own character's token (map tokens PR 2): only on a map they can see,
+   * with player movement on, no token of that character there yet, a snapped visible square and,
+   * during combat on this map, on that character's turn. The server builds the token.
+   */
+  z
+    .object({
+      id,
+      kind: z.literal("map-token-claim"),
+      mapId: id,
+      grid: z.string().max(1000),
+      purseId: id,
+      tokenId: id,
+      at: tile,
     })
     .strict(),
   /**

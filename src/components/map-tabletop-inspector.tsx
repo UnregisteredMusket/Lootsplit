@@ -3,13 +3,18 @@ import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { libraryRecordHref } from "@/lib/quire/library-records";
-import { readMapTabletop } from "@/lib/quire/tabletop";
+import {
+  legacyMovementOff,
+  movementMode,
+  readMapTabletop,
+  type MovementMode,
+} from "@/lib/quire/tabletop";
 import type { CampaignMap, MapToken } from "@/lib/quire/world-schema";
 import type { MapTabletop, AreaTemplate } from "@/lib/quire/tabletop-schema";
 import { SIZE_NAMES, TOKEN_SIZE_CLASSES, SIZE_SQUARES } from "@/lib/quire/tabletop-geometry";
 import { resizedToken } from "@/lib/quire/token-display";
 import { Button, Fold } from "./ui";
-import { CommandForm } from "./world-tools";
+import { CommandButton, CommandForm } from "./world-tools";
 import { AppLink } from "./app-link";
 type Position = { column: number; row: number; offsetX?: number; offsetY?: number };
 type Move = { tokenId: string; before: Position; after: Position };
@@ -386,6 +391,7 @@ export function TokenInspector({
 }
 
 export function SceneConfiguration({ map }: { map: CampaignMap }) {
+  const table = useWorldTable();
   const [before, setBefore] = useState(map.tabletop ?? null),
     [draft, setDraft] = useState(readMapTabletop(map));
   return (
@@ -397,14 +403,46 @@ export function SceneConfiguration({ map }: { map: CampaignMap }) {
         }
         submit={() => ({ kind: "map-tabletop", mapId: map.id, before, settings: draft })}
       >
+        {/* Player movement (map tokens PR 2, owner 2026-10-29). */}
         <label>
-          <input
-            type="checkbox"
-            checked={draft.playerMovement}
-            onChange={(event) => setDraft({ ...draft, playerMovement: event.target.checked })}
-          />
-          Allow assigned-player token movement
+          Player movement
+          <select
+            aria-label="Player movement"
+            value={draft.movement ?? movementMode({ tabletop: before ?? undefined })}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                movement: event.target.value as MovementMode,
+                playerMovement: event.target.value !== "off",
+              })
+            }
+          >
+            <option value="auto">Automatic: free, taking turns in combat</option>
+            <option value="off">Off: the DM moves tokens</option>
+          </select>
         </label>
+        <fieldset>
+          <legend>Characters who can't move on this map</legend>
+          {table.purses
+            .filter((person) => person.kind === "character")
+            .map((person) => (
+              <label key={person.id}>
+                <input
+                  type="checkbox"
+                  checked={draft.lockedPurseIds?.includes(person.id) ?? false}
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      lockedPurseIds: event.target.checked
+                        ? [...(draft.lockedPurseIds ?? []), person.id]
+                        : (draft.lockedPurseIds ?? []).filter((id) => id !== person.id),
+                    })
+                  }
+                />
+                {person.name}
+              </label>
+            ))}
+        </fieldset>
         <label>
           <input
             type="checkbox"
@@ -482,5 +520,31 @@ export function SceneConfiguration({ map }: { map: CampaignMap }) {
         </Button>
       </CommandForm>
     </Fold>
+  );
+}
+
+/**
+ * Maps configured before players could move their own tokens keep movement off (owner,
+ * 2026-10-29); the DM gets a one-tap way to turn on Automatic.
+ */
+export function MovementNotice({ map }: { map: CampaignMap }) {
+  if (!legacyMovementOff(map)) return null;
+  return (
+    <div className="map-movement-notice" role="note">
+      <p>
+        <strong>New: let players move their own tokens</strong> — freely outside combat, and only on
+        their turn while combat is active here. Player movement is off on this map.
+      </p>
+      <CommandButton
+        input={{
+          kind: "map-tabletop",
+          mapId: map.id,
+          before: map.tabletop ?? null,
+          settings: { ...readMapTabletop(map), movement: "auto", playerMovement: true },
+        }}
+      >
+        Turn on Automatic
+      </CommandButton>
+    </div>
   );
 }

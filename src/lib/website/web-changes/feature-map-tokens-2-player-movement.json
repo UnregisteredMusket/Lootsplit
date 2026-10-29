@@ -1,0 +1,13 @@
+{
+  "title": "Players move their own tokens, taking turns in combat",
+  "summary": "Players can move their own map tokens freely, and during combat only on their character's turn.",
+  "items": [
+    "New maps let players move their own tokens (Automatic): freely when there's no combat, and only on their character's turn while an encounter is running on that map. Movement is free again when combat ends.",
+    "The DM can always move anything, switch a map's player movement off, lock a token, or keep chosen characters still on a map.",
+    "Maps set up before this change keep player movement off, with a one-tap Turn on Automatic in Map settings › Players & display.",
+    "Players see whose turn it is at the top of the map, a hint when it isn't theirs, and their sheet's speed as a guide on their turn.",
+    "In turn-based rooms players can move their own token outside their room turn; combat initiative still applies.",
+    "A player without a token on the map can choose Place my token and tap a square.",
+    "The server checks every move, so older apps follow the same turn rules."
+  ]
+}

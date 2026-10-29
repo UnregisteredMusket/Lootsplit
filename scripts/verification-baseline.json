@@ -30,6 +30,7 @@
   "node scripts/recovery-step.mjs dev-map-controls 240 node --experimental-strip-types scripts/map-controls-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-map-tokens-footprint 240 node scripts/map-tokens-footprint-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-map-grid-mode 240 node scripts/map-grid-mode-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-map-player-move 240 node scripts/map-player-move-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot-claims 300 node scripts/loot-claims-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot-fairness 300 node scripts/loot-fairness-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-themed-confirm 180 node scripts/themed-confirm-browser-audit.mjs",

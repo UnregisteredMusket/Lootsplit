@@ -46,6 +46,7 @@ import { TemplateShape, TokenInspector, SceneConfiguration } from "./map-tableto
 import { AppLink } from "./app-link";
 import { GridModeDialog, type GridModeChoice } from "./map-grid-mode";
 import { resultToast } from "@/lib/quire/result-toast";
+import type { PlayerMovement } from "@/lib/quire/map-movement";
 
 export type MapTool =
   | "select"
@@ -86,6 +87,8 @@ export function useMapTabletopTools(
   map: CampaignMap,
   selectedToken: string,
   selectToken?: (id: string) => void,
+  /** A player's movement on this map (map tokens PR 2); undefined for the DM. */
+  movement?: PlayerMovement,
 ) {
   const table = useWorldTable(),
     seat = useSeat(),
@@ -128,12 +131,18 @@ export function useMapTabletopTools(
           moved: boolean;
           /** Where the token was grabbed, in squares from its footprint's top-left corner. */
           grab?: { x: number; y: number };
+          /** Placing the player's own token (map-token-claim). */
+          claim?: string;
         }
       | undefined
     >(undefined),
     movePreview = useRef<Move[]>([]),
     stroke = useRef<StrokeDraft>({ points: [], frozen: 0 }),
     keyboardAnchor = useRef<ScenePoint | undefined>(undefined);
+  // Player movement (map tokens PR 2): placing your own token, and "Not your turn" on a press.
+  const [claiming, setClaiming] = useState(""),
+    [notTurn, setNotTurn] = useState(""),
+    notTurnTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [gridDialog, setGridDialog] = useState<GridModeChoice | null>(null),
     [gridError, setGridError] = useState(""),
     latest = useRef(map);
@@ -217,14 +226,28 @@ export function useMapTabletopTools(
       selectToken?.(tokenId);
       const box = tokenBox(token),
         at = map.grid ? gridPoint(map.grid, point) : { x: box.left + 0.5, y: box.top + 0.5 };
+      // During combat a player moves only the token whose turn it is (the server checks too).
+      const allowed =
+        !disabled &&
+        canMoveMapToken(table, map, token, seat) &&
+        (!movement?.combat || movement.acting?.tokenId === token.id);
+      if (!allowed && movement?.combat && canMoveMapToken(table, map, token, seat)) {
+        setNotTurn(token.id);
+        clearTimeout(notTurnTimer.current);
+        notTurnTimer.current = setTimeout(() => setNotTurn(""), 4000);
+      }
       gesture.current = {
         point,
-        token: !disabled && canMoveMapToken(table, map, token, seat) ? token : undefined,
+        token: allowed ? token : undefined,
         ids,
         grid: canonicalJson(map.grid),
         moved: false,
         grab: { x: at.x - box.left, y: at.y - box.top },
       };
+      return true;
+    }
+    if (claiming && (tool === "pan" || tool === "select")) {
+      gesture.current = { point, moved: false, claim: claiming };
       return true;
     }
     if (tool === "pan" || tool === "select") return false;
@@ -295,6 +318,29 @@ export function useMapTabletopTools(
     } else if (tool === "fog-rectangle" || tool === "wall") setPoints([current.point, point]);
     return true;
   }
+  /** Place the player's own character token on the square under the point (map-token-claim). */
+  function claimAt(purseId: string, point: ScenePoint) {
+    if (!map.grid) return;
+    const at = (settings.snap ? snapTokenPosition : freeTokenPosition)(map.grid, {}, point);
+    if (!at) {
+      setError("Choose a square inside the grid.");
+      return;
+    }
+    void act(
+      {
+        kind: "map-token-claim",
+        mapId: map.id,
+        grid: canonicalJson(map.grid),
+        purseId,
+        tokenId: crypto.randomUUID(),
+        at: { column: at.column, row: at.row, ...quadrant(at), ...(settings.snap ? {} : { offsetX: at.offsetX, offsetY: at.offsetY }) },
+      },
+      () => {
+        setClaiming("");
+        resultToast("Your token is on the map");
+      },
+    );
+  }
   function saveMoves(next: Move[], grid = canonicalJson(map.grid)) {
     if (!next.length || !map.grid) return;
     if (
@@ -362,6 +408,10 @@ export function useMapTabletopTools(
     if (!current) return false;
     // A tap inspects; dragging keeps the map unobstructed until the move ends.
     if (current.ids?.length && !current.moved) setInspector(true);
+    if (current.claim) {
+      if (!current.moved) claimAt(current.claim, point);
+      return true;
+    }
     if (current.token) {
       if (current.moved && movePreview.current.length) saveMoves(movePreview.current, current.grid);
       return true;
@@ -433,10 +483,17 @@ export function useMapTabletopTools(
   }
   function keyboard(event: KeyboardEvent, center?: ScenePoint) {
     if (event.key === "Escape") {
+      setClaiming("");
       cancel();
       return false;
     }
     if (event.target !== event.currentTarget) return false;
+    // "Place my token": Enter places it at the keyboard crosshair.
+    if (event.key === "Enter" && claiming && center) {
+      event.preventDefault();
+      claimAt(claiming, center);
+      return true;
+    }
     if (tool === "select" && selected.length && !event.altKey && event.key.startsWith("Arrow")) {
       event.preventDefault();
       const dx = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0,
@@ -1265,6 +1322,9 @@ export function useMapTabletopTools(
     /** The move being previewed (dragging, or kept after a refused save). */
     moves,
     gridMode: { on: settings.snap, set: setGridMode, dialog: gridModeDialog, select: gridModeSelect },
+    /** Player movement: arm "Place my token", and the token whose press was refused this turn. */
+    claim: { purseId: claiming, start: setClaiming, cancel: () => setClaiming("") },
+    notTurn,
     showPreview,
     session,
     busy: disabled,

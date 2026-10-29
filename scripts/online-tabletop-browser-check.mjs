@@ -17,9 +17,9 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await dm.getByRole("button", { name: "Objects & inspector", exact: true }).click();
   const inspector = dm.getByRole("complementary", { name: "Map inspector" });
   await inspector.getByRole("button", { name: "Scene permissions & vision", exact: true }).click();
-  await inspector
-    .getByRole("checkbox", { name: "Allow assigned-player token movement", exact: true })
-    .check();
+  // Player movement (map tokens PR 2): Automatic replaced the "Allow assigned-player token
+  // movement" box; this map's settings predate it, so movement starts off here.
+  await inspector.getByLabel("Player movement", { exact: true }).selectOption("auto");
   await inspector
     .getByRole("checkbox", { name: "Allow player area templates", exact: true })
     .check();

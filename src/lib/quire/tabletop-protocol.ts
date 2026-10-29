@@ -94,8 +94,18 @@ export const FOOTPRINT_PROTOCOL = 12;
  * website.
  */
 export const GRID_MODE_PROTOCOL = 13;
+/**
+ * Protocol 14 (2026-10-29, map tokens: player movement): a map's tabletop settings may carry
+ * `movement` ("auto" | "off" | "approval") and `lockedPurseIds`, and players may send
+ * `map-token-claim`. Protocols 0-13 receive settings without the new fields (`playerMovement` is
+ * kept in step with `movement`); their scene and map saves compare without them, keep them, and a
+ * change to "Allow assigned-player token movement" sets Automatic or Off. Pending drafts with the
+ * new fields or claims ask them to finish on the updated website. The movement rules, including
+ * turns during combat, are enforced by the server for every protocol.
+ */
+export const PLAYER_MOVEMENT_PROTOCOL = 14;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = GRID_MODE_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = PLAYER_MOVEMENT_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -107,6 +117,7 @@ const commands = new Set([
   "map-template",
   "map-render",
   "map-grid-snap",
+  "map-token-claim",
 ]);
 /**
  * Tabletop protocol 2 and older apps (Android 1.10.0 and earlier) have no `alternating` diagonal
@@ -792,25 +803,32 @@ function gridHiddenFreeTable(table: CloudTable): CloudTable {
   };
 }
 /**
- * Protocols 0-12 can't see `gridHidden`: their scene saves (`map-tabletop`) and map saves compare
- * against the settings without it and keep it. Commands about other maps are untouched.
+ * Older clients can't see some tabletop settings fields: their scene saves (`map-tabletop`) and
+ * map saves are compared against the settings without them (`strip`) and keep them (`restore`).
+ * Commands about other maps are untouched.
  */
-function upgradeGridHiddenCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
+function upgradeSettingsCommands<C extends { kind: string }>(
+  table: CloudTable,
+  commands: C[],
+  hidden: (settings: NonNullable<CampaignMap["tabletop"]>) => boolean,
+  strip: <T>(settings: T) => T,
+  restore: (sent: Record<string, unknown>, current: NonNullable<CampaignMap["tabletop"]>) => Record<string, unknown>,
+): C[] {
   const maps = table.journal?.world?.maps ?? [];
-  if (!maps.some((m) => m.tabletop?.gridHidden !== undefined)) return commands;
+  if (!maps.some((m) => m.tabletop && hidden(m.tabletop))) return commands;
   return commands.map((command) => {
     const c = command as C & Record<string, unknown>;
     const map = maps.find((m) => m.id === c.mapId);
     const current = map?.tabletop;
-    if (!current || current.gridHidden === undefined) return command;
+    if (!current || !hidden(current)) return command;
     // Protocol 2 sent full-snapshot fog history; tabletop.ts accepts either form.
     const forms = [current, expandTabletopHistory(current)];
-    const match = (sent: unknown) => forms.find((form) => sameJson(withoutGridHidden(form), sent));
-    const keep = <T extends object | null | undefined>(next: T) =>
-      next && !("gridHidden" in next) ? { ...next, gridHidden: current.gridHidden } : next;
+    const match = (sent: unknown) => forms.find((form) => sameJson(strip(form), sent));
+    const keep = (next: unknown) =>
+      next && typeof next === "object" ? restore(next as Record<string, unknown>, current) : next;
     if (c.kind === "map-tabletop") {
       const before = match(c.before);
-      return before ? { ...c, before, settings: keep(c.settings as object) } : command;
+      return before ? { ...c, before, settings: keep(c.settings) } : command;
     }
     if (c.kind === "map-save") {
       const before = c.before as CampaignMap | null,
@@ -826,6 +844,80 @@ function upgradeGridHiddenCommands<C extends { kind: string }>(table: CloudTable
     return command;
   });
 }
+const upgradeGridHiddenCommands = <C extends { kind: string }>(table: CloudTable, commands: C[]) =>
+  upgradeSettingsCommands(
+    table,
+    commands,
+    (t) => t.gridHidden !== undefined,
+    withoutGridHidden,
+    (sent, current) => ("gridHidden" in sent ? sent : { ...sent, gridHidden: current.gridHidden }),
+  );
+// Protocol 14 (player movement).
+const movementText = (text: string) => /"movement":"(auto|off|approval)"|"lockedPurseIds":\[/.test(text);
+/** Tabletop settings without `movement` and `lockedPurseIds` (protocols 0-13). */
+export function withoutMovement<T>(settings: T): T {
+  if (!settings || typeof settings !== "object" || (!("movement" in settings) && !("lockedPurseIds" in settings)))
+    return settings;
+  const plain = { ...settings } as T & { movement?: unknown; lockedPurseIds?: unknown };
+  delete plain.movement;
+  delete plain.lockedPurseIds;
+  return plain;
+}
+const hasMovementFields = (t: NonNullable<CampaignMap["tabletop"]>) =>
+  t.movement !== undefined || t.lockedPurseIds !== undefined;
+/** Whether a table (or a stored backup body) holds the movement choice or movement locks. */
+export function hasMovementSettings(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.tabletop && hasMovementFields(m.tabletop)) ||
+    !!table.journal?.reports?.some((r) => movementText(r.snapshot ?? ""))
+  );
+}
+function movementFreeTable(table: CloudTable): CloudTable {
+  if (!hasMovementSettings(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!movementText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(movementFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world
+        ? {
+            world: {
+              ...world,
+              maps: world.maps.map((m) =>
+                m.tabletop && hasMovementFields(m.tabletop) ? { ...m, tabletop: withoutMovement(m.tabletop) } : m,
+              ),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
+const upgradeMovementCommands = <C extends { kind: string }>(table: CloudTable, commands: C[]) =>
+  upgradeSettingsCommands(table, commands, hasMovementFields, withoutMovement, (sent, current) => {
+    if ("movement" in sent || "lockedPurseIds" in sent) return sent;
+    // "Allow assigned-player token movement" changed on an older client: Automatic or Off.
+    const was = current.movement ? current.movement !== "off" : current.playerMovement;
+    const movement =
+      typeof sent.playerMovement === "boolean" && sent.playerMovement !== was
+        ? sent.playerMovement
+          ? "auto"
+          : "off"
+        : current.movement;
+    return {
+      ...sent,
+      ...(movement ? { movement } : {}),
+      ...(current.lockedPurseIds ? { lockedPurseIds: current.lockedPurseIds } : {}),
+    };
+  });
 /** Every older-client conversion, applied to a batch before it runs (cloud.server.ts). */
 export function upgradeOldClientCommands<C extends { kind: string }>(
   table: CloudTable,
@@ -833,11 +925,14 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   protocol = 0,
 ): C[] {
   let result = commands;
+  if (protocol < PLAYER_MOVEMENT_PROTOCOL) result = upgradeMovementCommands(table, result);
   if (protocol < GRID_MODE_PROTOCOL) result = upgradeGridHiddenCommands(table, result);
   if (protocol < FOOTPRINT_PROTOCOL) result = upgradeFootprintCommands(table, result);
   return result;
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= PLAYER_MOVEMENT_PROTOCOL) return table;
+  table = movementFreeTable(table);
   if (protocol >= GRID_MODE_PROTOCOL) return table;
   table = gridHiddenFreeTable(table);
   if (protocol >= FOOTPRINT_PROTOCOL) return table;
@@ -921,12 +1016,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= GRID_MODE_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= PLAYER_MOVEMENT_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 14: token claims and the movement fields.
+      if (c.kind === "map-token-claim" || movementText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= GRID_MODE_PROTOCOL) return false;
       // Protocol 13: grid mode commands and the hidden-grid flag.
       if (c.kind === "map-grid-snap" || gridHiddenText(JSON.stringify(c))) return true;
       if (protocol && protocol >= FOOTPRINT_PROTOCOL) return false;
