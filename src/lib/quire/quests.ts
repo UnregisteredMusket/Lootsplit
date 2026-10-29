@@ -85,9 +85,9 @@ function stamp(journal: Journal): { sessionId?: string; day?: number } {
   };
 }
 
-type ReceiptLine = { purseId: string; copper: number; summary: string };
+export type ReceiptLine = { purseId: string; copper: number; summary: string };
 /** Where a reward receipt lives in this campaign (current records, then archived sessions). */
-function findReceipt(
+export function findReceipt(
   t: Pick<CloudTable, "ledger" | "journal">,
   link: Pick<QuestRewardLink, "kind" | "id">,
 ): ReceiptLine[] | null {
@@ -427,6 +427,12 @@ export type QuestProjectionContext = {
    * fog and vision, so the redacted geometry must not be used to judge sight again.
    */
   tabletopProjected?: boolean;
+  /**
+   * History on demand (step 4): the Worker projects a room read without its older ledger pages and
+   * archived sessions, so it resolves reward receipts against the whole campaign beforehand
+   * (`findReceipt` over the full history) and passes the result here. Absent: `findReceipt(table)`.
+   */
+  receipt?: (link: QuestRewardLink) => ReceiptLine[] | null;
 };
 /**
  * A player's copy of the quest log. Runs on the unprojected `table` (audiences and receipts are
@@ -461,7 +467,7 @@ export function projectQuests(
     );
   };
   const projectLink = (link: QuestRewardLink): QuestRewardLink[] => {
-    const lines = findReceipt(table, link);
+    const lines = context.receipt ? context.receipt(link) : findReceipt(table, link);
     if (!lines?.length) return [];
     // A pool resolution is party-visible (projectLoot); its label carries no amounts.
     const readable = link.kind === "loot-resolution" ? (party || lines.some((l) => own.has(l.purseId)) ? lines : []) : lines.filter((l) => lineReadable(l.purseId));
