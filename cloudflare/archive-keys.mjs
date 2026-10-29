@@ -32,20 +32,26 @@ export function archiveKeys(text) {
   } catch {
     return null;
   }
+  // Anything not shaped like an archived campaign is never indexed (unindexable: every command
+  // that needs archives then loads every session, and meets the same refusal as before).
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (raw.ledger !== undefined && !Array.isArray(raw.ledger)) return null;
+  if (raw.journal !== undefined && (!raw.journal || typeof raw.journal !== "object" || Array.isArray(raw.journal))) return null;
+  if (raw.journal?.events !== undefined && !Array.isArray(raw.journal.events)) return null;
   const keys = new Set([ARCHIVE_INDEXED]);
-  const ledger = Array.isArray(raw.ledger) ? raw.ledger : [];
+  const ledger = raw.ledger ?? [];
   for (const line of ledger) {
-    if (!line || typeof line !== "object") continue;
+    if (!line || typeof line !== "object" || Array.isArray(line)) return null;
     if (typeof line.id === "string") keys.add("id:" + line.id);
     if (typeof line.reversalOf === "string") keys.add("rev:" + line.reversalOf);
     if (typeof line.summary === "string" && line.summary.includes("(void:")) keys.add("void");
     if (line.trade && typeof line.trade.receiptId === "string") keys.add("trade:" + line.trade.receiptId);
     if (line.award && typeof line.award.receiptId === "string") keys.add("award:" + line.award.receiptId);
   }
-  const events = Array.isArray(raw.journal?.events) ? raw.journal.events : [];
-  for (const event of events)
-    if (event && typeof event.lootResolution?.id === "string") keys.add("loot:" + event.lootResolution.id);
+  for (const event of raw.journal?.events ?? []) {
+    if (!event || typeof event !== "object" || Array.isArray(event)) return null;
+    if (typeof event.lootResolution?.id === "string") keys.add("loot:" + event.lootResolution.id);
+  }
   return [...keys];
 }
 

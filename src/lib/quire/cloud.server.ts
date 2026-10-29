@@ -1182,8 +1182,11 @@ export async function submitCommands(input: {
     // A staged batch is validated the same way (the merged draft), and nothing of it is stored.
     let source = room;
     let table = room.table;
+    // Undo and quest reward links are the DM's; for any other seat they are refused before anything
+    // older is read, so no archived session is loaded (and no selection planned) for them.
+    const dmOnly = seat.role !== "dm" && unapplied.every((c) => c.kind === "ledger-void" || c.kind === "quest-link-reward");
     let pages = historyNeedsPages(unapplied),
-      sessions = historyNeedsSessions(unapplied);
+      sessions = historyNeedsSessions(unapplied) && !dmOnly;
     // Archived sessions the batch can touch, from their lookup keys (archive-keys.mjs): Undo of an
     // archived line or a quest reward link loads only those, not every session. `undefined`: not
     // planned yet; `null`: load every session (the index cannot answer, or the attempt needed more).
@@ -1192,7 +1195,7 @@ export async function submitCommands(input: {
       let runOn = source;
       let stubbed: Map<string, string> | null = null;
       if (pages || sessions) {
-        if (sessions && selection === undefined) selection = await archiveSelection(source, unapplied);
+        if (sessions && selection === undefined) selection = seat.role === "dm" ? await archiveSelection(source, unapplied) : null;
         if (sessions && selection) {
           const partial = await withRoomHistory(source, { reports: selection });
           const plan = selectionSafe(partial, unapplied) ? stubArchives(partial, selection) : null;

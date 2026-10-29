@@ -25,6 +25,7 @@ function shopTable() {
   const table = tradeFixture();
   table.shops.push({ id: "outfitter", name: "Outfitter", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5, wealth: "modest", category: "general", priceScale: 1 });
   table.stock.push({ id: "rope", shopId: "outfitter", name: "Rope", copper: 100, baseCopper: 100, rarity: "common", quantity: 100000, notes: "50 feet", category: "general" });
+  table.holdings.push({ id: "potion", purseId: "party", name: "Potion of healing", kind: "item", quantity: 3, unitCopper: 50, notes: "", pool: { at: 1, source: "add-loot" } });
   return table;
 }
 const buy = (id, purseId = "a") => ({ id, kind: "buy", stockId: "rope", purseId, quantity: 1 });
@@ -56,14 +57,34 @@ async function scenario(selections, script) {
     const a = await joinRoom({ code: dm.code, purseId: "a", name: "Arden" });
     await choosePace({ ...dm, live: true });
     const seats = { dm, a: { code: dm.code, token: a.token } };
-    const send = (seat, batchId, commands) => ((clock += 1000), submitCommands({ ...seat, batchId, commands }));
-    const session = async (n, lines) => {
+    // Every command response (or refusal) is recorded and compared between the two runs.
+    const responses = [];
+    const send = async (seat, batchId, commands) => {
+      clock += 1000;
+      try {
+        const view = await submitCommands({ ...seat, batchId, commands });
+        responses.push({ batchId, view: canonicalJson(view) });
+        return view;
+      } catch (error) {
+        responses.push({ batchId, error: error.message });
+        throw error;
+      }
+    };
+    const inject = async (lines, events = []) => {
+      const room = await readRoom(dm.code);
+      room.table.ledger.push(...lines);
+      room.table.journal.events.push(...events);
+      room.revision++;
+      await updateRoom(room, room.revision - 1);
+    };
+    const session = async (n, lines, extra) => {
       await send(dm, `s-${n}`, [{ id: `s-${n}`, kind: "session", name: `Session ${n}`, end: false }]);
       for (let i = 0; i < lines; i += 20) await send(dm, `b-${n}-${i}`, Array.from({ length: 20 }, (_, k) => buy(`b-${n}-${i + k}`, k % 2 ? "a" : "b")));
+      if (extra) await extra();
       await send(seats.a, `m-${n}`, [message(`m-${n}`, `Session ${n}`)]);
       await send(dm, `e-${n}`, [{ id: `e-${n}`, kind: "session", name: `Session ${n}`, end: true }]);
     };
-    const result = await script({ db, dm, seats, send, session, archived: async (id) => {
+    const result = await script({ db, dm, seats, send, session, inject, archived: async (id) => {
       for (const r of (await readRoom(dm.code)).table.journal.reports) {
         const line = JSON.parse(r.snapshot).ledger.find((l) => l.id === id);
         if (line) return line;
@@ -74,7 +95,7 @@ async function scenario(selections, script) {
     const views = {};
     for (const [name, seat] of Object.entries(seats)) views[name] = (await roomState({ ...seat, ...OLD })).table;
     const whole = await readRoom(dm.code);
-    return { ...result, table: stored.room.table, whole: whole.table, views, code: dm.code, selections: historyEngineStats.selections.slice(before), db };
+    return { ...result, responses, table: stored.room.table, whole: whole.table, views, code: dm.code, selections: historyEngineStats.selections.slice(before), db };
   } finally {
     Date.now = realNow;
     Math.random = realRandom;
@@ -88,7 +109,11 @@ const same = (x, y) => {
   assert.equal(norm(x.table, x.code), norm(y.table, y.code), "the stored campaigns are identical");
   assert.equal(norm(x.whole, x.code), norm(y.whole, y.code), "the whole campaigns are identical");
   for (const seat of Object.keys(x.views)) assert.equal(norm(x.views[seat], x.code), norm(y.views[seat], y.code), `${seat}'s complete view is identical`);
+  assert.equal(x.responses.length, y.responses.length);
+  for (const [i, response] of x.responses.entries())
+    assert.equal(norm(response, x.code), norm(y.responses[i], y.code), `response to ${response.batchId} is identical`);
 };
+const settle = (promise) => promise.then(() => "applied", (error) => error.message);
 const undo = (id, line) => ({ id, kind: "ledger-void", target: { kind: "ledger", id: line.id }, before: canonicalJson(line), reason: "Wrong." });
 
 test("0030 (archive keys) is additive", () => {
@@ -191,4 +216,69 @@ test("Undo of a trade-linked line, or an unplanned command, loads every session 
   assert.equal(selected.error, every.error);
   assert.ok(selected.error, "the incomplete trade is refused the same way");
   assert.equal(selected.selections.length, 0, "no selection was used");
+});
+
+test("reused line IDs, voids recorded only in summaries, multi-Undo batches and players: identical either way", async () => {
+  const script = async ({ dm, seats, send, session, inject, archived }) => {
+    // A note in session 1 reuses the ID "V"; session 3 holds a genuine void of b-2-3 under "V".
+    await session(1, 20, () => inject([{ id: "V", at: 1, purseId: "b", shopId: null, copper: 0, summary: "A note", transactionType: "adjustment" }]));
+    await session(2, 20);
+    const x = await archived("b-2-3");
+    await session(3, 20, () => inject([{ id: "V", at: 2, purseId: x.purseId, shopId: x.shopId, copper: -x.copper, summary: "Voided " + x.summary + " (void:" + x.id + ")", transactionType: "adjustment", reversalOf: x.id }]));
+    const outcomes = [await settle(send(dm, "undo-hidden", [undo("undo-hidden", x)]))];
+    // A void recorded only in a summary (no reversalOf) in session 4.
+    const y = await archived("b-1-5");
+    await session(4, 20, () => inject([{ id: "summary-void", at: 3, purseId: y.purseId, shopId: y.shopId, copper: -y.copper, summary: "Voided by hand (void:" + y.id + ")", transactionType: "adjustment" }]));
+    outcomes.push(await settle(send(dm, "undo-summary", [undo("undo-summary", y)])));
+    // Undo of a current line whose earlier void is archived.
+    await session(5, 0, () => inject([{ id: "cur-void", at: 4, purseId: "a", shopId: null, copper: 50, summary: "Voided Current fee (void:cur-1)", transactionType: "adjustment", reversalOf: "cur-1" }]));
+    await inject([{ id: "cur-1", at: 5, purseId: "a", shopId: null, copper: -50, summary: "Current fee", transactionType: "adjustment" }]);
+    const current = (await readRoom(dm.code)).table.ledger.find((l) => l.id === "cur-1");
+    outcomes.push(await settle(send(dm, "undo-current", [undo("undo-current", current)])));
+    // A batch with two Undos from different sessions.
+    const p = await archived("b-3-7"), q = await archived("b-4-9");
+    outcomes.push(await settle(send(dm, "undo-two", [undo("undo-two-a", p), undo("undo-two-b", q)])));
+    // A player's Undo is refused the same way, without loading archived sessions.
+    outcomes.push(await settle(send(seats.a, "player-undo", [undo("player-undo", q)])));
+    return { outcomes };
+  };
+  const selected = await scenario(true, script);
+  const every = await scenario(false, script);
+  same(selected, every);
+  assert.deepEqual(selected.outcomes, every.outcomes);
+  assert.equal(selected.outcomes[4] === "applied", false, "the player is refused");
+  const voidsOf = (run, id) => run.whole.journal.reports.flatMap((r) => JSON.parse(r.snapshot).ledger).concat(run.whole.ledger).filter((l) => l.reversalOf === id).length;
+  assert.equal(voidsOf(selected, "b-2-3"), 1, "the hidden void is found: no second reversal");
+  assert.equal(voidsOf(selected, "cur-1"), 1, "the archived void of a current line is found");
+  assert.ok(selected.selections.some((s) => s.kinds.length === 2), "a two-Undo batch ran on a selection");
+});
+
+test("quest reward links of every kind (ledger, encounter award, treasure-pool resolution): identical either way", async () => {
+  const script = async ({ dm, seats, send, session, inject }) => {
+    await session(1, 20, async () => {
+      // An encounter coin award line, and a treasure-pool resolution, both archived with session 1.
+      await inject([{ id: "award-1-coins", at: 1, purseId: "a", shopId: null, copper: 500, summary: "Encounter award: 5 gp", transactionType: "adjustment", award: { receiptId: "award-1", role: "coins" } }]);
+      await send(seats.a, "claim-a", [{ id: "claim-a", kind: "loot-claim", holdingId: "potion", purseId: "a", choice: "need", before: null }]);
+      const { lootFingerprint } = await import("../src/lib/quire/loot-claims.ts");
+      const lots = [{ holdingId: "potion", quantity: 3 }];
+      await send(dm, "loot-1", [{ id: "loot-1", kind: "loot-resolve", method: "round-robin", lots, expect: lootFingerprint((await readRoom(dm.code)).table, lots, "round-robin") }]);
+    });
+    await session(2, 20);
+    await session(3, 20);
+    const draft = { title: "Rope", summary: "Find it.", locationIds: [], markers: [], areas: [], objectives: [], rewardText: "Rope", dmNotes: "" };
+    await send(dm, "q", [{ id: "q", kind: "quest-save", questId: null, revision: null, quest: draft }]);
+    const rev = async () => questsOf((await readRoom(dm.code)).table).find((q) => q.id === "q").revision;
+    await send(dm, "q-reveal", [{ id: "q-reveal", kind: "quest-reveal", questId: "q", revision: await rev(), audience: { kind: "party" } }]);
+    const outcomes = [];
+    for (const link of [{ kind: "ledger", id: "b-2-4" }, { kind: "encounter-award", id: "award-1" }, { kind: "loot-resolution", id: "loot-1" }, { kind: "loot-resolution", id: "missing" }])
+      outcomes.push(await settle(send(dm, `link-${link.kind}-${link.id}`, [{ id: `link-${link.kind}-${link.id}`, kind: "quest-link-reward", questId: "q", revision: await rev(), link }])));
+    return { outcomes };
+  };
+  const selected = await scenario(true, script);
+  const every = await scenario(false, script);
+  same(selected, every);
+  assert.deepEqual(selected.outcomes, every.outcomes);
+  assert.ok(selected.selections.filter((s) => s.kinds[0] === "quest-link-reward").length >= 3);
+  assert.deepEqual(selected.outcomes.slice(0, 3), ["applied", "applied", "applied"], "each kind of archived receipt is found and linked");
+  assert.notEqual(selected.outcomes[3], "applied", "a missing resolution is refused");
 });
