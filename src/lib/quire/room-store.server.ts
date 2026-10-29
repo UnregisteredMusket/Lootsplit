@@ -268,16 +268,26 @@ export async function hydrateDeferredReports<R extends { snapshot: string }>(cod
  * Returns a new room object (the working room is not changed) that keeps the read's stored-body
  * and version bookkeeping, so it can be written back exactly like a whole read.
  */
-export async function withRoomHistory(room: CloudRoom, options: { reports?: boolean } = {}): Promise<CloudRoom> {
+export async function withRoomHistory(
+  room: CloudRoom,
+  options: { reports?: boolean | ReadonlySet<string> } = {},
+): Promise<CloudRoom> {
   const db = database();
   const value = room as CloudRoom & { [HISTORY_KEY]?: unknown };
   const reports = room.table.journal?.reports ?? [];
-  const deferred = options.reports === true && reports.some((r) => isDeferredSnapshot(r.snapshot));
+  // `reports`: every deferred archived session (true), or only those with these report IDs (a
+  // set: archive-keys.mjs; the others stay deferred).
+  const wanted = (r: { id: string; snapshot: string }) =>
+    isDeferredSnapshot(r.snapshot) && (options.reports === true || (options.reports instanceof Set && options.reports.has(r.id)));
+  const deferred = !!options.reports && reports.some(wanted);
   if (!db || (!(HISTORY_KEY in value) && !deferred)) return room;
   const next = keepStoredBody(room, { ...room, table: { ...room.table } }) as CloudRoom & { [HISTORY_KEY]?: unknown };
   if (HISTORY_KEY in value) await restoreRoomHistory(db, next);
-  if (deferred)
-    next.table.journal = { ...next.table.journal!, reports: await hydrateDeferredReports(room.code, reports) };
+  if (deferred) {
+    const hydrated = await hydrateDeferredReports(room.code, reports.filter(wanted));
+    let at = 0;
+    next.table.journal = { ...next.table.journal!, reports: reports.map((r) => (wanted(r) ? hydrated[at++]! : r)) };
+  }
   return next;
 }
 export type CombatViewRead = {
