@@ -194,3 +194,7 @@ Grids have a fourth diagonal rule, `alternating`: straight steps cost one tile, 
 - Announcements use only the map the viewer already receives (the server's player projection for players), so hidden tokens, DM-only markers and fog geometry are never named.
 - Pings differ by shape as well as colour: red circle, amber square, green triangle, blue diamond, violet star. The picker and the active-tool label name the shape.
 
+
+## Planned: player tokens, footprints, map menus, group placement and zones (approved 2026-10-29)
+
+The owner approved the plan and mockups in `docs/plans/MAP-TOKENS.md` and `docs/previews/map-tokens/` on 2026-10-29. They are built as stacked PRs in the plan's order (section 7): footprints and server-checked snapping (1), the grid mode switch (1b), player movement that is free outside combat and turn-based during it (2), group placement and group commands (3), the desktop right-click menu (4), the phone press-and-hold radial (5), moving the party to a submap (6), tokens following the player's map view (7), zones and the DM's split rule (7A) and "Ask the DM" movement (8). Until each lands, the sections above describe what is live. Each PR updates this file when it ships.
