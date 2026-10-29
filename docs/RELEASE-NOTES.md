@@ -22,7 +22,13 @@ If the widget currently shows SIGN IN, tap it (or open My account → Home-scree
 
 ## Release verification
 
-Pending: published by `android-release.yml` (started by the owner), then independently inspected before `release.json` is updated.
+Published October 29, 2026 by `android-release.yml` (run 40849851166), started automatically by the version bump merged to main `407e7c6` (#371), after the full preservation checks, the API 24 and API 35 widget checks, and the signed-APK upgrade gate passed.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `3078f05b7c8e9c4489cdd465e6cc5ea5a9a2ae72d46b26ef4bb8dd0e5059cf9d` (32,982,281 bytes), matching SHA256SUMS.txt.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.14.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.14.1 and versionCode 22.
+- The app code contains the widget disconnect-reason store (`owner-widget-disconnect.json`) from #371.
 
 ---
 

@@ -1,0 +1,8 @@
+{
+  "title": "Android 1.14.1 download",
+  "summary": "The website's Android download is now version 1.14.1, which fixes the owner's home-screen Field monitor losing its connection.",
+  "items": [
+    "Downloads offers Android 1.14.1 with its checksum; install it over the existing app.",
+    "For the site owner: removing or re-adding the Field monitor widgets no longer disconnects it, Sign in on the widget opens Connect widget directly, and the widget says why if it ever disconnects. Tap Sign in, then Connect widget, once after updating."
+  ]
+}
