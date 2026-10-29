@@ -85,8 +85,9 @@ async function setup(path) {
  * `favour` ("favour whoever is behind" over every archived session, refused afterwards),
  * `undo-archived` (Undo of a line in an archived session: only the sessions that can hold it are
  * loaded since part 3), `stream` (the DM's campaign file streamed one archived session at a time, as Download a copy and
- * deletion copies are built since part 2), `restore` (restoring the deletion recovery copy that
- * setup `--backup 1` leaves).
+ * deletion copies are built since part 2), `records` (Account → Session records streamed one
+ * archived session at a time, follow-up (c)), `records-whole` (records as built before it) and
+ * `restore` (restoring the deletion recovery copy that setup `--backup 1` leaves).
  */
 async function read(path) {
   const { seats } = JSON.parse(readFileSync(path + ".json", "utf8"));
@@ -144,6 +145,29 @@ async function read(path) {
         let length = 0;
         for await (const chunk of file.chunks()) length += chunk.length;
         return length;
+      }
+      if (op === "records" || op === "records-whole") {
+        // Account → Session records for the DM's account: `records` streamed one archived session
+        // at a time (follow-up (c)); `records-whole` every session hydrated at once, as before it.
+        const db = globalThis.__env__.DB;
+        const user = `measure-user-${i}`;
+        const { readStoredRoom } = await import("../cloudflare/room-storage.mjs");
+        const { room } = await readStoredRoom(db, seats[0].code);
+        const seat = room.seats.find((s) => s.role === "dm");
+        await db.prepare(`INSERT OR IGNORE INTO "user"(id,name,email,emailVerified,image,createdAt,updatedAt) VALUES(?, 'M', ?, 1, null, 0, 0)`).bind(user, `${user}@example.com`).run();
+        await db.prepare("DELETE FROM library_members WHERE code=?").bind(seats[0].code).run();
+        await db.prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)").bind(user, seats[0].code, seat.id, seat.token, "Measured").run();
+        if (op === "records") {
+          const { campaignRecordsStream } = await import("../cloudflare/campaign-records.mjs");
+          let length = 0;
+          for await (const chunk of (await campaignRecordsStream(db, user)).chunks()) length += chunk.length;
+          return length;
+        }
+        const { hydrateRoomImages } = await import("../cloudflare/room-images.mjs");
+        const { readArchivedSnapshot } = await import("../src/lib/quire/journal.ts");
+        const whole = await hydrateRoomImages(db, room.code, room);
+        const reports = whole.table.journal.reports.map((r) => ({ id: r.id, snapshot: projectRecord(readArchivedSnapshot(r.snapshot), seat) }));
+        return JSON.stringify({ reports }).length;
       }
       if (op === "restore") {
         // Restore of a deletion recovery copy (setup `--backup 1`), as Account → Restore runs it.
