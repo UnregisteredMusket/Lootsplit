@@ -143,6 +143,8 @@ try {
   await owner.page.getByRole("tab", { name: "Campaigns", exact: true }).click();
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).waitFor();
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();
+  // The download-first question (2026-10-28): continue without downloading.
+  await answerThemedDialog(owner.page, { accept: false });
   await answerThemedDialog(owner.page, { value: code });
   await owner.page
     .getByText("Shared campaign deleted. Its saved state is in Cloud backups.", { exact: true })

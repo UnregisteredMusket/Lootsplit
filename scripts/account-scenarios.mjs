@@ -15,6 +15,7 @@ export const accountScenarios = [
   "resume-queue",
   "dm-resume",
   "shared-recovery",
+  "backup-limit",
 ];
 
 export function selectAccountScenario(args, ci = process.env.CI) {

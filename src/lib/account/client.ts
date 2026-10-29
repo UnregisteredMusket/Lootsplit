@@ -127,7 +127,16 @@ export type AccountLibrary = {
     updated_at: number;
     has_recovery?: number;
   }[];
-  backups: { id: string; name: string; created_at: number; shared_recovery?: number }[];
+  backups: {
+    id: string;
+    name: string;
+    created_at: number;
+    shared_recovery?: number;
+    /** The backup's campaign ("room:CODE" / "device:id"); null for older backups. Absent on older servers. */
+    campaign_key?: string | null;
+  }[];
+  /** Online backups kept per campaign (server-enforced); absent on older servers. */
+  backupLimits?: { perCampaign: number };
   characters: CharacterProfile[];
   hasRecoveryKey: boolean;
   /** Live online campaigns this account hosts against its limit; absent on older servers. */

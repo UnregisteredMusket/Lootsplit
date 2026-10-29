@@ -1,0 +1,12 @@
+{
+  "title": "Online backups: 3 per campaign, and easy downloads",
+  "summary": "Each account now keeps up to 3 online backups per campaign, and Lootsplitter makes it easy to keep a downloaded copy of your campaigns.",
+  "items": [
+    "Online backups are limited to 3 per campaign. When a campaign already has 3, My account → Backups tells you which backup your next save replaces, with Download it first, and asks before replacing it.",
+    "Only the oldest backup of that campaign is replaced, and only after the new one is completely saved. Your other campaigns' backups are never touched.",
+    "Backups you already have are kept: nothing is removed automatically, and each new save replaces at most one older backup.",
+    "Deleting a shared campaign no longer fails just because its recovery copy needs space: it replaces that campaign's oldest online backup in the same way, after offering to download the campaign first.",
+    "Download a copy is now a main button in Backups, every online backup has a labelled Download button, and each shared campaign you run has Download a copy in Campaigns. Settings → Device backups → Import reads these files.",
+    "Backups shows when this device last downloaded the open campaign, as a gentle reminder to keep a fresh local copy."
+  ]
+}

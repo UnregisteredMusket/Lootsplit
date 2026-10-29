@@ -1550,6 +1550,14 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   });
   await page.setViewportSize({ width: 390, height: 900 });
   await page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();
+  // Deleting first offers a downloaded copy of the campaign (owner decision 2026-10-28), in the
+  // device backup format Import reads.
+  const campaignDownload = page.waitForEvent("download");
+  const offered = await answerThemedDialog(page);
+  assert.match(offered, /safest long-term copy/);
+  const campaignFile = JSON.parse(await readFile(await (await campaignDownload).path(), "utf8"));
+  assert.equal(campaignFile.kind, "quire");
+  assert.equal(campaignFile.campaignRecovery, undefined);
   await answerThemedDialog(page, { value: member.code });
   await expect(
     page.getByRole("status").filter({ hasText: "Shared campaign deleted" }),
@@ -1600,4 +1608,63 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
     fullPage: true,
   });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+});
+
+// Online backups per campaign (owner decision 2026-10-28): the Backups section states the limit
+// and offers Download a copy; once the open campaign has 3 online backups it names the one the
+// next save replaces, with Download it first, and Save asks before replacing it.
+test("backup-limit", async ({ devices, baseURL: origin }, testInfo) => {
+  const { page } = devices;
+  await accountPost(devices.context, origin, "auth/sign-up/email", credentials());
+  await visitPage(page, origin, "/account");
+  await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+  await prepareDmFixture(page, origin, { useAccountLink: true });
+  await navigateAccountScenario(page, origin, "/account");
+  await page.getByRole("tab", { name: "Backups", exact: true }).click();
+  const note = page.getByTestId("backup-limit-note");
+  await expect(note).toContainText("Online backups are limited to 3 per campaign");
+  await expect(note).toContainText("has not downloaded");
+  const restoreButtons = page.getByRole("button", { name: "Restore as new", exact: true });
+  for (let saved = 1; saved <= 3; saved++) {
+    await expect(page.getByTestId("backup-rotation-notice")).toHaveCount(0);
+    await page.getByRole("button", { name: "Save current campaign", exact: true }).click();
+    await expect(restoreButtons).toHaveCount(saved);
+  }
+  const rotation = page.getByTestId("backup-rotation-notice");
+  await expect(rotation).toContainText("This replaces your oldest online backup of");
+  await expect(page.locator(".portal-backup-tag")).toHaveCount(1);
+  for (const [width, name] of [
+    [320, "backup-limit-320.png"],
+    [1280, "backup-limit-desktop.png"],
+  ]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(rotation).toBeVisible();
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `no sideways scroll at ${width}px`);
+    await page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
+  }
+  // Download it first saves the backup that would be replaced, in the format Import reads.
+  const firstDownload = page.waitForEvent("download");
+  await rotation.getByRole("button", { name: "Download it first", exact: true }).click();
+  const oldest = JSON.parse(await readFile(await (await firstDownload).path(), "utf8"));
+  assert.equal(oldest.kind, "quire");
+  // Download a copy saves the open campaign and updates the reminder.
+  const copyDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download a copy", exact: true }).click();
+  const copy = JSON.parse(await readFile(await (await copyDownload).path(), "utf8"));
+  assert.equal(copy.kind, "quire");
+  await expect(note).toContainText("This device last downloaded");
+  // Saving again asks first, then replaces only the oldest: still 3 online backups.
+  await page.getByRole("button", { name: "Save current campaign", exact: true }).click();
+  const asked = await answerThemedDialog(page, { accept: false });
+  assert.match(asked, /This replaces your oldest online backup of/);
+  await expect(restoreButtons).toHaveCount(3);
+  await page.getByRole("button", { name: "Save current campaign", exact: true }).click();
+  await answerThemedDialog(page);
+  await expect(page.getByRole("status").filter({ hasText: "It replaced" })).toBeVisible();
+  await expect(restoreButtons).toHaveCount(3);
+  const library = await (await page.context().request.get(origin + "/api/account/library")).json();
+  assert.equal(library.backups.length, 3);
+  assert.equal(new Set(library.backups.map((b) => b.campaign_key)).size, 1, "one campaign");
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.screenshot({ path: testInfo.outputPath("backup-limit-after-320.png"), fullPage: true });
 });
