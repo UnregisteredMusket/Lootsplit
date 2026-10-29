@@ -1,3 +1,4 @@
+import { readBackupPayload } from "./backup-parts.mjs";
 import { restoredCampaignName } from "./library-member-room.mjs";
 import { readCloudTableForImport } from "../src/lib/quire/cloud.ts";
 import { encounterSchema } from "../src/lib/encounters/model.mjs";
@@ -247,7 +248,8 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
     .bind(body.id, userId)
     .first();
   if (!row) fail("Shared recovery backup not found.", 404);
-  const payload = JSON.parse(row.body),
+  // A large campaign's backup is stored in parts (backup-parts.mjs), read back verified.
+  const payload = await readBackupPayload(db, body.id, row.body),
     recovery = payload.campaignRecovery;
   const table = readCloudTableForImport(payload);
   if (!table)

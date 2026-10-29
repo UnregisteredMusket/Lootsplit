@@ -1,3 +1,4 @@
+import { ACCOUNT_BACKUP_BYTES, accountBackupBytesSql, readBackupPayload } from "./backup-parts.mjs";
 import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
@@ -83,7 +84,7 @@ const nativeOrigins = ["https://localhost", "http://localhost", "capacitor://loc
 // (largest account: 2 backups, 5.4 MB). Device backups remain unlimited.
 export const LIBRARY_LIMITS = Object.freeze({
   backups: 20,
-  backupBytes: 60_000_000,
+  backupBytes: ACCOUNT_BACKUP_BYTES,
   characters: 100,
   characterBytes: 30_000_000,
 });
@@ -660,7 +661,7 @@ export async function handleAccounts(request, env, context = null) {
       // the INSERT, so concurrent uploads cannot each pass a separate pre-check.
       const saved = await db
         .prepare(
-          "INSERT INTO library_backups (id,user_id,name,body,created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM library_backups WHERE user_id=?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_backups WHERE user_id=?)+?<=?",
+          `INSERT INTO library_backups (id,user_id,name,body,created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM library_backups WHERE user_id=?)<? AND ${accountBackupBytesSql}+?<=?`,
         )
         .bind(
           id,
@@ -670,6 +671,7 @@ export async function handleAccounts(request, env, context = null) {
           Date.now(),
           userId,
           LIBRARY_LIMITS.backups,
+          userId,
           userId,
           serialized.length,
           LIBRARY_LIMITS.backupBytes,
@@ -688,7 +690,8 @@ export async function handleAccounts(request, env, context = null) {
         .bind(text(body.id), userId)
         .first();
       if (!row) fail("Backup not found.", 404);
-      const stored = JSON.parse(row.body);
+      // A large deletion backup is stored in parts (backup-parts.mjs), read back verified.
+      const stored = await readBackupPayload(db, text(body.id), row.body);
       const protocol = tabletopHeader(request);
       // Protocol 2 differs only by compact fog history, which expands losslessly.
       const payload = protocol === 2 ? tableForProtocol(stored, 2) : stored;

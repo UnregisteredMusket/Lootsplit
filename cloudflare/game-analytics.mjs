@@ -8,7 +8,7 @@ import {
 } from "../src/lib/quire/analytics.ts";
 import { roleOf } from "./members.mjs";
 import { hydrateRoomReports } from "./room-reports.mjs";
-import { readRoomTablePage } from "./room-storage.mjs";
+import { readRoomTables } from "./room-storage.mjs";
 
 // Bound repeated homepage reads per database/isolate; failures are never cached as zero.
 const snapshots = new WeakMap();
@@ -27,31 +27,24 @@ export async function siteGameAnalytics(db) {
 
 async function collect(db) {
   const metrics = emptyMetrics();
-  let after = "",
-    sharedCampaigns = 0;
-  // Keyset pagination, projecting table data only; never deserialize room tokens or chats.
-  for (;;) {
-    const results = await readRoomTablePage(db, ["ledger", "purses", "holdings", "journal"], {
-      after,
-      limit: 100,
-      where: `COALESCE(json_extract(body, '$.testMode'), 0) = 0 AND ${notProbeRoom()}`,
-    });
-    for (const { code, fields: row } of results) {
-      addMetrics(
-        metrics,
-        campaignAnalytics({
-          ledger: JSON.parse(row.ledger || "[]"),
-          purses: JSON.parse(row.purses || "[]"),
-          holdings: JSON.parse(row.holdings || "[]"),
-          // Archived session snapshots are stored beside the room row (room-reports.mjs).
-          journal: (await hydrateRoomReports(db, code, { journal: JSON.parse(row.journal || "null") }))
-            .journal,
-        }),
-      );
-      sharedCampaigns++;
-      after = code;
-    }
-    if (results.length < 100) break;
+  let sharedCampaigns = 0;
+  // One room at a time, projecting table data only; never deserialize room tokens or chats. A
+  // sectioned room reads only the sections holding these fields (room-storage.mjs).
+  for await (const { code, fields: row } of readRoomTables(db, ["ledger", "purses", "holdings", "journal"], {
+    where: `COALESCE(json_extract(body, '$.testMode'), 0) = 0 AND ${notProbeRoom()}`,
+  })) {
+    addMetrics(
+      metrics,
+      campaignAnalytics({
+        ledger: JSON.parse(row.ledger || "[]"),
+        purses: JSON.parse(row.purses || "[]"),
+        holdings: JSON.parse(row.holdings || "[]"),
+        // Archived session snapshots are stored beside the room row (room-reports.mjs).
+        journal: (await hydrateRoomReports(db, code, { journal: JSON.parse(row.journal || "null") }))
+          .journal,
+      }),
+    );
+    sharedCampaigns++;
   }
   return {
     version: ANALYTICS_VERSION,

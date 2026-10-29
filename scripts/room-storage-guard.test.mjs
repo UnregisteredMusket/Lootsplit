@@ -132,7 +132,7 @@ test("only the room storage API writes campaign_rooms or reads room bodies", () 
   assert.deepEqual(
     found,
     [],
-    "Use cloudflare/room-storage.mjs (readStoredRoom, readRoomCore, readRoomTablePage, roomWriteStatements, roomVersionSql, roomSectionsDeletedStatement) instead of campaign_rooms or campaign_room_sections SQL.",
+    "Use cloudflare/room-storage.mjs (readStoredRoom, readRoomCore, readRoomTables, readRoomPaths, roomWriteStatements, roomVersionSql, roomSectionsDeletedStatement) instead of campaign_rooms or campaign_room_sections SQL.",
   );
 });
 
