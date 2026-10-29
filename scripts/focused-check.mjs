@@ -41,6 +41,7 @@ const featureAudits = {
   "player-onboarding": "scripts/player-onboarding-browser-audit.mjs",
   "session-chip": "scripts/session-chip-browser-audit.mjs",
   "campaign-loading": "scripts/campaign-loading-browser-audit.mjs",
+  "history-on-demand": "scripts/history-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))

@@ -1,3 +1,4 @@
+import { historyWindow } from "./history-window.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { characterPermissionsSchema } from "../characters/permissions.mjs";
 import { z } from "zod";
@@ -116,7 +117,13 @@ export function validateEconomyRows(value: {
 }): void {
   const schemas = { purses: purse, holdings: holdingSchema, shops: shop, stock, ledger };
   for (const key of Object.keys(schemas) as (keyof typeof schemas)[]) {
-    const rows = value[key];
+    // History on demand (Worker command batches only, history-window.ts): the older lines of a
+    // windowed ledger are stored, immutable pages that were validated when they were added, so
+    // the loaded lines are validated here, and IDs added since are recorded for the Worker to check
+    // against the stored pages before it writes (a duplicate there reruns the batch on the whole
+    // ledger, where this check refuses it exactly as before).
+    const window = historyWindow(value[key]);
+    const rows = window ? window.tail : value[key];
     if (!z.array(schemas[key]).safeParse(rows).success)
       throw new Error(
         `The ${key} contain invalid or missing data. The current campaign was not changed.`,
@@ -124,6 +131,7 @@ export function validateEconomyRows(value: {
     const ids = (rows as { id: string }[]).map((row) => row.id);
     if (new Set(ids).size !== ids.length)
       throw new Error(`The ${key} contain duplicate IDs. The current campaign was not changed.`);
+    if (window) for (const id of ids) if (!window.initialIds.has(id)) window.pendingIds.add(id);
     if (key === "holdings" && (rows as import("./types.ts").Holding[]).some(holding => holding.deed && (holding.kind !== "property" || holding.deed.ownerId !== holding.purseId)))
       throw Error("A deed must belong to its property owner. The current campaign was not changed.");
   }

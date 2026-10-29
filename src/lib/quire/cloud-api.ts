@@ -9,7 +9,7 @@ import type { ViewSectionsResult } from "./view-sections.server.ts";
  */
 async function roomResponse<T extends import("./cloud.server.ts").RoomView>(
   view: T,
-  data: { tabletopProtocol?: number; viewSections?: string[] },
+  data: { tabletopProtocol?: number; viewSections?: string[]; unsectioned?: boolean },
 ) {
   const { roomViewResponse } = await import("./view-sections.server.ts");
   return roomViewResponse(view, data);
@@ -83,7 +83,9 @@ export const joinCloudTable = createServerFn({ method: "POST" })
   });
 
 export const pullCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { tabletopProtocol?: number; viewSections?: string[]; code: string; token: string }) => input)
+  .validator(
+    (input: { tabletopProtocol?: number; viewSections?: string[]; unsectioned?: boolean; code: string; token: string }) => input,
+  )
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
@@ -120,6 +122,34 @@ export const readCloudSections = createServerFn({ method: "POST" })
     await guardMemberSeat(data);
     const { readViewSections } = await import("./view-sections.server.ts");
     return readViewSections(data);
+  });
+
+/**
+ * History on demand (tabletop protocol 12): older ledger or chat pages from a cursor, or one
+ * archived session, projected for the requesting seat by the room view's own rules. Authorized
+ * like a room read (cloud.server.ts `readRoomHistory`); pages and sessions the client already
+ * holds (`held`, seat-salted hashes) are not sent again.
+ */
+export const readCloudHistory = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      tabletopProtocol?: number;
+      code: string;
+      token: string;
+      list?: "ledger" | "notes";
+      before?: string;
+      report?: string;
+      held?: string[];
+      bulk?: boolean;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { readRoomHistory } = await import("./cloud.server.ts");
+    return readRoomHistory(data);
   });
 
 export const finishCloudTurn = createServerFn({ method: "POST" })

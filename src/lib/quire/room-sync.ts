@@ -30,7 +30,7 @@ type SectionServer = Fn<
   { tabletopProtocol: number; code: string; token: string; hashes: string[] },
   ViewSectionsResult
 >;
-type FullRead = Fn<{ tabletopProtocol: number; code: string; token: string }, unknown>;
+type FullRead = Fn<{ tabletopProtocol: number; code: string; token: string; unsectioned?: boolean }, unknown>;
 
 /**
  * A write the room committed whose updated campaign this device could not load yet. The change is
@@ -42,6 +42,17 @@ export class RoomWriteSaved extends Error {
       "Your change was saved, but this device could not load the updated campaign yet. It will appear after the next refresh; do not send it again.",
     );
   }
+}
+
+/**
+ * The fallback read that needs no sections. A protocol 12 client (history on demand) asks for its
+ * own protocol's view unsectioned (the working set, light); an older caller reads as protocol 10,
+ * which receives the whole view.
+ */
+function fullReadData(data: Seat) {
+  return (data.tabletopProtocol ?? 0) >= 12
+    ? { code: data.code, token: data.token, tabletopProtocol: data.tabletopProtocol!, unsectioned: true }
+    : { code: data.code, token: data.token, tabletopProtocol: 10 };
 }
 
 export function createRoomSync(servers: { readSections: SectionServer; fullRead: FullRead }) {
@@ -103,7 +114,9 @@ export function createRoomSync(servers: { readSections: SectionServer; fullRead:
           throwIfRoomLoadingPaused(code);
           const batch = await servers.readSections({
             data: {
-              tabletopProtocol: SECTIONS_PROTOCOL,
+              // The caller's own protocol: sections are salted with it, and since protocol 12
+              // the view is the working set (history on demand).
+              tabletopProtocol: Math.max(SECTIONS_PROTOCOL, seat.tabletopProtocol ?? 0),
               code: seat.code,
               token: seat.token,
               hashes: remaining.slice(0, VIEW_MAX_HASHES),
@@ -147,7 +160,7 @@ export function createRoomSync(servers: { readSections: SectionServer; fullRead:
         }
       }
       return servers.fullRead({
-        data: { code: data.code, token: data.token, tabletopProtocol: 10 },
+        data: fullReadData(data),
       }) as Promise<O>;
     };
   }
@@ -168,7 +181,7 @@ export function createRoomSync(servers: { readSections: SectionServer; fullRead:
       } catch {
         try {
           return (await servers.fullRead({
-            data: { code: data.code, token: data.token, tabletopProtocol: 10 },
+            data: fullReadData(data),
           })) as O;
         } catch {
           throw new RoomWriteSaved();
