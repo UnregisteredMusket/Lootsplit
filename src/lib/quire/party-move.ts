@@ -2,8 +2,7 @@ import { canonicalJson } from "./canonical-json.ts";
 import type { CloudTable } from "./cloud.ts";
 import type { CommandRequest } from "./commands.ts";
 import { DEFAULT_FORMATION, planFormation } from "./formation.ts";
-import { groupMembers, MAIN_GROUP } from "./party-groups.ts";
-import { readMarketLocations } from "./shop-locations.ts";
+import { groupInfo, groupMembers, groupPlace, MAIN_GROUP } from "./party-groups.ts";
 import { snapTokenPosition } from "./tabletop-geometry.ts";
 import { readMapTabletop, readTabletopSession } from "./tabletop.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
@@ -51,7 +50,12 @@ export function partyEntry(from: CampaignMap, to: CampaignMap) {
   return readMapTabletop(to).initialView ?? { x: 0.5, y: 0.5, zoom: 1 };
 }
 
-export type PartyMoveOptions = { follow: boolean; placeTokens: boolean };
+export type PartyMoveOptions = {
+  follow: boolean;
+  placeTokens: boolean;
+  /** A split party: the group that moves (absent = the main group, as before). */
+  groupId?: string;
+};
 
 /**
  * The one batch for "Move party to ▸ <map>" (plan section 3.1), all or nothing, in this order:
@@ -70,14 +74,15 @@ export function partyMoveCommands(
   newId: () => string = () => crypto.randomUUID(),
 ): CommandRequest[] {
   const steps: CommandRequest[] = [];
-  const market = readMarketLocations(table.journal?.market);
-  if (to.locationId && to.locationId !== market.currentLocationId) {
-    const position = table.journal?.world?.partyPosition;
+  const group = options.groupId ?? MAIN_GROUP,
+    place = groupPlace(table, group);
+  if (to.locationId && to.locationId !== place.locationId) {
     steps.push({
       kind: "party-location",
-      before: market.currentLocationId,
+      before: place.locationId,
       locationId: to.locationId,
-      ...(position ? { beforePosition: canonicalJson(position) } : {}),
+      ...(place.position ? { beforePosition: canonicalJson(place.position) } : {}),
+      ...(group !== MAIN_GROUP ? { groupId: group } : {}),
     });
   }
   const entry = partyEntry(from, to);
@@ -95,7 +100,7 @@ export function partyMoveCommands(
     });
   }
   if (options.placeTokens && to.grid) {
-    const members = groupMembers(table, MAIN_GROUP);
+    const members = groupMembers(table, group);
     const moving = members.map((person) => {
       const there = to.tokens?.find((t) => t.kind === "character" && t.entityId === person.id);
       const here = from.tokens?.find((t) => t.kind === "character" && t.entityId === person.id);
@@ -128,4 +133,28 @@ export function partyMoveCommands(
       steps.push({ kind: "map-tokens-place", mapId: to.id, grid: to.grid, place, ...(remove.length ? { remove } : {}) });
   }
   return steps;
+}
+
+/**
+ * The summary shown before the batch is sent: "The party moves to The Cellar · players' scene
+ * switches · 4 tokens placed at the trapdoor".
+ */
+export function partyMoveSummary(
+  table: Pick<CloudTable, "journal" | "purses">,
+  from: CampaignMap,
+  to: CampaignMap,
+  steps: readonly CommandRequest[],
+  groupId?: string,
+) {
+  const who = groupInfo(table, groupId ?? MAIN_GROUP).name;
+  const parts = [`${who} moves to ${to.name}`];
+  if (steps.some((s) => s.kind === "tabletop-session")) parts.push("players' scene switches");
+  const placed = steps.find((s) => s.kind === "map-tokens-place");
+  if (placed && placed.kind === "map-tokens-place") {
+    const back = to.connected?.links.find((l) => l.targetMapId === from.id);
+    const via = from.connected?.links.find((l) => l.targetMapId === to.id);
+    const n = placed.place.length;
+    parts.push(`${n} ${n === 1 ? "token" : "tokens"} placed at the ${via?.label ?? back?.label ?? "entry"}`);
+  }
+  return parts.join(" · ");
 }

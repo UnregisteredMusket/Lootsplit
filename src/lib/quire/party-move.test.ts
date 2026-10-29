@@ -117,3 +117,26 @@ test("device and room give the same result (shared engine)", () => {
   const without = (x: CloudTable) => ({ ...x.journal, events: x.journal!.events.map((e) => ({ ...e, at: 0 })) });
   assert.deepEqual(without(server), without(device));
 });
+
+test("summary before sending: who moves, the scene and the tokens at the entrance", async () => {
+  const { partyMoveSummary } = await import("./party-move.ts");
+  const t = fixture();
+  const steps = partyMoveCommands(t, mapOf(t, "keep"), mapOf(t, "cellar"), { follow: true, placeTokens: true }, ids);
+  assert.equal(partyMoveSummary(t, mapOf(t, "keep"), mapOf(t, "cellar"), steps), "The party moves to cellar · players' scene switches · 2 tokens placed at the trapdoor");
+  const quiet = partyMoveCommands(t, mapOf(t, "keep"), mapOf(t, "upper"), { follow: false, placeTokens: false }, ids);
+  assert.equal(partyMoveSummary(t, mapOf(t, "keep"), mapOf(t, "upper"), quiet), "The party moves to upper");
+});
+
+test("a split party: one group moves with its own place, the others stay", async () => {
+  const { partyGroupsFingerprint } = await import("./party-groups.ts");
+  let t = fixture();
+  t = applyCommandBatch(t, dm, [commandSchema.parse({ id: "split", kind: "party-split", before: partyGroupsFingerprint(t), groups: [{ id: "b", name: "Bram's band", colour: "blue", locationId: "town", memberIds: ["bram"] }] })], () => ({ source: "server" }));
+  const steps = partyMoveCommands(t, mapOf(t, "keep"), mapOf(t, "forest-map"), { follow: false, placeTokens: true, groupId: "b" }, ids);
+  assert.deepEqual(steps.map((s) => s.kind), ["party-location", "map-tokens-place"]);
+  assert.equal((steps[0] as { groupId?: string }).groupId, "b");
+  const next = run(t, steps);
+  assert.equal(readMarketLocations(next.journal?.market).currentLocationId, "town", "the main group stays");
+  assert.equal(next.journal!.world!.groups!.find((g) => g.id === "b")!.locationId, "forest");
+  assert.deepEqual(mapOf(next, "forest-map").tokens!.map((x) => x.entityId), ["bram"]);
+  assert.deepEqual(mapOf(next, "keep").tokens!.map((x) => x.entityId), ["mira"]);
+});

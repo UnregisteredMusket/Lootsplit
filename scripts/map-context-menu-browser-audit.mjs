@@ -153,6 +153,8 @@ try {
   await rightClick(4.5, 3.5);
   await menu.getByRole("menuitem", { name: /Move party to/ }).click();
   await submenu.getByRole("menuitem", { name: /The Cellar/ }).click();
+  // The summary (map tokens PR 6) comes first.
+  await page.getByRole("alertdialog", { name: /Move the party to The Cellar/ }).getByRole("button", { name: "Move party" }).click();
   await expect.poll(async () => (await journalOf(page)).world.maps.find((m) => m.id === "cellar").tokens.length).toBe(4);
   assert.equal((await keepMap(page)).tokens.length, 0);
   assert.equal((await journalOf(page)).world.tabletop.activeMapId, "cellar");

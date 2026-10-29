@@ -11,7 +11,12 @@ import { mapGroupPins, type GroupPin } from "@/lib/quire/party-groups-map";
 import { HereGroupSwitch } from "./party-groups-map";
 import { useMapSketches } from "./map-sketch-tools";
 import { MapWorkspaceChrome, MapEmptyWorkspace } from "./map-workspace-chrome";
-import { captureMutationScope } from "@/lib/quire/cloud-client";
+import {
+  captureMutationScope,
+  getCloudTable,
+  getServerCloudTable,
+  subscribeCloudTable,
+} from "@/lib/quire/cloud-client";
 import {
   mapViewKey,
   readMapView,
@@ -51,6 +56,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -139,7 +145,15 @@ import { toast } from "sonner";
 import { MapContextMenu } from "./map-context-menu";
 import { MAP_ACTION_ICONS, menuFromActions } from "./map-action-items";
 import { mapActions, radialSlices, shortMapName } from "@/lib/quire/map-actions";
-import { partyDestinations, partyEntry, partyMoveCommands, type PartyDestination } from "@/lib/quire/party-move";
+import {
+  partyDestinations,
+  partyEntry,
+  partyMoveCommands,
+  partyMoveSummary,
+  type PartyDestination,
+  type PartyMoveOptions,
+} from "@/lib/quire/party-move";
+import { AddCharactersPanel, AddCreaturesPanel } from "./map-quick-flows";
 import { mapEncounterId, removeFromInitiative } from "@/lib/quire/map-initiative-link";
 import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
 import { requestConfirm } from "@/lib/quire/confirm-store";
@@ -2070,8 +2084,10 @@ function MapViewport({
         .sort((a, b) => a.order - b.order)
     : [];
   const partyMembers = (): { token: MapToken; before: MapToken | null }[] =>
-    partyRows
-      .filter((row) => row.checked)
+    membersFor(partyRows.filter((row) => row.checked));
+  /** Each character's token on this map (it moves), or a new one (it is placed). */
+  const membersFor = (rows: { purseId: string; name: string }[]): { token: MapToken; before: MapToken | null }[] =>
+    rows
       .flatMap((row): { token: MapToken; before: MapToken | null }[] => {
         const token = map.tokens?.find((t) => t.kind === "character" && t.entityId === row.purseId);
         if (token) return [{ token, before: token }];
@@ -3223,10 +3239,29 @@ function MapViewport({
       tapsFrom?: number;
     }>(),
     [holding, setHolding] = useState<{ x: number; y: number }>(),
-    [partyMoveOptions, setPartyMoveOptions] = useState({ follow: true, placeTokens: true }),
+    // Map menu quick flows (map tokens PR 6): Add creatures / Add characters at a point, and
+    // Start encounter here (this map as the encounter map, the point as the return camera).
+    [quickPanel, setQuickPanel] = useState<{ kind: "creatures" | "characters"; point: { x: number; y: number } }>(),
+    [encounterHere, setEncounterHere] = useState<{ nonce: string; camera: { x: number; y: number; zoom: number } }>(),
+    cloudNow = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable),
+    cloudCode = cloudNow.joined ? cloudNow.code : "device",
+    [partyMoveOptions, setPartyMoveOptions] = useState<PartyMoveOptions>({ follow: true, placeTokens: true }),
     encounterId = useDm ? mapEncounterId(recordTable, map) : undefined,
     [combatantIds, setCombatantIds] = useState<{ id: string; ids: Set<string> }>();
   const menuTokenCount = (mapMenu ?? radial)?.tokenIds.length ?? 0;
+  // "Start encounter here" applies to the panel it opened; the next opening starts plain.
+  useEffect(() => {
+    if (!combatOpen) setEncounterHere(undefined);
+  }, [combatOpen]);
+  const closeSidePanels = () => {
+    setPartyPanel(false);
+    if (tools.group.placing) tools.group.setPlacing(null);
+    setCombatOpen(false);
+    setDrawerOpen(false);
+    setLayersOpen(false);
+    setHereOpen(false);
+    tools.hideInspector();
+  };
   useEffect(() => {
     // While a token menu is open, the tracker says who is already in combat.
     if (!menuTokenCount || !encounterId) return;
@@ -3287,6 +3322,13 @@ function MapViewport({
       selectMap(to.id, partyEntry(map, to));
       return;
     }
+    // What will happen, before anything is sent (plan section 3.1).
+    const ok = await requestConfirm({
+      title: `Move ${groupInfo(recordTable, partyMoveOptions.groupId ?? MAIN_GROUP).name.replace(/^The /, "the ")} to ${to.name}?`,
+      body: partyMoveSummary(recordTable, map, to, steps, partyMoveOptions.groupId),
+      confirmLabel: "Move party",
+    });
+    if (!ok) return;
     try {
       const outcome = await commandBatch(crypto.randomUUID(), steps);
       resultToast(mutationNotice(outcome, `The party moved to ${to.name}`));
@@ -3333,10 +3375,13 @@ function MapViewport({
     const menu = menuFromActions(
       actionList,
       {
-        "start-encounter": () => (centreOn(at), openCombat()),
-        // Until the SRD quick picker (PR 6): Combat token with the point chosen.
-        "add-creatures": setup ? () => armSetup("token", at) : undefined,
-        "add-characters": map.grid ? () => (openPlaceParty(), requestAnimationFrame(() => tools.group.hover(at))) : undefined,
+        "start-encounter": () => {
+          setEncounterHere({ nonce: crypto.randomUUID(), camera: { x: at.x, y: at.y, zoom: view.scale } });
+          centreOn(at);
+          openCombat();
+        },
+        "add-creatures": map.grid ? () => (closeSidePanels(), setQuickPanel({ kind: "creatures", point: at })) : undefined,
+        "add-characters": map.grid ? () => (closeSidePanels(), setQuickPanel({ kind: "characters", point: at })) : undefined,
         "place-party": map.grid
           ? () => tools.menu.placeAt({ members: partyMembers(), mode: "formation", label: "party" }, at)
           : undefined,
@@ -3380,6 +3425,21 @@ function MapViewport({
           groups: [
             ...(destinations.submaps.length ? [{ label: `Submaps of ${map.name}`, items: destinationItems(destinations.submaps, true) }] : []),
             ...(destinations.connected.length ? [{ label: "Connected", items: destinationItems(destinations.connected, false) }] : []),
+            // A split party: choose which group moves (plan: "Move Group B to…").
+            ...(partySplit(recordTable)
+              ? [
+                  {
+                    label: "Who moves",
+                    items: groupRefs(recordTable).map((ref) => ({
+                      id: `group:${ref}`,
+                      label: groupInfo(recordTable, ref).name,
+                      checked: (partyMoveOptions.groupId ?? MAIN_GROUP) === ref,
+                      run: () => setPartyMoveOptions((o) => ({ ...o, groupId: ref === MAIN_GROUP ? undefined : ref })),
+                      keepOpen: true,
+                    })),
+                  },
+                ]
+              : []),
             {
               items: [
                 {
@@ -4317,6 +4377,47 @@ function MapViewport({
             </aside>
           )}
           {tools.gridMode.dialog}
+          {quickPanel?.kind === "creatures" && useDm && (
+            <AddCreaturesPanel
+              map={map}
+              table={recordTable}
+              code={cloudCode}
+              point={quickPanel.point}
+              act={tools.group.act}
+              close={() => (setQuickPanel(undefined), root.current?.focus({ preventScroll: true }))}
+            />
+          )}
+          {quickPanel?.kind === "characters" && useDm && (
+            <AddCharactersPanel
+              rows={recordTable.purses
+                .filter((p) => p.kind === "character")
+                .map((p) => {
+                  const ref = groupRefs(recordTable).find((g) => groupMembers(recordTable, g).some((m) => m.id === p.id));
+                  return {
+                    purseId: p.id,
+                    name: p.name,
+                    status: map.tokens?.some((t) => t.kind === "character" && t.entityId === p.id)
+                      ? "on map · will move"
+                      : ref
+                        ? groupInfo(recordTable, ref).name
+                        : "not in the party",
+                  };
+                })}
+              place={(ids) => {
+                const point = quickPanel.point;
+                setQuickPanel(undefined);
+                tools.menu.placeAt(
+                  {
+                    members: membersFor(ids.map((id) => ({ purseId: id, name: recordTable.purses.find((p) => p.id === id)?.name ?? id }))),
+                    mode: "formation",
+                    label: "characters",
+                  },
+                  point,
+                );
+              }}
+              close={() => (setQuickPanel(undefined), root.current?.focus({ preventScroll: true }))}
+            />
+          )}
           {partyPanel && tools.group.placing && (
             <PlacePartyPanel
               rows={partyRows}
@@ -5203,7 +5304,13 @@ function MapViewport({
                 </Button>
               </div>
               <Suspense fallback={<p>Opening encounter controls…</p>}>
-                <MapCombatWorkspace map={map} camera={currentCamera} openMap={selectMap} />
+                <MapCombatWorkspace
+                  key={encounterHere?.nonce ?? "map"}
+                  map={map}
+                  camera={currentCamera}
+                  openMap={selectMap}
+                  here={encounterHere}
+                />
               </Suspense>
             </section>
           )}
