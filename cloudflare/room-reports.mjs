@@ -1,5 +1,6 @@
 import { roomCommittedSql } from "./room-storage.mjs";
 import { DEFERRED_REPORT_PREFIX } from "../src/lib/quire/history-pages.ts";
+import { decodeReportDelta, encodeReportDelta, reportDeltaMarker, REPORT_DELTA_KEY } from "./report-delta.mjs";
 /**
  * Archived session snapshots (`table.journal.reports[].snapshot`) live in campaign_room_reports,
  * not in the room row. The stored room keeps each report's id, name, time and seat list plus a
@@ -156,7 +157,50 @@ export async function readRoomReportSnapshots(db, code, references) {
       .all();
     for (const row of rows.results) bodies.set(row.reference, row.body);
   }
-  return joinReportParts(db, code, bodies);
+  return joinReportDeltas(db, code, await joinReportParts(db, code, bodies));
+}
+
+/**
+ * Delta-stored snapshots (report-delta.mjs): each is decoded from its base, a full snapshot of the
+ * same room, and verified against its own reference. Bases are never deltas themselves.
+ * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
+ * @param {string} code @param {Map<string, string>} texts @returns {Promise<Map<string, string>>}
+ */
+async function joinReportDeltas(db, code, texts) {
+  /** @type {Map<string, NonNullable<ReturnType<typeof reportDeltaMarker>>>} */
+  const deltas = new Map();
+  for (const [reference, text] of texts) {
+    const marker = reportDeltaMarker(text);
+    if (marker) deltas.set(reference, marker);
+  }
+  if (!deltas.size) return texts;
+  const result = new Map(texts);
+  const needed = [...new Set([...deltas.values()].map((m) => m.base))].filter((base) => !texts.has(base) || deltas.has(base));
+  /** @type {Map<string, string>} */
+  const bases = new Map([...texts].filter(([reference]) => !deltas.has(reference)));
+  if (needed.length) {
+    /** @type {Map<string, string>} */
+    const rows = new Map();
+    for (let offset = 0; offset < needed.length; offset += 80) {
+      const page = needed.slice(offset, offset + 80);
+      const found = await db
+        .prepare(`SELECT reference,body FROM campaign_room_reports WHERE code=? AND reference IN (${page.map(() => "?").join(",")})`)
+        .bind(code, ...page)
+        .all();
+      for (const row of found.results) rows.set(row.reference, row.body);
+    }
+    for (const [reference, text] of await joinReportParts(db, code, rows)) bases.set(reference, text);
+  }
+  for (const [reference, marker] of deltas) {
+    const base = bases.get(marker.base);
+    if (base === undefined || reportDeltaMarker(base))
+      throw Error("An archived session report is incomplete. Keep the original recovery export; the campaign was not changed.");
+    const text = decodeReportDelta(marker, base);
+    if ("session-report:" + (await sha256(text)) !== marker.reference)
+      throw Error("An archived session report is damaged. Keep the original recovery export; the campaign was not changed.");
+    result.set(reference, text);
+  }
+  return result;
 }
 
 /** A deferred report's stored reference (history-pages.ts `DEFERRED_REPORT_PREFIX`), else null. @param {unknown} snapshot */
@@ -219,10 +263,25 @@ export async function roomReportStatements(db, room, encoded, writeId) {
     .bind(room.code)
     .all();
   const existing = new Set(present.results.map((row) => row.reference));
-  return encoded.reports
-    .filter((doc) => !existing.has(doc.reference))
+  const fresh = encoded.reports.filter((doc) => !existing.has(doc.reference));
+  if (!fresh.length) return [];
+  // Delta storage (report-delta.mjs): each new snapshot against the latest full snapshot of the
+  // room (stored before, or earlier in this same write).
+  /** @type {{ reference: string; text: string } | null} */
+  let base = reportDeltas ? await latestFullReport(db, room.code) : null;
+  /** @type {{ reference: string; body: string }[]} */
+  const docs = [];
+  for (const doc of fresh) {
+    const delta = base && base.reference !== doc.reference ? encodeReportDelta(doc.body, doc.reference, base.text, base.reference) : null;
+    if (delta && delta.length <= REPORT_INLINE_BYTES) docs.push({ reference: doc.reference, body: delta });
+    else {
+      docs.push(doc);
+      base = { reference: doc.reference, text: doc.body };
+    }
+  }
+  return docs
     .flatMap((doc) => {
-      const parts = reportParts(doc.body);
+      const parts = reportDeltaMarker(doc.body) ? null : reportParts(doc.body);
       const body = parts
         ? JSON.stringify({ [REPORT_PARTS_KEY]: { parts: parts.length, bytes: encoder.encode(doc.body).length, reference: doc.reference } })
         : doc.body;
@@ -242,4 +301,31 @@ export async function roomReportStatements(db, room, encoded, writeId) {
         ),
       ];
     });
+}
+
+/**
+ * The room's most recently stored full snapshot (not a delta), joined from its parts, or null.
+ * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
+ * @param {string} code @returns {Promise<{ reference: string; text: string } | null>}
+ */
+async function latestFullReport(db, code) {
+  const row = await db
+    .prepare(`SELECT reference,body FROM campaign_room_reports WHERE code=? AND substr(body,1,${REPORT_DELTA_KEY.length + 4}) <> '{"${REPORT_DELTA_KEY}":' ORDER BY rowid DESC LIMIT 1`)
+    .bind(code)
+    .first();
+  if (!row) return null;
+  const text = (await joinReportParts(db, code, new Map([[row.reference, row.body]]))).get(row.reference);
+  // A row an older Worker stored under another reference is verified like any part marker.
+  return typeof text === "string" && !reportDeltaMarker(text) ? { reference: row.reference, text } : null;
+}
+/**
+ * SQL for the stored logical size of a room's archived sessions (bytes of the snapshots they stand
+ * for: a delta counts its whole snapshot), for the total-size warning (room-store.server.ts).
+ */
+export const ARCHIVED_BYTES_SQL = `SELECT COALESCE(SUM(CASE WHEN substr(body,1,${REPORT_DELTA_KEY.length + 4})='{"${REPORT_DELTA_KEY}":' THEN json_extract(body,'$."${REPORT_DELTA_KEY}".bytes') ELSE length(body) END),0)+(SELECT COALESCE(SUM(length(body)),0) FROM campaign_room_report_parts WHERE code=?1) AS n FROM campaign_room_reports WHERE code=?1`;
+
+let reportDeltas = true;
+/** Test-only: store new snapshots in full (as before delta storage) while false. */
+export function setReportDeltasForTests(/** @type {boolean} */ on) {
+  reportDeltas = on;
 }
