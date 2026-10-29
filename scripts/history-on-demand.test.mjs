@@ -558,36 +558,37 @@ test("exports and deletion copies hold the complete history, byte for byte as wi
   assert.ok(JSON.parse(payloads[0].exported.journal.reports[0].snapshot).ledger.length >= 200, "the archived session is complete");
 });
 
-test("ending a session past the total cap is refused with Download a copy, logged, and changes nothing", async () => {
-  const { ROOM_TOTAL_LIMIT, ROOM_TOTAL_REFUSAL } = await import("../src/lib/quire/room-size.ts");
-  const seats = await liveRoom("Total cap DM");
+test("past the total-size warning threshold a session still ends; the owner is warned and the DM gets a notice", async () => {
+  const { ROOM_TOTAL_LIMIT } = await import("../src/lib/quire/room-size.ts");
+  const seats = await liveRoom("Total warning DM");
   await send(seats.dm, "cap-s1", [{ id: "cap-s1", kind: "session", name: "One", end: false }]);
   await history(seats, 100, "cap");
-  // Archived sessions already stored up to the cap (a stand-in row: only its size counts here).
+  // Archived sessions already stored up to the threshold (a stand-in row: only its size counts here).
   await db.prepare("INSERT INTO campaign_room_reports(code,reference,body) VALUES (?,?,?)").bind(seats.dm.code, "session-report:padding", "x".repeat(ROOM_TOTAL_LIMIT)).run();
-  const before = await readStoredRoom(db, seats.dm.code);
   const logsBefore = (await db.prepare("SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE source='room-storage'").first()).n;
-  await assert.rejects(send(seats.dm, "cap-e1", [{ id: "cap-e1", kind: "session", name: "One", end: true }]), (error) => {
-    assert.ok(error.message.startsWith(ROOM_TOTAL_REFUSAL), error.message);
-    assert.match(error.message, /Download a copy/);
-    assert.match(error.message, /Download session report/);
-    assert.match(error.message, /Nothing was changed/);
-    return true;
-  });
-  const after = await readStoredRoom(db, seats.dm.code);
-  assert.equal(after.body, before.body, "the campaign is unchanged");
+  // Never refused: the session is archived as always.
+  await send(seats.dm, "cap-e1", [{ id: "cap-e1", kind: "session", name: "One", end: true }]);
+  assert.ok((await readRoom(seats.dm.code)).table.journal.reports.some((r) => r.name === "One"), "the session was archived");
   const logs = await db.prepare("SELECT body FROM owner_monitor_logs WHERE source='room-storage'").all();
-  assert.equal(logs.results.length, logsBefore + 1);
+  assert.equal(logs.results.length, logsBefore + 1, "one owner-monitor entry");
   const body = JSON.parse(logs.results.at(-1).body);
-  assert.equal(body.refusal, "total");
+  assert.equal(body.warning, "total");
+  assert.equal(body.refusal, undefined, "a warning, not a refusal");
   assert.equal(body.totalLimit, ROOM_TOTAL_LIMIT);
   assert.ok(body.totalBytes > ROOM_TOTAL_LIMIT);
-  // Everything else still works at the cap: a purchase and a message are not refused.
+  // The DM's view carries the notice (old and new protocols); players never see it.
+  for (const protocol of [NEW, OLD]) {
+    const dm = await roomState({ ...seats.dm, ...protocol });
+    assert.ok(dm.storageWarning.totalBytes > ROOM_TOTAL_LIMIT && dm.storageWarning.limit === ROOM_TOTAL_LIMIT);
+    assert.equal((await roomState({ ...seats.a, ...protocol })).storageWarning, undefined);
+  }
+  // Play goes on, and the notice stays until an archive finds the total below the threshold.
   await send(seats.dm, "cap-more", [buy("cap-more-buy"), message("cap-more-msg", "a", "Still playing")]);
-  // Below the cap (the largest production campaign is 2.5 MB in total), the session ends as before.
+  assert.ok((await roomState({ ...seats.dm, ...NEW })).storageWarning);
   await db.prepare("DELETE FROM campaign_room_reports WHERE reference='session-report:padding'").run();
-  await send(seats.dm, "cap-e2", [{ id: "cap-e2", kind: "session", name: "One", end: true }]);
-  assert.ok((await readRoom(seats.dm.code)).table.journal.reports.some((r) => r.name === "One"));
+  await send(seats.dm, "cap-s2", [{ id: "cap-s2", kind: "session", name: "Two", end: false }]);
+  await send(seats.dm, "cap-e2", [{ id: "cap-e2", kind: "session", name: "Two", end: true }]);
+  assert.equal((await roomState({ ...seats.dm, ...NEW })).storageWarning, undefined, "cleared below the threshold");
 });
 
 test("a table whose archived sessions are not loaded is never uploaded as a campaign", async () => {

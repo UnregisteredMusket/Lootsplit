@@ -7,7 +7,7 @@ import {
   ROOM_ROW_LIMIT,
   ROOM_IMAGE_SOURCES,
 } from "../../../cloudflare/room-images.mjs";
-import { ROOM_LIVE_LIMIT, ROOM_TOTAL_LIMIT, ROOM_TOTAL_REFUSAL } from "./room-size.ts";
+import { ROOM_LIVE_LIMIT, ROOM_TOTAL_LIMIT } from "./room-size.ts";
 import {
   HISTORY_KEY,
   readRoomSectionHashes,
@@ -314,16 +314,20 @@ export async function readCombatView(code: string): Promise<CombatViewRead | nul
 }
 /**
  * Room writes are refused with a clear message, and logged to the owner monitor (`room-storage`,
- * registered in BUILTIN_LOGS), when they would store more than a campaign may hold
+ * registered in BUILTIN_LOGS), when they would store more than a write can hold
  * (src/lib/quire/room-size.ts):
  * - a working set (what every room read loads) above `ROOM_BODY_LIMIT`;
  * - a single row above `ROOM_ROW_LIMIT` (a sectioned room's own row; D1 rejects rows above
  *   2,000,000 bytes with an opaque error);
- * - a live campaign (working set plus sealed history pages) above `ROOM_LIVE_LIMIT`;
- * - when the write archives a session, a total (live campaign plus every archived session) above
- *   `ROOM_TOTAL_LIMIT`. Only archiving adds to the archive, so only it is checked against the
- *   total, and a campaign that is already larger is never refused anything else for it.
+ * - a live campaign (working set plus sealed history pages) above `ROOM_LIVE_LIMIT`.
  * The stored campaign is never changed by a refusal.
+ *
+ * The total (live campaign plus every archived session) is never refused: a session can always
+ * be archived. When a write archives one and the total passes `ROOM_TOTAL_LIMIT`, the size at
+ * which every whole-campaign operation still fits comfortably in a Worker, the write goes ahead,
+ * the owner monitor gets a `room-storage` warning entry, and the room records `storageWarning`,
+ * which the DM's view carries as a notice recommending Download a copy. Whole-campaign operations
+ * that cannot fit still fail loudly with nothing changed, as before.
  */
 export { ROOM_BODY_LIMIT, ROOM_ROW_LIMIT };
 type Encoded = Awaited<ReturnType<typeof encodeRoomImages>>;
@@ -338,46 +342,43 @@ async function archivedBytes(db: Database, code: string): Promise<number> {
     .first<{ n: number }>();
   return Number(row?.n ?? 0);
 }
-async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
-  const { bytes, largestReport } = encodedRoomBytes(encoded);
-  const sizes = roomStorageSizes(encoded.body);
-  const archiving = (encoded.reports ?? []).length > 0;
-  const total = archiving
-    ? sizes.liveBytes + (await archivedBytes(db, room.code)) + (encoded.reports ?? []).reduce((sum, r) => sum + utf8(r.body), 0)
-    : null;
-  const refusal =
-    sizes.workingBytes > ROOM_BODY_LIMIT
-      ? ("working" as const)
-      : sizes.rowBytes > ROOM_ROW_LIMIT
-        ? ("row" as const)
-        : sizes.liveBytes > ROOM_LIVE_LIMIT || largestReport > ROOM_LIVE_LIMIT
-          ? ("live" as const)
-          : total !== null && total > ROOM_TOTAL_LIMIT
-            ? ("total" as const)
-            : null;
-  if (!refusal) return;
+type StorageSizes = ReturnType<typeof roomStorageSizes>;
+/** One `room-storage` monitor entry (a refusal, or the total-size warning), per room per half-hour and kind. */
+async function logRoomStorage(
+  db: Database,
+  room: CloudRoom,
+  encoded: Encoded,
+  sizes: StorageSizes,
+  entry: { kind: "refusal"; refusal: "working" | "row" | "live" } | { kind: "warning"; warning: "total" },
+  total: number | null,
+) {
   const now = Date.now();
   try {
+    const { bytes, largestReport } = encodedRoomBytes(encoded);
     const stored = JSON.parse(encoded.body) as CloudRoom;
     const size = (value: unknown) => (value === undefined ? 0 : utf8(JSON.stringify(value)));
     const { initializeMonitor, recordLog } = await import("../../../cloudflare/monitor-journal.mjs");
-    // Log rows reference the registry; a refusal before the first collection after a deploy
+    // Log rows reference the registry; an entry before the first collection after a deploy
     // must still be recorded, so the built-in sources are registered first (idempotent).
     await initializeMonitor(db, now);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(room.code));
-    // A one-way room tag correlates repeated refusals without storing the join code.
+    // A one-way room tag correlates repeated entries without storing the join code.
     const tag = Array.from(new Uint8Array(digest).slice(0, 6), (b) => b.toString(16).padStart(2, "0")).join("");
-    const limit = { working: ROOM_BODY_LIMIT, row: ROOM_ROW_LIMIT, live: ROOM_LIVE_LIMIT, total: ROOM_TOTAL_LIMIT }[refusal];
+    const measured = `working set ${sizes.workingBytes} bytes, room row ${sizes.rowBytes}, live campaign ${sizes.liveBytes}${total === null ? "" : `, total with archived sessions ${total}`}`;
+    const summary =
+      entry.kind === "refusal"
+        ? `A shared room write was refused before reaching D1: its ${entry.refusal} size exceeds the ${{ working: ROOM_BODY_LIMIT, row: ROOM_ROW_LIMIT, live: ROOM_LIVE_LIMIT }[entry.refusal]}-byte budget (${measured}). The stored campaign was not changed. Later refusals for this room in the same half-hour share this entry.`
+        : `Warning (nothing refused): a shared room archived a session and its total with archived sessions passed ${ROOM_TOTAL_LIMIT} bytes, the size at which whole-campaign operations (exports, Download a copy, deletion copies, Undo of archived lines) fit comfortably in a Worker (${measured}). The session was archived; the DM is shown a notice recommending Download a copy. Later warnings for this room in the same half-hour share this entry.`;
     await recordLog(
       db,
       {
-        id: `room-storage:${tag}:${Math.floor(now / 1_800_000)}`,
+        id: `room-storage:${entry.kind === "refusal" ? "" : "warning:"}${tag}:${Math.floor(now / 1_800_000)}`,
         source: "room-storage",
         observedAt: now,
-        summary: `A shared room write was refused before reaching D1: its ${refusal} size exceeds the ${limit}-byte budget (working set ${sizes.workingBytes} bytes, room row ${sizes.rowBytes}, live campaign ${sizes.liveBytes}${total === null ? "" : `, total with archived sessions ${total}`}). The stored campaign was not changed. Later refusals for this room in the same half-hour share this entry.`,
+        summary,
         room: tag,
         revision: room.revision,
-        refusal,
+        ...(entry.kind === "refusal" ? { refusal: entry.refusal } : { warning: entry.warning }),
         bytes,
         workingBytes: sizes.workingBytes,
         liveBytes: sizes.liveBytes,
@@ -410,8 +411,34 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
       now,
     );
   } catch (error) {
-    console.warn("The room size refusal could not be logged to monitoring.", error);
+    console.warn("The room size entry could not be logged to monitoring.", error);
   }
+}
+/**
+ * Refuses a write that cannot be stored (see above). Returns the total with archived sessions
+ * when the write archives one (null otherwise), after logging the warning when it is past
+ * `ROOM_TOTAL_LIMIT`.
+ */
+async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded): Promise<number | null> {
+  const { largestReport } = encodedRoomBytes(encoded);
+  const sizes = roomStorageSizes(encoded.body);
+  const archiving = (encoded.reports ?? []).length > 0;
+  const total = archiving
+    ? sizes.liveBytes + (await archivedBytes(db, room.code)) + (encoded.reports ?? []).reduce((sum, r) => sum + utf8(r.body), 0)
+    : null;
+  const refusal =
+    sizes.workingBytes > ROOM_BODY_LIMIT
+      ? ("working" as const)
+      : sizes.rowBytes > ROOM_ROW_LIMIT
+        ? ("row" as const)
+        : sizes.liveBytes > ROOM_LIVE_LIMIT || largestReport > ROOM_LIVE_LIMIT
+          ? ("live" as const)
+          : null;
+  if (!refusal) {
+    if (total !== null && total > ROOM_TOTAL_LIMIT) await logRoomStorage(db, room, encoded, sizes, { kind: "warning", warning: "total" }, total);
+    return total;
+  }
+  await logRoomStorage(db, room, encoded, sizes, { kind: "refusal", refusal }, total);
   const mb = (value: number) => (value / 1e6).toFixed(2);
   const end = "Nothing was changed and pending actions are preserved.";
   throw Object.assign(
@@ -420,12 +447,27 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
         ? `This campaign is too large to save online (${mb(sizes.workingBytes)} MB of current records; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB). ${end} The DM can end the session to archive the current messages and ledger, or export the campaign.`
         : refusal === "row"
           ? `Part of this campaign is too large to save online (${mb(sizes.rowBytes)} MB in one piece; the limit is ${(ROOM_ROW_LIMIT / 1e6).toFixed(1)} MB). ${end} Export the campaign and ask for help.`
-          : refusal === "live"
-            ? `This campaign's current session history is too large to save online (${mb(Math.max(sizes.liveBytes, largestReport))} MB; the limit is ${(ROOM_LIVE_LIMIT / 1e6).toFixed(1)} MB). ${end} The DM can end the session to archive the current messages and ledger.`
-            : `${ROOM_TOTAL_REFUSAL} (${mb(total ?? 0)} MB with its archived sessions; the limit is ${(ROOM_TOTAL_LIMIT / 1e6).toFixed(0)} MB), so this session cannot be archived. ${end} Download a copy (My account → Campaigns) keeps the whole campaign, including every archived session, and each archived session can also be saved on its own with Download session report. Archived sessions cannot be removed from an online campaign yet; play continues in the current session.`,
+          : `This campaign's current session history is too large to save online (${mb(Math.max(sizes.liveBytes, largestReport))} MB; the limit is ${(ROOM_LIVE_LIMIT / 1e6).toFixed(1)} MB). ${end} The DM can end the session to archive the current messages and ledger.`,
     ),
     { status: 413 },
   );
+}
+/**
+ * The total-size notice the room should record after a write that archived sessions (`total`):
+ * set past `ROOM_TOTAL_LIMIT`, cleared below it. Returns whether `room` changed (it must then be
+ * encoded again; rare: only when the notice appears, moves or clears).
+ */
+function noteStorageWarning(room: CloudRoom, total: number | null): boolean {
+  if (total === null) return false;
+  const current = room.storageWarning;
+  if (total <= ROOM_TOTAL_LIMIT) {
+    if (!current) return false;
+    delete room.storageWarning;
+    return true;
+  }
+  if (current && current.totalBytes === total && current.limit === ROOM_TOTAL_LIMIT) return false;
+  room.storageWarning = { totalBytes: total, limit: ROOM_TOTAL_LIMIT };
+  return true;
 }
 /**
  * `hostLimit` (set by every account hosting path) makes the insert itself conditional on the
@@ -442,8 +484,8 @@ export async function createRoom(
     const hosting = host ? await import("../../../cloudflare/hosted-campaigns.mjs") : null;
     // Friendly pre-check: refuses before encoding images or writing anything.
     if (host && hosting) await hosting.assertCanHost(db, host.userId, host.path, host.limit);
-    const encoded = await encodeRoomImages(room);
-    await guardRoomSize(db, room, encoded);
+    let encoded = await encodeRoomImages(room);
+    if (noteStorageWarning(room, await guardRoomSize(db, room, encoded))) encoded = await encodeRoomImages(room);
     const write = roomWriteStatements(db, room, {
       create: true,
       body: encoded.body,
@@ -571,8 +613,8 @@ export async function updateRoom(
     // Body receipts (older rooms) move to their table with this write, oldest first, then the new ones.
     const receipts = [...bodyReceipts(room), ...(options.receipts ?? [])];
     const stored = withoutReceipts(room);
-    const encoded = await encodeRoomImages(stored);
-    await guardRoomSize(db, stored, encoded);
+    let encoded = await encodeRoomImages(stored);
+    if (noteStorageWarning(stored, await guardRoomSize(db, stored, encoded))) encoded = await encodeRoomImages(stored);
     // A sectioned write re-sends only sections that are not stored yet (hashes only are read).
     const present = roomBodySectioned(encoded.body) ? await readRoomSectionHashes(db, room.code) : undefined;
     const write = roomWriteStatements(db, room, {

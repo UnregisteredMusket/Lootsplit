@@ -629,6 +629,8 @@ export type RoomView = {
    * `readCloudHistory`. Absent when the view holds every line.
    */
   history?: HistoryCursors;
+  /** DM only: the campaign's total with archived sessions passed `ROOM_TOTAL_LIMIT` (a notice). */
+  storageWarning?: { totalBytes: number; limit: number };
   encounterActive?: boolean;
   userId?: string;
   viewOnly?: boolean;
@@ -766,6 +768,9 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
     table,
   });
+  // The campaign passed the total size at which whole-campaign operations fit comfortably
+  // (room-size.ts `ROOM_TOTAL_LIMIT`): a notice for the DM only, recommending Download a copy.
+  if (seat.role === "dm" && room.storageWarning) result.storageWarning = { ...room.storageWarning };
   // History on demand: where this seat's ledger and chat continue (absent for a whole room).
   const history = await historyCursors(room, seat, await historyProjector(room.table, seat, room.code));
   if (history) result.history = history;

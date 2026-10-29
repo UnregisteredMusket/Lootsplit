@@ -142,10 +142,10 @@ export const BUILTIN_LOGS = [
   ],
   [
     "room-storage",
-    "Shared room size refusals",
+    "Shared room size refusals and warnings",
     "event",
     0,
-    "Room writes refused before D1's row limit (one entry per room per half-hour, with a size breakdown); silence means no refusal was recorded, checked every half-hour.",
+    "Room writes refused before D1's row limit, and warnings (nothing refused) when an archived session takes a campaign past the total size at which whole-campaign operations fit comfortably (one entry per room, kind and half-hour, with a size breakdown); silence means nothing was recorded, checked every half-hour.",
   ],
   [
     "campaign-limit",
