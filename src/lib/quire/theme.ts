@@ -81,6 +81,8 @@ export function themeVars(appearance: Appearance, accent: string, ground: string
     // Gains/"open" and losses/warnings, used as text (`text-positive`, `text-negative`).
     "--color-positive": readable(POSITIVE),
     "--color-negative": readable(NEGATIVE),
+    // The selection ring on map tokens (map tokens PR 1): the blue of the approved mockups.
+    "--color-select": dark ? "#4d8fe0" : "#1e5e96",
   };
 }
 

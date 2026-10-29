@@ -5,6 +5,7 @@ import { connectedMapSchema } from "./connected-maps-schema.ts";
 import { artworkSchema } from "./artwork.ts";
 import { npcBarterConfigSchema, npcBarterStateSchema } from "./npc-barter-schema.ts";
 import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tokenTabletopFields } from "./tabletop-schema.ts";
+import { tokenFootprint } from "./tabletop-geometry.ts";
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
 const copper = z.number().int().min(0).max(1e12);
@@ -161,6 +162,8 @@ export const mapTokenSchema = z
       ctx.addIssue({ code: "custom", message: "Choose an existing character or ship." });
     if (t.kind === "creature" && (!t.encounterId || !t.combatantId))
       ctx.addIssue({ code: "custom", message: "Choose an encounter combatant." });
+    if (tokenFootprint(t) > 1 && t.anchor !== "corner")
+      ctx.addIssue({ code: "custom", message: "A token wider than one square is placed by its top-left square." });
   });
 export const campaignMapSchema = z
   .object({

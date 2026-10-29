@@ -1,6 +1,8 @@
 import type { CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
 import { expandTabletopHistory, tabletopHasFogDiffs } from "./fog-history.ts";
+import { canonicalJson } from "./canonical-json.ts";
+import { placeFromBox, tokenBox, tokenFootprint } from "./tabletop-geometry.ts";
 
 /**
  * The current tabletop table shape; 3 added compact fog history, continued brush strokes, fog
@@ -73,8 +75,19 @@ export const PARTY_GROUPS_PROTOCOL = 10;
  * Android apps, older tabs) receive the full view as before and never see a manifest.
  */
 export const VIEW_SECTIONS_PROTOCOL = 11;
+/**
+ * Protocol 12 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
+ * `footprint` and `anchor: "corner"` (stored by their top-left square). Older clients have a strict
+ * token schema, so protocols 0-11 receive footprint tokens in the centre form they know (the
+ * centre square plus a half-square offset for even sizes) without those fields
+ * (`centreFormToken`). Their token moves, token saves and map saves come back in that form and the
+ * server converts them to the stored form before applying them (`upgradeFootprintCommands`);
+ * their saves keep the fields. Pending drafts with footprint fields ask them to finish on the
+ * updated website.
+ */
+export const FOOTPRINT_PROTOCOL = 12;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = VIEW_SECTIONS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = FOOTPRINT_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -111,7 +124,7 @@ export function legacyDiagonals<T>(value: T): T {
   return walk(value) as T;
 }
 export function legacyTabletopToken(token: MapToken): MapToken {
-  const result = { ...token };
+  const result = { ...centreFormToken(token) };
   delete result.locked;
   delete result.controllerPurseIds;
   delete result.offsetX;
@@ -557,7 +570,176 @@ export function refuseOldClientGroupActions(
     }
   }
 }
+// Protocol 12 (footprints and snapping).
+const footprintFields = ["sizeClass", "footprint", "anchor"] as const;
+const hasFootprint = (token: Partial<MapToken> | null | undefined) =>
+  !!token && footprintFields.some((key) => token[key] !== undefined);
+const footprinted = (text: string) => /"(sizeClass|footprint|anchor)":/.test(text);
+/**
+ * A token as protocols 0-11 read it: without its size fields, and a corner-anchored footprint
+ * token at its centre square (plus half a square for even sizes), so older apps draw it at its
+ * true centre. The same object when the token has no footprint fields.
+ */
+export function centreFormToken(token: MapToken): MapToken {
+  if (!hasFootprint(token)) return token;
+  const result = { ...token };
+  for (const key of footprintFields) delete result[key];
+  delete result.offsetX;
+  delete result.offsetY;
+  const box = tokenBox(token),
+    n = tokenFootprint(token),
+    x = box.left + (n - 1) / 2,
+    y = box.top + (n - 1) / 2,
+    column = Math.floor(x + 0.5 - 1e-9),
+    row = Math.floor(y + 0.5 - 1e-9),
+    offsetX = Math.round((x - column) * 1e6) / 1e6,
+    offsetY = Math.round((y - row) * 1e6) / 1e6;
+  if (n < 1 || n === 1) {
+    if (token.offsetX !== undefined) result.offsetX = token.offsetX;
+    if (token.offsetY !== undefined) result.offsetY = token.offsetY;
+    return result;
+  }
+  return {
+    ...result,
+    column,
+    row,
+    ...(offsetX ? { offsetX } : {}),
+    ...(offsetY ? { offsetY } : {}),
+  };
+}
+/** Whether a table (or a stored backup body) holds footprint tokens. */
+export function hasFootprintTokens(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.tokens?.some(hasFootprint)) ||
+    !!table.journal?.reports?.some((r) => footprinted(r.snapshot ?? ""))
+  );
+}
+function footprintFreeTable(table: CloudTable): CloudTable {
+  if (!hasFootprintTokens(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!footprinted(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(footprintFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world
+        ? {
+            world: {
+              ...world,
+              maps: world.maps.map((m) =>
+                m.tokens?.some(hasFootprint) ? { ...m, tokens: m.tokens.map(centreFormToken) } : m,
+              ),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
+/** Whether a pending command (as JSON) carries footprint fields older apps can't read. */
+export function footprintCommandText(c: unknown) {
+  return footprinted(JSON.stringify(c));
+}
+type Place = { column: number; row: number; offsetX?: number; offsetY?: number };
+const samePlace = (a: Place, b: Place) =>
+  a.column === b.column &&
+  a.row === b.row &&
+  (a.offsetX ?? 0) === (b.offsetX ?? 0) &&
+  (a.offsetY ?? 0) === (b.offsetY ?? 0);
+const sameJson = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
+/** A centre-form position (older apps) of a stored footprint token, in its stored form. */
+function storedPlace(stored: MapToken, centre: Place, snap: boolean): Place {
+  const n = tokenFootprint(stored);
+  if (stored.anchor !== "corner" || n <= 1) return centre;
+  const left = centre.column + (centre.offsetX ?? 0) - (n - 1) / 2,
+    top = centre.row + (centre.offsetY ?? 0) - (n - 1) / 2;
+  // An even footprint has no centre square: with grid mode on an older app cannot express a
+  // snapped position for it, and the server never picks a square on its behalf.
+  if (snap && (Math.abs(left - Math.round(left)) > 1e-6 || Math.abs(top - Math.round(top)) > 1e-6))
+    throw Error(`Update Lootsplitter to move ${stored.label} on this map.`);
+  const place = placeFromBox(stored, left, top);
+  return {
+    column: place.column,
+    row: place.row,
+    ...(place.offsetX ? { offsetX: place.offsetX } : {}),
+    ...(place.offsetY ? { offsetY: place.offsetY } : {}),
+  };
+}
+/** The token an older app saved (centre form, maybe without tabletop fields), in stored form. */
+function storedToken(stored: MapToken, sent: MapToken, snap: boolean): MapToken {
+  if (sent.anchor !== undefined || sent.kind !== stored.kind || sent.entityId !== stored.entityId)
+    return sent;
+  const result: MapToken = { ...sent };
+  delete result.offsetX;
+  delete result.offsetY;
+  for (const key of footprintFields) if (stored[key] !== undefined) Object.assign(result, { [key]: stored[key] });
+  return { ...result, ...storedPlace(stored, sent, snap) };
+}
+/**
+ * Protocols 0-11 send footprint tokens in their centre form. Before a batch from such a client is
+ * applied, the server rewrites its token moves, token saves and map saves into the stored form
+ * (against the current table). Nothing else changes; commands about other tokens are untouched.
+ */
+export function upgradeFootprintCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
+  const maps = table.journal?.world?.maps ?? [];
+  if (!maps.some((m) => m.tokens?.some(hasFootprint))) return commands;
+  return commands.map((command) => {
+    const c = command as C & Record<string, unknown>;
+    const map = maps.find((m) => m.id === c.mapId);
+    const snap = (map?.tabletop as { snap?: boolean } | undefined)?.snap ?? true;
+    if (!map?.tokens?.some(hasFootprint)) return command;
+    const stored = (id: unknown) => map.tokens!.find((t) => t.id === id && hasFootprint(t));
+    if (c.kind === "map-token-move") {
+      const moves = (c.moves as { tokenId: string; before: Place; after: Place }[]).map((move) => {
+        const token = stored(move.tokenId);
+        if (!token || !samePlace(centreFormToken(token), move.before)) return move;
+        const before: Place = { column: token.column, row: token.row };
+        if (token.offsetX !== undefined) before.offsetX = token.offsetX;
+        if (token.offsetY !== undefined) before.offsetY = token.offsetY;
+        return { ...move, before, after: storedPlace(token, move.after, snap) };
+      });
+      return { ...c, moves };
+    }
+    if (c.kind === "map-token") {
+      const token = stored(c.tokenId);
+      if (!token) return command;
+      const before = c.before as MapToken | null;
+      // Protocols 1-11 sent the centre form; protocol 0 the centre form without tabletop fields,
+      // which world.ts already accepts as legacyTabletopToken(current) and merges.
+      const fromCentre = sameJson(centreFormToken(token), before);
+      if (!fromCentre && !sameJson(legacyTabletopToken(token), before)) return command;
+      const sent = c.token as MapToken | null;
+      return { ...c, before: fromCentre ? token : before, token: sent && storedToken(token, sent, snap) };
+    }
+    if (c.kind === "map-save") {
+      const before = c.before as CampaignMap | null,
+        sent = c.map as CampaignMap | null;
+      const restore = (list: MapToken[] | undefined, previous: boolean) =>
+        list?.map((t) => {
+          const s = stored(t.id);
+          if (!s) return t;
+          if (previous) return sameJson(centreFormToken(s), t) ? s : t;
+          return storedToken(s, t, snap);
+        });
+      return {
+        ...c,
+        ...(before?.tokens ? { before: { ...before, tokens: restore(before.tokens, true) } } : {}),
+        ...(sent?.tokens ? { map: { ...sent, tokens: restore(sent.tokens, false) } } : {}),
+      };
+    }
+    return command;
+  });
+}
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= FOOTPRINT_PROTOCOL) return table;
+  table = footprintFreeTable(table);
   if (protocol >= PARTY_GROUPS_PROTOCOL) return table;
   table = groupFreeTable(table);
   if (protocol >= SERVICES_WAVE2_PROTOCOL) return table;
@@ -637,12 +819,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= FOOTPRINT_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 12: footprint fields older apps cannot read.
+      if (footprintCommandText(c)) return true;
+      if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return false;
       // Protocol 10: split-the-party commands and group fields older apps cannot read.
       if (groupCommandText(c)) return true;
       if (protocol && protocol >= SERVICES_WAVE2_PROTOCOL) return false;

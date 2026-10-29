@@ -5,7 +5,17 @@ import { useWorldTable } from "@/lib/quire/use-world-table";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
-import { sceneDistance, sceneRouteDistance, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
+import {
+  freeTokenPosition,
+  gridPoint,
+  sceneRouteDistance,
+  sceneTokenPoint,
+  shiftToken,
+  snapTokenPosition,
+  tokenBox,
+  tokenInsideGrid,
+  tokenSnapped,
+} from "@/lib/quire/tabletop-geometry";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { scaleDistance } from "@/lib/quire/journey";
 import { fogStorageBytes, fogDiff } from "@/lib/quire/fog-history";
@@ -51,6 +61,11 @@ const position = (token: Position): Position => ({
   offsetX: token.offsetX,
   offsetY: token.offsetY,
 });
+/** Snapped Tiny tokens keep their quadrant offsets; other snapped positions drop offsets. */
+const quadrant = (place: Position) =>
+  Math.abs(place.offsetX ?? 0) === 0.25 && Math.abs(place.offsetY ?? 0) === 0.25
+    ? { offsetX: place.offsetX, offsetY: place.offsetY }
+    : {};
 const toolNames: Record<MapTool, string> = {
   select: "Select / move",
   pan: "Pan",
@@ -101,7 +116,15 @@ export function useMapTabletopTools(
       (FogConsolidation & { from: FogState; bytes: number }) | null
     >(null);
   const gesture = useRef<
-      | { point: ScenePoint; token?: MapToken; ids?: string[]; grid?: string; moved: boolean }
+      | {
+          point: ScenePoint;
+          token?: MapToken;
+          ids?: string[];
+          grid?: string;
+          moved: boolean;
+          /** Where the token was grabbed, in squares from its footprint's top-left corner. */
+          grab?: { x: number; y: number };
+        }
       | undefined
     >(undefined),
     movePreview = useRef<Move[]>([]),
@@ -124,7 +147,7 @@ export function useMapTabletopTools(
     if (selectedToken && !selected.includes(selectedToken)) {
       setSelected([selectedToken]);
       // Exact-position forms in Settings select without opening another panel.
-    }
+    } else if (!selectedToken && selected.length) setSelected([]);
     // The parent also services the preserved exact-position forms.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedToken]);
@@ -172,19 +195,6 @@ export function useMapTabletopTools(
     selectToken?.(next.includes(id) ? id : (next[0] ?? ""));
     setInspector(true);
   }
-  function gridPosition(point: ScenePoint): Position | undefined {
-    if (!map.grid) return;
-    const x = ((point.x - map.grid.x) / map.grid.width) * map.grid.columns,
-      y = ((point.y - map.grid.y) / map.grid.height) * map.grid.rows;
-    if (x < 0 || y < 0 || x >= map.grid.columns || y >= map.grid.rows) return;
-    const column = Math.floor(x),
-      row = Math.floor(y);
-    return {
-      column,
-      row,
-      ...(settings.snap ? {} : { offsetX: x - column - 0.5, offsetY: y - row - 0.5 }),
-    };
-  }
   function pointerDown(point: ScenePoint, tokenId?: string, additive = false) {
     // Inspection and temporary measurement remain available between sessions.
     if (tokenId && tool === "select") {
@@ -197,12 +207,15 @@ export function useMapTabletopTools(
           : [tokenId];
       setSelected(ids);
       selectToken?.(tokenId);
+      const box = tokenBox(token),
+        at = map.grid ? gridPoint(map.grid, point) : { x: box.left + 0.5, y: box.top + 0.5 };
       gesture.current = {
         point,
         token: !disabled && canMoveMapToken(table, map, token, seat) ? token : undefined,
         ids,
         grid: canonicalJson(map.grid),
         moved: false,
+        grab: { x: at.x - box.left, y: at.y - box.top },
       };
       return true;
     }
@@ -221,37 +234,41 @@ export function useMapTabletopTools(
     current.moved = true;
     setCursor(point);
     if (current.token && map.grid) {
-      const destination = gridPosition(point);
+      // Footprints (owner, 2026-10-29): with grid mode on the square under the grabbed point
+      // wins; with it off the token follows the pointer exactly. The server checks the same rule.
+      const destination = (settings.snap ? snapTokenPosition : freeTokenPosition)(
+        map.grid,
+        current.token,
+        point,
+        current.grab,
+      );
       if (!destination) {
         movePreview.current = [];
         setMoves([]);
         return true;
       }
-      const dx =
-          destination.column +
-          (destination.offsetX ?? 0) -
-          current.token.column -
-          (current.token.offsetX ?? 0),
-        dy =
-          destination.row +
-          (destination.offsetY ?? 0) -
-          current.token.row -
-          (current.token.offsetY ?? 0);
+      const from = tokenBox(current.token),
+        to = tokenBox({ ...current.token, ...destination }),
+        dx = to.left - from.left,
+        dy = to.top - from.top;
       const preview = (map.tokens ?? [])
         .filter((token) => current.ids?.includes(token.id))
         .map((token) => {
-          const x = token.column + 0.5 + (token.offsetX ?? 0) + dx,
-            y = token.row + 0.5 + (token.offsetY ?? 0) + dy,
-            column = Math.floor(x),
-            row = Math.floor(y);
+          let after: Position =
+            token.id === current.token!.id ? destination : shiftToken(token, dx, dy);
+          if (settings.snap && !tokenSnapped({ ...token, ...after }))
+            after =
+              snapTokenPosition(
+                map.grid!,
+                token,
+                sceneTokenPoint(map.grid!, { ...token, ...after }),
+              ) ?? after;
           return {
             tokenId: token.id,
             before: position(token),
-            after: {
-              column,
-              row,
-              ...(settings.snap ? {} : { offsetX: x - column - 0.5, offsetY: y - row - 0.5 }),
-            },
+            after: settings.snap
+              ? { column: after.column, row: after.row, ...quadrant(after) }
+              : after,
           };
         });
       movePreview.current = preview;
@@ -273,13 +290,10 @@ export function useMapTabletopTools(
   function saveMoves(next: Move[], grid = canonicalJson(map.grid)) {
     if (!next.length || !map.grid) return;
     if (
-      next.some(
-        (move) =>
-          move.after.column < 0 ||
-          move.after.row < 0 ||
-          move.after.column >= map.grid!.columns ||
-          move.after.row >= map.grid!.rows,
-      )
+      next.some((move) => {
+        const token = map.tokens?.find((t) => t.id === move.tokenId);
+        return !tokenInsideGrid(map.grid!, { ...token, ...move.after });
+      })
     ) {
       setError("Keep every selected token inside the grid.");
       return;
@@ -698,15 +712,13 @@ export function useMapTabletopTools(
                 {consolidationProposal.merged
                   ? `, ${consolidationProposal.merged} fewer after merging rectangles`
                   : ""}
-                . What players see stays exactly the same. Brush strokes, ellipses and freehand
-                polygons that still show are kept as they are. Afterwards fog storage is about{" "}
-                {Math.max(1, Math.round(consolidationProposal.bytes / 1000))} KB including undo
-                history.
+            . What players see stays exactly the same. Brush strokes, ellipses and freehand polygons
+            that still show are kept as they are. Afterwards fog storage is about{" "}
+            {Math.max(1, Math.round(consolidationProposal.bytes / 1000))} KB including undo history.
               </p>
               <p>
-                One Undo fog restores the separate shapes. Earlier undo steps stay unchanged (as
-                with any fog change, the oldest is dropped once 20 are saved), and Redo fog is
-                cleared.
+            One Undo fog restores the separate shapes. Earlier undo steps stay unchanged (as with
+            any fog change, the oldest is dropped once 20 are saved), and Redo fog is cleared.
               </p>
               <div className="tabletop-tool-row">
                 <Button
@@ -1008,7 +1020,11 @@ export function useMapTabletopTools(
     >
       {map.grid &&
         map.tokens
-          ?.filter((token) => token.style)
+          // The legacy visual scale; footprint tokens draw their footprint (map-token-layer.tsx).
+          ?.filter(
+            (token) =>
+              token.style && !token.sizeClass && token.footprint === undefined && !token.anchor,
+          )
           .map((token) => {
             const p = sceneTokenPoint(map.grid!, token);
             return (
@@ -1041,38 +1057,24 @@ export function useMapTabletopTools(
           <TemplateShape key={template.id} map={map} template={template} />
         ))}
       {map.grid &&
-        selectedTokens.map((token) => {
-          const p = sceneTokenPoint(map.grid!, token);
+        selectedTokens
+          // A token being dragged is drawn as a ghost with its target (map-token-layer.tsx).
+          .filter((token) => !moves.some((move) => move.tokenId === token.id))
+          .map((token) => {
+            const p = sceneTokenPoint(map.grid!, token),
+              scale =
+                token.anchor || token.sizeClass || token.footprint
+                  ? tokenBox(token).size
+                  : (token.style?.size ?? 1);
           return (
             <ellipse
               key={token.id}
               className="tabletop-selection"
               cx={p.x * 1000}
               cy={p.y * 1000}
-              rx={((500 * map.grid!.width) / map.grid!.columns) * (token.style?.size ?? 1)}
-              ry={((500 * map.grid!.height) / map.grid!.rows) * (token.style?.size ?? 1)}
-            />
-          );
-        })}
-      {map.grid &&
-        moves.map((move) => {
-          const a = sceneTokenPoint(map.grid!, move.before),
-            b = sceneTokenPoint(map.grid!, move.after);
-          return (
-            <g key={move.tokenId}>
-              <line
-                className="tabletop-measure"
-                x1={a.x * 1000}
-                y1={a.y * 1000}
-                x2={b.x * 1000}
-                y2={b.y * 1000}
+                rx={((500 * map.grid!.width) / map.grid!.columns) * scale}
+                ry={((500 * map.grid!.height) / map.grid!.rows) * scale}
               />
-              <circle className="tabletop-ghost" cx={b.x * 1000} cy={b.y * 1000} r="12" />
-              <text x={b.x * 1000 + 15} y={b.y * 1000}>
-                {(sceneDistance(map.grid!, a, b) * settings.unitsPerFoot).toFixed(1)}{" "}
-                {settings.unitLabel}
-              </text>
-            </g>
           );
         })}
       {tool === "measure" && (
@@ -1140,6 +1142,8 @@ export function useMapTabletopTools(
     shareCamera,
     saveInitialView,
     selected,
+    /** The move being previewed (dragging, or kept after a refused save). */
+    moves,
     showPreview,
     session,
     busy: disabled,

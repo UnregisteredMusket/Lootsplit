@@ -6,6 +6,8 @@ import { libraryRecordHref } from "@/lib/quire/library-records";
 import { readMapTabletop } from "@/lib/quire/tabletop";
 import type { CampaignMap, MapToken } from "@/lib/quire/world-schema";
 import type { MapTabletop, AreaTemplate } from "@/lib/quire/tabletop-schema";
+import { SIZE_NAMES, TOKEN_SIZE_CLASSES, SIZE_SQUARES } from "@/lib/quire/tabletop-geometry";
+import { resizedToken } from "@/lib/quire/token-display";
 import { Button, Fold } from "./ui";
 import { CommandForm } from "./world-tools";
 import { AppLink } from "./app-link";
@@ -17,6 +19,10 @@ const position = (token: Position): Position => ({
   offsetX: token.offsetX,
   offsetY: token.offsetY,
 });
+
+/** "quarter square", "1 square", "2×2 squares". */
+const squaresText = (n: number) =>
+  n < 1 ? "quarter square" : n === 1 ? "1 square" : `${n}×${n} squares`;
 
 export function TemplateShape({ map, template }: { map: CampaignMap; template: AreaTemplate }) {
   const grid = map.grid!,
@@ -90,43 +96,6 @@ export function TokenInspector({
         {token.visibility === "dm" ? "DM only" : "Shared token"}
         {token.locked ? " · locked for players" : ""}
       </p>
-      {canMove && (
-        <form
-          className="world-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            move({
-              tokenId: token.id,
-              before: position(token),
-              after: { column: column - 1, row: row - 1 },
-            });
-          }}
-        >
-          <label>
-            Column
-            <input
-              type="number"
-              min="1"
-              max={map.grid?.columns}
-              required
-              value={column}
-              onChange={(event) => setColumn(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Row
-            <input
-              type="number"
-              min="1"
-              max={map.grid?.rows}
-              required
-              value={row}
-              onChange={(event) => setRow(Number(event.target.value))}
-            />
-          </label>
-          <Button type="submit">Move to exact position</Button>
-        </form>
-      )}
       {dm && map.grid && (
         <CommandForm
           label="Save token controls"
@@ -141,6 +110,73 @@ export function TokenInspector({
           })}
           onDone={() => setBase(draft)}
         >
+          {/* Footprints (map tokens PR 1): the size, the DM's custom squares and the anchor. */}
+          <label>
+            Size
+            <select
+              aria-label="Size"
+              value={draft.sizeClass ?? "medium"}
+              onChange={(event) =>
+                setDraft(
+                  resizedToken(
+                    draft,
+                    {
+                      sizeClass: event.target.value as NonNullable<MapToken["sizeClass"]>,
+                      footprint: draft.footprint,
+                    },
+                    map.grid!,
+                  ),
+                )
+              }
+            >
+              {TOKEN_SIZE_CLASSES.map((size) => (
+                <option key={size} value={size}>
+                  {SIZE_NAMES[size]} · {squaresText(SIZE_SQUARES[size])}
+                </option>
+              ))}
+            </select>
+          </label>
+          <small className="tabletop-size-hint">
+            {token.kind === "creature" && token.sizeClass
+              ? "From the SRD stat block. DM can override."
+              : "DM can override."}
+          </small>
+          <label>
+            Custom squares
+            <select
+              aria-label="Custom squares"
+              value={draft.footprint === undefined ? "" : String(draft.footprint)}
+              onChange={(event) =>
+                setDraft(
+                  resizedToken(
+                    draft,
+                    {
+                      sizeClass: draft.sizeClass,
+                      footprint:
+                        event.target.value === ""
+                          ? undefined
+                          : (Number(event.target.value) as MapToken["footprint"]),
+                    },
+                    map.grid!,
+                  ),
+                )
+              }
+            >
+              <option value="">— (use size)</option>
+              {[0.25, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                <option key={n} value={n}>
+                  {squaresText(n)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Anchor
+            <output>
+              {draft.anchor === "corner" ? "Top-left square" : "Centre square"} · col{" "}
+              {draft.column + 1}, row {draft.row + 1}
+            </output>
+          </label>
           <label>
             <input
               type="checkbox"
@@ -303,6 +339,43 @@ export function TokenInspector({
             Reload current token controls
           </Button>
         </CommandForm>
+      )}
+      {canMove && (
+        <form
+          className="world-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            move({
+              tokenId: token.id,
+              before: position(token),
+              after: { column: column - 1, row: row - 1 },
+            });
+          }}
+        >
+          <label>
+            Column
+            <input
+              type="number"
+              min="1"
+              max={map.grid?.columns}
+              required
+              value={column}
+              onChange={(event) => setColumn(Number(event.target.value))}
+            />
+          </label>
+          <label>
+            Row
+            <input
+              type="number"
+              min="1"
+              max={map.grid?.rows}
+              required
+              value={row}
+              onChange={(event) => setRow(Number(event.target.value))}
+            />
+          </label>
+          <Button type="submit">Move to exact position</Button>
+        </form>
       )}
     </section>
   );

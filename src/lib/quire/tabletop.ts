@@ -11,6 +11,10 @@ import {
   blocked,
   scenePointVisible,
   sceneTokenPoint,
+  shiftToken,
+  tokenBox,
+  tokenInsideGrid,
+  tokenSnapped,
   type VisionSource,
 } from "./tabletop-geometry.ts";
 import {
@@ -404,12 +408,16 @@ export function applyTabletopCommand(
         throw Error("You cannot move one of these tokens.");
       if (!same(position(token), position(move.before)))
         throw Error("A selected token moved or changed. Refresh before moving it.");
-      if (move.after.column >= map.grid.columns || move.after.row >= map.grid.rows)
-        throw Error("Keep tokens inside the combat grid.");
-      if (settings.snap && ((move.after.offsetX ?? 0) !== 0 || (move.after.offsetY ?? 0) !== 0))
+      // Footprints (protocol 12): the whole footprint stays inside the grid, and with grid mode
+      // on the position must already be snapped. The server refuses; it never relocates a token.
+      const placed = { ...token, ...move.after };
+      if (move.after.offsetX === undefined) delete placed.offsetX;
+      if (move.after.offsetY === undefined) delete placed.offsetY;
+      if (!tokenInsideGrid(map.grid, placed)) throw Error("Keep tokens inside the combat grid.");
+      if (settings.snap && !tokenSnapped(placed))
         throw Error("This map requires movement snapped to the grid.");
       const a = sceneTokenPoint(map.grid, token),
-        b = sceneTokenPoint(map.grid, move.after);
+        b = sceneTokenPoint(map.grid, placed);
       if (
         seat.role !== "dm" &&
         !scenePointVisible(b, settings, map.grid, sceneViewers(table, map, seat))
@@ -429,30 +437,14 @@ export function applyTabletopCommand(
           .aboard.filter((a) => a.propertyId === ship.entityId)
           .map((a) => a.purseId),
       );
+      const from = tokenBox({ ...ship, ...move.before }),
+        to = tokenBox({ ...ship, ...move.after });
       for (const crew of next.filter((t) => t.kind === "character" && aboard.has(t.entityId!))) {
         const original = map.tokens!.find((t) => t.id === crew.id)!;
-        const x =
-          original.column +
-          0.5 +
-          (original.offsetX ?? 0) +
-          move.after.column -
-          move.before.column +
-          (move.after.offsetX ?? 0) -
-          (move.before.offsetX ?? 0);
-        const y =
-          original.row +
-          0.5 +
-          (original.offsetY ?? 0) +
-          move.after.row -
-          move.before.row +
-          (move.after.offsetY ?? 0) -
-          (move.before.offsetY ?? 0);
-        const column = Math.min(map.grid.columns - 1, Math.floor(x)),
-          row = Math.min(map.grid.rows - 1, Math.floor(y));
-        const carried = { column, row, offsetX: x - column - 0.5, offsetY: y - row - 0.5 };
-        if (requested.has(crew.id) && !same(position(crew), carried))
+        const carried = shiftToken(original, to.left - from.left, to.top - from.top);
+        if (requested.has(crew.id) && !same(position(crew), position(carried)))
           throw Error("An aboard character must retain its relative ship position.");
-        if (x < 0 || y < 0 || x > map.grid.columns || y > map.grid.rows)
+        if (!tokenInsideGrid(map.grid, { ...original, ...carried }))
           throw Error("Moving this ship would place an aboard character outside the grid.");
         Object.assign(crew, carried);
       }

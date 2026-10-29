@@ -3670,6 +3670,30 @@ input,select,textarea { max-width: 100%; }
   .map-view-frame.map-fullscreen .tabletop-inspector { top:auto; max-height:45dvh; }
 }
 .tabletop-token-portrait { width:100%; height:100%; object-fit:cover; border-radius:50%; pointer-events:none; }
+/* Map tokens drawn at their footprint (map tokens PR 1, docs/plans/MAP-TOKENS.md section 2.2). */
+.map-token-slot { display:contents; }
+.map-token { position:absolute; z-index:3; display:grid; place-items:center; padding:0; transform:translate(-50%,-50%); border-radius:50%; border:2px solid var(--token-ring, var(--color-lead)); background:radial-gradient(circle at 35% 30%, var(--color-border), var(--color-elevated) 70%); color:var(--color-fg); font-family:var(--font-sans); font-weight:700; line-height:1; box-shadow:0 2px 6px color-mix(in srgb, black 66%, transparent); pointer-events:auto; touch-action:none; }
+.map-token::after { content:""; position:absolute; left:50%; top:50%; width:var(--token-target, 44px); height:var(--token-target, 44px); transform:translate(-50%,-50%); border-radius:50%; }
+.map-token > img { width:100%; height:100%; object-fit:cover; border-radius:50%; pointer-events:none; }
+.map-token-creature { background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--color-danger) 80%, var(--color-fg) 6%), color-mix(in srgb, var(--color-danger) 45%, black) 70%); border-color:var(--token-ring, var(--color-negative)); }
+.map-token.tinted { background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--token-ring) 45%, var(--color-elevated)), color-mix(in srgb, var(--token-ring) 18%, black) 70%); }
+.map-token.mine { border-color:color-mix(in srgb, var(--color-accent) 55%, white); box-shadow:0 0 0 3px color-mix(in srgb, var(--color-accent) 45%, transparent), 0 2px 6px color-mix(in srgb, black 66%, transparent); }
+.map-token.dm-only { opacity:.62; border-style:dashed; }
+.map-token[aria-pressed="true"]:not(.ghost) { border-color:color-mix(in srgb, var(--color-select) 50%, white); box-shadow:0 0 0 3px var(--color-select), 0 0 14px color-mix(in srgb, var(--color-select) 70%, transparent); z-index:4; }
+.map-token.ghost { opacity:.55; border-style:dashed; box-shadow:none; }
+.map-token.preview { pointer-events:none; z-index:4; }
+.map-token:focus-visible { outline:3px solid var(--color-positive); outline-offset:3px; }
+.map-token-label { position:absolute; top:100%; left:50%; margin-top:3px; transform:translateX(-50%); white-space:nowrap; padding:1px 7px; border-radius:8px; background:color-mix(in srgb, var(--color-bg) 78%, transparent); color:var(--color-fg); font:600 11.5px/1.35 var(--font-sans); pointer-events:none; }
+.map-token.ghost .map-token-label { top:auto; bottom:100%; margin:0 0 3px; }
+.map-token-foot { position:absolute; z-index:2; box-sizing:border-box; border:2px solid color-mix(in srgb, var(--color-lead) 80%, transparent); background:color-mix(in srgb, var(--color-lead) 14%, transparent); border-radius:6px; pointer-events:none; }
+.map-token-foot.target { border-color:color-mix(in srgb, var(--color-positive) 70%, white); background:color-mix(in srgb, var(--color-positive) 26%, transparent); }
+.map-token-drag { display:contents; }
+.map-token-path { position:absolute; inset:0; width:100%; height:100%; overflow:visible; z-index:2; pointer-events:none; }
+.map-token-path line { stroke:color-mix(in srgb, var(--color-positive) 70%, white); stroke-width:3; stroke-dasharray:6 6; }
+.map-token-drop { position:absolute; z-index:6; padding:2px 7px; border-radius:7px; border:1px solid color-mix(in srgb, var(--color-positive) 55%, transparent); background:color-mix(in srgb, var(--color-bg) 85%, transparent); color:color-mix(in srgb, var(--color-positive) 45%, white); font:700 11px var(--font-sans); letter-spacing:.04em; white-space:nowrap; pointer-events:none; }
+@media (forced-colors:active) { .map-token[aria-pressed="true"] { outline:2px solid Highlight; outline-offset:2px; } }
+@media (prefers-reduced-motion:reduce) { .map-token { transition:none; } }
+
 .tabletop-token-label { position:absolute; left:50%; top:calc(100% + 4px); transform:translateX(-50%); max-width:140px; width:max-content; padding:2px 5px; border:1px solid var(--color-border); border-radius:3px; background:var(--color-bg); color:var(--color-fg); font-size:11px; overflow-wrap:anywhere; pointer-events:none; }
 
 .map-media-status button { display:block; min-height:44px; padding:6px; text-decoration:underline; }

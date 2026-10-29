@@ -14,6 +14,7 @@ import type { CloudTable } from "@/lib/quire/cloud";
 import { getCloudTable, captureMutationScope, assertMutationScope } from "@/lib/quire/cloud-client";
 import { encounterRequest } from "@/lib/encounters/client";
 import { tileAt, tileDistance, partyEnvironment } from "@/lib/quire/map-tiles";
+import { firstFreeSquare, occupiedSquares, sizedToken, tokenFootprint, type TokenSizeClass } from "@/lib/quire/tabletop-geometry";
 
 type Point = { x: number; y: number };
 export function GridEditor({ map, set }: { map: CampaignMap; set: (map: CampaignMap) => void }) {
@@ -238,7 +239,7 @@ type EncounterDetail = {
     name: string;
     round: number;
     activeId: string;
-    combatants: { id: string; name: string; side: string }[];
+    combatants: { id: string; name: string; side: string; size?: TokenSizeClass }[];
   };
 };
 export function CombatControls({
@@ -519,11 +520,9 @@ export function CombatControls({
                   next = [...tokens];
                 for (const c of e.body.combatants) {
                   if (next.some((t) => t.encounterId === e.id && t.combatantId === c.id)) continue;
-                  let cell;
-                  for (let r = 0; r < grid.rows && !cell; r++)
-                    for (let col = 0; col < grid.columns && !cell; col++)
-                      if (!next.some((t) => t.column === col && t.row === r))
-                        cell = { column: col, row: r };
+                  // Footprints: SRD creatures keep their size; each takes its whole free area.
+                  const sized = sizedToken(c.size);
+                  const cell = firstFreeSquare(grid, occupiedSquares(next), tokenFootprint(sized));
                   if (!cell)
                     throw Error(
                       "The grid has no free tile for the entire roster. Enlarge it first.",
@@ -534,6 +533,7 @@ export function CombatControls({
                     label: c.name,
                     encounterId: e.id,
                     combatantId: c.id,
+                    ...sized,
                     ...cell,
                     visibility: "dm",
                   });

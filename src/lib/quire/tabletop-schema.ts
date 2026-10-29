@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mapMediaReferenceSchema, mapRenderedFrameSchema } from "./map-assets-schema.ts";
+import { TOKEN_SIZE_CLASSES } from "./tabletop-geometry.ts";
 
 const id = z.string().min(1).max(150);
 export const scenePointSchema = z
@@ -128,6 +129,15 @@ export const tokenTabletopFields = {
     })
     .strict()
     .optional(),
+  /**
+   * Tabletop protocol 12 (footprints): the creature size, the DM's custom squares per side (0.25
+   * is a Tiny-style quarter square) and `anchor: "corner"`, which stores the token by its
+   * top-left square. Tokens without `anchor` keep their centre square. Older clients receive
+   * footprint tokens in that centre form (tabletop-protocol.ts).
+   */
+  sizeClass: z.enum(TOKEN_SIZE_CLASSES).optional(),
+  footprint: z.union([z.literal(0.25), z.number().int().min(1).max(8)]).optional(),
+  anchor: z.literal("corner").optional(),
 };
 export const mapTabletopSchema = z
   .object({

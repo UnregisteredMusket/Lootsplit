@@ -1,0 +1,13 @@
+{
+  "title": "Map tokens at their real size",
+  "summary": "Tokens on gridded maps are now drawn at their creature size and snap to the square you drop them on.",
+  "items": [
+    "Tokens are round portraits or initials that fill their footprint, with the name below: Tiny takes a quarter square, Small and Medium one square, Large 2×2, Huge 3×3 and Gargantuan 4×4.",
+    "DMs set a token's size in the Inspector, or Custom squares up to 8×8. Wider tokens are placed by their top-left square.",
+    "Creatures from the SRD keep their stat-block size when an encounter roster is placed on a map.",
+    "With snapping on, a dragged token lands on the square under the point you grabbed, so a Large token doesn't jump under your finger, and its whole footprint stays on the grid.",
+    "While dragging, a label shows the squares the token will cover and how far it moves.",
+    "Moves that aren't snapped or leave the grid are refused rather than moved somewhere else.",
+    "Older apps keep working: they see sized tokens at their centre and are asked to update before moving a Large or Gargantuan token on a snapped map."
+  ]
+}

@@ -29,6 +29,7 @@ const featureAudits = {
   a11y: "scripts/a11y-browser-audit.mjs",
   landscape: "scripts/landscape-browser-audit.mjs",
   "map-controls": "scripts/map-controls-browser-audit.mjs",
+  "map-tokens-footprint": "scripts/map-tokens-footprint-browser-audit.mjs",
   "review-inbox": "scripts/review-inbox-browser-audit.mjs",
   "command-palette": "scripts/command-palette-browser-audit.mjs",
   "player-onboarding": "scripts/player-onboarding-browser-audit.mjs",

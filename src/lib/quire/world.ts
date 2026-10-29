@@ -19,6 +19,7 @@ import { readFleet } from "./ships-schema.ts";
 import { legacyServiceKinds, serviceKinds } from "./services-schema.ts";
 import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
+import { tokenInsideGrid } from "./tabletop-geometry.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
 import { actingGroups, groupPlace, groupRefs, MAIN_GROUP, resolveGroup } from "./party-groups.ts";
@@ -142,7 +143,7 @@ export function validateWorld(t: CloudTable, projected = false) {
       "combat entity",
     );
     for (const token of map.tokens ?? []) {
-      if (!map.grid || token.column >= map.grid.columns || token.row >= map.grid.rows)
+      if (!map.grid || !tokenInsideGrid(map.grid, token))
         throw Error("Combat tokens must fit inside the configured grid.");
       if (
         !projected &&
@@ -473,12 +474,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
         if (crew.kind === "character" && aboard.has(crew.entityId!)) {
           crew.column += cmd.token.column - current.column;
           crew.row += cmd.token.row - current.row;
-          if (
-            crew.column < 0 ||
-            crew.row < 0 ||
-            crew.column >= cmd.grid.columns ||
-            crew.row >= cmd.grid.rows
-          )
+          if (!tokenInsideGrid(cmd.grid, crew))
             throw Error("Moving this ship would place an aboard character outside the grid.");
         }
     }

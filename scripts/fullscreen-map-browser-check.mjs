@@ -3,6 +3,11 @@ import { expect } from "playwright/test";
 
 export function mapMarkerColor(marker) {
   return marker.evaluate((el) => {
+    // Footprint tokens (map tokens PR 1) keep their colour and show selection as a blue ring.
+    if (el.classList.contains("map-token")) {
+      const style = getComputedStyle(el);
+      return `${style.borderColor} ${style.boxShadow}`;
+    }
     const symbol = getComputedStyle(el, "::before");
     return symbol.content !== "none"
       ? symbol.backgroundColor

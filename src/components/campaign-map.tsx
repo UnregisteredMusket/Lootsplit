@@ -68,6 +68,8 @@ import { readMapTabletop, readTabletopSession } from "@/lib/quire/tabletop";
 import { MapArtwork } from "./map-artwork";
 import { MapBrowser, MapSessionBar } from "./map-session-bar";
 import { useMapTabletopTools } from "./map-tabletop-tools";
+import { MapTokenLayer } from "./map-token-layer";
+import { discToken } from "@/lib/quire/token-display";
 import { MapPlayerPreview } from "./map-player-preview";
 import { sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
 import { useWorldTable } from "@/lib/quire/use-world-table";
@@ -1992,7 +1994,16 @@ function MapViewport({
         ? [{ id: "party", label: "Party", kind: "Party", point: party }]
         : []),
   ];
-  const groups = groupMapRecords(records, visible);
+  // Map tokens PR 1: characters, creatures and custom tokens are drawn at their footprint
+  // (MapTokenLayer); ships keep their record icon.
+  const discTokens =
+    tileMode && map.grid && visible.includes("Combatant")
+      ? (map.tokens ?? []).filter((t) => discToken(t) && (useDm || t.visibility === "party"))
+      : [];
+  const groups = groupMapRecords(
+    records.filter((r) => !(r.kind === "Combatant" && discTokens.some((t) => t.id === r.id))),
+    visible,
+  );
   const currentDetails = details.flatMap((d) => {
     const match = records.filter((r) => r.id === d.id && r.kind === d.kind);
     return match.length
@@ -4048,6 +4059,38 @@ function MapViewport({
               {tools.overlay}
             </div>
             {planner.handles}
+            <MapTokenLayer
+              map={map}
+              tokens={discTokens}
+              view={view}
+              width={w}
+              height={h}
+              selected={tools.selected}
+              moves={tools.moves}
+              onActivate={(token, event) => {
+                if (planner.active && !moved.current && !placing && !pinging) {
+                  if (!planner.calibrating) planner.addAt(sceneTokenPoint(map.grid!, token));
+                  return;
+                }
+                // A keyboard press (detail 0) is never the end of a drag.
+                if (
+                  (moved.current && event.detail !== 0) ||
+                  pinging ||
+                  sketches.active ||
+                  !["pan", "select"].includes(tools.tool)
+                )
+                  return;
+                const openToken = () => {
+                  setService(undefined);
+                  setCombatOpen(false);
+                  setHereOpen(false);
+                  setDetails([]);
+                  // Pointer presses select through the tools; keyboard activation selects here.
+                  if (event.detail === 0) tools.choose(token.id, event.shiftKey);
+                };
+                if (!(service || combatOpen) || allowContextChange(openToken)) openToken();
+              }}
+            />
             {groups.map((group) => (
               <div
                 key={group.id}
