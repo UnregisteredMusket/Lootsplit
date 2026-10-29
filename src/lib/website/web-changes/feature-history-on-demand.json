@@ -1,0 +1,9 @@
+{
+  "title": "Long sessions can always be ended",
+  "summary": "Ending a long session no longer fails because the session is too large to archive, and shared campaigns keep their history in a lighter way.",
+  "items": [
+    "Ending a session archives its messages and ledger even when the session ran for a very long time. Before, a session whose records had grown past about 1.8 MB could not be ended.",
+    "A shared campaign can keep up to 50 MB online including its archived sessions. If a campaign ever reaches that, ending another session is refused with a clear message; nothing is changed or deleted, and you can still download a copy.",
+    "Behind the scenes, long ledgers and chats are now stored in fixed pages, so adding a line no longer rewrites the whole history. Nothing changes in how campaigns look or play."
+  ]
+}

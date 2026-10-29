@@ -231,17 +231,18 @@ test("the size guard refuses an oversized room write, logs it to monitoring and 
   const { dm } = await liveRoom();
   const before = await raw(dm.code);
   const room = (await readRoom(dm.code));
-  room.table.notes.push(
-    // Above the campaign cap (room-size.ts), whatever it is.
-    ...Array.from({ length: Math.ceil(ROOM_BODY_LIMIT / 500) + 200 }, (_, i) => ({
-      id: `bulk-${i}`,
-      at: i,
-      from: "dm",
-      to: "party",
-      purseId: "party",
-      text: "w".repeat(500),
-    })),
-  );
+  // Above the working-set cap (room-size.ts), whatever it is, in a part every read loads (journal
+  // notes; the ledger and chat are paged since step 4 and checked against the live cap instead).
+  room.table.journal.entries = Array.from({ length: Math.ceil(ROOM_BODY_LIMIT / 500) + 200 }, (_, i) => ({
+    id: `bulk-${i}`,
+    at: i,
+    authorId: "dm",
+    purseId: "",
+    visibility: "party",
+    title: "Bulk",
+    text: "w".repeat(500),
+    reportIds: [],
+  }));
   room.revision++;
   await assert.rejects(updateRoom(room, before.revision), (error) => {
     assert.match(error.message, /too large to save online/);
@@ -255,8 +256,8 @@ test("the size guard refuses an oversized room write, logs it to monitoring and 
     .all());
   assert.equal(logs.results.length, 1);
   const body = JSON.parse(logs.results[0].body);
-  assert.ok(body.bytes > ROOM_BODY_LIMIT && body.limit === ROOM_BODY_LIMIT);
-  assert.ok(body.parts.notes > ROOM_BODY_LIMIT);
+  assert.ok(body.workingBytes > ROOM_BODY_LIMIT && body.limit === ROOM_BODY_LIMIT && body.refusal === "working");
+  assert.ok(body.parts.journal > ROOM_BODY_LIMIT);
   assert.equal(body.rowLimit, ROOM_ROW_LIMIT);
   assert.equal(body.storage.sectioned, true, "the refused room would have been stored sectioned");
   assert.equal(JSON.stringify(logs.results[0]).includes(dm.code), false, "the join code is not logged");

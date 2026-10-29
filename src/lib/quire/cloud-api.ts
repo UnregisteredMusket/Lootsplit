@@ -122,6 +122,33 @@ export const readCloudSections = createServerFn({ method: "POST" })
     return readViewSections(data);
   });
 
+/**
+ * History on demand (tabletop protocol 12): older ledger or chat pages from a cursor, or one
+ * archived session, projected for the requesting seat by the room view's own rules. Authorized
+ * like a room read (cloud.server.ts `readRoomHistory`); pages and sessions the client already
+ * holds (`held`, seat-salted hashes) are not sent again.
+ */
+export const readCloudHistory = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      tabletopProtocol?: number;
+      code: string;
+      token: string;
+      list?: "ledger" | "notes";
+      before?: string;
+      report?: string;
+      held?: string[];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { readRoomHistory } = await import("./cloud.server.ts");
+    return readRoomHistory(data);
+  });
+
 export const finishCloudTurn = createServerFn({ method: "POST" })
   .validator(
     (input: {
