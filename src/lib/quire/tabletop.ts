@@ -346,8 +346,8 @@ export function applyTabletopCommand(
   const dm = () => {
     if (seat.role !== "dm") throw Error("Only the DM can configure tabletop scenes.");
   };
-  const event = (summary: string) =>
-    table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary });
+  const event = (summary: string, purseId?: string) =>
+    table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary, ...(purseId ? { purseId } : {}) });
   if (command.kind === "tabletop-session") {
     dm();
     const previousSession = world.tabletop ? { ...world.tabletop } : null;
@@ -511,8 +511,13 @@ export function applyTabletopCommand(
       if (settings.lockedPurseIds?.includes(person.id))
         throw Error(`The DM has locked ${person.name}'s movement on this map.`);
     }
+    // A token the DM hid must not be revealed by the refusal (privacy review, 2026-10-29).
     if ((map.tokens ?? []).some((t) => t.kind === "character" && t.entityId === person.id))
-      throw Error(`${person.name} already has a token on this map.`);
+      throw Error(
+        seat.role === "dm"
+          ? `${person.name} already has a token on this map.`
+          : "That character can't be placed here right now.",
+      );
     if ((map.tokens ?? []).some((t) => t.id === command.tokenId))
       throw Error("Choose a new token. Refresh and try again.");
     const token: MapToken = {
@@ -538,7 +543,8 @@ export function applyTabletopCommand(
     map.tokens = [...(map.tokens ?? []), token];
     if (map.tabletop && settings.vision !== "off")
       map.tabletop = { ...settings, revision: settings.revision + 1 };
-    event(`${person.name}'s token placed`);
+    // Shown to that character's player and the DM only.
+    event(`${person.name}'s token placed`, person.id);
   } else if (command.kind === "map-grid-snap") {
     dm();
     if (!map.grid) throw Error("Configure a combat grid before turning on grid mode.");
