@@ -544,15 +544,6 @@ export function applyTabletopCommand(
       if (settings.lockedPurseIds?.includes(person.id))
         throw Error(`The DM has locked ${person.name}'s movement on this map.`);
     }
-    // A token the DM hid must not be revealed by the refusal (privacy review, 2026-10-29).
-    if ((map.tokens ?? []).some((t) => t.kind === "character" && t.entityId === person.id))
-      throw Error(
-        seat.role === "dm"
-          ? `${person.name} already has a token on this map.`
-          : "That character can't be placed here right now.",
-      );
-    if ((map.tokens ?? []).some((t) => t.id === command.tokenId))
-      throw Error("Choose a new token. Refresh and try again.");
     const token: MapToken = {
       id: command.tokenId,
       kind: "character",
@@ -572,12 +563,29 @@ export function applyTabletopCommand(
       !scenePointVisible(sceneTokenPoint(map.grid, token), settings, map.grid, sceneViewers(table, map, seat))
     )
       throw Error("Choose a visible square.");
+    // A token the DM hid must not be revealed by the refusal (privacy review, 2026-10-29); checked
+    // after the square's own checks, so the answers don't depend on it.
+    if ((map.tokens ?? []).some((t) => t.kind === "character" && t.entityId === person.id))
+      throw Error(
+        seat.role === "dm"
+          ? `${person.name} already has a token on this map.`
+          : "That character can't be placed here right now.",
+      );
+    if ((map.tokens ?? []).some((t) => t.id === command.tokenId))
+      throw Error("Choose a new token. Refresh and try again.");
     assertCombatTurn(table, map, [token], seat, execution);
     // Zones (privacy review 2026-10-29): placing a first token on a map in another zone is a
     // crossing like following there, under the same split rule. A character with no place yet
     // (no group location and no token) may place anywhere they can see.
     const world = table.journal!.world!;
-    const elsewhere = world.maps.find((m) => m.id !== map.id && (m.tokens ?? []).some((t) => t.kind === "character" && t.entityId === person.id));
+    // Only a map the player can open counts as where the character is (re-review 2026-10-29): a
+    // token on a hidden map is never revealed by a refusal or a journey estimate.
+    const elsewhere = world.maps.find(
+      (m) =>
+        m.id !== map.id &&
+        mapAccessible(table, m, seat) &&
+        (m.tokens ?? []).some((t) => t.kind === "character" && t.entityId === person.id),
+    );
     const crossed =
       seat.role !== "dm" && characterPlace(table, person.id, elsewhere?.id).kind !== "unknown"
         ? crossing(table, person.id, person.name, map.id, elsewhere?.id)
@@ -586,7 +594,8 @@ export function applyTabletopCommand(
     if (crossed?.kind === "far") throw Error(followRefusal(table, person.id, person.name, map.id, elsewhere?.id)!);
     if (crossed && (crossed.kind === "join" || crossed.kind === "split")) {
       const combat = world.combat?.phase === "active" ? world.combat : undefined;
-      if (combat && zoneOf(table, combat.mapId) === crossed.from) throw Error(`Finish the encounter before leaving ${zoneName(table, crossed.from)}.`);
+      // Generic, like zone-request: the zone being left may be named after a map the player can't open.
+      if (combat && zoneOf(table, combat.mapId) === crossed.from) throw Error("Finish the encounter before leaving.");
       const refusal = splitRefusal(crossed, person.name, map.name, execution);
       if (refusal) throw Error(refusal);
     }
