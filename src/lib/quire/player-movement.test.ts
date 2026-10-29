@@ -165,7 +165,8 @@ test("claiming: a player places their own missing token on a visible square", ()
     visibility: "party",
   });
   // Replaying it (or a second token) is refused: a character has one token per map.
-  assert.throws(() => claim(mira, {}, {}, placed), /already has a token/);
+  assert.throws(() => claim(mira, {}, {}, placed), /can't be placed here right now/);
+  assert.throws(() => claim(dm, {}, {}, placed), /already has a token/);
   assert.throws(() => claim(mira, { purseId: "torvald" }), /your own character/);
   assert.throws(() => claim(mira, { at: { column: 4, row: 4, offsetX: 0.3 } }), /snapped/);
   assert.throws(() => claim(mira, { at: { column: 25, row: 4 } }));
@@ -229,4 +230,19 @@ test("protocol 15: older clients see playerMovement only; their toggle sets Auto
   // Older clients can't skip the turn rule: the server checks every protocol.
   const fight = combat(fixture());
   assert.throws(() => move(fight, "mira-token", 5, 5, mira, turn("ogre")), /Not your turn/);
+});
+
+// Privacy review 2026-10-29 (finding A4a): a token the DM hid is never revealed by a claim refusal,
+// and the claim's activity line reaches only that character's player and the DM.
+test("claiming: a DM-hidden token is not revealed; the event stays with the player", () => {
+  const hidden = fixture(undefined, {}, [...tokens.filter((x) => x.id !== "mira-token"), { ...tokens[0], visibility: "dm" }]);
+  assert.equal(projectRecord(hidden, mira).journal!.world!.maps[0].tokens!.some((x) => x.id === "mira-token"), false);
+  assert.throws(
+    () => run(hidden, { kind: "map-token-claim", mapId: "keep", grid: canonicalJson(grid), purseId: "mira", tokenId: "n1", at: { column: 4, row: 4 } }, mira),
+    (e: Error) => e.message === "That character can't be placed here right now.",
+  );
+  const placed = run(fixture(undefined, {}, tokens.filter((x) => x.id !== "mira-token")), { kind: "map-token-claim", mapId: "keep", grid: canonicalJson(grid), purseId: "mira", tokenId: "n2", at: { column: 4, row: 4 } }, mira);
+  const torvald: CloudSeat = { id: "p2", token: "p2", name: "Torvald's player", role: "player", purseIds: ["torvald"] };
+  assert.equal(projectRecord(placed, mira).journal!.events.some((e) => /token placed/.test(e.summary)), true);
+  assert.equal(projectRecord(placed, torvald).journal!.events.some((e) => /token placed/.test(e.summary)), false);
 });

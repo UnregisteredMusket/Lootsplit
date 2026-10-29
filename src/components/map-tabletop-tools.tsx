@@ -4,7 +4,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
-import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
+import { readMapTabletop, readTabletopSession, canMoveMapToken, alignUndoMap } from "@/lib/quire/tabletop";
 import {
   alignedGrid,
   freeTokenPosition,
@@ -47,7 +47,7 @@ import { AppLink } from "./app-link";
 import { GridModeDialog, type GridModeChoice } from "./map-grid-mode";
 import { resultToast } from "@/lib/quire/result-toast";
 import type { PlayerMovement } from "@/lib/quire/map-movement";
-import { DEFAULT_FORMATION, planFormation, type Formation } from "@/lib/quire/formation";
+import { DEFAULT_FORMATION, placeUndo, planFormation, type Formation } from "@/lib/quire/formation";
 import { manuallyVisible } from "@/lib/quire/tabletop-geometry";
 
 export type MapTool =
@@ -464,27 +464,11 @@ export function useMapTabletopTools(
             before: table.journal.world?.tabletop ?? null,
             session: { ...session, partyFormation: current.formation },
           });
-        const placedNew = entries.filter((e) => !e.before);
         resultToast(`Placed ${entries.length} on ${map.name}`, {
-          // The inverse: moved tokens go back, new ones are removed, if nothing changed since.
-          undo: () => {
-            const now = latest.current.tokens ?? [];
-            const back = entries
-              .filter((e) => e.before)
-              .map((e) => ({ tokenId: e.tokenId, before: now.find((t) => t.id === e.tokenId) ?? e.token, token: e.before! }));
-            void act({
-              kind: "map-tokens-place",
-              mapId: map.id,
-              grid: map.grid!,
-              place: back,
-              remove: placedNew.map((e) => ({
-                mapId: map.id,
-                grid: map.grid!,
-                tokenId: e.tokenId,
-                before: now.find((t) => t.id === e.tokenId) ?? e.token,
-              })),
-            });
-          },
+          // The inverse: moved tokens go back, new ones are removed, only while every token is
+          // still exactly as placed (`before` is the placed token, checked by the server).
+          undo: () =>
+            void act(placeUndo(map.id, map.grid!, entries)),
         });
       },
     );
@@ -1253,19 +1237,15 @@ export function useMapTabletopTools(
     void act({ kind: "map-save", mapId: map.id, before: map, map: next }, () => {
       setGridDialog(null);
       resultToast("Grid mode on · grid aligned under the tokens", {
+        // Only while nothing changed since the align; the save is checked against `current`.
         undo: () => {
           const current = latest.current;
-          void act({
-            kind: "map-save",
-            mapId: map.id,
-            before: current,
-            map: {
-              ...current,
-              grid: previous.grid,
-              tokens: previous.tokens,
-              tabletop: { ...readMapTabletop(current), snap: settings.snap },
-            },
-          });
+          const restored = alignUndoMap(current, next, previous);
+          if (!restored) {
+            setError("The map changed since; undo not available.");
+            return;
+          }
+          void act({ kind: "map-save", mapId: map.id, before: current, map: restored });
         },
       });
     });
