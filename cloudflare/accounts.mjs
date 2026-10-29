@@ -12,7 +12,8 @@ import { campaignBackupKey } from "../src/lib/account/campaign-backups.ts";
 import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
-import { campaignRecords } from "./campaign-records.mjs";
+import { campaignRecordsStream } from "./campaign-records.mjs";
+import { streamedJson } from "./campaign-file-stream.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
 import { libraryMemberRoom } from "./library-member-room.mjs";
 import {
@@ -22,7 +23,7 @@ import {
   roomVersionSql,
   roomWriteStatements,
 } from "./room-storage.mjs";
-import { CURRENT_TABLETOP_PROTOCOL, FOLLOW_VIEW_PROTOCOL, hasFollowView, GROUP_COMMANDS_PROTOCOL, hasPartyFormation, FOOTPRINT_PROTOCOL, GRID_MODE_PROTOCOL, PLAYER_MOVEMENT_PROTOCOL, hasFootprintTokens, hasHiddenGrids, hasMovementSettings, hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
+import { FOLLOW_VIEW_PROTOCOL, hasFollowView, GROUP_COMMANDS_PROTOCOL, hasPartyFormation, FOOTPRINT_PROTOCOL, GRID_MODE_PROTOCOL, PLAYER_MOVEMENT_PROTOCOL, hasFootprintTokens, hasHiddenGrids, hasMovementSettings, hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 /** Tabletop protocol the account client declared: 0 (none) to 9 (current; 4 adds nothing here,
  * 5 adds placement pin styles, 6 map scale bars, 7 journeys, 8 NPC service lists, 9 services
@@ -530,7 +531,11 @@ export async function handleAccounts(request, env, context = null) {
       return cors(json(await moderation(db, userId, body, session.session.id)));
     }
     if (path === "/api/account/campaign" && request.method === "POST")
-      return cors(json(await campaignAction(db, userId, body, session.session)));
+    {
+      // Download a copy answers with a streamed response (campaign-file-stream.mjs).
+      const result = await campaignAction(db, userId, body, session.session);
+      return cors(result instanceof Response ? result : json(result));
+    }
     if (path === "/api/account/restore-backup" && request.method === "POST")
       return cors(
         json(
@@ -552,12 +557,9 @@ export async function handleAccounts(request, env, context = null) {
     if (path === "/api/account/map-assets" && request.method === "POST")
       return cors(json(await accountMapAsset(db, userId, body)));
     if (path === "/api/account/records" && request.method === "GET") {
-      const result = await campaignRecords(db, userId);
-      const protocol = tabletopHeader(request);
-      if (protocol < CURRENT_TABLETOP_PROTOCOL)
-        for (const report of result.reports)
-          if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, protocol);
-      return cors(json(result));
+      // Streamed one archived session at a time (campaign-records.mjs); refusals come first.
+      const records = await campaignRecordsStream(db, userId, tabletopHeader(request));
+      return cors(streamedJson(records.chunks));
     }
     if (path === "/api/account/library" && request.method === "GET") {
       const [members, backups, characters, recovery] = await Promise.all([

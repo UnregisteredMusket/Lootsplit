@@ -1,0 +1,8 @@
+{
+  "title": "Restoring a deleted campaign works for much larger campaigns",
+  "summary": "Restoring a shared campaign's recovery copy, and saving campaigns with long histories, now need far less server memory.",
+  "items": [
+    "Restore from a deletion recovery copy handles archived sessions one at a time, so campaigns with many archived sessions restore reliably.",
+    "Saving a shared campaign whose whole history is open no longer copies that history several times on the server. What is stored is exactly the same as before."
+  ]
+}

@@ -536,7 +536,7 @@ test("exports and deletion copies hold the complete history, byte for byte as wi
     await send(dm, "s1", [{ id: "session-1", kind: "session", name: "One", end: false }]);
     await send(dm, "end-1", [{ id: "end-1", kind: "session", name: "One", end: true }]);
     await history(seats, 120, "y");
-    const exported = await campaignAction(db, userId, { action: "export", code: dm.code }, actor);
+    const exported = await (await campaignAction(db, userId, { action: "export", code: dm.code }, actor)).json();
     const normalize = (value) => JSON.parse(JSON.stringify(value).split(dm.code).join("CODE"));
     payloads.push({ page, exported: normalize(exported.payload), pages: (await manifest(dm.code)).filter((e) => e.path[0] === "$history").length });
     // The deletion copy: the same file plus its recovery records.

@@ -19,8 +19,8 @@ export function StorageWarningNotice() {
       <p className="history-loader-note">
         <HardDriveDownload size={16} aria-hidden /> This campaign now keeps {mb(warning.totalBytes)} MB online with its
         archived sessions (more than {mb(warning.limit)} MB). Everything still works and sessions still end as usual,
-        but very large campaigns can become too big to export or to undo old entries online. Download a copy to keep the
-        whole campaign safe.
+        but very large campaigns can become too big to open in older versions of the Android app, or to delete and restore
+        online. Download a copy to keep the whole campaign safe.
       </p>
       <AppLink href="/account#account-campaigns" className="multiplayer-settings">
         Download a copy

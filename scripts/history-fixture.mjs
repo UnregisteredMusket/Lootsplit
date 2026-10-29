@@ -56,9 +56,11 @@ export function archiveSessions(room, count, bytes, seatIds) {
       at: 1_600_000_000_000 + s * 1e6 + i,
       purseId: i % 2 ? "a" : "party",
       shopId: null,
-      summary: `Session ${s} purchase ${i}: rope, lantern oil and rations`,
+      // Every tenth line is a plain adjustment, which Undo can reverse (memory of Undo of an
+      // archived line: room-memory-measure.mjs `undo-archived`).
+      summary: i % 10 ? `Session ${s} purchase ${i}: rope, lantern oil and rations` : `Session ${s} adjust ${i}: rope, lantern oil and rations`,
       copper: -1 - (i % 97),
-      transactionType: "purchase",
+      transactionType: i % 10 ? "purchase" : "adjustment",
     }));
     snapshot.notes = Array.from({ length: Math.round((bytes * 0.3) / 160) }, (_, i) => ({
       id: `s${s}-n-${i}`,

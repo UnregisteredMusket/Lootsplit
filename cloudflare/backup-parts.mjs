@@ -74,17 +74,23 @@ export async function readBackupPayload(db, backupId, body) {
   const row = JSON.parse(body);
   const marker = row && typeof row === "object" ? row[BACKUP_PARTS_KEY] : undefined;
   if (marker === undefined) return row;
-  const rows = (
+  /** @type {{ part: number; body: string }[] | null} */
+  let rows = (
     await db.prepare("SELECT part,body FROM library_backup_parts WHERE backup_id=? ORDER BY part").bind(backupId).all()
   ).results;
-  const text = rows.map((r) => r.body).join("");
-  if (
-    rows.length !== marker.parts ||
-    rows.some((r, i) => Number(r.part) !== i) ||
-    encoder.encode(text).length !== marker.bytes ||
-    createHash("sha256").update(text).digest("hex") !== marker.sha256
-  )
+  // Size and hash part by part (parts never split a character, so they add up to the whole
+  // text's), and the parts let go once joined: the backup is held once as text, not three times
+  // (follow-up (b)).
+  const hash = createHash("sha256");
+  let bytes = 0;
+  for (const r of rows) {
+    hash.update(r.body);
+    bytes += encoder.encode(r.body).length;
+  }
+  if (rows.length !== marker.parts || rows.some((r, i) => Number(r.part) !== i) || bytes !== marker.bytes || hash.digest("hex") !== marker.sha256)
     throw Object.assign(Error("This backup is incomplete in cloud storage and cannot be read."), { status: 409 });
+  const text = rows.map((r) => r.body).join("");
+  rows = null;
   const payload = JSON.parse(text);
   delete row[BACKUP_PARTS_KEY];
   return Object.assign(payload, row);
@@ -93,3 +99,56 @@ export async function readBackupPayload(db, backupId, body) {
 /** SQL for an account's stored backup bytes, parts included (bind the user id twice). */
 export const accountBackupBytesSql =
   "(SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_backups WHERE user_id=?)+(SELECT COALESCE(SUM(LENGTH(p.body)),0) FROM library_backup_parts p JOIN library_backups b ON b.id=p.backup_id WHERE b.user_id=?)";
+
+/**
+ * `backupParts` for a campaign JSON produced as a sequence of text chunks (campaign-file-stream.mjs),
+ * without ever holding it as one string when it is stored in parts: the same parts, marker and
+ * inline decision as `backupParts(chunks.join(""))`. Returns `{ text }` when it fits inline, else
+ * `{ chunked }`.
+ * @param {AsyncIterable<string>} chunks
+ * @returns {Promise<{ text: string; chunked: null } | { text: null; chunked: { marker: { parts: number; bytes: number; sha256: string }; parts: string[] } }>}
+ */
+export async function backupPartsFromChunks(chunks) {
+  const hash = createHash("sha256");
+  /** @type {string[] | null} text while it may still fit inline */
+  let small = [];
+  let bytes = 0;
+  /** @type {string[]} */
+  const parts = [];
+  // Encoded bytes not yet cut into parts, kept as pieces and joined only when a part is cut.
+  /** @type {Uint8Array[]} */
+  let pieces = [];
+  let pendingBytes = 0;
+  const cut = (/** @type {boolean} */ final) => {
+    if (!(pendingBytes > BACKUP_PART_BYTES || (final && pendingBytes))) return;
+    let pending = new Uint8Array(pendingBytes);
+    let offset = 0;
+    for (const piece of pieces) {
+      pending.set(piece, offset);
+      offset += piece.length;
+    }
+    while (pending.length > BACKUP_PART_BYTES || (final && pending.length)) {
+      let end = Math.min(pending.length, BACKUP_PART_BYTES);
+      while (end < pending.length && end > 0 && (pending[end] & 0xc0) === 0x80) end--;
+      parts.push(decoder.decode(pending.subarray(0, end)));
+      pending = pending.subarray(end);
+    }
+    pieces = pending.length ? [pending.slice()] : [];
+    pendingBytes = pending.length;
+  };
+  for await (const chunk of chunks) {
+    hash.update(chunk);
+    const encoded = encoder.encode(chunk);
+    bytes += encoded.length;
+    if (small) {
+      small.push(chunk);
+      if (bytes > BACKUP_INLINE_BYTES) small = null;
+    }
+    pieces.push(encoded);
+    pendingBytes += encoded.length;
+    cut(false);
+  }
+  if (small) return { text: small.join(""), chunked: null };
+  cut(true);
+  return { text: null, chunked: { marker: { parts: parts.length, bytes, sha256: hash.digest("hex") }, parts } };
+}
