@@ -1,0 +1,8 @@
+{
+  "title": "Session records load for accounts with long histories",
+  "summary": "Account → Session records now reads archived sessions one at a time on the server.",
+  "items": [
+    "Your archived session reports no longer need every session of every campaign in server memory at once, so they keep loading for campaigns with many archived sessions.",
+    "The reports you see, and who can see them, are exactly the same as before."
+  ]
+}

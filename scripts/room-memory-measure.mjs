@@ -59,7 +59,21 @@ async function setup(path) {
     storedBytes: Buffer.byteLength(stored.body),
     reportBytes: Number((await db.prepare("SELECT COALESCE(SUM(length(body)),0) AS n FROM campaign_room_reports WHERE code=?").bind(dm.code).first()).n),
   };
-  writeFileSync(path + ".json", JSON.stringify({ seats, sizes }));
+  // `--backup 1`: the campaign is then deleted from a DM account, leaving its deletion recovery
+  // copy for the `restore` op (the room itself is gone after this).
+  let backup = null;
+  if (flag("backup", 0)) {
+    const { campaignAction } = await import("../cloudflare/account-campaigns.mjs");
+    const user = "measure-owner", session = "measure-session";
+    await db.prepare(`INSERT INTO "user"(id,name,email,emailVerified,image,createdAt,updatedAt) VALUES(?, 'M', 'measure-owner@example.com', 1, null, 0, 0)`).bind(user).run();
+    await db.prepare(`INSERT INTO "session"(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,0,0,?)`).bind(session, new Date(Date.now() + 365 * 86_400_000).toISOString(), "measure-token", user).run();
+    const dmSeat = stored.room.seats.find((s) => s.role === "dm");
+    await db.prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)").bind(user, dm.code, dmSeat.id, dmSeat.token, "Measured").run();
+    const deleted = await campaignAction(db, user, { action: "delete", code: dm.code, confirm: dm.code, revision: stored.version.revision }, { id: session });
+    backup = { user, session, id: deleted.backupId };
+    sizes.backupBytes = Number((await db.prepare("SELECT length(body)+COALESCE((SELECT SUM(length(body)) FROM library_backup_parts WHERE backup_id=?1),0) AS n FROM library_backups WHERE id=?1").bind(backup.id).first()).n);
+  }
+  writeFileSync(path + ".json", JSON.stringify({ seats, sizes, backup }));
   return sizes;
 }
 
@@ -67,7 +81,13 @@ async function setup(path) {
  * `--op`: `read` (a changed-room read, default), `write` (a purchase from the DM, answered with
  * its view), `undo` (Undo of the oldest purchase: a command that needs the whole live ledger and
  * every archived session), `whole` (the whole campaign as exports and deletion copies read it:
- * every page and archived session, projected for the DM).
+ * every page and archived session, projected for the DM, as exports were built before part 2),
+ * `favour` ("favour whoever is behind" over every archived session, refused afterwards),
+ * `undo-archived` (Undo of a line in an archived session: only the sessions that can hold it are
+ * loaded since part 3), `stream` (the DM's campaign file streamed one archived session at a time, as Download a copy and
+ * deletion copies are built since part 2), `records` (Account → Session records streamed one
+ * archived session at a time, follow-up (c)), `records-whole` (records as built before it) and
+ * `restore` (restoring the deletion recovery copy that setup `--backup 1` leaves).
  */
 async function read(path) {
   const { seats } = JSON.parse(readFileSync(path + ".json", "utf8"));
@@ -78,6 +98,8 @@ async function read(path) {
   const { projectRecord } = await import("../src/lib/quire/session-records.ts");
   const { canonicalJson } = await import("../src/lib/quire/canonical-json.ts");
   const protocol = flag("protocol", 11);
+  // MEASURE_EVERY=1: load every archived session (no selections or favour digests), as before.
+  if (process.env.MEASURE_EVERY === "1") (await import("../src/lib/quire/cloud.server.ts")).setArchiveSelectionForTests(false);
   const n = flag("concurrency", 1);
   const op = (rest[rest.indexOf("--op") + 1] && rest.includes("--op")) ? rest[rest.indexOf("--op") + 1] : "read";
   const started = performance.now();
@@ -96,6 +118,63 @@ async function read(path) {
         const id = `undo-${process.pid}-${i}`;
         const view = await submitCommands({ ...seats[0], tabletopProtocol: protocol, batchId: id, commands: [{ id, kind: "ledger-void", target: { kind: "ledger", id: line.id }, before: canonicalJson(line), reason: "Measured." }] }).catch((error) => ({ error: String(error.message) }));
         return JSON.stringify(view).length;
+      }
+      if (op === "favour") {
+        // "Favour whoever is behind": fairness over every archived session is computed before the
+        // (deliberately stale) expectation is compared, so the refusal measures the whole work.
+        const id = `favour-${process.pid}-${i}`;
+        const view = await submitCommands({ ...seats[0], tabletopProtocol: protocol, batchId: id, commands: [{ id, kind: "loot-resolve", method: "round-robin", lots: [{ holdingId: "measure-none", quantity: 1 }], favour: { basis: "campaign" }, expect: "stale" }] }).catch((error) => ({ error: String(error.message) }));
+        if (!/Claims changed|not in the pool|no longer|pool/i.test(view.error ?? "")) throw Error(view.error ?? "favour unexpectedly applied");
+        return JSON.stringify(view).length;
+      }
+      if (op === "undo-archived") {
+        // Undo of a line in the first archived session (history-fixture.mjs `archiveSessions`):
+        // since part 3 only the sessions that can hold it are loaded (archive-keys.mjs).
+        const line = { id: "s0-l-10", at: 1_600_000_000_010, purseId: "party", shopId: null, summary: "Session 0 adjust 10: rope, lantern oil and rations", copper: -11, transactionType: "adjustment" };
+        const id = `undo-archived-${process.pid}-${i}`;
+        const view = await submitCommands({ ...seats[0], tabletopProtocol: protocol, batchId: id, commands: [{ id, kind: "ledger-void", target: { kind: "ledger", id: line.id }, before: canonicalJson(line), reason: "Measured." }] }).catch((error) => ({ error: String(error.message) }));
+        if (view.error) throw Error(view.error);
+        return JSON.stringify(view).length;
+      }
+      if (op === "stream") {
+        // Download a copy / deletion copy as streamed since part 2 (campaign-file-stream.mjs).
+        const { readStoredRoom } = await import("../cloudflare/room-storage.mjs");
+        const { campaignFileStream } = await import("../cloudflare/campaign-file-stream.mjs");
+        const { room } = await readStoredRoom(globalThis.__env__.DB, seats[0].code);
+        const file = await campaignFileStream(globalThis.__env__.DB, room, room.seats[0], (projected) => projected);
+        let length = 0;
+        for await (const chunk of file.chunks()) length += chunk.length;
+        return length;
+      }
+      if (op === "records" || op === "records-whole") {
+        // Account → Session records for the DM's account: `records` streamed one archived session
+        // at a time (follow-up (c)); `records-whole` every session hydrated at once, as before it.
+        const db = globalThis.__env__.DB;
+        const user = `measure-user-${i}`;
+        const { readStoredRoom } = await import("../cloudflare/room-storage.mjs");
+        const { room } = await readStoredRoom(db, seats[0].code);
+        const seat = room.seats.find((s) => s.role === "dm");
+        await db.prepare(`INSERT OR IGNORE INTO "user"(id,name,email,emailVerified,image,createdAt,updatedAt) VALUES(?, 'M', ?, 1, null, 0, 0)`).bind(user, `${user}@example.com`).run();
+        await db.prepare("DELETE FROM library_members WHERE code=?").bind(seats[0].code).run();
+        await db.prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)").bind(user, seats[0].code, seat.id, seat.token, "Measured").run();
+        if (op === "records") {
+          const { campaignRecordsStream } = await import("../cloudflare/campaign-records.mjs");
+          let length = 0;
+          for await (const chunk of (await campaignRecordsStream(db, user)).chunks()) length += chunk.length;
+          return length;
+        }
+        const { hydrateRoomImages } = await import("../cloudflare/room-images.mjs");
+        const { readArchivedSnapshot } = await import("../src/lib/quire/journal.ts");
+        const whole = await hydrateRoomImages(db, room.code, room);
+        const reports = whole.table.journal.reports.map((r) => ({ id: r.id, snapshot: projectRecord(readArchivedSnapshot(r.snapshot), seat) }));
+        return JSON.stringify({ reports }).length;
+      }
+      if (op === "restore") {
+        // Restore of a deletion recovery copy (setup `--backup 1`), as Account → Restore runs it.
+        const { backup } = JSON.parse(readFileSync(path + ".json", "utf8"));
+        const { restoreDeletedCampaign } = await import("../cloudflare/campaign-recovery.mjs");
+        const restored = await restoreDeletedCampaign(globalThis.__env__.DB, backup.user, { id: backup.id, requestKey: `measure-restore-${process.pid}-${i}` }, { id: backup.session }, 1_000);
+        return JSON.stringify(restored).length;
       }
       if (op === "whole") {
         const room = await readRoom(seats[0].code);

@@ -63,7 +63,13 @@ export function readTradeSettlementHolding(receipt: TradeReceipt): Holding {
   return holding;
 }
 
-type LedgerIndex = { lines: LedgerLine[]; conflicting: Set<string> };
+/**
+ * `lines`: one copy per line ID (the first found: current ledger, then archives in order), used to
+ * find a receipt (`exactLine` refuses an ID with differing copies). `rows`: every distinct copy, used for
+ * everything that decides whether something was already reversed or belongs to a trade, so a void
+ * or a trade leg stored under an ID another line also uses is never hidden (money review of #385).
+ */
+type LedgerIndex = { lines: LedgerLine[]; rows: LedgerLine[]; conflicting: Set<string> };
 function ledgerIndex(table: CloudTable, seat: CloudSeat, ownedDevice = false): LedgerIndex {
   const rows = [...table.ledger];
   for (const record of table.journal?.reports ?? []) {
@@ -73,21 +79,30 @@ function ledgerIndex(table: CloudTable, seat: CloudSeat, ownedDevice = false): L
     }
   }
   const unique = new Map<string, LedgerLine>(), conflicting = new Set<string>();
+  // Every distinct copy (identical copies of one line count once).
+  const copies = new Map<string, LedgerLine[]>(), distinct: LedgerLine[] = [];
   for (const line of rows) {
     const previous = unique.get(line.id);
     if (previous && !same(previous, line)) conflicting.add(line.id);
     else unique.set(line.id, line);
+    const seen = copies.get(line.id) ?? [];
+    if (!seen.some(copy => same(copy, line))) {
+      seen.push(line);
+      copies.set(line.id, seen);
+      distinct.push(line);
+    }
   }
-  return { lines: [...unique.values()], conflicting };
+  return { lines: [...unique.values()], rows: distinct, conflicting };
 }
 function exactLine(index: LedgerIndex, id: string): LedgerLine | undefined {
   if (index.conflicting.has(id)) unsafe("The current ledger and an archive disagree about this receipt.");
   return index.lines.find(line => line.id === id);
 }
 function wasVoided(index: LedgerIndex, id: string) {
-  return index.lines.some(line => line.reversalOf === id || line.summary.includes("(void:" + id + ")"));
+  return index.rows.some(line => line.reversalOf === id || line.summary.includes("(void:" + id + ")"));
 }
-function receiptForLine(table: CloudTable, line: LedgerLine): TradeReceipt | undefined {
+/** The market receipt a ledger line belongs to, if any (also used by the server to plan which archives an Undo reads). */
+export function receiptForLine(table: CloudTable, line: LedgerLine): TradeReceipt | undefined {
   const receipts = table.journal?.tradeEconomy?.receipts ?? [];
   if (line.trade) return receipts.find(receipt => receipt.id === line.trade!.receiptId);
   return receipts.find(receipt =>
@@ -151,7 +166,7 @@ function reverseExchange(
   if (!offer || exchange?.purseId !== treasuryId || !treasury?.nonParty || treasury.control !== "npc" || treasury.kind !== "character" ||
     treasuryId === receipt.purseId)
     unsafe("The original exchange stock or treasury is missing or changed.");
-  const legs = index.lines.filter(line => line.trade?.receiptId === receipt.id);
+  const legs = index.rows.filter(line => line.trade?.receiptId === receipt.id);
   for (const line of legs) {
     exactLine(index, line.id);
     if (wasVoided(index, line.id))
@@ -304,7 +319,7 @@ export function applyLedgerVoid(
         unsafe("This operation contains incompatible trade receipts.");
     }
     if (receipt.origin === "shop") {
-      const matching = index.lines.filter(line =>
+      const matching = index.rows.filter(line =>
         line.trade?.receiptId === receipt.id && line.trade.leg === "owner" ||
         !line.trade && line.id === receipt.id,
       );

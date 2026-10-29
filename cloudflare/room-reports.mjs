@@ -1,5 +1,7 @@
 import { roomCommittedSql } from "./room-storage.mjs";
 import { DEFERRED_REPORT_PREFIX } from "../src/lib/quire/history-pages.ts";
+import { archiveKeyStatements } from "./archive-keys.mjs";
+import { decodeReportDelta, encodeReportDelta, reportDeltaMarker, REPORT_DELTA_KEY } from "./report-delta.mjs";
 /**
  * Archived session snapshots (`table.journal.reports[].snapshot`) live in campaign_room_reports,
  * not in the room row. The stored room keeps each report's id, name, time and seat list plus a
@@ -103,17 +105,23 @@ async function sha256(text) {
 }
 
 /**
- * Replaces inline snapshots with references. Returns a new value; the input is not changed.
+ * Replaces inline snapshots with references. Returns a new value; the input is not changed
+ * (unless `options.owned`). `options.transform` rewrites each snapshot's text before it is stored
+ * and named (image references, room-images.mjs).
  * @template T @param {T} value
+ * @param {{ owned?: boolean; transform?: (text: string) => string }} [options]
  * `changed` is true when the value was rewritten (a snapshot moved out, or a deferred report
  * turned back into its reference).
  * @returns {Promise<{ value: T; reports: { reference: string; body: string }[]; changed: boolean }>}
  */
-export async function encodeRoomReports(value) {
+export async function encodeRoomReports(value, options = {}) {
   const documents = new Map();
   if (!reportLists(value).length) return { value, reports: [], changed: false };
   let changed = false;
-  const result = structuredClone(value);
+  // `owned`: the value is the caller's own fresh copy (room-images.mjs), changed in place rather
+  // than cloned with every archived session it carries.
+  const result = options.owned ? value : structuredClone(value);
+  const transform = options.transform ?? ((/** @type {string} */ text) => text);
   for (const list of reportLists(result))
     for (const [index, report] of list.entries()) {
       if (!report || typeof report.snapshot !== "string") continue;
@@ -126,8 +134,9 @@ export async function encodeRoomReports(value) {
         changed = true;
         continue;
       }
-      const reference = "session-report:" + (await sha256(report.snapshot));
-      documents.set(reference, { reference, body: report.snapshot });
+      const text = transform(report.snapshot);
+      const reference = "session-report:" + (await sha256(text));
+      documents.set(reference, { reference, body: text });
       const { snapshot: _snapshot, ...stored } = report;
       list[index] = { ...stored, snapshotReference: reference };
       changed = true;
@@ -156,7 +165,53 @@ export async function readRoomReportSnapshots(db, code, references) {
       .all();
     for (const row of rows.results) bodies.set(row.reference, row.body);
   }
-  return joinReportParts(db, code, bodies);
+  return joinReportDeltas(db, code, await joinReportParts(db, code, bodies));
+}
+
+/**
+ * Delta-stored snapshots (report-delta.mjs): each is decoded from its base, a full snapshot of the
+ * same room, and verified against its own reference. Bases are never deltas themselves.
+ * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
+ * @param {string} code @param {Map<string, string>} texts @returns {Promise<Map<string, string>>}
+ */
+async function joinReportDeltas(db, code, texts) {
+  /** @type {Map<string, NonNullable<ReturnType<typeof reportDeltaMarker>>>} */
+  const deltas = new Map();
+  for (const [reference, text] of texts) {
+    const marker = reportDeltaMarker(text);
+    if (marker) deltas.set(reference, marker);
+  }
+  if (!deltas.size) return texts;
+  const result = new Map(texts);
+  const needed = [...new Set([...deltas.values()].map((m) => m.base))].filter((base) => !texts.has(base) || deltas.has(base));
+  /** @type {Map<string, string>} */
+  const bases = new Map([...texts].filter(([reference]) => !deltas.has(reference)));
+  if (needed.length) {
+    /** @type {Map<string, string>} */
+    const rows = new Map();
+    for (let offset = 0; offset < needed.length; offset += 80) {
+      const page = needed.slice(offset, offset + 80);
+      const found = await db
+        .prepare(`SELECT reference,body FROM campaign_room_reports WHERE code=? AND reference IN (${page.map(() => "?").join(",")})`)
+        .bind(code, ...page)
+        .all();
+      for (const row of found.results) rows.set(row.reference, row.body);
+    }
+    for (const [reference, text] of await joinReportParts(db, code, rows)) bases.set(reference, text);
+  }
+  for (const [reference, marker] of deltas) {
+    const base = bases.get(marker.base);
+    if (base === undefined || reportDeltaMarker(base))
+      throw Error("An archived session report is incomplete. Keep the original recovery export; the campaign was not changed.");
+    const text = decodeReportDelta(marker, base);
+    // Verified against the row's own reference (the snapshot this row stands for). A row whose
+    // text merely begins like a delta (an import, or an older Worker that stored a delta's text as
+    // a snapshot) does not decode to its own reference and is refused, never shown as history.
+    if (marker.reference !== reference || "session-report:" + (await sha256(text)) !== reference)
+      throw Error("An archived session report is damaged. Keep the original recovery export; the campaign was not changed.");
+    result.set(reference, text);
+  }
+  return result;
 }
 
 /** A deferred report's stored reference (history-pages.ts `DEFERRED_REPORT_PREFIX`), else null. @param {unknown} snapshot */
@@ -219,10 +274,29 @@ export async function roomReportStatements(db, room, encoded, writeId) {
     .bind(room.code)
     .all();
   const existing = new Set(present.results.map((row) => row.reference));
-  return encoded.reports
-    .filter((doc) => !existing.has(doc.reference))
+  const fresh = encoded.reports.filter((doc) => !existing.has(doc.reference));
+  if (!fresh.length) return [];
+  // Delta storage (report-delta.mjs): each new snapshot against the latest full snapshot of the
+  // room (stored before, or earlier in this same write).
+  /** @type {{ reference: string; text: string } | null} */
+  let base = reportDeltas ? await latestFullReport(db, room.code) : null;
+  /** @type {{ reference: string; body: string }[]} */
+  const docs = [];
+  for (const doc of fresh) {
+    const delta = base && base.reference !== doc.reference ? encodeReportDelta(doc.body, doc.reference, base.text, base.reference) : null;
+    // Measured in UTF-8 bytes (D1's row limit); a larger delta is stored as a full snapshot,
+    // which is split into parts when it needs to be.
+    if (delta && encoder.encode(delta).length <= REPORT_INLINE_BYTES) docs.push({ reference: doc.reference, body: delta });
+    else {
+      docs.push(doc);
+      base = { reference: doc.reference, text: doc.body };
+    }
+  }
+  // Lookup keys of the new sessions (archive-keys.mjs, migration 0030), from their full text.
+  const keys = archiveKeyStatements(db, room.code, fresh, committed);
+  return docs
     .flatMap((doc) => {
-      const parts = reportParts(doc.body);
+      const parts = reportDeltaMarker(doc.body) ? null : reportParts(doc.body);
       const body = parts
         ? JSON.stringify({ [REPORT_PARTS_KEY]: { parts: parts.length, bytes: encoder.encode(doc.body).length, reference: doc.reference } })
         : doc.body;
@@ -241,5 +315,42 @@ export async function roomReportStatements(db, room, encoded, writeId) {
             .bind(room.code, doc.reference, index, part, ...committed.args, room.code, doc.reference),
         ),
       ];
-    });
+    })
+    .concat(keys);
+}
+
+/**
+ * The room's most recently stored full snapshot (not a delta), joined from its parts, or null.
+ * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
+ * @param {string} code @returns {Promise<{ reference: string; text: string } | null>}
+ */
+async function latestFullReport(db, code) {
+  const row = await db
+    .prepare(`SELECT reference,body FROM campaign_room_reports WHERE code=? AND substr(body,1,${REPORT_DELTA_KEY.length + 4}) <> '{"${REPORT_DELTA_KEY}":' ORDER BY rowid DESC LIMIT 1`)
+    .bind(code)
+    .first();
+  if (!row) return null;
+  const text = (await joinReportParts(db, code, new Map([[row.reference, row.body]]))).get(row.reference);
+  // A row an older Worker stored under another reference is verified like any part marker.
+  return typeof text === "string" && !reportDeltaMarker(text) ? { reference: row.reference, text } : null;
+}
+/**
+ * SQL for the logical size of a room's archived sessions in UTF-8 bytes (of the snapshots they
+ * stand for: a delta counts its whole snapshot's bytes, a full row or part its own bytes), for the
+ * total-size warning (room-store.server.ts).
+ */
+export const ARCHIVED_BYTES_SQL = `SELECT COALESCE(SUM(CASE WHEN substr(body,1,${REPORT_DELTA_KEY.length + 4})='{"${REPORT_DELTA_KEY}":' THEN json_extract(body,'$."${REPORT_DELTA_KEY}".bytes') ELSE length(CAST(body AS BLOB)) END),0)+(SELECT COALESCE(SUM(length(CAST(body AS BLOB))),0) FROM campaign_room_report_parts WHERE code=?1) AS n FROM campaign_room_reports WHERE code=?1`;
+
+/**
+ * Release order (integrity review of #382). Reading deltas ships first, with writes still full:
+ * an older Worker (deploy overlap, or a revert) reads a delta row's body as if it were the
+ * snapshot, so delta rows may only be written once every Worker that can serve this database
+ * decodes them. `REPORT_DELTA_WRITES` was false in the reader release (#382) and is turned on by
+ * this release, which merges only after the reader release is live.
+ */
+export const REPORT_DELTA_WRITES = true;
+let reportDeltas = REPORT_DELTA_WRITES;
+/** Test-only: write new snapshots as deltas (true) or in full (false). */
+export function setReportDeltasForTests(/** @type {boolean} */ on) {
+  reportDeltas = on;
 }

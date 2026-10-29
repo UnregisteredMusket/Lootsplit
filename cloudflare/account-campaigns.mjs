@@ -1,4 +1,4 @@
-import { hydrateRoomImages } from "./room-images.mjs";
+import { campaignFileStream, streamedJson } from "./campaign-file-stream.mjs";
 import {
   deletionRecoverySql,
   deletionRecoveryArgs,
@@ -6,7 +6,6 @@ import {
   recoveryAccountGuardSql,
   recoveryAccountGuardArgs,
 } from "./campaign-recovery.mjs";
-import { readCloudTable } from "../src/lib/quire/cloud.ts";
 import {
   assertCanHost,
   hostedCampaignGuardArgs,
@@ -14,14 +13,13 @@ import {
   hostedCampaignLimit,
   hostedCampaignLimitError,
 } from "./hosted-campaigns.mjs";
-import { projectRecord } from "../src/lib/quire/session-records.ts";
 import {
   ACCOUNT_BACKUP_BYTES,
   accountBackupBytesSql,
   BACKUP_MAX_BYTES,
   BACKUP_PARTS_KEY,
   backupPartStatements,
-  backupParts,
+  backupPartsFromChunks,
   backupPartsCompleteSql,
 } from "./backup-parts.mjs";
 import {
@@ -151,24 +149,28 @@ export async function campaignAction(db, userId, body, actor) {
     fail("Submit or discard pending turns in the campaign before deleting it.", 409);
   if (!exporting && body.revision !== row.version.revision)
     fail("The campaign changed. Refresh your library before deleting it.", 409);
-  let projected;
+  // The DM's projection of the whole campaign, produced one archived session at a time
+  // (campaign-file-stream.mjs): byte for byte the file it was before, within bounded memory.
+  let file;
   try {
-    projected = projectRecord(await hydrateRoomImages(db, room.code, room.table), seat);
+    file = await campaignFileStream(
+      db,
+      room,
+      seat,
+      (projected) => campaignFile(projected, room),
+      exporting ? (payload) => ({ payload, name: member.name }) : undefined,
+    );
   } catch {
     fail(
       "An archived record cannot be safely backed up. Your campaign was not deleted. Export your records for recovery first.",
       409,
     );
   }
-  if (projected.journal?.reports?.some((report) => report.error) || !readCloudTable(projected))
-    fail(
-      "An archived record cannot be safely backed up. Your campaign was not deleted. Export your records for recovery first.",
-      409,
-    );
   // Download a copy (owner decision 2026-10-28: encourage local copies): the same campaign file
   // the deletion copy holds (the DM's projection, no private PDFs), without its recovery
   // records. It is a device backup file (kind "quire", version 2) that Import reads. Read-only.
-  if (exporting) return { payload: campaignFile(projected, room), name: member.name };
+  // Streamed: `{ payload, name }`, as the account API answered before.
+  if (exporting) return streamedJson(file.chunks);
   // Check existing records before mutation. The transaction captures them again,
   // so a legitimate concurrent saved roll/encounter is included as well.
   let recovery;
@@ -197,7 +199,6 @@ export async function campaignAction(db, userId, body, actor) {
       409,
     );
   }
-  const payload = campaignFile(projected, room);
   // Per-campaign limit (backup-rotation.mjs): when this room already has the limit's worth of
   // online backups, its oldest is replaced by this recovery copy (confirmed by `replace`), in the
   // same batch and only once the copy is complete; the deletion is no longer refused for it.
@@ -206,8 +207,9 @@ export async function campaignAction(db, userId, body, actor) {
   const backupId = crypto.randomUUID();
   // A campaign too large for one backup row is stored in parts (backup-parts.mjs, migration
   // 0027); the row then holds the parts marker and the recovery records.
-  const payloadText = JSON.stringify(payload);
-  const chunked = backupParts(payloadText);
+  const built = await backupPartsFromChunks(file.chunks());
+  const payloadText = built.text ?? "";
+  const chunked = built.chunked;
   if (chunked && chunked.marker.bytes > BACKUP_MAX_BYTES)
     fail(
       "Campaign access changed or its complete recovery copy exceeds the supported cloud size. Your campaign was not deleted. Refresh or download your backups.",

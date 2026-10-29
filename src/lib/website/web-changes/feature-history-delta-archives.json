@@ -1,0 +1,8 @@
+{
+  "title": "Groundwork for smaller archived sessions",
+  "summary": "The server can now read archived sessions stored in a compact form, ready for the next update to start saving them that way.",
+  "items": [
+    "Archived sessions are still saved exactly as before. This update only teaches the server to read the compact form, where a session stores what changed since an earlier one, and to check every session it rebuilds before showing it.",
+    "Nothing changes in how campaigns look, play, download or restore."
+  ]
+}
