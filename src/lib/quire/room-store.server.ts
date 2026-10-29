@@ -4,6 +4,7 @@ import {
   hydrateRoomImages,
   roomImageStatements,
   ROOM_BODY_LIMIT,
+  ROOM_ROW_LIMIT,
   ROOM_IMAGE_SOURCES,
 } from "../../../cloudflare/room-images.mjs";
 import {
@@ -238,22 +239,27 @@ export async function readCombatView(code: string): Promise<CombatViewRead | nul
   return { room, encounter: read.encounter };
 }
 /**
- * D1 rejects rows above 2,000,000 bytes with an opaque error. Room bodies (after images, resource
- * packs and archived session snapshots move to their own tables) and each archived snapshot row are
- * refused below that with a clear message, and the refusal is logged to the owner monitor
- * (`room-storage`, registered in BUILTIN_LOGS). The stored campaign is never changed by a refusal.
+ * A room write above the campaign cap (`ROOM_BODY_LIMIT`, the assembled stored room after images,
+ * resource packs and archived session snapshots move to their own tables), or one that would store
+ * a single row above `ROOM_ROW_LIMIT` (an archived snapshot, or a sectioned room's own row; D1
+ * rejects rows above 2,000,000 bytes with an opaque error), is refused with a clear message and
+ * logged to the owner monitor (`room-storage`, registered in BUILTIN_LOGS). The stored campaign is
+ * never changed by a refusal. Limits: src/lib/quire/room-size.ts.
  */
-export { ROOM_BODY_LIMIT };
+export { ROOM_BODY_LIMIT, ROOM_ROW_LIMIT };
 type Encoded = Awaited<ReturnType<typeof encodeRoomImages>>;
 const utf8 = (text: string) => new TextEncoder().encode(text).length;
 async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
   const { bytes, largestReport } = encodedRoomBytes(encoded);
-  if (bytes <= ROOM_BODY_LIMIT && largestReport <= ROOM_BODY_LIMIT) return;
+  // Only a room above the inline threshold has a separate row size (sectioned storage).
+  const storage = bytes <= ROOM_ROW_LIMIT ? null : roomStorageSizes(encoded.body);
+  const rowBytes = storage?.rowBytes ?? bytes;
+  if (bytes <= ROOM_BODY_LIMIT && largestReport <= ROOM_ROW_LIMIT && rowBytes <= ROOM_ROW_LIMIT) return;
   const now = Date.now();
   try {
     // `bytes` is the assembled stored room (the logical cap); `storage` is what the row and its
     // sections would hold (sectioned storage, step 2b).
-    const storage = roomStorageSizes(encoded.body);
+    const sizes = storage ?? roomStorageSizes(encoded.body);
     const stored = JSON.parse(encoded.body) as CloudRoom;
     const size = (value: unknown) => (value === undefined ? 0 : utf8(JSON.stringify(value)));
     const { initializeMonitor, recordLog } = await import("../../../cloudflare/monitor-journal.mjs");
@@ -269,17 +275,18 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
         id: `room-storage:${tag}:${Math.floor(now / 1_800_000)}`,
         source: "room-storage",
         observedAt: now,
-        summary: `A shared room write was refused before reaching D1: ${bytes} bytes (largest archived snapshot ${largestReport} bytes) exceeds the ${ROOM_BODY_LIMIT}-byte budget. The stored campaign was not changed. Later refusals for this room in the same half-hour share this entry.`,
+        summary: `A shared room write was refused before reaching D1: ${bytes} bytes (largest archived snapshot ${largestReport} bytes, room row ${rowBytes} bytes) exceeds the ${ROOM_BODY_LIMIT}-byte campaign budget or the ${ROOM_ROW_LIMIT}-byte row budget. The stored campaign was not changed. Later refusals for this room in the same half-hour share this entry.`,
         room: tag,
         revision: room.revision,
         bytes,
         largestReport,
         limit: ROOM_BODY_LIMIT,
+        rowLimit: ROOM_ROW_LIMIT,
         storage: {
-          sectioned: storage.sectioned,
-          rowBytes: storage.rowBytes,
-          sectionBytes: storage.sectionBytes,
-          sections: storage.sections,
+          sectioned: sizes.sectioned,
+          rowBytes: sizes.rowBytes,
+          sectionBytes: sizes.sectionBytes,
+          sections: sizes.sections,
         },
         parts: {
           notes: size(stored.table?.notes),
@@ -300,7 +307,9 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
   }
   throw Object.assign(
     Error(
-      `This campaign is too large to save online (${(Math.max(bytes, largestReport) / 1e6).toFixed(2)} MB; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB). Nothing was changed and pending actions are preserved. The DM can end the session to archive the current messages and ledger, or export the campaign.`,
+      bytes > ROOM_BODY_LIMIT
+        ? `This campaign is too large to save online (${(bytes / 1e6).toFixed(2)} MB; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB). Nothing was changed and pending actions are preserved. The DM can end the session to archive the current messages and ledger, or export the campaign.`
+        : `Part of this campaign is too large to save online (${(Math.max(largestReport, rowBytes) / 1e6).toFixed(2)} MB in one piece; the limit is ${(ROOM_ROW_LIMIT / 1e6).toFixed(1)} MB). Nothing was changed and pending actions are preserved. The DM can end the session to archive the current messages and ledger, or export the campaign.`,
     ),
     { status: 413 },
   );

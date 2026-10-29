@@ -2,6 +2,7 @@ import { PlayerDisplayProvider } from "@/components/player-display-controller";
 import { CampaignGate } from "@/components/account/campaign-gate";
 import { MobileOwnerWidgetBridge } from "@/components/account/mobile-owner-widget";
 import { AppNotifications } from "@/components/app-notifications";
+import { CampaignLoadingHost } from "@/components/campaign-loading";
 import { RouteLoading } from "@/components/route-loading";
 import { DialogHost } from "@/components/confirm-dialog";
 import { APP_DESCRIPTION } from "@/lib/help/content";
@@ -124,6 +125,8 @@ function RootDocument() {
                     <EconomyProvider>
                       <PlayerDisplayProvider>
                         <AppNotifications />
+                        {/* Progress for a large shared campaign's first load or catch-up. */}
+                        <CampaignLoadingHost />
                         <QuestUpdateToasts />
                         <SplitViewProvider>
                           <Outlet />

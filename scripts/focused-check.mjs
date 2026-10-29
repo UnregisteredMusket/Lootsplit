@@ -33,6 +33,7 @@ const featureAudits = {
   "command-palette": "scripts/command-palette-browser-audit.mjs",
   "player-onboarding": "scripts/player-onboarding-browser-audit.mjs",
   "session-chip": "scripts/session-chip-browser-audit.mjs",
+  "campaign-loading": "scripts/campaign-loading-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { ROOM_LIMIT_TEXT } from "@/lib/quire/room-size";
 import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -678,7 +679,7 @@ export function useMapTabletopTools(
             Fog storage: {settings.fog.shapes.length} of 500 shapes ·{" "}
             {Math.max(1, Math.round(fogBytes / 1000))} KB including undo history
             {fogLarge &&
-              ". This map's fog is getting large; a shared campaign stops saving above 1.8 MB in total. Consolidate fog, or prefer rectangles, polygons or a larger brush for big areas."}
+              `. This map's fog is getting large; a shared campaign stops saving above ${ROOM_LIMIT_TEXT} in total. Consolidate fog, or prefer rectangles, polygons or a larger brush for big areas.`}
           </p>
           {consolidationProposal ? (
             <div

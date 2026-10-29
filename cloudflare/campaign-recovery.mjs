@@ -8,6 +8,7 @@ import {
   encodedRoomBytes,
   roomImageStatements,
   ROOM_BODY_LIMIT,
+  ROOM_ROW_LIMIT,
 } from "./room-images.mjs";
 import {
   assertCanHost,
@@ -15,7 +16,7 @@ import {
   hostedCampaignGuardSql,
   hostedCampaignLimit,
 } from "./hosted-campaigns.mjs";
-import { readRoomCore, roomWriteStatements } from "./room-storage.mjs";
+import { readRoomCore, roomStorageSizes, roomWriteStatements } from "./room-storage.mjs";
 
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
@@ -325,9 +326,10 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
   // D1's row limit and the restored row is already in its current shape.
   const encoded = await encodeRoomImages(room);
   const { bytes, largestReport } = encodedRoomBytes(encoded);
-  if (bytes > ROOM_BODY_LIMIT || largestReport > ROOM_BODY_LIMIT)
+  const rowBytes = bytes > ROOM_ROW_LIMIT ? roomStorageSizes(encoded.body).rowBytes : bytes;
+  if (bytes > ROOM_BODY_LIMIT || largestReport > ROOM_ROW_LIMIT || rowBytes > ROOM_ROW_LIMIT)
     fail(
-      `This campaign is too large to restore online (${(Math.max(bytes, largestReport) / 1e6).toFixed(2)} MB; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB). No campaign was created and your backup is still safe; download it for recovery.`,
+      `This campaign is too large to restore online (${(Math.max(bytes, largestReport) / 1e6).toFixed(2)} MB; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB, and ${(ROOM_ROW_LIMIT / 1e6).toFixed(1)} MB for one archived session). No campaign was created and your backup is still safe; download it for recovery.`,
       413,
     );
   const committed = "EXISTS(SELECT 1 FROM campaign_recoveries WHERE id=? AND user_id=?)";

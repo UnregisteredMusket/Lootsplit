@@ -1,0 +1,83 @@
+/* Loading screen for a large shared campaign (campaign-loading.tsx). App tokens only. */
+.campaign-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  backdrop-filter: blur(3px);
+}
+.campaign-loading-card {
+  width: min(28rem, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.9rem;
+  background: var(--color-elevated);
+  color: var(--color-fg);
+  text-align: center;
+  box-shadow: 0 12px 36px color-mix(in srgb, var(--color-bg) 60%, transparent);
+}
+.campaign-loading-card h2 {
+  font-size: 1.6rem;
+  line-height: 1.15;
+}
+.campaign-loading-card p {
+  color: var(--color-muted);
+  font-size: 0.92rem;
+}
+.campaign-loading-card .campaign-loading-detail {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+.campaign-loading-bar {
+  width: 100%;
+  height: 0.6rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+.campaign-loading-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 0.3s ease-out;
+}
+.campaign-loading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.campaign-loading-pill {
+  position: fixed;
+  z-index: 65;
+  left: 50%;
+  /* Below the app header, clear of the phone tab bar. */
+  top: calc(4.5rem + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  width: min(24rem, calc(100vw - 2rem));
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-elevated);
+  color: var(--color-fg);
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-bg) 50%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .campaign-loading-bar > span {
+    transition: none;
+  }
+  .campaign-loading {
+    backdrop-filter: none;
+  }
+}

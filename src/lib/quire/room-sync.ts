@@ -20,7 +20,7 @@ import {
   advanceRoomLoading,
   finishRoomLoading,
   startRoomLoading,
-  throwIfRoomLoadingCancelled,
+  throwIfRoomLoadingPaused,
 } from "./room-loading.ts";
 import type { ViewSectionsResult } from "./view-sections.server.ts";
 
@@ -90,6 +90,8 @@ export function createRoomSync(servers: { readSections: SectionServer; fullRead:
     ];
     if (wanted.length) {
       const code = seat.code.trim().toUpperCase();
+      // Paused ("Go back" on the loading screen): no download is started.
+      throwIfRoomLoadingPaused(code);
       startRoomLoading(
         code,
         wanted.reduce((sum, [, bytes]) => sum + bytes, 0),
@@ -98,7 +100,7 @@ export function createRoomSync(servers: { readSections: SectionServer; fullRead:
       try {
         let remaining = wanted.map(([hash]) => hash);
         while (remaining.length) {
-          throwIfRoomLoadingCancelled(code);
+          throwIfRoomLoadingPaused(code);
           const batch = await servers.readSections({
             data: {
               tabletopProtocol: SECTIONS_PROTOCOL,

@@ -6,11 +6,12 @@ import {
 } from "./room-resources.mjs";
 import { encodeRoomReports, hydrateRoomReports, roomReportStatements } from "./room-reports.mjs";
 /**
- * D1 rejects rows above 2,000,000 bytes with an opaque error. An encoded room body and each
- * archived snapshot row must stay at or below this budget (room-store.server.ts guards room
- * writes; campaign-recovery.mjs guards restores).
+ * The campaign size cap (assembled stored room) and the single-row limit (each archived snapshot
+ * row and a sectioned room's own row; D1 rejects rows above 2,000,000 bytes with an opaque error):
+ * src/lib/quire/room-size.ts. room-store.server.ts guards room writes; campaign-recovery.mjs
+ * guards restores.
  */
-export const ROOM_BODY_LIMIT = 1_800_000;
+export { ROOM_BODY_LIMIT, ROOM_ROW_LIMIT } from "../src/lib/quire/room-size.ts";
 /** UTF-8 bytes of the largest row an encoded room write would store (room body or one snapshot).
  * @param {{body:string;reports?:{body:string}[]}} encoded */
 export function encodedRoomBytes(encoded) {

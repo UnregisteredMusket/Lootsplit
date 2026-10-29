@@ -308,3 +308,35 @@ test("the isolate projection cache stays bounded and never caches views with acc
   await read(host);
   assert.equal(viewSectionCacheSizeForTests().entries, 1, "the DM's view (no posters) is cached");
 });
+
+test("a write that commits while section downloads are paused still applies (review regression)", async () => {
+  const { pauseRoomLoading, resumeRoomLoading } = await import("../src/lib/quire/room-loading.ts");
+  // The reviewer's case: the server commits once, its view needs sections, downloads are paused.
+  let committed = 0,
+    fetched = 0;
+  const table = { ledger: Array.from({ length: 2000 }, (_, i) => ({ id: `l${i}`, note: "x".repeat(300) })) };
+  const split = await splitViewTable(table, "salt");
+  const sync = createRoomSync({
+    readSections: async () => {
+      fetched++;
+      throw Error("should not be called while paused");
+    },
+    fullRead: async ({ data }) => {
+      assert.equal(data.tabletopProtocol, 10);
+      return { code: "ABC", seatId: "s1", revision: 2, table, draft: "[]" };
+    },
+  });
+  const submit = sync.roomWrite(async () => {
+    committed++;
+    return { code: "ABC", seatId: "s1", revision: 2, table: split.table, draft: "[]", viewSections: { v: 1, entries: split.entries, data: {} } };
+  });
+  pauseRoomLoading("ABC");
+  try {
+    const view = await submit({ data: { code: "ABC", token: "t", tabletopProtocol: P11 } });
+    assert.deepEqual(view.table, table, "the committed write's view arrives");
+    assert.equal(committed, 1);
+    assert.equal(fetched, 0, "no section download while paused");
+  } finally {
+    resumeRoomLoading();
+  }
+});

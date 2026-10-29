@@ -3,7 +3,7 @@ import { readStoredRoom } from "../cloudflare/room-storage.mjs";
 import test from "node:test";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { openRoom, joinRoom, roomState, submitCommands, choosePace } from "../src/lib/quire/cloud.server.ts";
-import { readRoom, updateRoom, ROOM_BODY_LIMIT } from "../src/lib/quire/room-store.server.ts";
+import { readRoom, updateRoom, ROOM_BODY_LIMIT, ROOM_ROW_LIMIT } from "../src/lib/quire/room-store.server.ts";
 import { archiveSession } from "../src/lib/quire/session-records.ts";
 import { tradeFixture } from "../src/lib/quire/test-fixtures/trade-economy.ts";
 import { ROOM_SUBMIT_LIMITS, takeSubmitAllowance } from "../src/lib/quire/room-submit-limit.ts";
@@ -232,7 +232,8 @@ test("the size guard refuses an oversized room write, logs it to monitoring and 
   const before = await raw(dm.code);
   const room = (await readRoom(dm.code));
   room.table.notes.push(
-    ...Array.from({ length: 4000 }, (_, i) => ({
+    // Above the campaign cap (room-size.ts), whatever it is.
+    ...Array.from({ length: Math.ceil(ROOM_BODY_LIMIT / 500) + 200 }, (_, i) => ({
       id: `bulk-${i}`,
       at: i,
       from: "dm",
@@ -255,7 +256,9 @@ test("the size guard refuses an oversized room write, logs it to monitoring and 
   assert.equal(logs.results.length, 1);
   const body = JSON.parse(logs.results[0].body);
   assert.ok(body.bytes > ROOM_BODY_LIMIT && body.limit === ROOM_BODY_LIMIT);
-  assert.ok(body.parts.notes > 1_900_000);
+  assert.ok(body.parts.notes > ROOM_BODY_LIMIT);
+  assert.equal(body.rowLimit, ROOM_ROW_LIMIT);
+  assert.equal(body.storage.sectioned, true, "the refused room would have been stored sectioned");
   assert.equal(JSON.stringify(logs.results[0]).includes(dm.code), false, "the join code is not logged");
   // A repeated refusal in the same half-hour shares the entry instead of flooding monitoring.
   await assert.rejects(updateRoom(room, before.revision), /too large/);

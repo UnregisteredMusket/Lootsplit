@@ -1,0 +1,10 @@
+{
+  "title": "Bigger shared campaigns",
+  "summary": "Shared campaigns can now grow to 4 MB, more than twice as large as before, and only what changed is downloaded after the first load.",
+  "items": [
+    "A shared campaign can hold up to 4 MB (it was 1.8 MB). Map images and archived session reports are stored separately and still do not count.",
+    "After the first load, players and the DM download only the parts of the campaign that changed, such as the newest chat lines.",
+    "When a large campaign takes a while to load, a loading screen shows the progress. Keep waiting continues in the background; Go back pauses the download until you choose Continue loading.",
+    "The fog-size warning and the Help guides state the new limit."
+  ]
+}
