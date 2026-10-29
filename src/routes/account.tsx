@@ -76,6 +76,18 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { downloadJson } from "@/lib/quire/table";
 import { requestConfirm, requestPrompt } from "@/lib/quire/confirm-store";
+import { getCampaigns } from "@/lib/quire/campaigns";
+import {
+  backupToReplace,
+  CAMPAIGN_BACKUP_LIMIT,
+  roomBackupKey,
+} from "@/lib/account/campaign-backups";
+import {
+  currentCampaignBackupKey,
+  DOWNLOAD_REMINDER_MS,
+  lastCampaignDownload,
+  noteCampaignDownload,
+} from "@/lib/account/campaign-backup-client";
 export const Route = createFileRoute("/account")({
   head: () => ({
     meta: [
@@ -256,6 +268,39 @@ function Account() {
       await accountRequest("remove", { kind, id });
       await reload();
     });
+  // Online backups per campaign (owner decision 2026-10-28). The server enforces the limit and
+  // refuses a rotation that was not confirmed; this only shows it before it happens.
+  const [downloadTick, setDownloadTick] = useState(0);
+  const backupLimit = library?.backupLimits?.perCampaign ?? CAMPAIGN_BACKUP_LIMIT;
+  const backupKey =
+    library && seat.role === "dm" && economy.ready && typeof window !== "undefined"
+      ? currentCampaignBackupKey()
+      : null;
+  const backupRotation = library ? backupToReplace(library.backups, backupKey, backupLimit) : null;
+  const deviceCampaigns = typeof window !== "undefined" ? getCampaigns() : null;
+  const currentCampaignName =
+    (cloud.joined && cloud.campaignName) ||
+    deviceCampaigns?.campaigns.find((c) => c.id === deviceCampaigns.activeId)?.name ||
+    "this campaign";
+  // Re-read after a download on this page (downloadTick) so the reminder updates.
+  const lastDownload = downloadTick >= 0 ? lastCampaignDownload(backupKey) : null;
+  const backupDate = (at: number) => new Date(at).toLocaleDateString();
+  const downloadBackup = async (b: { id: string }) => {
+    const r = await accountRequest<{ payload: unknown }>("read-backup", { id: b.id });
+    await downloadJson(`Lootsplitter-cloud-${b.id}.json`, r.payload);
+  };
+  /** The DM's copy of a shared campaign as a device backup file (the format Import reads). */
+  const downloadSharedCampaign = async (code: string, campaignName: string) => {
+    const r = await accountRequest<{ payload: unknown }>("campaign", { action: "export", code });
+    const safe = campaignName.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 40) || code;
+    const saved = await downloadJson(
+      `Lootsplitter-${safe}-${new Date().toISOString().slice(0, 10)}.json`,
+      r.payload,
+    );
+    if (!saved) throw new Error("Share was dismissed. The campaign file was not saved.");
+    noteCampaignDownload(roomBackupKey(code));
+    setDownloadTick((n) => n + 1);
+  };
   const role = library?.user.role;
   const tabs = accountTabs(role);
   // Panels render only after the library loads in the browser, so reading the hash here is safe.
@@ -662,14 +707,53 @@ function Account() {
                             <button
                               className="portal-button secondary"
                               disabled={busy}
+                              onClick={action(() => downloadSharedCampaign(m.code, m.name))}
+                            >
+                              <Download size={16} /> Download a copy
+                            </button>
+                          )}
+                          {m.role === "dm" && (
+                            <button
+                              className="portal-button secondary"
+                              disabled={busy}
                               onClick={action(async () => {
                                 if (cloud.joined && cloud.code === m.code && hasPendingChanges())
                                   throw new Error(
                                     "Submit or export pending changes before deleting this campaign.",
                                   );
+                                // Encourage a local copy first (owner decision 2026-10-28), and say
+                                // which online backup the recovery copy replaces, if any.
+                                const replaced = backupToReplace(
+                                  library.backups,
+                                  roomBackupKey(m.code),
+                                  backupLimit,
+                                );
+                                const rotation = replaced
+                                  ? ` Its recovery copy replaces your oldest online backup of ${m.name} from ${backupDate(replaced.created_at)} (“${replaced.name}”); online backups are limited to ${backupLimit} per campaign.`
+                                  : "";
+                                if (
+                                  await requestConfirm({
+                                    title: `Download ${m.name} before deleting it?`,
+                                    body: `A downloaded file is the safest long-term copy.${rotation}`,
+                                    confirmLabel: "Download a copy",
+                                    cancelLabel: "Continue without downloading",
+                                  })
+                                ) {
+                                  await downloadSharedCampaign(m.code, m.name);
+                                  if (
+                                    replaced &&
+                                    (await requestConfirm({
+                                      title: "Download the backup it replaces too?",
+                                      body: `“${replaced.name}” from ${backupDate(replaced.created_at)} is removed when this campaign is deleted.`,
+                                      confirmLabel: "Download it first",
+                                      cancelLabel: "Continue",
+                                    }))
+                                  )
+                                    await downloadBackup(replaced);
+                                }
                                 const confirm = await requestPrompt({
                                   title: `Delete shared campaign ${m.name} for everyone?`,
-                                  body: "A private cloud backup of its saved state will be kept. Device copies remain.",
+                                  body: `A private cloud backup of its saved state will be kept. Device copies remain.${rotation}`,
                                   label: `Type ${m.code} to confirm`,
                                   tone: "danger",
                                   confirmLabel: "Delete campaign",
@@ -682,6 +766,7 @@ function Account() {
                                   code: m.code,
                                   confirm,
                                   revision: m.room_revision,
+                                  ...(replaced ? { replace: replaced.id } : {}),
                                 });
                                 if (cloud.joined && cloud.code === m.code)
                                   await clearAccountRoom(true);
@@ -1059,19 +1144,78 @@ function Account() {
                       <p className="portal-eyebrow">SAVE A MOMENT IN THE STORY</p>
                       <h2>Cloud backups</h2>
                     </div>
-                    <button
-                      className="portal-button secondary"
-                      disabled={busy || seat.role !== "dm" || !economy.ready}
-                      onClick={action(async () => {
-                        await saveAccountBackup();
-                        await reload();
-                        setNotice(
-                          "A new private cloud backup is saved. Earlier backups were kept.",
-                        );
-                      })}
-                    >
-                      <Plus size={16} /> Save current campaign
-                    </button>
+                    <div className="portal-actions">
+                      <button
+                        className="portal-button"
+                        disabled={busy || seat.role !== "dm" || !economy.ready}
+                        onClick={action(async () => {
+                          await economy.download();
+                          setDownloadTick((n) => n + 1);
+                          setNotice(
+                            "A copy of the open campaign is downloaded. Keep it somewhere safe; Settings → Device backups → Import reads it.",
+                          );
+                        })}
+                      >
+                        <Download size={16} /> Download a copy
+                      </button>
+                      <button
+                        className="portal-button secondary"
+                        disabled={busy || seat.role !== "dm" || !economy.ready}
+                        onClick={action(async () => {
+                          // The server refuses a rotation that was not confirmed (backup-rotation.mjs).
+                          if (
+                            backupRotation &&
+                            !(await requestConfirm({
+                              title: "Replace your oldest online backup?",
+                              body: `This replaces your oldest online backup of ${currentCampaignName} from ${backupDate(backupRotation.created_at)} (“${backupRotation.name}”). Online backups are limited to ${backupLimit} per campaign. Use Download it first to keep a copy on your device.`,
+                              confirmLabel: "Save and replace",
+                            }))
+                          )
+                            return;
+                          await saveAccountBackup(backupRotation?.id);
+                          await reload();
+                          setNotice(
+                            backupRotation
+                              ? `A new private cloud backup is saved. It replaced “${backupRotation.name}” from ${backupDate(backupRotation.created_at)}.`
+                              : "A new private cloud backup is saved. Earlier backups were kept.",
+                          );
+                        })}
+                      >
+                        <Plus size={16} /> Save current campaign
+                      </button>
+                    </div>
+                  </div>
+                  <div className="portal-backup-limit" data-testid="backup-limit-note">
+                    <p>
+                      <strong>Online backups are limited to {backupLimit} per campaign.</strong> A
+                      downloaded file is the safest long-term copy: keep one on your device or
+                      another drive. Settings → Device backups → Import reads it.
+                    </p>
+                    {seat.role === "dm" && economy.ready && (
+                      <p className="portal-backup-limit-detail">
+                        {lastDownload
+                          ? `This device last downloaded ${currentCampaignName} on ${backupDate(lastDownload)}.`
+                          : `This device has not downloaded ${currentCampaignName} yet.`}
+                        {(!lastDownload || Date.now() - lastDownload > DOWNLOAD_REMINDER_MS) &&
+                          " Consider downloading a fresh copy."}
+                      </p>
+                    )}
+                    {backupRotation && (
+                      <div className="portal-backup-rotation" role="status" data-testid="backup-rotation-notice">
+                        <p>
+                          This replaces your oldest online backup of {currentCampaignName} from{" "}
+                          {backupDate(backupRotation.created_at)} (“{backupRotation.name}”) when you
+                          save again.
+                        </p>
+                        <button
+                          className="portal-button secondary small"
+                          disabled={busy}
+                          onClick={action(() => downloadBackup(backupRotation))}
+                        >
+                          <Download size={16} /> Download it first
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <p className="portal-subtle">
                     Manual recovery copies, separate from live campaigns. Each save keeps a new
@@ -1088,6 +1232,9 @@ function Account() {
                         <div>
                           <h3>{b.name}</h3>
                           <p>{new Date(b.created_at).toLocaleString()}</p>
+                          {backupRotation?.id === b.id && (
+                            <p className="portal-backup-tag">Replaced by your next save of this campaign</p>
+                          )}
                         </div>
                         <div className="portal-actions">
                           <BackupPreview id={b.id} shared={!!b.shared_recovery} />
@@ -1142,18 +1289,11 @@ function Account() {
                           </button>
                           <button
                             aria-label={`Download ${b.name}`}
-                            className="portal-icon-button"
+                            className="portal-button secondary"
                             disabled={busy}
-                            onClick={action(async () => {
-                              const r = await accountRequest<{
-                                payload: unknown;
-                              }>("read-backup", {
-                                id: b.id,
-                              });
-                              await downloadJson(`Lootsplitter-cloud-${b.id}.json`, r.payload);
-                            })}
+                            onClick={action(() => downloadBackup(b))}
                           >
-                            <Download size={18} />
+                            <Download size={16} /> Download
                           </button>
                           <button
                             aria-label={`Delete backup ${b.name}`}

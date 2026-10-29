@@ -25,6 +25,14 @@ import {
   backupPartsCompleteSql,
 } from "./backup-parts.mjs";
 import {
+  backupBytesSql,
+  campaignGuardArgs,
+  campaignGuardSql,
+  planBackupRotation,
+  replaceStatement,
+} from "./backup-rotation.mjs";
+import { roomBackupKey } from "../src/lib/account/campaign-backups.ts";
+import {
   readRoomCore,
   readStoredRoom,
   roomDeleteStatement,
@@ -106,7 +114,7 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
 }
 
 export async function campaignAction(db, userId, body, actor) {
-  if (typeof body.code !== "string" || !["rename", "delete"].includes(body.action))
+  if (typeof body.code !== "string" || !["rename", "delete", "export"].includes(body.action))
     fail("Invalid campaign action.");
   const member = await db
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
@@ -122,8 +130,9 @@ export async function campaignAction(db, userId, body, actor) {
       .run();
     return { ok: true };
   }
-  if (body.confirm !== body.code) fail("Type the campaign code to confirm deletion.");
-  const accountGuardArgs = recoveryAccountGuardArgs(actor, userId);
+  const exporting = body.action === "export";
+  if (!exporting && body.confirm !== body.code) fail("Type the campaign code to confirm deletion.");
+  const accountGuardArgs = exporting ? [] : recoveryAccountGuardArgs(actor, userId);
   const row = await readStoredRoom(db, body.code);
   if (!row) fail("This campaign is already closed.", 404);
   const room = row.room,
@@ -132,10 +141,15 @@ export async function campaignAction(db, userId, body, actor) {
   // hydration below can touch the room object).
   const recoveryRoom = { ...room, table: { purses: structuredClone(room.table?.purses) } };
   if (seat?.role !== "dm")
-    fail("Only the linked dungeon master can delete a shared campaign.", 403);
-  if (Object.values(room.drafts || {}).some((d) => d.length))
+    fail(
+      exporting
+        ? "Only the linked dungeon master can download a shared campaign."
+        : "Only the linked dungeon master can delete a shared campaign.",
+      403,
+    );
+  if (!exporting && Object.values(room.drafts || {}).some((d) => d.length))
     fail("Submit or discard pending turns in the campaign before deleting it.", 409);
-  if (body.revision !== row.version.revision)
+  if (!exporting && body.revision !== row.version.revision)
     fail("The campaign changed. Refresh your library before deleting it.", 409);
   let projected;
   try {
@@ -151,6 +165,10 @@ export async function campaignAction(db, userId, body, actor) {
       "An archived record cannot be safely backed up. Your campaign was not deleted. Export your records for recovery first.",
       409,
     );
+  // Download a copy (owner decision 2026-10-28: encourage local copies): the same campaign file
+  // the deletion copy holds (the DM's projection, no private PDFs), without its recovery
+  // records. It is a device backup file (kind "quire", version 2) that Import reads. Read-only.
+  if (exporting) return { payload: campaignFile(projected, room), name: member.name };
   // Check existing records before mutation. The transaction captures them again,
   // so a legitimate concurrent saved roll/encounter is included as well.
   let recovery;
@@ -179,16 +197,12 @@ export async function campaignAction(db, userId, body, actor) {
       409,
     );
   }
-  const payload = {
-    ...projected,
-    kind: "quire",
-    version: 2,
-    exportedAt: Date.now(),
-    settings: room.table.realm,
-    notes: (room.table.notes || []).filter((note) => note.to !== "player"),
-    books: [],
-    articles: [],
-  };
+  const payload = campaignFile(projected, room);
+  // Per-campaign limit (backup-rotation.mjs): when this room already has the limit's worth of
+  // online backups, its oldest is replaced by this recovery copy (confirmed by `replace`), in the
+  // same batch and only once the copy is complete; the deletion is no longer refused for it.
+  const campaignKey = roomBackupKey(body.code);
+  const plan = await planBackupRotation(db, userId, campaignKey, body.replace, "Deleting this campaign");
   const backupId = crypto.randomUUID();
   // A campaign too large for one backup row is stored in parts (backup-parts.mjs, migration
   // 0027); the row then holds the parts marker and the recovery records.
@@ -201,16 +215,27 @@ export async function campaignAction(db, userId, body, actor) {
     );
   const partStatements = chunked ? backupPartStatements(db, backupId, userId, chunked.parts) : [];
   // The recovery copy counts toward the account's backup storage, like any backup (step 3 review:
-  // repeated delete/restore must not grow the database without bound). Nothing is removed to make
-  // room: the deletion is refused and the campaign and every backup stay as they are.
+  // repeated delete/restore must not grow the database without bound). Apart from the one
+  // confirmed rotation above, nothing is removed to make room: if the copy does not fit even
+  // after it, the deletion is refused and the campaign and every backup stay as they are.
   const partChars = chunked ? chunked.parts.reduce((sum, part) => sum + part.length, 0) : 0;
-  const stored = await db.prepare(`SELECT ${accountBackupBytesSql} AS n`).bind(userId, userId).first();
+  const freedSql = plan.replace ? backupBytesSql : "0";
+  const freedArgs = plan.replace ? [plan.replace.id, userId, plan.replace.id] : [];
+  const usedBytes = async () =>
+    Number(
+      (
+        await db
+          .prepare(`SELECT ${accountBackupBytesSql}-${freedSql} AS n`)
+          .bind(userId, userId, ...freedArgs)
+          .first()
+      )?.n ?? 0,
+    );
   const backupFull = () =>
     fail(
-      `Your account backup storage is full (up to ${ACCOUNT_BACKUP_BYTES / 1_000_000} MB, including recovery copies of deleted campaigns). Deleting this campaign needs room for its recovery copy. Download and remove an older backup in My account → Backups, then delete again. Your campaign was not deleted.`,
+      `Your account backup storage is full (up to ${ACCOUNT_BACKUP_BYTES / 1_000_000} MB, including recovery copies of deleted campaigns). Deleting this campaign needs room for its recovery copy${plan.replace ? ", even after it replaces this campaign's oldest online backup" : ""}. Download a copy of the campaign, download and remove an older backup in My account → Backups, then delete again. Your campaign was not deleted.`,
       413,
     );
-  if (Number(stored?.n ?? 0) + (chunked ? partChars : payloadText.length) > ACCOUNT_BACKUP_BYTES) backupFull();
+  if ((await usedBytes()) + (chunked ? partChars : payloadText.length) > ACCOUNT_BACKUP_BYTES) backupFull();
   // The room must still be exactly as read (no write since) for the backup and the delete.
   const unchanged = roomVersionSql(row.version);
   let results;
@@ -218,11 +243,12 @@ export async function campaignAction(db, userId, body, actor) {
     results = await db.batch([
       db
         .prepare(
-          `INSERT INTO library_backups(id,user_id,name,body,created_at)
+          `INSERT INTO library_backups(id,user_id,name,body,created_at,campaign_key)
          WITH snapshot(body) AS (SELECT json_set(?, '$.campaignRecovery', ${deletionRecoverySql}))
-         SELECT ?,?,?,snapshot.body,? FROM snapshot
+         SELECT ?,?,?,snapshot.body,?,? FROM snapshot
          WHERE length(CAST(snapshot.body AS BLOB))<=1900000
-         AND ${accountBackupBytesSql}+length(snapshot.body)+?<=?
+         AND ${accountBackupBytesSql}-${freedSql}+length(snapshot.body)+?<=?
+         AND ${campaignGuardSql(campaignKey, plan)}
          AND ${unchanged.sql}
          AND ${recoveryAccountGuardSql}
          AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
@@ -234,10 +260,13 @@ export async function campaignAction(db, userId, body, actor) {
           userId,
           member.name + " (before deletion)",
           Date.now(),
+          campaignKey,
           userId,
           userId,
+          ...freedArgs,
           partChars,
           ACCOUNT_BACKUP_BYTES,
+          ...campaignGuardArgs(userId, campaignKey, plan),
           ...unchanged.args,
           ...accountGuardArgs,
           userId,
@@ -252,6 +281,18 @@ export async function campaignAction(db, userId, body, actor) {
           `INSERT INTO campaign_deletion_backups(backup_id,user_id,source_code) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?) AND ${backupPartsCompleteSql}`,
         )
         .bind(backupId, userId, body.code, backupId, userId, backupId, partStatements.length),
+      // The replaced backup goes only once the new copy is complete (its deletion record exists).
+      ...(plan.replace
+        ? [
+            replaceStatement(
+              db,
+              userId,
+              plan,
+              "EXISTS(SELECT 1 FROM campaign_deletion_backups WHERE backup_id=? AND user_id=?)",
+              [backupId, userId],
+            ),
+          ]
+        : []),
       roomDeleteStatement(db, body.code, {
         expect: row.version,
         extraWhere: "EXISTS(SELECT 1 FROM campaign_deletion_backups WHERE backup_id=? AND user_id=?)",
@@ -282,13 +323,32 @@ export async function campaignAction(db, userId, body, actor) {
   }
   if (results[0].meta.changes !== 1) {
     // A concurrent backup filled the storage between the check above and this transaction.
-    const now = await db.prepare(`SELECT ${accountBackupBytesSql} AS n`).bind(userId, userId).first();
-    if (Number(now?.n ?? 0) + (chunked ? partChars : payloadText.length) > ACCOUNT_BACKUP_BYTES) backupFull();
+    // Or another device changed this campaign's backups: planning again names the backup it
+    // would now replace.
+    const again = await planBackupRotation(db, userId, campaignKey, body.replace, "Deleting this campaign");
+    if ((again.replace?.id ?? null) !== (plan.replace?.id ?? null))
+      fail("Your online backups changed on another device. Refresh My campaigns and delete again. Your campaign was not deleted.", 409);
+    if ((await usedBytes()) + (chunked ? partChars : payloadText.length) > ACCOUNT_BACKUP_BYTES) backupFull();
     fail(
       "Campaign access changed or its complete recovery copy exceeds the supported cloud size. Your campaign was not deleted. Refresh or download your backups.",
       409,
     );
   }
-  if (results[2 + partStatements.length].meta.changes !== 1) fail("The campaign changed. Refresh before deleting it.", 409);
-  return { ok: true, backupId };
+  if (results[2 + partStatements.length + (plan.replace ? 1 : 0)].meta.changes !== 1)
+    fail("The campaign changed. Refresh before deleting it.", 409);
+  return { ok: true, backupId, replaced: plan.replace?.id ?? null };
+}
+
+/** A shared campaign as a device backup file (kind "quire"), as the DM's projection shows it. */
+function campaignFile(projected, room) {
+  return {
+    ...projected,
+    kind: "quire",
+    version: 2,
+    exportedAt: Date.now(),
+    settings: room.table.realm,
+    notes: (room.table.notes || []).filter((note) => note.to !== "player"),
+    books: [],
+    articles: [],
+  };
 }

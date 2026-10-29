@@ -1,4 +1,14 @@
 import { ACCOUNT_BACKUP_BYTES, accountBackupBytesSql, readBackupPayload } from "./backup-parts.mjs";
+import {
+  backupBytesSql,
+  backupCampaignKeySql,
+  CAMPAIGN_BACKUP_LIMIT,
+  campaignGuardArgs,
+  campaignGuardSql,
+  planBackupRotation,
+  replaceStatement,
+} from "./backup-rotation.mjs";
+import { campaignBackupKey } from "../src/lib/account/campaign-backups.ts";
 import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
@@ -559,7 +569,7 @@ export async function handleAccounts(request, env, context = null) {
           .all(),
         db
           .prepare(
-            "SELECT b.id,b.name,b.created_at,EXISTS(SELECT 1 FROM campaign_deletion_backups d WHERE d.backup_id=b.id AND d.user_id=b.user_id) AS shared_recovery FROM library_backups b WHERE b.user_id=? ORDER BY b.created_at DESC",
+            `SELECT b.id,b.name,b.created_at,EXISTS(SELECT 1 FROM campaign_deletion_backups d WHERE d.backup_id=b.id AND d.user_id=b.user_id) AS shared_recovery,${backupCampaignKeySql("b")} AS campaign_key FROM library_backups b WHERE b.user_id=? ORDER BY b.created_at DESC`,
           )
           .bind(userId)
           .all(),
@@ -595,6 +605,8 @@ export async function handleAccounts(request, env, context = null) {
             return { ...m, ...libraryMemberRoom(roomCoreFromRow(row), m, token) };
           }),
           backups: backups.results,
+          // Online backups per campaign (backup-rotation.mjs), for the Backups notices.
+          backupLimits: { perCampaign: CAMPAIGN_BACKUP_LIMIT },
           characters: characters.results.map((r) => ({ id: r.id, ...JSON.parse(r.body) })),
           hasRecoveryKey: !!recovery,
           hosting,
@@ -657,11 +669,18 @@ export async function handleAccounts(request, env, context = null) {
       await validateBackupMapAssets(db, userId, payload);
       const id = crypto.randomUUID();
       const serialized = JSON.stringify(payload);
-      // Per-account bound so one account cannot fill the shared database. The check is part of
-      // the INSERT, so concurrent uploads cannot each pass a separate pre-check.
-      const saved = await db
+      // Per-campaign limit (backup-rotation.mjs): the campaign's oldest backup is replaced only
+      // when the request confirms that exact backup, after the new one is stored. A backup from an
+      // older app has no campaign key and only meets the account limits below.
+      const campaignKey = campaignBackupKey(body.campaignKey);
+      const plan = await planBackupRotation(db, userId, campaignKey, body.replace);
+      const rotating = plan.replace ? 1 : 0;
+      // Per-account bound so one account cannot fill the shared database. The checks are part of
+      // the INSERT, so concurrent uploads cannot each pass a separate pre-check. A replaced backup
+      // no longer counts, because it is removed in the same batch.
+      const insert = db
         .prepare(
-          `INSERT INTO library_backups (id,user_id,name,body,created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM library_backups WHERE user_id=?)<? AND ${accountBackupBytesSql}+?<=?`,
+          `INSERT INTO library_backups (id,user_id,name,body,created_at,campaign_key) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM library_backups WHERE user_id=?)-?<? AND ${accountBackupBytesSql}-${rotating ? backupBytesSql : "0"}+?<=? AND ${campaignGuardSql(campaignKey, plan)}`,
         )
         .bind(
           id,
@@ -669,20 +688,46 @@ export async function handleAccounts(request, env, context = null) {
           text(body.name),
           serialized,
           Date.now(),
+          campaignKey,
           userId,
+          rotating,
           LIBRARY_LIMITS.backups,
           userId,
           userId,
+          ...(rotating ? [plan.replace.id, userId, plan.replace.id] : []),
           serialized.length,
           LIBRARY_LIMITS.backupBytes,
-        )
-        .run();
-      if (!saved.meta.changes)
+          ...campaignGuardArgs(userId, campaignKey, plan),
+        );
+      const results = await db.batch([
+        insert,
+        ...(plan.replace
+          ? [
+              replaceStatement(
+                db,
+                userId,
+                plan,
+                "EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?)",
+                [id, userId],
+              ),
+            ]
+          : []),
+      ]);
+      if (!results[0].meta.changes) {
+        // Either the account is full even after rotation, or the campaign's backups changed
+        // since the request was made (another device saved or removed one).
+        const again = await planBackupRotation(db, userId, campaignKey, body.replace);
+        if ((again.replace?.id ?? null) !== (plan.replace?.id ?? null))
+          fail(
+            "Your online backups changed on another device. Refresh your Library and save again. Your device data has not changed.",
+            409,
+          );
         fail(
-          `Your account backup storage is full (up to ${LIBRARY_LIMITS.backups} backups or ${LIBRARY_LIMITS.backupBytes / 1_000_000} MB). Remove an older backup from your Library, then save again. Your device data has not changed.`,
+          `Your account backup storage is full (up to ${LIBRARY_LIMITS.backups} backups or ${LIBRARY_LIMITS.backupBytes / 1_000_000} MB). Download and remove an older backup from your Library, then save again. Your device data has not changed.`,
           413,
         );
-      return cors(json({ id }));
+      }
+      return cors(json({ id, replaced: plan.replace?.id ?? null }));
     }
     if (path === "/api/account/read-backup" && request.method === "POST") {
       const row = await db
@@ -777,6 +822,8 @@ export async function handleAccounts(request, env, context = null) {
           error: error.status
             ? error.message
             : "The account service could not complete this request. Your device data has not been replaced.",
+          // The online backup a confirmed save or deletion would replace (backup-rotation.mjs).
+          ...(error.status && error.replaces ? { replaces: error.replaces } : {}),
         },
         error.status || 500,
       ),

@@ -19,9 +19,15 @@ import {
   type QuireFile,
 } from "../quire/economy";
 import { accountRequest, type AccountMembership, type CharacterProfile } from "./client";
+import { currentCampaignBackupKey } from "./campaign-backup-client.ts";
 import { accountRestoreRequest, acknowledgeAccountRestore } from "./restore-request";
 import { saveAccountMapAsset, hydrateAccountMapBackup } from "./map-media";
-export async function saveAccountBackup() {
+/**
+ * Save the open campaign as an online backup. `replace` confirms the one older backup of this
+ * campaign that the save replaces when the campaign is at its online limit (the server refuses a
+ * rotation that was not confirmed, and never removes more than that one).
+ */
+export async function saveAccountBackup(replace?: string) {
   if (getSeat().role !== "dm")
     throw new Error(
       "Only the DM can save a complete campaign backup. Players can save their campaign membership.",
@@ -45,6 +51,8 @@ export async function saveAccountBackup() {
   await accountRequest("backup", {
     name: state.campaigns.find((c) => c.id === state.activeId)?.name || "Campaign",
     payload,
+    campaignKey: currentCampaignBackupKey(),
+    ...(replace ? { replace } : {}),
   });
 }
 export async function linkCurrentCampaign() {

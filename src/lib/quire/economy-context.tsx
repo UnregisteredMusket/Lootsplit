@@ -1,4 +1,5 @@
 import { activeCampaignId } from "./campaign-context.ts";
+import { currentCampaignBackupKey, noteCampaignDownload } from "../account/campaign-backup-client.ts";
 import { announceWorkspaceChange, subscribeWorkspaceChanges } from "./workspace-events.ts";
 import {
   captureMutationScope,
@@ -1185,6 +1186,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           file,
         );
         if (!saved) throw new Error("Share was dismissed. The backup file was not saved.");
+        // For the Backups reminder in My account (device-only; never blocks anything).
+        noteCampaignDownload(currentCampaignBackupKey());
       },
       restoreFile: async (file, password) => {
         const lock = await loadSeatLock();

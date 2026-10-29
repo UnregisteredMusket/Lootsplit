@@ -117,3 +117,40 @@
   border: 1px solid #859087;
   border-radius: 0.5rem;
 }
+
+/* Online backups per campaign (2026-10-28): the limit note, download reminder and rotation notice. */
+.portal-backup-limit {
+  margin: 16px 0 6px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--portal-gold) 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--portal-ink) 5%, transparent);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.portal-backup-limit p {
+  margin: 0;
+}
+.portal-backup-limit-detail {
+  margin-top: 8px !important;
+  color: var(--portal-muted);
+  font-size: 13px;
+}
+.portal-backup-rotation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--portal-ink) 12%, transparent);
+}
+.portal-backup-rotation p {
+  flex: 1 1 240px;
+  color: var(--portal-gold);
+}
+.portal-backup-list .portal-backup-tag {
+  color: var(--portal-gold);
+  margin-top: 4px;
+}
