@@ -8,7 +8,7 @@ import { canonicalJson } from "./canonical-json.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import { legacyDiagonals } from "./tabletop-protocol.ts";
 import { scenePointVisible, sceneTokenPoint, tokenInsideGrid, tokenSnapped } from "./tabletop-geometry.ts";
-import { assertCombatTurn, canRequestMove, mapAccessible, readMapTabletop, sceneViewers, type TabletopExecution } from "./tabletop.ts";
+import { assertCombatTurn, canRequestMove, mapAccessible, movementMode, readMapTabletop, sceneViewers, type TabletopExecution } from "./tabletop.ts";
 import type { MapToken, MoveRequest } from "./world-schema.ts";
 
 type Tile = { column: number; row: number; offsetX?: number; offsetY?: number };
@@ -103,6 +103,16 @@ export function applyMoveRequestCommand(
   if (!same(token, r.before)) return close("cancelled", `${token.label} moved since; the request was cancelled.`);
   const next = placed(token, r.after);
   if (!tokenInsideGrid(map.grid, next)) return close("cancelled", "The grid changed; the request was cancelled.");
+  // Checked again as the player who asked (privacy review 2026-10-29): the map is still Ask the DM
+  // and they may still move the token (else the request is moot), the destination is still visible
+  // to them, and in combat it is that token's turn (else the DM approves it later or denies it).
+  const asker = { id: "", role: "player" as const, purseIds: [r.purseId] };
+  if (movementMode(map) !== "approval" || !canRequestMove(t, map, token, asker))
+    return close("cancelled", "Player movement on this map changed; the request was cancelled.");
+  const settings0 = readMapTabletop(map);
+  if (!scenePointVisible(sceneTokenPoint(map.grid, next), settings0, map.grid, sceneViewers(t, map, asker)))
+    throw Error(`The destination isn't visible to ${token.label} any more. Deny the move, or reveal it first.`);
+  assertCombatTurn(t, map, [token], asker, execution);
   map.tokens = (map.tokens ?? []).map((x) => (x.id === token.id ? next : x));
   const settings = readMapTabletop(map);
   if (map.tabletop && settings.vision !== "off") map.tabletop = { ...settings, revision: settings.revision + 1 };

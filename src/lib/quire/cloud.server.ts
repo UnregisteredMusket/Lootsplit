@@ -1178,10 +1178,12 @@ export async function submitCommands(input: {
     // tracker's turn, read once per write attempt from the encounter store (fails closed).
     const binding = room.table.journal?.world?.combat;
     const mapCombat =
-      seat.role !== "dm" &&
       binding?.phase === "active" &&
-      unapplied.some(
-        (c) => (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-move-request") && c.mapId === binding.mapId,
+      unapplied.some((c) =>
+        seat.role !== "dm"
+          ? (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-move-request") && c.mapId === binding.mapId
+          : // The DM's approval of a player's move is held to that token's turn too.
+            c.kind === "map-move-request-review" && c.approve,
       )
         ? await readMapCombatTurn(room.code, binding.encounterId)
         : undefined;
