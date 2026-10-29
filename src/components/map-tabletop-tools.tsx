@@ -47,6 +47,8 @@ import { AppLink } from "./app-link";
 import { GridModeDialog, type GridModeChoice } from "./map-grid-mode";
 import { resultToast } from "@/lib/quire/result-toast";
 import type { PlayerMovement } from "@/lib/quire/map-movement";
+import { DEFAULT_FORMATION, planFormation, type Formation } from "@/lib/quire/formation";
+import { manuallyVisible } from "@/lib/quire/tabletop-geometry";
 
 export type MapTool =
   | "select"
@@ -66,6 +68,16 @@ const position = (token: Position): Position => ({
   offsetX: token.offsetX,
   offsetY: token.offsetY,
 });
+/** A group placement in progress: who is placed, and how. */
+export type Placing = {
+  members: { token: MapToken; before: MapToken | null }[];
+  /** "formation": arranged around the pointer; "keep": moved together in their shape. */
+  mode: "formation" | "keep";
+  formation: Formation;
+  label: string;
+  /** Save the formation as the party's default when placed. */
+  makeDefault?: boolean;
+};
 /** Snapped Tiny tokens keep their quadrant offsets; other snapped positions drop offsets. */
 const quadrant = (place: Position) =>
   Math.abs(place.offsetX ?? 0) === 0.25 && Math.abs(place.offsetY ?? 0) === 0.25
@@ -133,12 +145,20 @@ export function useMapTabletopTools(
           grab?: { x: number; y: number };
           /** Placing the player's own token (map-token-claim). */
           claim?: string;
+          /** Drawing a selection box (Shift+drag). */
+          box?: boolean;
         }
       | undefined
     >(undefined),
     movePreview = useRef<Move[]>([]),
     stroke = useRef<StrokeDraft>({ points: [], frozen: 0 }),
     keyboardAnchor = useRef<ScenePoint | undefined>(undefined);
+  // Group placement (map tokens PR 3): Place party / Place / Move with ghosts that follow the
+  // pointer square by square, Shift+drag box selection, and the phones' Select mode.
+  const [placing, setPlacing] = useState<Placing | null>(null),
+    [placeAnchor, setPlaceAnchor] = useState<{ column: number; row: number }>(),
+    [box, setBox] = useState<{ a: ScenePoint; b: ScenePoint }>(),
+    [selectMode, setSelectMode] = useState(false);
   // Player movement (map tokens PR 2): placing your own token, and "Not your turn" on a press.
   const [claiming, setClaiming] = useState(""),
     [notTurn, setNotTurn] = useState(""),
@@ -212,7 +232,29 @@ export function useMapTabletopTools(
     selectToken?.(next.includes(id) ? id : (next[0] ?? ""));
     setInspector(true);
   }
+  /** The square under a point (grid placements and ghosts). */
+  const squareAt = (point: ScenePoint) => (map.grid ? snapTokenPosition(map.grid, {}, point) : undefined);
+  function hover(point: ScenePoint) {
+    if (!placing) return false;
+    const at = squareAt(point);
+    if (at && (at.column !== placeAnchor?.column || at.row !== placeAnchor?.row))
+      setPlaceAnchor({ column: at.column, row: at.row });
+    return true;
+  }
   function pointerDown(point: ScenePoint, tokenId?: string, additive = false) {
+    if (placing) {
+      hover(point);
+      gesture.current = { point, moved: false };
+      return true;
+    }
+    // Shift+drag on the empty map draws a selection box; a plain drag still pans.
+    if (!tokenId && dm && additive && (tool === "select" || tool === "pan") && map.grid) {
+      gesture.current = { point, moved: false, box: true };
+      setBox({ a: point, b: point });
+      return true;
+    }
+    // Phones' Select mode: a tap toggles a token in the selection.
+    if (tokenId && selectMode) additive = true;
     // Inspection and temporary measurement remain available between sessions.
     if (tokenId && tool === "select") {
       const token = map.tokens?.find((token) => token.id === tokenId);
@@ -264,6 +306,11 @@ export function useMapTabletopTools(
       return true;
     current.moved = true;
     setCursor(point);
+    if (placing) return hover(point);
+    if (current.box) {
+      setBox({ a: current.point, b: point });
+      return true;
+    }
     if (current.token && map.grid) {
       // Footprints (owner, 2026-10-29): with grid mode on the square under the grabbed point
       // wins; with it off the token follows the pointer exactly. The server checks the same rule.
@@ -317,6 +364,138 @@ export function useMapTabletopTools(
       }
     } else if (tool === "fog-rectangle" || tool === "wall") setPoints([current.point, point]);
     return true;
+  }
+  const placingOthers = placing
+    ? (map.tokens ?? []).filter((t) => !placing.members.some((m) => m.token.id === t.id))
+    : [];
+  function planAt(anchor: { column: number; row: number } | undefined) {
+    if (!placing || !anchor || !map.grid) return undefined;
+    if (placing.mode === "keep") {
+      // Move together: the group keeps its shape, led by its first token.
+      const lead = tokenBox(placing.members[0].token);
+      return {
+        places: placing.members.map((m) => {
+          const b = tokenBox(m.token);
+          return {
+            id: m.token.id,
+            column: anchor.column + Math.round(b.left - lead.left),
+            row: anchor.row + Math.round(b.top - lead.top),
+          };
+        }),
+        displaced: 0,
+        unplaced: 0,
+      };
+    }
+    return planFormation(
+      map.grid,
+      placingOthers,
+      placing.members.map((m) => ({ ...m.token, id: m.token.id })),
+      anchor,
+      placing.formation,
+      settings.walls,
+    );
+  }
+  /** The ghost tokens of a placement plan (fogged squares are marked for the DM). */
+  function ghostsOf(current: ReturnType<typeof planAt>) {
+    if (!current || !placing) return [];
+    return current.places.flatMap((p) => {
+      const member = placing.members.find((m) => m.token.id === p.id);
+      if (!member) return [];
+      const token = { ...member.token, column: p.column, row: p.row };
+      delete token.offsetX;
+      delete token.offsetY;
+      const fogged = !manuallyVisible(sceneTokenPoint(map.grid!, token), settings.fog);
+      return [{ token, fogged }];
+    });
+  }
+  const plan = planAt(placeAnchor),
+    ghosts = ghostsOf(plan);
+  function rotatePlacing() {
+    setPlacing((current) =>
+      current
+        ? {
+            ...current,
+            formation: { ...current.formation, rotation: (((current.formation.rotation + 90) % 360) as Formation["rotation"]) },
+          }
+        : current,
+    );
+  }
+  function placingSpacing(delta: number) {
+    setPlacing((current) =>
+      current
+        ? { ...current, formation: { ...current.formation, spacing: Math.max(0, Math.min(4, current.formation.spacing + delta)) } }
+        : current,
+    );
+  }
+  function commitPlacing(anchor?: { column: number; row: number }) {
+    if (!placing || !map.grid || !anchor) return;
+    setPlaceAnchor(anchor);
+    const current = placing,
+      planned = planAt(anchor),
+      ready = ghostsOf(planned);
+    if (!ready.length || planned?.unplaced) {
+      setError("There is no room here for every token. Choose another spot.");
+      return;
+    }
+    if (current.mode === "keep") {
+      saveMoves(
+        ready.map((g) => {
+          const before = current.members.find((m) => m.token.id === g.token.id)!.token;
+          return {
+            tokenId: g.token.id,
+            before: position(before),
+            after: { column: g.token.column, row: g.token.row },
+          };
+        }),
+      );
+      setPlacing(null);
+      return;
+    }
+    const entries = ready.map((g) => {
+      const member = current.members.find((m) => m.token.id === g.token.id)!;
+      return { tokenId: g.token.id, before: member.before, token: g.token };
+    });
+    void act(
+      { kind: "map-tokens-place", mapId: map.id, grid: map.grid, place: entries },
+      () => {
+        setPlacing(null);
+        if (current.makeDefault)
+          void act({
+            kind: "tabletop-session",
+            before: table.journal.world?.tabletop ?? null,
+            session: { ...session, partyFormation: current.formation },
+          });
+        const placedNew = entries.filter((e) => !e.before);
+        resultToast(`Placed ${entries.length} on ${map.name}`, {
+          // The inverse: moved tokens go back, new ones are removed, if nothing changed since.
+          undo: () => {
+            const now = latest.current.tokens ?? [];
+            const back = entries
+              .filter((e) => e.before)
+              .map((e) => ({ tokenId: e.tokenId, before: now.find((t) => t.id === e.tokenId) ?? e.token, token: e.before! }));
+            void act({
+              kind: "map-tokens-place",
+              mapId: map.id,
+              grid: map.grid!,
+              place: back,
+              remove: placedNew.map((e) => ({
+                mapId: map.id,
+                grid: map.grid!,
+                tokenId: e.tokenId,
+                before: now.find((t) => t.id === e.tokenId) ?? e.token,
+              })),
+            });
+          },
+        });
+      },
+    );
+  }
+  /** Place party, Place (the selection in a formation) or Move (the selection, same shape). */
+  function startPlacing(next: Omit<Placing, "formation"> & { formation?: Formation }) {
+    setError("");
+    setInspector(false);
+    setPlaceAnchor(undefined);
+    setPlacing({ ...next, formation: next.formation ?? session.partyFormation ?? DEFAULT_FORMATION });
   }
   /** Place the player's own character token on the square under the point (map-token-claim). */
   function claimAt(purseId: string, point: ScenePoint) {
@@ -407,7 +586,29 @@ export function useMapTabletopTools(
     gesture.current = undefined;
     if (!current) return false;
     // A tap inspects; dragging keeps the map unobstructed until the move ends.
-    if (current.ids?.length && !current.moved) setInspector(true);
+    if (placing) {
+      hover(point);
+      commitPlacing(squareAt(point));
+      return true;
+    }
+    if (current.box) {
+      const left = Math.min(current.point.x, point.x),
+        right = Math.max(current.point.x, point.x),
+        top = Math.min(current.point.y, point.y),
+        bottom = Math.max(current.point.y, point.y);
+      const inside = (map.tokens ?? [])
+        .filter((t) => {
+          const p = sceneTokenPoint(map.grid!, t);
+          return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
+        })
+        .map((t) => t.id);
+      setBox(undefined);
+      const next = [...new Set([...selected, ...inside])];
+      setSelected(next);
+      selectToken?.(next[0] ?? "");
+      return true;
+    }
+    if (current.ids?.length && !current.moved && !selectMode) setInspector(true);
     if (current.claim) {
       if (!current.moved) claimAt(current.claim, point);
       return true;
@@ -482,8 +683,33 @@ export function useMapTabletopTools(
     return true;
   }
   function keyboard(event: KeyboardEvent, center?: ScenePoint) {
+    if (placing) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setPlacing(null);
+        return true;
+      }
+      if (event.key === "r" || event.key === "R") {
+        event.preventDefault();
+        rotatePlacing();
+        return true;
+      }
+      if (event.key === "Enter" && center) {
+        event.preventDefault();
+        commitPlacing(squareAt(center));
+        return true;
+      }
+    }
+    if (dm && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a" && event.target === event.currentTarget) {
+      event.preventDefault();
+      const all = (map.tokens ?? []).map((t) => t.id);
+      setSelected(all);
+      selectToken?.(all[0] ?? "");
+      return true;
+    }
     if (event.key === "Escape") {
       setClaiming("");
+      setSelectMode(false);
       cancel();
       return false;
     }
@@ -1092,6 +1318,18 @@ export function useMapTabletopTools(
             {selectedTokens.length} selected ·{" "}
             {selectedTokens.map((token) => token.label).join(", ")}
           </p>
+          {dm && map.grid && (
+            // Group commands (map tokens PR 3): back to the map with taps adding tokens.
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setInspector(false);
+                setSelectMode(true);
+              }}
+            >
+              Select more tokens
+            </Button>
+          )}
           <div className="tabletop-token-list">
             {(map.tokens ?? []).map((token) => (
               <label key={token.id}>
@@ -1325,6 +1563,28 @@ export function useMapTabletopTools(
     /** Player movement: arm "Place my token", and the token whose press was refused this turn. */
     claim: { purseId: claiming, start: setClaiming, cancel: () => setClaiming("") },
     notTurn,
+    /** Group placement and selection (map tokens PR 3). */
+    group: {
+      placing,
+      setPlacing,
+      startPlacing,
+      plan,
+      ghosts,
+      anchor: placeAnchor,
+      rotate: rotatePlacing,
+      spacing: placingSpacing,
+      hover,
+      box,
+      selectMode,
+      setSelectMode,
+      selectedTokens,
+      clear: () => {
+        setSelected([]);
+        selectToken?.("");
+        setSelectMode(false);
+      },
+      act,
+    },
     showPreview,
     session,
     busy: disabled,

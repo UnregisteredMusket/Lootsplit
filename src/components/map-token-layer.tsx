@@ -54,6 +54,8 @@ export function MapTokenLayer({
   movement,
   notTurn,
   speedFeet,
+  ghosts = [],
+  box,
 }: {
   map: CampaignMap;
   tokens: MapToken[];
@@ -70,6 +72,10 @@ export function MapTokenLayer({
   notTurn?: string;
   /** The player's speed from their sheet: the reach guide on their turn. */
   speedFeet?: number;
+  /** Group placement ghosts (map tokens PR 3), snapped square by square. */
+  ghosts?: { token: MapToken; fogged: boolean }[];
+  /** The Shift+drag selection box, in scene coordinates. */
+  box?: { a: { x: number; y: number }; b: { x: number; y: number } };
 }) {
   const table = useWorldTable(),
     seat = useSeat(),
@@ -231,6 +237,35 @@ export function MapTokenLayer({
           </div>
         );
       })}
+      {ghosts.map(({ token, fogged }) => {
+        const { r, d, cx, cy } = disc(token, token);
+        return (
+          <div key={`ghost-${token.id}`} className="map-token-drag" aria-hidden="true">
+            <span
+              className={`map-token-foot target${fogged ? " fogged" : ""}`}
+              style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
+            />
+            <span
+              className={`map-token map-token-${token.kind} ghost preview`}
+              style={{ left: cx, top: cy, width: d, height: d, fontSize: Math.max(10, Math.round(d * 0.36)) }}
+            >
+              <span>{initial(token)}</span>
+            </span>
+          </div>
+        );
+      })}
+      {box && (
+        <span
+          className="map-select-box"
+          aria-hidden="true"
+          style={{
+            left: view.x + Math.min(box.a.x, box.b.x) * width * view.scale,
+            top: view.y + Math.min(box.a.y, box.b.y) * height * view.scale,
+            width: Math.abs(box.a.x - box.b.x) * width * view.scale,
+            height: Math.abs(box.a.y - box.b.y) * height * view.scale,
+          }}
+        />
+      )}
       {moves.map((move) => {
         const token = map.tokens?.find((t) => t.id === move.tokenId);
         if (!token || !discToken(token)) return null;

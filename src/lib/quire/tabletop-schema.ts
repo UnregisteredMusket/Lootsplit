@@ -182,6 +182,18 @@ export const tabletopSessionSchema = z
       .nullable()
       .optional(),
     tvEnabled: z.boolean().default(false),
+    /**
+     * Tabletop protocol 15 (group placement): the party's default formation for Place party.
+     * `spacing` is empty squares between members; `rotation` turns lines and clusters.
+     */
+    partyFormation: z
+      .object({
+        shape: z.enum(["cluster", "line", "circle"]),
+        spacing: z.number().int().min(0).max(4),
+        rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
+      })
+      .strict()
+      .optional(),
     activeMapId: id.nullable().default(null),
     activationId: id.optional(),
     playerBrowsing: z.boolean().default(true),

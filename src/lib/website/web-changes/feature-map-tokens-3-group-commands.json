@@ -1,0 +1,11 @@
+{
+  "title": "Place the whole party in one go",
+  "summary": "DMs can place the party on a map in a formation with one click, and act on several tokens at once.",
+  "items": [
+    "Place party lists the party's characters: choose Cluster, Line or Circle, spacing and rotation, and ghosts follow your pointer square by square. One click places everyone, with Undo.",
+    "The formation can become the party's default.",
+    "Placement skips occupied squares, the edge of the grid and squares behind walls.",
+    "Select several tokens with Shift+drag, Shift-click or Ctrl/⌘+A (on phones, Select more tokens), then use the bar to place, move, hide, lock, size, add to initiative or send them to another map, each in one step.",
+    "The bar also sets the map's player movement."
+  ]
+}

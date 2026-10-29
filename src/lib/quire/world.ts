@@ -484,6 +484,55 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     ];
     if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
     event("Combat map tokens updated");
+  } else if (cmd.kind === "map-tokens-place") {
+    dm();
+    if (!cmd.place.length && !cmd.remove?.length) throw Error("Choose tokens to place.");
+    const map = w.maps.find((m) => m.id === cmd.mapId);
+    if (!map || !same(map.grid, cmd.grid)) throw Error("The combat grid changed. Reload before placing tokens.");
+    if (new Set(cmd.place.map((p) => p.tokenId)).size !== cmd.place.length)
+      throw Error("Place each token only once.");
+    // Removals first (Send to map / Move party to), so a token can change maps in one action.
+    for (const r of cmd.remove ?? []) {
+      const from = w.maps.find((m) => m.id === r.mapId);
+      if (!from || !same(from.grid, r.grid)) throw Error("A map's combat grid changed. Reload before moving tokens.");
+      const current = from.tokens?.find((t) => t.id === r.tokenId);
+      if (!current || !same(current, r.before))
+        throw Error("A token moved or changed. Refresh before placing.");
+      from.tokens = from.tokens!.filter((t) => t.id !== r.tokenId);
+      if (from.tabletop && from.tabletop.vision !== "off") from.tabletop.revision++;
+    }
+    const next = [...(map.tokens ?? [])];
+    for (const p of cmd.place) {
+      if (p.token.id !== p.tokenId) throw Error("Token identity cannot change.");
+      const index = next.findIndex((t) => t.id === p.tokenId);
+      const current = index >= 0 ? next[index] : null;
+      if (!same(current, p.before)) throw Error("A token moved or changed. Refresh before placing.");
+      if (current && (current.kind !== p.token.kind || current.entityId !== p.token.entityId))
+        throw Error("Token identity cannot change.");
+      if (index >= 0) next[index] = p.token;
+      else next.push(p.token);
+    }
+    map.tokens = next;
+    if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
+    event(`${cmd.place.length} ${cmd.place.length === 1 ? "token" : "tokens"} placed on ${map.name}`);
+  } else if (cmd.kind === "map-tokens-edit") {
+    dm();
+    const map = w.maps.find((m) => m.id === cmd.mapId);
+    if (!map) throw Error("This map is unavailable.");
+    if (new Set(cmd.edits.map((e) => e.tokenId)).size !== cmd.edits.length)
+      throw Error("Choose each token only once.");
+    const next = [...(map.tokens ?? [])];
+    for (const e of cmd.edits) {
+      const index = next.findIndex((t) => t.id === e.tokenId);
+      if (index < 0 || !same(next[index], e.before))
+        throw Error("A token moved or changed. Refresh before changing it.");
+      if (e.token.id !== e.tokenId || e.token.kind !== e.before.kind || e.token.entityId !== e.before.entityId)
+        throw Error("Token identity cannot change.");
+      next[index] = e.token;
+    }
+    map.tokens = next;
+    if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
+    event(`${cmd.edits.length} ${cmd.edits.length === 1 ? "token" : "tokens"} changed on ${map.name}`);
   } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;

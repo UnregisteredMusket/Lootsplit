@@ -104,8 +104,16 @@ export const GRID_MODE_PROTOCOL = 13;
  * turns during combat, are enforced by the server for every protocol.
  */
 export const PLAYER_MOVEMENT_PROTOCOL = 14;
+/**
+ * Protocol 15 (2026-10-29, map tokens: group placement): the tabletop session may carry the
+ * party's default formation (`partyFormation`), and the DM may send `map-tokens-place` and
+ * `map-tokens-edit`. Protocols 0-14 receive the session without it; their session saves compare
+ * without it and keep it. Pending drafts with the new commands ask them to finish on the updated
+ * website.
+ */
+export const GROUP_COMMANDS_PROTOCOL = 15;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = PLAYER_MOVEMENT_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = GROUP_COMMANDS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -918,6 +926,59 @@ const upgradeMovementCommands = <C extends { kind: string }>(table: CloudTable, 
       ...(current.lockedPurseIds ? { lockedPurseIds: current.lockedPurseIds } : {}),
     };
   });
+// Protocol 15 (group placement).
+const formationText = (text: string) => text.includes('"partyFormation":');
+/** Whether a table (or a stored backup body) holds a party formation default. */
+export function hasPartyFormation(table: CloudTable): boolean {
+  return (
+    table.journal?.world?.tabletop?.partyFormation !== undefined ||
+    !!table.journal?.reports?.some((r) => formationText(r.snapshot ?? ""))
+  );
+}
+function formationFreeTable(table: CloudTable): CloudTable {
+  if (!hasPartyFormation(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!formationText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(formationFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world?.tabletop?.partyFormation !== undefined) {
+    const tabletop = { ...world.tabletop };
+    delete tabletop.partyFormation;
+    plainWorld = { ...world, tabletop };
+  }
+  return {
+    ...table,
+    journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
+  };
+}
+/** Protocols 0-14 save the session without the formation; it is compared without it and kept. */
+function upgradeFormationCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
+  const current = table.journal?.world?.tabletop;
+  if (current?.partyFormation === undefined) return commands;
+  const plain = { ...current };
+  delete plain.partyFormation;
+  const withoutPresentation = { ...plain };
+  delete withoutPresentation.presentation;
+  const fullWithoutPresentation = { ...current };
+  delete fullWithoutPresentation.presentation;
+  return commands.map((command) => {
+    const c = command as C & Record<string, unknown>;
+    if (c.kind !== "tabletop-session" || !(sameJson(plain, c.before) || sameJson(withoutPresentation, c.before)))
+      return command;
+    const session = c.session as Record<string, unknown>;
+    return {
+      ...c,
+      before: sameJson(plain, c.before) ? current : fullWithoutPresentation,
+      session: "partyFormation" in session ? session : { ...session, partyFormation: current.partyFormation },
+    };
+  });
+}
 /** Every older-client conversion, applied to a batch before it runs (cloud.server.ts). */
 export function upgradeOldClientCommands<C extends { kind: string }>(
   table: CloudTable,
@@ -925,12 +986,15 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   protocol = 0,
 ): C[] {
   let result = commands;
+  if (protocol < GROUP_COMMANDS_PROTOCOL) result = upgradeFormationCommands(table, result);
   if (protocol < PLAYER_MOVEMENT_PROTOCOL) result = upgradeMovementCommands(table, result);
   if (protocol < GRID_MODE_PROTOCOL) result = upgradeGridHiddenCommands(table, result);
   if (protocol < FOOTPRINT_PROTOCOL) result = upgradeFootprintCommands(table, result);
   return result;
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= GROUP_COMMANDS_PROTOCOL) return table;
+  table = formationFreeTable(table);
   if (protocol >= PLAYER_MOVEMENT_PROTOCOL) return table;
   table = movementFreeTable(table);
   if (protocol >= GRID_MODE_PROTOCOL) return table;
@@ -1016,12 +1080,16 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= PLAYER_MOVEMENT_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= GROUP_COMMANDS_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 15: group placement commands and the formation default.
+      if (c.kind === "map-tokens-place" || c.kind === "map-tokens-edit" || formationText(JSON.stringify(c)))
+        return true;
+      if (protocol && protocol >= PLAYER_MOVEMENT_PROTOCOL) return false;
       // Protocol 14: token claims and the movement fields.
       if (c.kind === "map-token-claim" || movementText(JSON.stringify(c))) return true;
       if (protocol && protocol >= GRID_MODE_PROTOCOL) return false;

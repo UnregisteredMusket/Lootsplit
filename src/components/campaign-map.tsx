@@ -56,7 +56,7 @@ import {
   type ReactNode,
 } from "react";
 import { useSeat } from "@/lib/quire/seat";
-import { readWorld, mapTypes, type CampaignMap } from "@/lib/quire/world-schema";
+import { readWorld, mapTypes, type CampaignMap, type MapToken } from "@/lib/quire/world-schema";
 import { anchorFor, recognizedAnchors, npcAvailableHere, shopVisible } from "@/lib/quire/world";
 import { readMarketLocations, locationLabel, locationPath } from "@/lib/quire/shop-locations";
 import { recognizeMap } from "@/lib/quire/map-image";
@@ -70,6 +70,11 @@ import { MapBrowser, MapSessionBar } from "./map-session-bar";
 import { useMapTabletopTools } from "./map-tabletop-tools";
 import { MapTokenLayer } from "./map-token-layer";
 import { MovementNotice } from "./map-tabletop-inspector";
+import { GroupBar, PlacePartyPanel, PlacingHint, type PartyRow } from "./map-group-tools";
+import { groupMembers } from "@/lib/quire/party-groups";
+import { resizedToken } from "@/lib/quire/token-display";
+import { planFormation, DEFAULT_FORMATION } from "@/lib/quire/formation";
+import { addToInitiative } from "@/lib/quire/map-initiative-link";
 import { MapTurnStrip, MovementChips } from "./map-player-movement";
 import { useMapTurnOrder } from "@/lib/quire/use-map-turn-order";
 import { playerMovement, sheetSpeedFeet } from "@/lib/quire/map-movement";
@@ -2005,6 +2010,83 @@ function MapViewport({
     ? sheetSpeedFeet(recordTable.sheets?.find((sheet) => sheet.purseId === ownToken.entityId)?.speed)
     : undefined;
   const sketches = useMapSketches(viewScope, map.id);
+  const wheelSpacing = useRef<((e: WheelEvent) => boolean) | undefined>(undefined);
+  wheelSpacing.current = (e) => {
+    if (!tools.group.placing || !e.altKey) return false;
+    tools.group.spacing(e.deltaY > 0 ? -1 : 1);
+    return true;
+  };
+  // Place party (map tokens PR 3): the party's characters by group, ticked for the main group.
+  const [partyPanel, setPartyPanel] = useState(false),
+    [partyChecks, setPartyChecks] = useState<Record<string, boolean>>({}),
+    [makeDefault, setMakeDefault] = useState(true),
+    newTokenIds = useRef(new Map<string, string>());
+  const partyRows: PartyRow[] = useDm
+    ? groupRefs(recordTable).flatMap((ref) =>
+        groupMembers(recordTable, ref).map((person) => {
+          const token = map.tokens?.find((t) => t.kind === "character" && t.entityId === person.id);
+          const info = groupInfo(recordTable, ref);
+          const place = groupPlace(recordTable, ref).locationId;
+          const placeName = readMarketLocations(recordTable.journal?.market).locations.find((l) => l.id === place)?.name;
+          return {
+            purseId: person.id,
+            name: person.name,
+            status:
+              ref !== MAIN_GROUP
+                ? `Group ${info.letter}${placeName ? ` · ${placeName}` : ""}`
+                : token
+                  ? "on map · will move"
+                  : "not on this map",
+            checked: partyChecks[person.id] ?? ref === MAIN_GROUP,
+            order: token ? token.row * 1000 + token.column : 1e9,
+          };
+        }),
+      )
+        // Characters already on the map keep their reading order, so the formation keeps it too.
+        .sort((a, b) => a.order - b.order)
+    : [];
+  const partyMembers = (): { token: MapToken; before: MapToken | null }[] =>
+    partyRows
+      .filter((row) => row.checked)
+      .flatMap((row): { token: MapToken; before: MapToken | null }[] => {
+        const token = map.tokens?.find((t) => t.kind === "character" && t.entityId === row.purseId);
+        if (token) return [{ token, before: token }];
+        if (!newTokenIds.current.has(row.purseId)) newTokenIds.current.set(row.purseId, crypto.randomUUID());
+        return [
+          {
+            token: {
+              id: newTokenIds.current.get(row.purseId)!,
+              kind: "character" as const,
+              entityId: row.purseId,
+              label: row.name,
+              column: 0,
+              row: 0,
+              visibility: "party" as const,
+            },
+            before: null,
+          },
+        ];
+      });
+  const openPlaceParty = () => {
+    if (!map.grid) return;
+    setPartyPanel(true);
+    tools.group.startPlacing({ members: partyMembers(), mode: "formation", label: "party", makeDefault });
+  };
+  const closePlaceParty = () => {
+    setPartyPanel(false);
+    tools.group.setPlacing(null);
+  };
+  useEffect(() => {
+    // The panel follows the ticks; it closes once the party is placed.
+    if (!partyPanel) return;
+    if (!tools.group.placing) {
+      setPartyPanel(false);
+      return;
+    }
+    tools.group.setPlacing((current) => (current ? { ...current, members: partyMembers(), makeDefault } : current));
+    // partyMembers reads partyChecks and the map; rerun when they change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partyChecks, makeDefault, partyPanel, map.tokens]);
   useEffect(() => {
     if (full && tools.inspecting) setDrawerOpen(false);
   }, [full, tools.inspecting]);
@@ -2267,6 +2349,8 @@ function MapViewport({
     const el = root.current!;
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      // Place party: Alt+wheel changes the formation's spacing (map tokens PR 3).
+      if (wheelSpacing.current?.(e)) return;
       const rect = el.getBoundingClientRect(),
         v = viewRef.current,
         scale = Math.min(8, Math.max(0.5, v.scale * Math.exp(-e.deltaY * 0.002))),
@@ -2694,6 +2778,7 @@ function MapViewport({
     const upper = key.toUpperCase();
     const tool = SETUP_TOOLS.find((t) => t.shortcut === upper);
     if (tool) armSetup(tool.tool);
+    else if (upper === "A" && map.grid) openPlaceParty();
     else {
       const reveal = REVEAL_TOOLS.find((t) => t.shortcut === upper);
       if (reveal) chooseTool(reveal.tool);
@@ -3428,6 +3513,16 @@ function MapViewport({
                   </MapToolGroup>
                   <MapToolGroup caption="Combat">
                     {SETUP_TOOLS.slice(5).map(setupButton)}
+                    {map.grid && (
+                      <MapTool
+                        icon={<Users size={19} />}
+                        label="Place party"
+                        shortcut="⇧A"
+                        keys="Shift+A"
+                        expanded={partyPanel}
+                        onClick={() => (partyPanel ? closePlaceParty() : openPlaceParty())}
+                      />
+                    )}
                   </MapToolGroup>
                   <MapToolGroup caption="Objects">
                     <MapTool
@@ -3659,6 +3754,141 @@ function MapViewport({
             </aside>
           )}
           {tools.gridMode.dialog}
+          {partyPanel && tools.group.placing && (
+            <PlacePartyPanel
+              rows={partyRows}
+              toggle={(purseId) =>
+                setPartyChecks((checks) => ({
+                  ...checks,
+                  [purseId]: !(partyRows.find((r) => r.purseId === purseId)?.checked ?? false),
+                }))
+              }
+              formation={tools.group.placing.formation}
+              setFormation={(formation) =>
+                tools.group.setPlacing((current) => (current ? { ...current, formation } : current))
+              }
+              makeDefault={makeDefault}
+              setMakeDefault={setMakeDefault}
+              close={closePlaceParty}
+            />
+          )}
+          {tools.group.placing && (
+            <PlacingHint
+              count={tools.group.placing.members.length}
+              at={tools.group.plan?.places[0] && tools.group.anchor ? {
+                column: Math.min(...tools.group.plan.places.map((p) => p.column)),
+                row: Math.min(...tools.group.plan.places.map((p) => p.row)),
+              } : undefined}
+              shape={tools.group.placing.mode === "keep" ? "same shape" : tools.group.placing.formation.shape}
+              displaced={tools.group.plan?.displaced ?? 0}
+              unplaced={tools.group.plan?.unplaced ?? 0}
+            />
+          )}
+          {useDm &&
+            map.grid &&
+            !partyPanel &&
+            (tools.group.selectedTokens.length >= 2 ||
+              (layout === "phone" && tools.group.selectedTokens.length >= 1) ||
+              tools.group.selectMode) && (
+              <GroupBar
+                tokens={tools.group.selectedTokens}
+                placing={!!tools.group.placing}
+                busy={tools.busy}
+                phone={layout === "phone"}
+                raised={layout === "phone" && tools.inspecting}
+                selectMode={tools.group.selectMode}
+                setSelectMode={tools.group.setSelectMode}
+                movement={movement.mode}
+                maps={maps
+                  .filter((m) => m.id !== map.id && m.grid)
+                  .map((m) => ({ id: m.id, label: m.name }))}
+                onPlace={() =>
+                  tools.group.startPlacing({
+                    members: tools.group.selectedTokens.map((token) => ({ token, before: token })),
+                    mode: "formation",
+                    label: "selection",
+                  })
+                }
+                onMove={() =>
+                  tools.group.startPlacing({
+                    members: tools.group.selectedTokens.map((token) => ({ token, before: token })),
+                    mode: "keep",
+                    label: "selection",
+                  })
+                }
+                onHide={(hide) =>
+                  void tools.group.act({
+                    kind: "map-tokens-edit",
+                    mapId: map.id,
+                    edits: tools.group.selectedTokens.map((t) => ({
+                      tokenId: t.id,
+                      before: t,
+                      token: { ...t, visibility: hide ? "dm" : "party" },
+                    })),
+                  })
+                }
+                onLock={(lock) =>
+                  void tools.group.act({
+                    kind: "map-tokens-edit",
+                    mapId: map.id,
+                    edits: tools.group.selectedTokens.map((t) => {
+                      const token: MapToken = { ...t, locked: lock };
+                      if (!lock) delete token.locked;
+                      return { tokenId: t.id, before: t, token };
+                    }),
+                  })
+                }
+                onSize={(size) =>
+                  void tools.group.act({
+                    kind: "map-tokens-edit",
+                    mapId: map.id,
+                    edits: tools.group.selectedTokens.map((t) => ({
+                      tokenId: t.id,
+                      before: t,
+                      token: resizedToken(t, { sizeClass: size }, map.grid!),
+                    })),
+                  })
+                }
+                onSend={(targetId) => {
+                  const target = maps.find((m) => m.id === targetId);
+                  if (!target?.grid) return;
+                  const moving = tools.group.selectedTokens;
+                  const plan = planFormation(
+                    target.grid,
+                    target.tokens ?? [],
+                    moving,
+                    { column: Math.floor(target.grid.columns / 2), row: Math.floor(target.grid.rows / 2) },
+                    readTabletopSession(recordTable).partyFormation ?? DEFAULT_FORMATION,
+                    readMapTabletop(target).walls,
+                  );
+                  void tools.group.act(
+                    {
+                      kind: "map-tokens-place",
+                      mapId: target.id,
+                      grid: target.grid,
+                      place: plan.places.map((p) => {
+                        const token = { ...moving.find((t) => t.id === p.id)!, column: p.column, row: p.row };
+                        delete token.offsetX;
+                        delete token.offsetY;
+                        return { tokenId: p.id, before: target.tokens?.find((t) => t.id === p.id) ?? null, token };
+                      }),
+                      remove: moving.map((t) => ({ mapId: map.id, grid: map.grid!, tokenId: t.id, before: t })),
+                    },
+                    () => tools.group.clear(),
+                  );
+                }}
+                onMovement={(mode) =>
+                  void tools.group.act({
+                    kind: "map-tabletop",
+                    mapId: map.id,
+                    before: map.tabletop ?? null,
+                    settings: { ...readMapTabletop(map), movement: mode, playerMovement: mode !== "off" },
+                  })
+                }
+                onInitiative={() => void addToInitiative(recordTable, map, tools.group.selectedTokens, tools.group.act)}
+                onClear={tools.group.clear}
+              />
+            )}
           {contextOpen && !drawerOpen && (
             <aside
               className={`map-tool-context map-glass${revealTool ? " map-tool-context-setup" : ""}`}
@@ -3984,6 +4214,8 @@ function MapViewport({
               } else moved.current = true;
             }}
             onPointerMove={(e) => {
+              if (tools.group.placing && toolPointer.current !== e.pointerId)
+                tools.group.hover(mapPoint(e.clientX, e.clientY));
               if (toolPointer.current === e.pointerId) {
                 moved.current = true;
                 if (sketches.active) sketches.move(mapPoint(e.clientX, e.clientY));
@@ -4175,6 +4407,8 @@ function MapViewport({
               selected={tools.selected}
               moves={tools.moves}
               movement={useDm ? undefined : movement}
+              ghosts={tools.group.ghosts}
+              box={tools.group.box}
               notTurn={tools.notTurn}
               speedFeet={speedFeet}
               onActivate={(token, event) => {

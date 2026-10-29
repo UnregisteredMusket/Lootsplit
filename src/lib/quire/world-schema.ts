@@ -530,6 +530,34 @@ export const worldCommands = [
     before: mapTokenSchema.nullable(),
     token: mapTokenSchema.nullable(),
   }),
+  /**
+   * Group placement (map tokens PR 3): place or move several tokens on one map in one DM action
+   * (Place party, formations, Send to map), optionally removing tokens from other maps in the same
+   * action. Every token's before-state is checked; new tokens have `before: null`.
+   */
+  z.object({
+    id,
+    kind: z.literal("map-tokens-place"),
+    mapId: id,
+    grid: mapGridSchema,
+    place: z
+      .array(z.object({ tokenId: id, before: mapTokenSchema.nullable(), token: mapTokenSchema }).strict())
+      .max(50),
+    remove: z
+      .array(z.object({ mapId: id, grid: mapGridSchema, tokenId: id, before: mapTokenSchema }).strict())
+      .max(50)
+      .optional(),
+  }),
+  /** Group commands (map tokens PR 3): hide/show, lock, size, controllers, initiative links. */
+  z.object({
+    id,
+    kind: z.literal("map-tokens-edit"),
+    mapId: id,
+    edits: z
+      .array(z.object({ tokenId: id, before: mapTokenSchema, token: mapTokenSchema }).strict())
+      .min(1)
+      .max(100),
+  }),
   z.object({
     id,
     kind: z.literal("character-position"),
