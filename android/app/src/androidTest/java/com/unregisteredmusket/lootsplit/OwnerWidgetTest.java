@@ -37,6 +37,7 @@ public class OwnerWidgetTest {
     private final Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     @After public void cleanup() {
         WidgetStore.clear(context, null); OwnerWidgetJob.cancel(context);
+        WidgetStore.reasonFile(context).delete();
         WidgetRefresh.fetcher = WidgetClient::fetch;
         WidgetRefresh.alarm = DEFAULT_ALARM; WidgetRefresh.cancelActivity(context);
         WidgetStore.keys = DEFAULT_KEYS; WidgetStore.forgetCache();
@@ -98,6 +99,104 @@ public class OwnerWidgetTest {
         assertFalse(WidgetStore.finish(context, generation, snapshot, ""));
         assertEquals(next, WidgetStore.read(context).getString("generation"));
         assertNull(WidgetStore.read(context).optJSONObject("snapshot"));
+    }
+
+    /**
+     * Owner report 2026-10-29: removing the old widgets after connecting wiped the token, so the new
+     * ones started disconnected. Removing every widget now keeps the connection; re-adding restarts
+     * background refresh; only Disconnect widget, a 401/403 or an unusable key ends it, with a reason.
+     */
+    @Test public void removingEveryWidgetKeepsTheConnectionAndOnlyRealEndsClearIt() throws Exception {
+        WidgetStore.reasonFile(context).delete();
+        String generation = WidgetStore.connect(context, "synthetic-keep");
+        JSONObject old = WidgetData.project(fixture(), System.currentTimeMillis());
+        old.put("checkedAt", System.currentTimeMillis() - 40 * 60000L);
+        assertTrue(WidgetStore.finish(context, generation, old, ""));
+        OwnerWidgetJob.schedule(context);
+        assertNotNull(context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID));
+        // The last Field monitor and the last companion are removed (no instance is placed here).
+        new OwnerWidgetProvider().onDisabled(context);
+        new CompanionWidgetProvider().onDisabled(context);
+        if (OwnerWidgetProvider.ids(context).length + CompanionWidgetProvider.ids(context).length == 0)
+            assertNull("Background work stops with no widget placed", context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID));
+        WidgetStore.forgetCache();
+        assertEquals("Removing widgets keeps the owner connection", "synthetic-keep", WidgetStore.read(context).getString("token"));
+        assertEquals(generation, WidgetStore.read(context).getString("generation"));
+        assertNull("Nothing was disconnected", WidgetStore.lastDisconnect(context));
+
+        // Re-adding a widget restarts the periodic job and fetches at once (the reading is 40 minutes old).
+        CountDownLatch fetched = new CountDownLatch(1);
+        WidgetRefresh.fetcher = token -> {
+            assertEquals("synthetic-keep", token);
+            fetched.countDown();
+            return WidgetClient.fetch(token, () -> new FakeConnection(200, fixture().toString()), System.currentTimeMillis());
+        };
+        OwnerWidgetProvider.restart(context, null);
+        assertNotNull("Re-adding restarts the periodic check", context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID));
+        assertTrue("Re-adding fetches a reading now", fetched.await(3, TimeUnit.SECONDS));
+        long deadline = android.os.SystemClock.elapsedRealtime() + 3000;
+        while (WidgetStore.read(context).getJSONObject("snapshot").getLong("checkedAt") == old.getLong("checkedAt") && android.os.SystemClock.elapsedRealtime() < deadline)
+            android.os.SystemClock.sleep(20);
+        assertNotEquals(old.getLong("checkedAt"), WidgetStore.read(context).getJSONObject("snapshot").getLong("checkedAt"));
+        assertNotNull(OwnerWidgetProvider.current(WidgetStore.read(context)));
+
+        // App sign-in/sign-out passes the app's token: it never matches the widget's own session,
+        // and a busy Keystore that cannot compare keeps the connection too.
+        assertFalse(WidgetStore.clear(context, "synthetic-app-session"));
+        WidgetStore.keys = () -> { throw new java.security.KeyStoreException("synthetic busy keystore"); };
+        WidgetStore.forgetCache();
+        assertFalse(WidgetStore.clear(context, "synthetic-keep"));
+        WidgetStore.keys = DEFAULT_KEYS; WidgetStore.forgetCache();
+        assertEquals("synthetic-keep", WidgetStore.read(context).getString("token"));
+        // An APK update re-registers providers and reschedules without touching the connection.
+        WidgetRegistration.refresh(context, true);
+        assertEquals(generation, WidgetStore.read(context).getString("generation"));
+        assertNull(WidgetStore.lastDisconnect(context));
+
+        // 401/403: cleared, with the reason recorded and shown on the disconnected face.
+        android.os.SystemClock.sleep(2100); // Past the double-tap coalescing window of the successful fetch above.
+        WidgetRefresh.fetcher = token -> { throw new WidgetClient.AccessDenied(); };
+        CountDownLatch denied = new CountDownLatch(1);
+        WidgetRefresh.request(context, true, error -> denied.countDown());
+        assertTrue(denied.await(3, TimeUnit.SECONDS));
+        assertEquals("", WidgetStore.read(context).optString("token"));
+        assertEquals(WidgetStore.REASON_REJECTED, WidgetStore.lastDisconnect(context).getString("reason"));
+        View face = OwnerWidgetProvider.views(context, WidgetStore.read(context), true).apply(context, new FrameLayout(context));
+        String services = ((TextView) face.findViewById(R.id.monitor_services)).getText().toString();
+        assertTrue(services, services.startsWith(WidgetRefresh.NOT_CONNECTED + " · " + WidgetStore.REASON_REJECTED));
+        assertEquals("SIGN IN", ((TextView) face.findViewById(R.id.monitor_open)).getText().toString());
+        View medium = OwnerWidgetProvider.medium(context, WidgetStore.read(context), -1, true).apply(context, new FrameLayout(context));
+        assertTrue(((TextView) medium.findViewById(R.id.medium_item_text)).getText().toString().startsWith(WidgetRefresh.NOT_CONNECTED));
+        JSONObject placeholder = WidgetRows.placeholder(context, WidgetStore.read(context)).getJSONObject(0);
+        assertEquals(WidgetRefresh.NOT_CONNECTED, placeholder.getString("title"));
+        assertTrue(placeholder.getString("detail").startsWith(WidgetStore.REASON_REJECTED));
+        assertEquals("The row opens Connect instead of expanding", "", placeholder.optString("id"));
+        assertEquals(OwnerWidgetProvider.CONNECT, placeholder.getString("action"));
+        assertEquals("home-screen-widget", WidgetActions.destination(OwnerWidgetProvider.CONNECT));
+        assertEquals(OwnerWidgetProvider.CONNECT, WidgetActions.rowAction(OwnerWidgetProvider.CONNECT));
+        // Refresh while disconnected says so instead of implying a reading is coming.
+        AtomicReference<String> refresh = new AtomicReference<>();
+        assertNull(WidgetRefresh.request(context, true, refresh::set));
+        assertEquals(WidgetRefresh.NOT_CONNECTED, refresh.get());
+
+        // Connecting again forgets the old reason; Disconnect widget in the app records its own.
+        WidgetStore.connect(context, "synthetic-again");
+        assertNull(WidgetStore.lastDisconnect(context));
+        assertTrue(WidgetStore.clear(context, null));
+        assertEquals(WidgetStore.REASON_IN_APP, WidgetStore.lastDisconnect(context).getString("reason"));
+        // A legacy widget still holding the app's own token is cleared by that app sign-out.
+        WidgetStore.connect(context, "synthetic-legacy-app-token");
+        assertTrue(WidgetStore.clear(context, "synthetic-legacy-app-token"));
+        assertEquals(WidgetStore.REASON_LEGACY, WidgetStore.lastDisconnect(context).getString("reason"));
+        // An unusable key or file (bad tag) ends it as "Encryption key reset".
+        WidgetStore.connect(context, "synthetic-key-loss");
+        byte[] garbage = new byte[64];
+        new java.util.Random(11).nextBytes(garbage);
+        try (FileOutputStream output = new FileOutputStream(WidgetStore.file(context))) { output.write(garbage); }
+        WidgetStore.forgetCache();
+        assertEquals("", WidgetStore.read(context).optString("token"));
+        assertEquals(WidgetStore.REASON_KEY, WidgetStore.lastDisconnect(context).getString("reason"));
+        assertTrue(WidgetStore.disconnectNote(context).startsWith(WidgetStore.REASON_KEY + " · "));
     }
 
     private static final class FakeConnection extends HttpsURLConnection {
@@ -270,12 +369,15 @@ public class OwnerWidgetTest {
         WidgetStore.keys = DEFAULT_KEYS; WidgetStore.forgetCache();
         assertEquals("synthetic-keystore", WidgetStore.read(context).getString("token"));
         assertEquals(old.toString(), WidgetStore.read(context).getJSONObject("snapshot").toString());
-        // Sign-out still removes a credential it cannot compare while storage is busy.
+        // An app sign-out (expectedToken) that cannot compare the stored token while storage is busy
+        // keeps it: the widget has its own session, and a legacy app token ends on its next 401 anyway.
         WidgetStore.keys = () -> { throw new java.security.KeyStoreException("synthetic busy keystore"); };
         WidgetStore.forgetCache();
-        assertTrue(WidgetStore.clear(context, "synthetic-keystore"));
-        assertFalse(WidgetStore.file(context).exists());
+        assertFalse(WidgetStore.clear(context, "synthetic-keystore"));
+        assertTrue(WidgetStore.file(context).exists());
         WidgetStore.keys = DEFAULT_KEYS; WidgetStore.forgetCache();
+        assertEquals("synthetic-keystore", WidgetStore.read(context).getString("token"));
+        WidgetStore.clear(context, null);
         // Confirmed corruption (bad tag / invalid length) still clears the stored connection.
         WidgetStore.connect(context, "synthetic-corrupt");
         byte[] garbage = new byte[64];

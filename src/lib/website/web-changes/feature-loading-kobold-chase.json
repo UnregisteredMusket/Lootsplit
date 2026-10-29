@@ -1,0 +1,11 @@
+{
+  "title": "A livelier loading screen for large campaigns",
+  "summary": "While a large shared campaign downloads, the Lootsplitter kobold now runs off with its coin while the adventurer gives chase, above \"Loading your campaign…\" and how much has loaded.",
+  "items": [
+    "The adventurer and the kobold run in place in the middle of the screen, on a loop.",
+    "Progress reads as a percentage, for example 42%/100%, taken from what has actually downloaded; it shows 100% only when the campaign is complete.",
+    "The size in MB and the number of parts are still shown underneath, in smaller text.",
+    "Keep waiting, Go back and Continue loading work as before, and the small progress pill now shows the percentage too.",
+    "If your device asks for reduced motion, you see the still artwork instead."
+  ]
+}
