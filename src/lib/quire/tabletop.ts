@@ -754,7 +754,9 @@ export function applyTokenFollow(table: CloudTable, seat: CloudSeat, command: To
   }
   for (const m of [map, from])
     if (m?.tabletop && readMapTabletop(m).vision !== "off") m.tabletop = { ...readMapTabletop(m), revision: readMapTabletop(m).revision + 1 };
-  table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary: `${person.name}'s token followed to ${map.name}` });
+  // Only that character's player and the DM see it (privacy review 2026-10-29: a member of a
+  // hidden group must not be traced through the activity list).
+  table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary: `${person.name}'s token followed to ${map.name}`, purseId: person.id });
 
   function placeChecked(token: MapToken) {
     if (!tokenInsideGrid(map!.grid!, token)) throw Error("Keep tokens inside the combat grid.");
