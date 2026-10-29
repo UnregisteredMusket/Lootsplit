@@ -4,6 +4,7 @@ import { formatCopper } from "@/lib/quire/money";
 import { readJournal } from "@/lib/quire/journal";
 import { downloadJson } from "@/lib/quire/table";
 import { Button, Modal } from "./ui";
+import { LoadArchivedSession } from "./history-loader";
 
 export type SessionReport = {
   id: string;
@@ -11,6 +12,8 @@ export type SessionReport = {
   at: number;
   snapshot: unknown;
   error?: string;
+  /** Listed by a shared room without its contents (history on demand). */
+  deferred?: true;
 };
 
 /** Caller supplies an authorized account record, or a seat for campaign/device projection. */
@@ -61,7 +64,11 @@ export function SessionReportReader({
           This is a saved record. Reading it does not restore a campaign or change play.
         </p>
         {!result.available ? (
-          <p role="alert">{result.error}</p>
+          "deferred" in result && result.deferred ? (
+            <LoadArchivedSession id={report.id} name={report.name} />
+          ) : (
+            <p role="alert">{result.error}</p>
+          )
         ) : (
           <>
             <section>

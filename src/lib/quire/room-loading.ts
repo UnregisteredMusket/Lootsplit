@@ -95,3 +95,28 @@ export class RoomLoadingPaused extends Error {
 export function throwIfRoomLoadingPaused(code: string) {
   if (paused === code) throw new RoomLoadingPaused();
 }
+
+/** True when every byte and part of the load has arrived. */
+export function roomLoadingComplete(loading: RoomLoading) {
+  return (
+    loading.loadedBytes >= loading.totalBytes && loading.loadedSections >= loading.totalSections
+  );
+}
+/**
+ * Whole percent loaded for the loading screen: real bytes over the total, rounded down, kept
+ * within 0–100, and 100 only once the load is complete (99 until then).
+ */
+export function loadingPercent(loadedBytes: number, totalBytes: number, complete: boolean) {
+  if (complete) return 100;
+  if (!(totalBytes > 0) || !(loadedBytes > 0)) return 0;
+  const percent = Math.floor((loadedBytes * 100) / totalBytes);
+  return Math.max(0, Math.min(99, percent));
+}
+/** The owner's "_%/_%" format: "42%/100%". */
+export function formatLoadingPercent(percent: number) {
+  return `${percent}%/100%`;
+}
+/** The step a polite live region announces: every 10 %, so screen readers are not flooded. */
+export function announcedLoadingStep(percent: number) {
+  return percent >= 100 ? 100 : Math.floor(percent / 10) * 10;
+}

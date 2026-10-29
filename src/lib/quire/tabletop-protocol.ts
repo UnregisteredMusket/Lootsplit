@@ -76,6 +76,13 @@ export const PARTY_GROUPS_PROTOCOL = 10;
  */
 export const VIEW_SECTIONS_PROTOCOL = 11;
 /**
+ * Tabletop protocol 12 (history on demand, history-pages.ts): room views hold the working set, the
+ * newest ledger and chat lines and archived sessions without their snapshots, with per-seat
+ * cursors; earlier history comes from `readCloudHistory`. Protocols 0-11 receive the whole
+ * campaign as before.
+ */
+export { HISTORY_PROTOCOL } from "./history-pages.ts";
+/**
  * Protocol 13 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
  * `footprint` and `anchor: "corner"` (stored by their top-left square). Older clients have a strict
  * token schema, so protocols 0-12 receive footprint tokens in the centre form they know (the

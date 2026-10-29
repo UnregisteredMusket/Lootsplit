@@ -186,3 +186,51 @@ test("a WebView account token restored from another installation is never sent (
     }
   }
 });
+
+test("removing widgets never ends the owner widget connection (owner report 2026-10-29)", () => {
+  const dir = "android/app/src/main/java/com/unregisteredmusket/lootsplit/";
+  const read = (name) => readFileSync(dir + name, "utf8");
+  // Both providers' onDisabled stop background work only; the stored connection is kept.
+  for (const name of ["OwnerWidgetProvider.java", "CompanionWidgetProvider.java"]) {
+    const source = read(name);
+    const start = source.indexOf("public void onDisabled(");
+    assert.ok(start > 0, `${name} has onDisabled`);
+    const next = source.indexOf("@Override", start);
+    const body = source.slice(start, next > 0 ? next : source.lastIndexOf("}"));
+    assert.doesNotMatch(body, /WidgetStore\.(clear|remove|clearGeneration|revoke)\(/, `${name} onDisabled`);
+    assert.match(body, /OwnerWidgetJob\.cancel\(/, `${name} still stops the periodic job`);
+    assert.match(source, /public void onEnabled\(Context context\)/, `${name} restarts on re-add`);
+  }
+  // The only paths that end the connection: Disconnect widget / legacy app token (plugin),
+  // 401/403 (revoke), a connect that could not finish, and an unusable key (inside WidgetStore).
+  const callers = [];
+  for (const name of [
+    "OwnerWidgetProvider.java",
+    "CompanionWidgetProvider.java",
+    "OwnerWidgetPlugin.java",
+    "WidgetRefresh.java",
+    "OwnerWidgetJob.java",
+    "WidgetInstallReceiver.java",
+    "WidgetRegistration.java",
+    "OwnerWidgetService.java",
+    "MainActivity.java",
+  ]) {
+    // Each call's arguments after the context, up to the end of the call's line.
+    for (const match of read(name).matchAll(/WidgetStore\.(clear|remove|clearGeneration|revoke)\((?:getContext\(\)|context|task\.context), ([^;\n]*?)\)(?:;|\)\s*\{)/g))
+      callers.push(`${name}:${match[1]}(${match[2]})`);
+  }
+  assert.deepEqual(callers.sort(), [
+    'OwnerWidgetPlugin.java:clear(call.getString("expectedToken"))',
+    "OwnerWidgetPlugin.java:clearGeneration(generation, WidgetStore.REASON_REJECTED)",
+    'OwnerWidgetPlugin.java:revoke(generation, "Owner authorization was rejected. Tap Sign in to reconnect.")',
+    "WidgetRefresh.java:clearGeneration(generation, WidgetStore.REASON_CONNECT)",
+    'WidgetRefresh.java:revoke(task.generation, "Owner authorization was rejected. Tap Sign in to reconnect.")',
+  ].sort());
+  // Every removal records its reason; the disconnected face and the app's widget screen show it.
+  const store = read("WidgetStore.java");
+  assert.match(store, /recordReason\(context, REASON_KEY\)/);
+  assert.match(store, /remove\(context, REASON_REJECTED\)/);
+  assert.match(store, /REASON_IN_APP : REASON_LEGACY/);
+  assert.match(read("OwnerWidgetPlugin.java"), /result\.put\("disconnectReason"/);
+  assert.match(read("WidgetActions.java"), /case "connect": return "home-screen-widget";/);
+});
