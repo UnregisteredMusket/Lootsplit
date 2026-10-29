@@ -95,10 +95,10 @@ test("turn-based room: a player moves their own token outside the room turn; oth
   const dm = await openRoom({ name: "Movement DM", table: campaign() });
   const player = await joinRoom({ code: dm.code, purseId: "mira", name: "Mira's player" });
   const seat = { code: dm.code, token: player.token };
-  await submitCommands({ ...seat, tabletopProtocol: 14, batchId: "move-1", commands: [moveCmd("move-1", 1, 2)] });
+  await submitCommands({ ...seat, tabletopProtocol: 15, batchId: "move-1", commands: [moveCmd("move-1", 1, 2)] });
   assert.equal(await column(seat), 2);
   // A retried batch (lost response) applies once.
-  await submitCommands({ ...seat, tabletopProtocol: 14, batchId: "move-1", commands: [moveCmd("move-1", 1, 2)] });
+  await submitCommands({ ...seat, tabletopProtocol: 15, batchId: "move-1", commands: [moveCmd("move-1", 1, 2)] });
   assert.equal(await column(seat), 2);
   // Anything else still needs the room turn.
   await assert.rejects(

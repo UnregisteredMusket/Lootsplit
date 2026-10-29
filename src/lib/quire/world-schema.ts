@@ -547,7 +547,7 @@ export const worldSchema = z
     mainGroup: mainGroupSchema.optional(),
     /** Players' requests to move their group (the DM approves). */
     groupRequests: z.array(groupRequestSchema).max(1000).optional(),
-    /** Zones (tabletop protocol 17): DM-saved zones, the split rule, and split requests (history kept). */
+    /** Zones (tabletop protocol 18): DM-saved zones, the split rule, and split requests (history kept). */
     zones: z.array(zoneSchema).max(200).optional(),
     splitRule: splitRuleSettingsSchema.optional(),
     zoneRequests: z.array(zoneRequestSchema).max(2000).optional(),

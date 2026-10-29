@@ -76,59 +76,59 @@ export const PARTY_GROUPS_PROTOCOL = 10;
  */
 export const VIEW_SECTIONS_PROTOCOL = 11;
 /**
- * Protocol 12 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
+ * Protocol 13 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
  * `footprint` and `anchor: "corner"` (stored by their top-left square). Older clients have a strict
- * token schema, so protocols 0-11 receive footprint tokens in the centre form they know (the
+ * token schema, so protocols 0-12 receive footprint tokens in the centre form they know (the
  * centre square plus a half-square offset for even sizes) without those fields
  * (`centreFormToken`). Their token moves, token saves and map saves come back in that form and the
  * server converts them to the stored form before applying them (`upgradeFootprintCommands`);
  * their saves keep the fields. Pending drafts with footprint fields ask them to finish on the
  * updated website.
  */
-export const FOOTPRINT_PROTOCOL = 12;
+export const FOOTPRINT_PROTOCOL = 13;
 /**
- * Protocol 13 (2026-10-29, map tokens: grid mode): a map's tabletop settings may carry
+ * Protocol 14 (2026-10-29, map tokens: grid mode): a map's tabletop settings may carry
  * `gridHidden` (the automatic grid of an ungridded map). Older clients have a strict tabletop
- * schema, so protocols 0-12 receive settings without it; their scene saves and map saves keep it
+ * schema, so protocols 0-13 receive settings without it; their scene saves and map saves keep it
  * (`upgradeOldClientCommands`). Pending `map-grid-snap` drafts ask them to finish on the updated
  * website.
  */
-export const GRID_MODE_PROTOCOL = 13;
+export const GRID_MODE_PROTOCOL = 14;
 /**
- * Protocol 14 (2026-10-29, map tokens: player movement): a map's tabletop settings may carry
+ * Protocol 15 (2026-10-29, map tokens: player movement): a map's tabletop settings may carry
  * `movement` ("auto" | "off" | "approval") and `lockedPurseIds`, and players may send
- * `map-token-claim`. Protocols 0-13 receive settings without the new fields (`playerMovement` is
+ * `map-token-claim`. Protocols 0-14 receive settings without the new fields (`playerMovement` is
  * kept in step with `movement`); their scene and map saves compare without them, keep them, and a
  * change to "Allow assigned-player token movement" sets Automatic or Off. Pending drafts with the
  * new fields or claims ask them to finish on the updated website. The movement rules, including
  * turns during combat, are enforced by the server for every protocol.
  */
-export const PLAYER_MOVEMENT_PROTOCOL = 14;
+export const PLAYER_MOVEMENT_PROTOCOL = 15;
 /**
- * Protocol 15 (2026-10-29, map tokens: group placement): the tabletop session may carry the
+ * Protocol 16 (2026-10-29, map tokens: group placement): the tabletop session may carry the
  * party's default formation (`partyFormation`), and the DM may send `map-tokens-place` and
- * `map-tokens-edit`. Protocols 0-14 receive the session without it; their session saves compare
+ * `map-tokens-edit`. Protocols 0-15 receive the session without it; their session saves compare
  * without it and keep it. Pending drafts with the new commands ask them to finish on the updated
  * website.
  */
-export const GROUP_COMMANDS_PROTOCOL = 15;
+export const GROUP_COMMANDS_PROTOCOL = 16;
 /**
- * Protocol 16 (2026-10-29, map tokens: token follows view): the tabletop session may carry
+ * Protocol 17 (2026-10-29, map tokens: token follows view): the tabletop session may carry
  * `followView` ("Character tokens follow players' map view"), and players may send
- * `map-token-follow`. Protocols 0-15 receive the session without it; their session saves compare
+ * `map-token-follow`. Protocols 0-16 receive the session without it; their session saves compare
  * without it and keep it. Pending drafts with the new command ask them to finish on the updated
  * website.
  */
-export const FOLLOW_VIEW_PROTOCOL = 16;
+export const FOLLOW_VIEW_PROTOCOL = 17;
 /**
- * Protocol 17 (2026-10-29, map tokens: zones and the split rule): the world may carry `zones`,
+ * Protocol 18 (2026-10-29, map tokens: zones and the split rule): the world may carry `zones`,
  * `splitRule` and `zoneRequests`, and players may send `zone-request`, `zone-vote`,
- * `zone-request-withdraw` and `zone-request-resolve`; the DM `zone-save`. Protocols 0-16 receive
+ * `zone-request-withdraw` and `zone-request-resolve`; the DM `zone-save`. Protocols 0-17 receive
  * the world without them (their world saves keep them, journal.ts); the server still applies the
  * zone rules to their token follows. Drafts with the new commands ask them to finish on the
  * updated website.
  */
-export const ZONES_PROTOCOL = 17;
+export const ZONES_PROTOCOL = 18;
 /** The protocol current clients declare. */
 export const CURRENT_TABLETOP_PROTOCOL = ZONES_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
@@ -616,13 +616,13 @@ export function refuseOldClientGroupActions(
     }
   }
 }
-// Protocol 12 (footprints and snapping).
+// Protocol 13 (footprints and snapping).
 const footprintFields = ["sizeClass", "footprint", "anchor"] as const;
 const hasFootprint = (token: Partial<MapToken> | null | undefined) =>
   !!token && footprintFields.some((key) => token[key] !== undefined);
 const footprinted = (text: string) => /"(sizeClass|footprint|anchor)":/.test(text);
 /**
- * A token as protocols 0-11 read it: without its size fields, and a corner-anchored footprint
+ * A token as protocols 0-12 read it: without its size fields, and a corner-anchored footprint
  * token at its centre square (plus half a square for even sizes), so older apps draw it at its
  * true centre. The same object when the token has no footprint fields.
  */
@@ -729,7 +729,7 @@ function storedToken(stored: MapToken, sent: MapToken, snap: boolean): MapToken 
   return { ...result, ...storedPlace(stored, sent, snap) };
 }
 /**
- * Protocols 0-11 send footprint tokens in their centre form. Before a batch from such a client is
+ * Protocols 0-12 send footprint tokens in their centre form. Before a batch from such a client is
  * applied, the server rewrites its token moves, token saves and map saves into the stored form
  * (against the current table). Nothing else changes; commands about other tokens are untouched.
  */
@@ -757,7 +757,7 @@ export function upgradeFootprintCommands<C extends { kind: string }>(table: Clou
       const token = stored(c.tokenId);
       if (!token) return command;
       const before = c.before as MapToken | null;
-      // Protocols 1-11 sent the centre form; protocol 0 the centre form without tabletop fields,
+      // Protocols 1-12 sent the centre form; protocol 0 the centre form without tabletop fields,
       // which world.ts already accepts as legacyTabletopToken(current) and merges.
       const fromCentre = sameJson(centreFormToken(token), before);
       if (!fromCentre && !sameJson(legacyTabletopToken(token), before)) return command;
@@ -783,9 +783,9 @@ export function upgradeFootprintCommands<C extends { kind: string }>(table: Clou
     return command;
   });
 }
-// Protocol 13 (grid mode).
+// Protocol 14 (grid mode).
 const gridHiddenText = (text: string) => text.includes('"gridHidden":');
-/** Tabletop settings without the hidden-grid flag (protocols 0-12). The same object without it. */
+/** Tabletop settings without the hidden-grid flag (protocols 0-13). The same object without it. */
 export function withoutGridHidden<T>(settings: T): T {
   if (!settings || typeof settings !== "object" || !("gridHidden" in settings)) return settings;
   const plain = { ...settings } as T & { gridHidden?: boolean };
@@ -878,9 +878,9 @@ const upgradeGridHiddenCommands = <C extends { kind: string }>(table: CloudTable
     withoutGridHidden,
     (sent, current) => ("gridHidden" in sent ? sent : { ...sent, gridHidden: current.gridHidden }),
   );
-// Protocol 14 (player movement).
+// Protocol 15 (player movement).
 const movementText = (text: string) => /"movement":"(auto|off|approval)"|"lockedPurseIds":\[/.test(text);
-/** Tabletop settings without `movement` and `lockedPurseIds` (protocols 0-13). */
+/** Tabletop settings without `movement` and `lockedPurseIds` (protocols 0-14). */
 export function withoutMovement<T>(settings: T): T {
   if (!settings || typeof settings !== "object" || (!("movement" in settings) && !("lockedPurseIds" in settings)))
     return settings;
@@ -944,7 +944,7 @@ const upgradeMovementCommands = <C extends { kind: string }>(table: CloudTable, 
       ...(current.lockedPurseIds ? { lockedPurseIds: current.lockedPurseIds } : {}),
     };
   });
-// Protocol 15 (group placement).
+// Protocol 16 (group placement).
 const formationText = (text: string) => text.includes('"partyFormation":');
 /** Whether a table (or a stored backup body) holds a party formation default. */
 export function hasPartyFormation(table: CloudTable): boolean {
@@ -975,7 +975,7 @@ function formationFreeTable(table: CloudTable): CloudTable {
     journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
   };
 }
-/** Protocols 0-14 save the session without the formation; it is compared without it and kept. */
+/** Protocols 0-15 save the session without the formation; it is compared without it and kept. */
 function upgradeFormationCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
   const current = table.journal?.world?.tabletop;
   if (current?.partyFormation === undefined) return commands;
@@ -997,7 +997,7 @@ function upgradeFormationCommands<C extends { kind: string }>(table: CloudTable,
     };
   });
 }
-// Protocol 16 (token follows view): the same treatment as the formation default, for `followView`.
+// Protocol 17 (token follows view): the same treatment as the formation default, for `followView`.
 const followText = (text: string) => text.includes('"followView":');
 /** Whether a table (or a stored backup body) holds the follow-view setting. */
 export function hasFollowView(table: CloudTable): boolean {
@@ -1028,7 +1028,7 @@ function followFreeTable(table: CloudTable): CloudTable {
     journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
   };
 }
-/** Protocols 0-15 save the session without `followView`; it is compared without it and kept. */
+/** Protocols 0-16 save the session without `followView`; it is compared without it and kept. */
 function upgradeFollowCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
   const current = table.journal?.world?.tabletop;
   if (current?.followView === undefined) return commands;
@@ -1050,7 +1050,7 @@ function upgradeFollowCommands<C extends { kind: string }>(table: CloudTable, co
     return { ...c, before: full, session: "followView" in session ? session : { ...session, followView: current.followView } };
   });
 }
-// Protocol 17 (zones).
+// Protocol 18 (zones).
 const zonesText = (text: string) => /"(zones|zoneRequests)":\[|"splitRule":\{/.test(text);
 /** Whether a table (or a stored backup body) holds zones, the split rule or split requests. */
 export function hasZones(table: CloudTable): boolean {
@@ -1197,23 +1197,23 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
-      // Protocol 17: zone commands and fields.
+      // Protocol 18: zone commands and fields.
       if (String(c.kind).startsWith("zone-") || zonesText(JSON.stringify(c))) return true;
       if (protocol && protocol >= FOLLOW_VIEW_PROTOCOL) return false;
-      // Protocol 16: token follows and the follow-view setting.
+      // Protocol 17: token follows and the follow-view setting.
       if (c.kind === "map-token-follow" || followText(JSON.stringify(c))) return true;
       if (protocol && protocol >= GROUP_COMMANDS_PROTOCOL) return false;
-      // Protocol 15: group placement commands and the formation default.
+      // Protocol 16: group placement commands and the formation default.
       if (c.kind === "map-tokens-place" || c.kind === "map-tokens-edit" || formationText(JSON.stringify(c)))
         return true;
       if (protocol && protocol >= PLAYER_MOVEMENT_PROTOCOL) return false;
-      // Protocol 14: token claims and the movement fields.
+      // Protocol 15: token claims and the movement fields.
       if (c.kind === "map-token-claim" || movementText(JSON.stringify(c))) return true;
       if (protocol && protocol >= GRID_MODE_PROTOCOL) return false;
-      // Protocol 13: grid mode commands and the hidden-grid flag.
+      // Protocol 14: grid mode commands and the hidden-grid flag.
       if (c.kind === "map-grid-snap" || gridHiddenText(JSON.stringify(c))) return true;
       if (protocol && protocol >= FOOTPRINT_PROTOCOL) return false;
-      // Protocol 12: footprint fields older apps cannot read.
+      // Protocol 13: footprint fields older apps cannot read.
       if (footprintCommandText(c)) return true;
       if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return false;
       // Protocol 10: split-the-party commands and group fields older apps cannot read.
