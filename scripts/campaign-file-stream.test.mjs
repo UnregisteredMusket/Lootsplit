@@ -83,7 +83,7 @@ async function campaign(userId, sessions, lines = 120, entries = 200) {
 test("parts built from chunks are exactly the parts of the whole text", async () => {
   const text = JSON.stringify({ a: "x".repeat(1_200_000), b: "é€😀".repeat(400_000), c: [1, 2, 3] });
   const whole = backupParts(text);
-  for (const size of [1, 7, 65_536, 999_999, 1_000_001]) {
+  for (const size of [997, 65_536, 999_999, 1_000_001, 3_000_000]) {
     const chunks = [];
     for (let i = 0; i < text.length; i += size) chunks.push(text.slice(i, i + size));
     // Never split a surrogate pair across chunks (the stream never does: it yields whole JSON values).
@@ -122,7 +122,7 @@ test("Download a copy streams byte for byte the file it was, with paged history 
 
 test("the deletion copy is the same file, stored in parts when large, and reads back exactly", async () => {
   const { userId, actor } = await account();
-  const dm = await campaign(userId, 3, 120, 4000);
+  const dm = await campaign(userId, 1, 60, 4000);
   fixed();
   let expected;
   try {

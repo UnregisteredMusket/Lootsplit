@@ -109,14 +109,26 @@ export async function backupPartsFromChunks(chunks) {
   let bytes = 0;
   /** @type {string[]} */
   const parts = [];
-  let pending = new Uint8Array(0);
+  // Encoded bytes not yet cut into parts, kept as pieces and joined only when a part is cut.
+  /** @type {Uint8Array[]} */
+  let pieces = [];
+  let pendingBytes = 0;
   const cut = (/** @type {boolean} */ final) => {
+    if (!(pendingBytes > BACKUP_PART_BYTES || (final && pendingBytes))) return;
+    let pending = new Uint8Array(pendingBytes);
+    let offset = 0;
+    for (const piece of pieces) {
+      pending.set(piece, offset);
+      offset += piece.length;
+    }
     while (pending.length > BACKUP_PART_BYTES || (final && pending.length)) {
       let end = Math.min(pending.length, BACKUP_PART_BYTES);
       while (end < pending.length && end > 0 && (pending[end] & 0xc0) === 0x80) end--;
       parts.push(decoder.decode(pending.subarray(0, end)));
-      pending = pending.slice(end);
+      pending = pending.subarray(end);
     }
+    pieces = pending.length ? [pending.slice()] : [];
+    pendingBytes = pending.length;
   };
   for await (const chunk of chunks) {
     hash.update(chunk);
@@ -126,10 +138,8 @@ export async function backupPartsFromChunks(chunks) {
       small.push(chunk);
       if (bytes > BACKUP_INLINE_BYTES) small = null;
     }
-    const next = new Uint8Array(pending.length + encoded.length);
-    next.set(pending);
-    next.set(encoded, pending.length);
-    pending = next;
+    pieces.push(encoded);
+    pendingBytes += encoded.length;
     cut(false);
   }
   if (small) return { text: small.join(""), chunked: null };
