@@ -1,6 +1,6 @@
 // Token follows the player's map view (map tokens PR 7, plan section 6): derived zones, the
 // same-place rule, the DM's setting, control, hidden maps (generic refusal), combat, movement and
-// locks, the journey rule, an existing token on the destination, Undo, and protocol 16.
+// locks, the journey rule, an existing token on the destination, Undo, and protocol 17.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { canonicalJson } from "./canonical-json.ts";
@@ -149,15 +149,15 @@ test("an existing token on the destination stays where the player can see it", (
   assert.equal(mapOf(next, "keep").tokens!.some((x) => x.entityId === "mira"), false);
 });
 
-test("protocol 16: followView is kept from older clients; their drafts with follows are refused", () => {
-  assert.equal(FOLLOW_VIEW_PROTOCOL, 16);
+test("protocol 17: followView is kept from older clients; their drafts with follows are refused", () => {
+  assert.equal(FOLLOW_VIEW_PROTOCOL, 17);
   const t = fixture();
-  const old = tableForProtocol(t, 15).journal!.world!.tabletop!;
+  const old = tableForProtocol(t, 16).journal!.world!.tabletop!;
   assert.equal("followView" in old, false);
-  const [c] = upgradeOldClientCommands(t, [{ id: "s", kind: "tabletop-session", before: old, session: { ...readTabletopSession({ journal: { ...t.journal!, world: { ...t.journal!.world!, tabletop: old } } }), tvEnabled: true } }], 15);
+  const [c] = upgradeOldClientCommands(t, [{ id: "s", kind: "tabletop-session", before: old, session: { ...readTabletopSession({ journal: { ...t.journal!, world: { ...t.journal!.world!, tabletop: old } } }), tvEnabled: true } }], 16);
   const saved = applyCommand(t, dm, commandSchema.parse(c as CommandInput));
   assert.equal(readTabletopSession(saved).followView, true);
   assert.equal(readTabletopSession(saved).tvEnabled, true);
   for (const draft of [[{ kind: "map-token-follow" }], [{ kind: "tabletop-session", session: { followView: true } }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 15), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 16), /unfinished map actions/);
 });

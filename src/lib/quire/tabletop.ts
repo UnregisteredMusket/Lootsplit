@@ -49,7 +49,7 @@ export function mapAccessible(table: CloudTable, map: CampaignMap, seat: Seat) {
 export type MovementMode = "auto" | "off" | "approval";
 /**
  * The map's player movement: its explicit `movement`, else "auto" for a map without tabletop
- * settings (new maps), else `playerMovement` (maps configured before protocol 14 keep their "off").
+ * settings (new maps), else `playerMovement` (maps configured before protocol 15 keep their "off").
  */
 export function movementMode(map: Pick<CampaignMap, "tabletop">): MovementMode {
   const settings = map.tabletop;
@@ -570,7 +570,7 @@ export function applyTabletopCommand(
         throw Error("You cannot move one of these tokens.");
       if (!same(position(token), position(move.before)))
         throw Error("A selected token moved or changed. Refresh before moving it.");
-      // Footprints (protocol 12): the whole footprint stays inside the grid, and with grid mode
+      // Footprints (protocol 13): the whole footprint stays inside the grid, and with grid mode
       // on the position must already be snapped. The server refuses; it never relocates a token.
       const placed = { ...token, ...move.after };
       if (move.after.offsetX === undefined) delete placed.offsetX;
