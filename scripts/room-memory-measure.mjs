@@ -68,6 +68,7 @@ async function setup(path) {
  * its view), `undo` (Undo of the oldest purchase: a command that needs the whole live ledger and
  * every archived session), `whole` (the whole campaign as exports and deletion copies read it:
  * every page and archived session, projected for the DM, as exports were built before part 2),
+ * `favour` ("favour whoever is behind" over every archived session, refused afterwards),
  * `undo-archived` (Undo of a line in an archived session: only the sessions that can hold it are
  * loaded since part 3), `stream` (the DM's campaign file streamed one archived session at a time, as Download a copy and
  * deletion copies are built since part 2), `records` (Account → Session records streamed one
@@ -82,6 +83,8 @@ async function read(path) {
   const { projectRecord } = await import("../src/lib/quire/session-records.ts");
   const { canonicalJson } = await import("../src/lib/quire/canonical-json.ts");
   const protocol = flag("protocol", 11);
+  // MEASURE_EVERY=1: load every archived session (no selections or favour digests), as before.
+  if (process.env.MEASURE_EVERY === "1") (await import("../src/lib/quire/cloud.server.ts")).setArchiveSelectionForTests(false);
   const n = flag("concurrency", 1);
   const op = (rest[rest.indexOf("--op") + 1] && rest.includes("--op")) ? rest[rest.indexOf("--op") + 1] : "read";
   const started = performance.now();
@@ -99,6 +102,14 @@ async function read(path) {
         const line = room.table.ledger.find((l) => l.copper < 0 && l.transactionType === "purchase");
         const id = `undo-${process.pid}-${i}`;
         const view = await submitCommands({ ...seats[0], tabletopProtocol: protocol, batchId: id, commands: [{ id, kind: "ledger-void", target: { kind: "ledger", id: line.id }, before: canonicalJson(line), reason: "Measured." }] }).catch((error) => ({ error: String(error.message) }));
+        return JSON.stringify(view).length;
+      }
+      if (op === "favour") {
+        // "Favour whoever is behind": fairness over every archived session is computed before the
+        // (deliberately stale) expectation is compared, so the refusal measures the whole work.
+        const id = `favour-${process.pid}-${i}`;
+        const view = await submitCommands({ ...seats[0], tabletopProtocol: protocol, batchId: id, commands: [{ id, kind: "loot-resolve", method: "round-robin", lots: [{ holdingId: "measure-none", quantity: 1 }], favour: { basis: "campaign" }, expect: "stale" }] }).catch((error) => ({ error: String(error.message) }));
+        if (!/Claims changed|not in the pool|no longer|pool/i.test(view.error ?? "")) throw Error(view.error ?? "favour unexpectedly applied");
         return JSON.stringify(view).length;
       }
       if (op === "undo-archived") {

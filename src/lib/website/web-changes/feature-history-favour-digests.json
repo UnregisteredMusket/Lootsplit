@@ -1,0 +1,7 @@
+{
+  "title": "Favour whoever is behind works in long campaigns",
+  "summary": "Resolving the treasure pool with \"favour whoever is behind\" now reads past sessions one at a time instead of all at once.",
+  "items": [
+    "To compare who has received the least, each archived session is read on its own and only its fairness totals are kept, so this keeps working in campaigns with many archived sessions. The results are exactly the same as before."
+  ]
+}

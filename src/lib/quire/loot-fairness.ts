@@ -21,7 +21,7 @@
  * - Away and former characters are DM-only rows and are not compared. A player away from the
  *   party sees only their own totals. Party members see only counted receipts of others.
  */
-import { isDeferredSnapshot } from "./history-pages.ts";
+import { DEFERRED_REPORT_PREFIX, isDeferredSnapshot } from "./history-pages.ts";
 import { characterVisible, inParty } from "./character-position.ts";
 import { isNpc } from "./coin-split.ts";
 import type { CloudTable } from "./cloud.ts";
@@ -322,11 +322,43 @@ function snapshotKey(snapshot: string): string {
   for (let i = Math.max(0, snapshot.length - 512); i < snapshot.length; i++) h = Math.imul(h ^ snapshot.charCodeAt(i), 0x01000193) >>> 0;
   return `${snapshot.length}:${step}:${h.toString(16)}`;
 }
+/**
+ * Server only (storage follow-up, favour digests): digests of archived sessions the Worker read one
+ * at a time, by their stored reference, for one command batch run without loading them all
+ * (`withArchivedFairness`). Never set on a device, where archived sessions are never deferred.
+ */
+let archivedDigests: ReadonlyMap<string, Digest | null> | null = null;
+/** An archived session's digest as fairness computes it from its snapshot (opaque outside this module). */
+export type ArchivedFairnessDigest = Digest | null;
+/** The digest of one archived snapshot, exactly as fairness builds it (and cached the same way). */
+export function fairnessDigestOfSnapshot(snapshot: string): ArchivedFairnessDigest {
+  return cached(snapshot, () => {
+    const read = readSnapshot(snapshot);
+    return read ? digest(read.table, read.extension) : null;
+  });
+}
+/**
+ * Runs `run` (synchronous) with these archived sessions' digests standing in for their deferred
+ * snapshots (by stored reference). Restored afterwards.
+ */
+export function withArchivedFairness<T>(digests: ReadonlyMap<string, ArchivedFairnessDigest>, run: () => T): T {
+  const previous = archivedDigests;
+  archivedDigests = digests;
+  try {
+    return run();
+  } finally {
+    archivedDigests = previous;
+  }
+}
 function cached(snapshot: string, build: () => Digest | null): Digest | null {
   // A room read without its archived sessions (history on demand, step 4) must never be digested
-  // or cached as an unreadable session: the Worker reads those sessions before using fairness.
-  if (isDeferredSnapshot(snapshot))
+  // or cached as an unreadable session: the Worker reads those sessions before using fairness,
+  // or provides their digests (`withArchivedFairness`).
+  if (isDeferredSnapshot(snapshot)) {
+    const reference = snapshot.slice(DEFERRED_REPORT_PREFIX.length);
+    if (archivedDigests?.has(reference)) return archivedDigests.get(reference)!;
     throw Error("An archived session was not read with this campaign. Nothing was changed; try again.");
+  }
   const key = snapshotKey(snapshot);
   const hit = snapshotCache.get(key);
   if (hit !== undefined) {
