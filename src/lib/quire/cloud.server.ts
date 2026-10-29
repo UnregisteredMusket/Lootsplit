@@ -1255,6 +1255,7 @@ export async function readRoomHistory(input: {
   before?: unknown;
   report?: unknown;
   held?: unknown;
+  bulk?: unknown;
 }) {
   if (!historyClient(input.tabletopProtocol)) throw Error("Reload Lootsplitter to open earlier history.");
   const room = await must(input.code, { working: true });

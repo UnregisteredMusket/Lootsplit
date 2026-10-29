@@ -1,10 +1,12 @@
+import { HistoryCoverage, useRoomHistory } from "./history-loader";
+import { historyIncomplete, loadAllHistory } from "@/lib/quire/room-history";
 /**
  * Party treasure pool and item claims (future-development prompt 2, phase 2; mockups approved
  * by the owner on 2026-10-23). The Party → Treasure pool tab, the Review Inbox section and the
  * pool history. Every change goes through one `loot-*` command (economy-context.tsx); claims
  * never move items, and only the DM's resolution does.
  */
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AppLink } from "@/components/app-link";
 import { Button } from "@/components/ui";
 import { toast } from "sonner";
@@ -717,6 +719,13 @@ export function LootClaimsReview() {
         }
       : undefined;
   const favouring = favourOn && assist;
+  // Favour compares totals over every archived session: in a shared room that loads the whole
+  // history first (history on demand), so the totals and the room's agree.
+  useRoomHistory();
+  const historyMissing = favouring && historyIncomplete();
+  useEffect(() => {
+    if (historyMissing) void loadAllHistory().catch(() => undefined);
+  }, [historyMissing]);
   const totals = useMemo(
     () => (favouring ? fairnessStandings(fair.table, favourBasis) : null),
     [favouring, fair.table, favourBasis],
@@ -745,7 +754,8 @@ export function LootClaimsReview() {
     ? [...new Set(plan.lots.flatMap((l) => l.unmarked))].map((id) => nameOf(t, id))
     : [];
   const unmarkedLots = plan ? plan.lots.filter((l) => l.unmarked.length) : [];
-  const canResolve = !!plan && !blocked && !busy && (method !== "random" || rolls === "server" || plan.missing === 0);
+  const canResolve =
+    !!plan && !blocked && !busy && !historyMissing && (method !== "random" || rolls === "server" || plan.missing === 0);
   async function resolve() {
     if (!plan || !canResolve) return;
     setBusy(true);
@@ -948,6 +958,11 @@ export function LootClaimsReview() {
                     </li>
                   )}
                   {rolling && rolls === "manual" && <li>Your Pen &amp; Paper totals are recorded as entered by the DM.</li>}
+                  {historyMissing && (
+                    <li>
+                      <HistoryCoverage what="Favour totals" />
+                    </li>
+                  )}
                   {favouring && (
                     <li>
                       Favour whoever is behind is on ({favourBasis === "session" ? "this session" : "campaign to date"}); the totals it

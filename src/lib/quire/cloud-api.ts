@@ -9,7 +9,7 @@ import type { ViewSectionsResult } from "./view-sections.server.ts";
  */
 async function roomResponse<T extends import("./cloud.server.ts").RoomView>(
   view: T,
-  data: { tabletopProtocol?: number; viewSections?: string[] },
+  data: { tabletopProtocol?: number; viewSections?: string[]; unsectioned?: boolean },
 ) {
   const { roomViewResponse } = await import("./view-sections.server.ts");
   return roomViewResponse(view, data);
@@ -83,7 +83,9 @@ export const joinCloudTable = createServerFn({ method: "POST" })
   });
 
 export const pullCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { tabletopProtocol?: number; viewSections?: string[]; code: string; token: string }) => input)
+  .validator(
+    (input: { tabletopProtocol?: number; viewSections?: string[]; unsectioned?: boolean; code: string; token: string }) => input,
+  )
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
@@ -138,6 +140,7 @@ export const readCloudHistory = createServerFn({ method: "POST" })
       before?: string;
       report?: string;
       held?: string[];
+      bulk?: boolean;
     }) => input,
   )
   .handler(async ({ data }) => {

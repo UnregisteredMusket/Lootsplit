@@ -63,6 +63,9 @@ const seat = {
   role: "player" as const,
   purseIds: ["hero"],
 };
+// History on demand (room-history.ts) is not under test here: no older pages are loaded, so a
+// view's table reaches the device unchanged.
+const HISTORY_STUBS = "const noteRoomView=()=>{}, mergeHistory=(t)=>t;\n";
 function acceptance(pending: Command[], acknowledged: string[], draft: Command[]) {
   const session = {
     userId: undefined as string | undefined,
@@ -113,7 +116,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     "fail",
     "sameCommand",
     "compactPatch",
-    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) + "; return accept;",
+    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + HISTORY_STUBS + body) + "; return accept;",
   )(
     () => session,
     readRoomResponse,
@@ -768,7 +771,7 @@ function outcomeHarness({
     "sameCommand",
     "readRoomResponse",
     "compactPatch",
-    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) +
+    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + HISTORY_STUBS + body) +
       "; return {queueCommand, runSharedMutation, captureMutationScope, retryPending};",
   )(
     () => Object.freeze({ ...deviceScope }),

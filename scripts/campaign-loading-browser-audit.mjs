@@ -1,6 +1,8 @@
 // Loading screen for a large shared campaign (sectioned storage step 3C). A disposable DM shares a
-// synthetic campaign of about 2.5 MB (long party ledger and chat) live; players join at 320 px and
-// 1280 px. Section downloads are slowed in the browser so the screen is observable. Checks: the
+// synthetic campaign of about 3.7 MB live: a long party ledger and chat (1.1 MB, whose older lines
+// current clients load on demand since step 4) and 2.5 MB of journal notes, which every view holds
+// (more than one section batch, so progress is seen rising); players join
+// at 320 px and 1280 px. Section downloads are slowed in the browser so the screen is observable. Checks: the
 // screen appears with the brand chase (adventurer and kobold running in place, centred), "Loading
 // your campaign…" with an "N%/100%" value that rises and matches role=progressbar, MB and parts as
 // secondary detail, a 10 % polite announcement and both choices; Keep waiting
@@ -116,13 +118,16 @@ try {
         holdings: [],
         shops: [],
         stock: [],
-        // A long party history: about 1.4 MB of ledger and 1.1 MB of chat.
-        ledger: Array.from({ length: 7000 }, (_, i) => ({ id: `l-${i}`, at: 1_700_000_000_000 + i, purseId: "hoard", shopId: null, summary: `Road supplies ${i}: rope, lantern oil and rations`, copper: 0, transactionType: "adjustment" })),
+        // A long party history: about 0.6 MB of ledger and 0.5 MB of chat.
+        ledger: Array.from({ length: 3000 }, (_, i) => ({ id: `l-${i}`, at: 1_700_000_000_000 + i, purseId: "hoard", shopId: null, summary: `Road supplies ${i}: rope, lantern oil and rations`, copper: 0, transactionType: "adjustment" })),
         listings: [],
         loans: [],
         sheets: [],
-        notes: Array.from({ length: 7000 }, (_, i) => ({ id: `n-${i}`, at: 1_700_000_000_000 + i, from: "dm", to: "party", purseId: "", text: `Day ${i}: the caravan moves north at dawn.` })),
-        journal: readJournal({}),
+        notes: Array.from({ length: 3000 }, (_, i) => ({ id: `n-${i}`, at: 1_700_000_000_000 + i, from: "dm", to: "party", purseId: "", text: `Day ${i}: the caravan moves north at dawn.` })),
+        // Party journal notes every view holds (the ledger and chat above are history on demand).
+        journal: readJournal({
+          entries: Array.from({ length: 4200 }, (_, i) => ({ id: `e-${i}`, at: 1_700_000_000_000 + i, authorId: "dm", purseId: "", visibility: "party", title: `Road log ${i}`, text: `Day ${i}: `.padEnd(560, "the road winds on through the hills. "), reportIds: [] })),
+        }),
       });
       const { getCampaigns, renameCampaign } = await import("/src/lib/quire/campaigns.ts");
       renameCampaign(getCampaigns().activeId, campaign);
@@ -185,9 +190,10 @@ try {
   const arrived = await phone.page.evaluate(async () => {
     const { snapshot } = await import("/src/lib/quire/economy.ts");
     const t = await snapshot();
-    return { ledger: t.ledger.length, notes: t.notes?.length ?? 0 };
+    return { ledger: t.ledger.length, entries: t.journal?.entries?.length ?? 0 };
   });
-  assert.ok(arrived.ledger >= 7000, `the whole party ledger arrived (${arrived.ledger})`);
+  assert.equal(arrived.entries, 4200, "every journal note arrived");
+  assert.ok(arrived.ledger >= 512, `the newest party ledger lines arrived (${arrived.ledger}); earlier ones load on demand`);
 
   // 2. A desktop player with reduced motion: Go back pauses, Continue loading finishes.
   const desk = await device("player 1280", 1280, { reducedMotion: "reduce" });
@@ -231,11 +237,11 @@ try {
       async () =>
         desk.page.evaluate(async () => {
           const { snapshot } = await import("/src/lib/quire/economy.ts");
-          return (await snapshot()).ledger.length;
+          return (await snapshot()).journal?.entries?.length ?? 0;
         }),
       { timeout: 60000 },
     )
-    .toBeGreaterThanOrEqual(7000);
+    .toBeGreaterThanOrEqual(4200);
   await expect(desk.page.locator("[data-campaign-loading]")).toHaveCount(0, { timeout: 60000 });
 
   assert.deepEqual(errors, []);

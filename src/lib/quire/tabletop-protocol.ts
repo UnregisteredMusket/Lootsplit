@@ -73,8 +73,15 @@ export const PARTY_GROUPS_PROTOCOL = 10;
  * Android apps, older tabs) receive the full view as before and never see a manifest.
  */
 export const VIEW_SECTIONS_PROTOCOL = 11;
+/**
+ * Tabletop protocol 12 (history on demand, history-pages.ts): room views hold the working set, the
+ * newest ledger and chat lines and archived sessions without their snapshots, with per-seat
+ * cursors; earlier history comes from `readCloudHistory`. Protocols 0-11 receive the whole
+ * campaign as before.
+ */
+export { HISTORY_PROTOCOL } from "./history-pages.ts";
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = VIEW_SECTIONS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = 12;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 

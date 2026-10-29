@@ -1,3 +1,4 @@
+import { LedgerCoverage } from "../history-loader";
 import { lotClaims, pooledLots } from "@/lib/quire/loot-claims";
 import { inParty } from "@/lib/quire/character-position";
 import { localEncounterRequest } from "@/lib/encounters/local";
@@ -385,6 +386,7 @@ function DmDeskContents() {
                       ))}
                     </div>
                     <small>Account transfers excluded from received and spent.</small>
+                    {session && <LedgerCoverage since={session.startedAt} ledger={ledger} />}
                   </>
                 ) : (
                   <p>Start a play session to chart received and spent coins.</p>

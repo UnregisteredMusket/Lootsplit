@@ -161,7 +161,8 @@ export const HISTORY_BATCH_CHARS = 1_500_000;
 
 type HistoryItems = CloudTable["ledger"] | CloudTable["notes"];
 type ArchivedReport = NonNullable<NonNullable<CloudTable["journal"]>["reports"]>[number];
-export type HistoryPage = { hash: string; items?: HistoryItems };
+/** One older page: its cursor, the cursor of the page before it (null at the start), its hash. */
+export type HistoryPage = { cursor: string; prev: string | null; hash: string; items?: HistoryItems };
 export type HistoryResult =
   | {
       protocol: "lootsplit.room.history.v1";
@@ -184,7 +185,8 @@ export type HistoryResult =
 
 /**
  * Older history for one seat of a working read: up to `HISTORY_BATCH_ITEMS` visible lines of
- * `list` from the page `before` names, going back, or the archived session `report`. Pages and
+ * `list` from the page `before` names, going back (with `bulk`, up to `HISTORY_BATCH_CHARS`), or
+ * the archived session `report`. Pages and
  * sessions are read from this room's own rows only and projected with `project` (the view's own
  * rules) or `projectArchivedReport`. `missing` when the cursor or report is not in the room as it
  * is now (it moved on: the client reads the room again).
@@ -193,7 +195,7 @@ export async function readHistory(
   room: CloudRoom,
   seat: CloudSeat,
   project: HistoryProjector,
-  input: { list?: unknown; before?: unknown; report?: unknown; held?: unknown },
+  input: { list?: unknown; before?: unknown; report?: unknown; held?: unknown; bulk?: unknown },
 ): Promise<HistoryResult> {
   const db = database();
   const base = { protocol: "lootsplit.room.history.v1" as const, revision: room.revision };
@@ -234,10 +236,16 @@ export async function readHistory(
     const projectedText = JSON.stringify(visible);
     if (result.length && chars + projectedText.length > HISTORY_BATCH_CHARS) break;
     const hash = await projectedHash(room.code, seat.id, `${list}\n${projectedText}`);
-    result.unshift({ hash, ...(held.has(hash) ? {} : { items: visible }) });
+    result.unshift({
+      cursor: await cursorOf(room.code, seat.id, list, page),
+      prev: index > 0 ? await cursorOf(room.code, seat.id, list, pages[index - 1]!) : null,
+      hash,
+      ...(held.has(hash) ? {} : { items: visible }),
+    });
     lines += visible.length;
     chars += projectedText.length;
-    if (lines >= HISTORY_BATCH_ITEMS) {
+    // `bulk` (loading the whole history): as many pages as fit the response budget.
+    if (input.bulk !== true && lines >= HISTORY_BATCH_ITEMS) {
       index--;
       break;
     }

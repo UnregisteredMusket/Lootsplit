@@ -20,7 +20,16 @@ import {
   skipCloudTurn,
   submitCloudCommands,
   manageCloudRoom,
+  readCloudHistory,
 } from "./room-transport.ts";
+import {
+  connectRoomHistory,
+  historyIncomplete,
+  loadAllHistory,
+  mergeHistory,
+  noteRoomView,
+  onRoomHistoryLoaded,
+} from "./room-history.ts";
 import { setCloudWatch } from "./cloud-turn.ts";
 import { applyCloudTable, economySnapshot, snapshot } from "./economy.ts";
 import { getSeat, setSeat, downloadJson, resumedPlayerSeat } from "./table.ts";
@@ -457,6 +466,10 @@ async function accept(value: RoomView, committed = false) {
     throw Error(
       "The campaign response belongs to a different room or seat. Your pending actions are retained.",
     );
+  // History on demand (protocol 12): the view holds the newest lines; the older pages and
+  // archived sessions this tab has opened are put back before the device table is written.
+  noteRoomView({ code: s.code, token: s.token }, remote);
+  lastRemote = { code: remote.code, seatId: remote.seatId, revision: remote.revision, table: remote.table, purseIds: remote.purseIds, seats: remote.seats };
   if (remote.userId && s.userId && remote.userId !== s.userId)
     throw Error(
       "This seat now belongs to a different account. Export your original pending work before switching.",
@@ -502,25 +515,11 @@ async function accept(value: RoomView, committed = false) {
   let applied = false;
   let conflict: string | undefined;
   if (!s.pending.length && (changed || committed)) {
-    await applyCloudTable(remote.table);
+    await applyCloudTable(mergeHistory(remote.table));
     applied = true;
   } else if (changed) {
     try {
-      let preview = remote.table;
-      for (const cmd of s.pending)
-        preview = applyCommand(
-          preview,
-          {
-            id: s.seatId,
-            token: s.token,
-            name: remote.seats.find((x) => x.id === s.seatId)?.name ?? "Player",
-            role: s.role,
-            purseIds: remote.purseIds,
-          },
-          cmd,
-          { preview: true },
-        );
-      await applyCloudTable(preview);
+      await applyCloudTable(previewTable(s, lastRemote));
       applied = true;
     } catch (error) {
       s.revision = previousRevision;
@@ -627,6 +626,57 @@ async function withRoomImages(value: RoomView): Promise<RoomView> {
     });
   }
 }
+/** The latest accepted room view's table (unmerged), for re-merging loaded history. */
+let lastRemote:
+  | { code: string; seatId: string; revision: number; table: CloudTable; purseIds: string[]; seats: RoomView["seats"] }
+  | undefined;
+/** The device's table for a view with this seat's pending actions applied as a preview. */
+function previewTable(s: Session, remote: NonNullable<typeof lastRemote>) {
+  let preview = mergeHistory(remote.table);
+  for (const cmd of s.pending)
+    preview = applyCommand(
+      preview,
+      {
+        id: s.seatId,
+        token: s.token,
+        name: remote.seats.find((x) => x.id === s.seatId)?.name ?? "Player",
+        role: s.role,
+        purseIds: remote.purseIds,
+      },
+      cmd,
+      { preview: true },
+    );
+  return preview;
+}
+/**
+ * Earlier history finished loading (room-history.ts): write the latest view again with it merged,
+ * so every screen sees the older lines. Reads nothing from the room; changes nothing in it.
+ */
+async function applyLoadedHistory() {
+  const s = session();
+  if (!s || !lastRemote || lastRemote.code !== s.code || lastRemote.seatId !== s.seatId || lastRemote.revision !== s.revision)
+    return;
+  try {
+    await applyCloudTable(s.pending.length ? previewTable(s, lastRemote) : mergeHistory(lastRemote.table));
+  } catch {
+    // A pending preview that no longer applies is reported by the next sync, as before.
+    return;
+  }
+  publish({ lastSync: Date.now() }, true);
+}
+/** Coalesced: batches loaded while one merge waits are written by that one merge. */
+let reapplyQueued: Promise<void> | null = null;
+function reapplyRoomHistory() {
+  reapplyQueued ??= serial(async () => {
+    reapplyQueued = null;
+    await applyLoadedHistory();
+  });
+  return reapplyQueued;
+}
+if (typeof window !== "undefined") {
+  connectRoomHistory(readCloudHistory);
+  onRoomHistoryLoaded(() => void reapplyRoomHistory().catch(() => undefined));
+}
 async function refresh(conditional = false) {
   const s = session();
   if (!s) return;
@@ -648,7 +698,7 @@ async function refresh(conditional = false) {
       try {
         remote = await pollCloudTable({
           data: {
-            tabletopProtocol: 11,
+            tabletopProtocol: 12,
             code: s.code,
             token: s.token,
             knownRevision,
@@ -668,12 +718,12 @@ async function refresh(conditional = false) {
           );
         if (!protocol) throw error;
         remote = await pullCloudTable({
-          data: { tabletopProtocol: 11, code: s.code, token: s.token },
+          data: { tabletopProtocol: 12, code: s.code, token: s.token },
         });
       }
     } else
       remote = await pullCloudTable({
-        data: { tabletopProtocol: 11, code: s.code, token: s.token },
+        data: { tabletopProtocol: 12, code: s.code, token: s.token },
       });
   } catch (error) {
     if (key() !== campaignKey || session()?.token !== s.token) return;
@@ -742,6 +792,14 @@ export function captureDeviceBackup() {
           "Submit or resolve your pending actions before saving a campaign backup. Use Export pending actions to preserve an unfinished turn.",
         );
       }
+      // History on demand: a copy holds every older line and archived session this seat may
+      // read, as before, so they are loaded (with progress) and merged first.
+      await loadAllHistory();
+      if (historyIncomplete())
+        throw new Error(
+          "Part of this campaign's earlier history could not be loaded, so the copy would be incomplete. Nothing was saved; try again.",
+        );
+      await applyLoadedHistory();
     }
     return snapshot();
   });
@@ -771,7 +829,7 @@ export function syncRoomCampaignName() {
     if (!current || current.role !== "dm" || current.code !== s.code) return;
     await accept(
       await nameCloudRoom({
-        data: { tabletopProtocol: 11, code: current.code, token: current.token, campaignName: wanted },
+        data: { tabletopProtocol: 12, code: current.code, token: current.token, campaignName: wanted },
       }),
     );
   }).catch(() => {});
@@ -842,7 +900,7 @@ async function flush(endTurn = false) {
   try {
     const remote = await submitRoomCommands({
       data: {
-        tabletopProtocol: 11,
+        tabletopProtocol: 12,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -879,7 +937,7 @@ async function stage(rethrow = false) {
   try {
     const remote = await submitRoomCommands({
       data: {
-        tabletopProtocol: 11,
+        tabletopProtocol: 12,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -945,7 +1003,7 @@ export function discardPending() {
     const s = requireSession();
     const remote = await manageCloudRoom({
       data: {
-        tabletopProtocol: 11,
+        tabletopProtocol: 12,
         code: s.code,
         token: s.token,
         action: "discard",
@@ -1006,7 +1064,7 @@ export async function queueCommand(
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitRoomCommands({
         data: {
-          tabletopProtocol: 11,
+          tabletopProtocol: 12,
           code: s.code,
           token: s.token,
           batchId: command.id,
@@ -1092,7 +1150,7 @@ export async function queueCommandBatch(
       commandSchema.parse({ ...input, id: input.id || crypto.randomUUID() }),
     );
     const remote = await submitRoomCommands({
-      data: { tabletopProtocol: 11, code: s.code, token: s.token, batchId, commands },
+      data: { tabletopProtocol: 12, code: s.code, token: s.token, batchId, commands },
     });
     guard();
     await accept(remote);
@@ -1184,7 +1242,7 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
       const s = requireSession();
       await accept(
         await setCloudPace({
-          data: { tabletopProtocol: 11, code: s.code, token: s.token, live: mode === "live" },
+          data: { tabletopProtocol: 12, code: s.code, token: s.token, live: mode === "live" },
         }),
       );
     }
@@ -1212,7 +1270,7 @@ export function skipTableTurn() {
   return serial(async () => {
     const s = requireSession();
     await accept(
-      await skipCloudTurn({ data: { tabletopProtocol: 11, code: s.code, token: s.token } }),
+      await skipCloudTurn({ data: { tabletopProtocol: 12, code: s.code, token: s.token } }),
     );
   });
 }
@@ -1225,7 +1283,7 @@ export function manageParticipant(
     const s = requireSession();
     await accept(
       await manageCloudRoom({
-        data: { tabletopProtocol: 11, code: s.code, token: s.token, action, seatId, allowParty },
+        data: { tabletopProtocol: 12, code: s.code, token: s.token, action, seatId, allowParty },
       }),
     );
   });
@@ -1259,7 +1317,7 @@ export async function leaveTable() {
   if (s)
     await manageCloudRoom({
       data: {
-        tabletopProtocol: 11,
+        tabletopProtocol: 12,
         code: s.code,
         token: s.token,
         action: "leave",
@@ -1349,7 +1407,7 @@ export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) 
     const s = requireSession();
     const remote = await submitRoomCommands({
       data: {
-        tabletopProtocol: 11,
+        tabletopProtocol: 12,
         code: s.code,
         token: s.token,
         batchId: command.id,
@@ -1407,7 +1465,7 @@ export async function resumeAccountMembership(
       throw new Error("Export your unsynced player changes in Multiplayer before changing seats.");
     const { remote, draft } = readRoomResponse(
       await pullCloudTable({
-        data: { tabletopProtocol: 11, code: member.code, token: member.token },
+        data: { tabletopProtocol: 12, code: member.code, token: member.token },
       }),
     );
     const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
