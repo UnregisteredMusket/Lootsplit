@@ -401,3 +401,53 @@ test("unlinked cash corrections preserve existing coin denominations", () => {
   assert.equal(economy(corrected).receipts.length, 0);
   assert.equal(corrected.ledger[1].trade, undefined);
 });
+
+// Money review of #385: a void stored under a line ID that another line also uses must still
+// count as a void, so Undo never reverses a line twice (shared and offline, archives and live).
+function duplicateIdFixture(where: "archives" | "live") {
+  const table = tradeFixture();
+  const at = 1_700_000_000_000;
+  const original = { id: "X", at, purseId: "a", shopId: null, summary: "Adjusted coins", copper: -100, transactionType: "adjustment" as const };
+  const unrelated = { id: "V", at: at + 1, purseId: "b", shopId: null, summary: "A note", copper: 0, transactionType: "adjustment" as const };
+  const genuineVoid = { id: "V", at: at + 2, purseId: "a", shopId: null, summary: "Voided Adjusted coins (void:X)", copper: 100, transactionType: "adjustment" as const, reversalOf: "X" };
+  const snapshotWith = (ledger: CloudTable["ledger"]) => JSON.stringify({ ...tradeFixture(), ledger });
+  if (where === "archives") {
+    table.ledger = [original];
+    table.journal = {
+      ...table.journal!,
+      reports: [
+        { id: "session-1", name: "One", at: at + 10, snapshot: snapshotWith([unrelated]) },
+        { id: "session-3", name: "Three", at: at + 30, snapshot: snapshotWith([genuineVoid]) },
+      ],
+    } as CloudTable["journal"];
+  } else table.ledger = [unrelated, original, genuineVoid];
+  return { table, original };
+}
+for (const where of ["archives", "live"] as const)
+  test(`a void hidden behind a reused line ID (${where}) still stops a second reversal`, () => {
+    const { table, original } = duplicateIdFixture(where);
+    const before = wallet(table, "a");
+    const undo = { kind: "ledger-void" as const, target: { kind: "ledger" as const, id: "X" }, before: canonicalJson(original), reason: "Undo again." };
+    let after: CloudTable | undefined, error = "";
+    try {
+      after = act(table, undo);
+    } catch (e) {
+      error = (e as Error).message;
+    }
+    // Either nothing happens, or the conflicting evidence is refused; never a second reversal.
+    if (after) {
+      assert.equal(wallet(after, "a"), before, "no second reversal");
+      assert.equal(after.ledger.filter(l => l.reversalOf === "X").length, table.ledger.filter(l => l.reversalOf === "X").length);
+    } else assert.ok(error, "refused");
+  });
+
+test("offline Undo behaves the same with a reused void ID in an archive", async () => {
+  setSeat(DM_SEAT);
+  const { table } = duplicateIdFixture("archives");
+  await applyCloudTable(table);
+  const before = wallet(await economySnapshot(), "a");
+  await voidLedgerLine("X").catch(() => undefined);
+  const after = await economySnapshot();
+  assert.equal(wallet(after, "a"), before, "no second reversal offline");
+  assert.equal(after.ledger.filter(l => l.reversalOf === "X").length, 0);
+});
