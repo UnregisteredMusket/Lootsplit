@@ -22,7 +22,7 @@ import {
   roomVersionSql,
   roomWriteStatements,
 } from "./room-storage.mjs";
-import { FOOTPRINT_PROTOCOL, hasFootprintTokens, hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
+import { CURRENT_TABLETOP_PROTOCOL, FOOTPRINT_PROTOCOL, GRID_MODE_PROTOCOL, hasFootprintTokens, hasHiddenGrids, hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 /** Tabletop protocol the account client declared: 0 (none) to 9 (current; 4 adds nothing here,
  * 5 adds placement pin styles, 6 map scale bars, 7 journeys, 8 NPC service lists, 9 services
@@ -554,7 +554,7 @@ export async function handleAccounts(request, env, context = null) {
     if (path === "/api/account/records" && request.method === "GET") {
       const result = await campaignRecords(db, userId);
       const protocol = tabletopHeader(request);
-      if (protocol < FOOTPRINT_PROTOCOL)
+      if (protocol < CURRENT_TABLETOP_PROTOCOL)
         for (const report of result.reports)
           if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, protocol);
       return cors(json(result));
@@ -749,7 +749,8 @@ export async function handleAccounts(request, env, context = null) {
         (protocol < 8 && hasNpcServices(stored)) ||
         (protocol < 9 && hasWave2Services(stored)) ||
         (protocol < 10 && hasPartyGroups(stored)) ||
-        (protocol < FOOTPRINT_PROTOCOL && hasFootprintTokens(stored))
+        (protocol < FOOTPRINT_PROTOCOL && hasFootprintTokens(stored)) ||
+        (protocol < GRID_MODE_PROTOCOL && hasHiddenGrids(stored))
       )
         fail(
           "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",

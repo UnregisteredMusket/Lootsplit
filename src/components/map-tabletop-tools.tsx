@@ -6,8 +6,10 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
 import {
+  alignedGrid,
   freeTokenPosition,
   gridPoint,
+  nearestSnapped,
   sceneRouteDistance,
   sceneTokenPoint,
   shiftToken,
@@ -42,6 +44,8 @@ import { Button, Fold } from "./ui";
 import { CommandButton } from "./world-tools";
 import { TemplateShape, TokenInspector, SceneConfiguration } from "./map-tabletop-inspector";
 import { AppLink } from "./app-link";
+import { GridModeDialog, type GridModeChoice } from "./map-grid-mode";
+import { resultToast } from "@/lib/quire/result-toast";
 
 export type MapTool =
   | "select"
@@ -130,6 +134,10 @@ export function useMapTabletopTools(
     movePreview = useRef<Move[]>([]),
     stroke = useRef<StrokeDraft>({ points: [], frozen: 0 }),
     keyboardAnchor = useRef<ScenePoint | undefined>(undefined);
+  const [gridDialog, setGridDialog] = useState<GridModeChoice | null>(null),
+    [gridError, setGridError] = useState(""),
+    latest = useRef(map);
+  latest.current = map;
   const disabled = busy || cloud.viewOnly || (cloud.joined && !cloud.mine);
   const selectedTokens = (map.tokens ?? []).filter((token) => selected.includes(token.id));
   const cancel = () => {
@@ -895,6 +903,117 @@ export function useMapTabletopTools(
             ))}
     </>
   );
+  // Grid mode (map tokens 1b, owner 2026-10-29): the shared snap setting. Turning it off never
+  // moves a token; turning it on offers to snap the tokens between squares (one undoable command)
+  // or to align the grid under them.
+  const unsnapped = (map.tokens ?? []).filter((token) => !tokenSnapped(token));
+  function setGridMode(on: boolean) {
+    if (!dm || !map.grid || disabled) return;
+    setGridError("");
+    if (!on || !unsnapped.length) {
+      void configure({ ...settings, snap: on }, () =>
+        resultToast(on ? "Grid mode on" : "Grid mode off · tokens stay where they are"),
+      );
+      return;
+    }
+    setGridDialog("snap");
+  }
+  function snapAll() {
+    if (!map.grid) return;
+    const moves = unsnapped.map((token) => ({
+      tokenId: token.id,
+      before: position(token),
+      after: nearestSnapped(map.grid!, token),
+    }));
+    const grid = canonicalJson(map.grid);
+    void act(
+      { kind: "map-grid-snap", mapId: map.id, grid, before: map.tabletop ?? null, snap: true, moves },
+      () => {
+        setGridDialog(null);
+        resultToast(`Grid mode on · ${moves.length} ${moves.length === 1 ? "token" : "tokens"} snapped`, {
+          // The inverse command, checked against the map as it is when Undo is chosen.
+          undo: () =>
+            void act({
+              kind: "map-grid-snap",
+              mapId: map.id,
+              grid,
+              before: latest.current.tabletop ?? null,
+              snap: false,
+              moves: moves.map((move) => ({
+                tokenId: move.tokenId,
+                before: move.after,
+                after: move.before,
+              })),
+            }),
+        });
+      },
+    );
+  }
+  function alignGrid() {
+    if (!map.grid) return;
+    const aligned = alignedGrid(map.grid, map.tokens ?? []);
+    if (!aligned) {
+      setGridError(
+        "The grid can't shift under these tokens without leaving the map art. Snap the tokens instead.",
+      );
+      return;
+    }
+    const previous = map;
+    const next = { ...map, grid: aligned.grid, tokens: aligned.tokens, tabletop: { ...settings, snap: true } };
+    void act({ kind: "map-save", mapId: map.id, before: map, map: next }, () => {
+      setGridDialog(null);
+      resultToast("Grid mode on · grid aligned under the tokens", {
+        undo: () => {
+          const current = latest.current;
+          void act({
+            kind: "map-save",
+            mapId: map.id,
+            before: current,
+            map: {
+              ...current,
+              grid: previous.grid,
+              tokens: previous.tokens,
+              tabletop: { ...readMapTabletop(current), snap: settings.snap },
+            },
+          });
+        },
+      });
+    });
+  }
+  const gridModeDialog = gridDialog && (
+    <GridModeDialog
+      count={unsnapped.length}
+      choice={gridDialog}
+      setChoice={setGridDialog}
+      busy={disabled}
+      error={gridError || error}
+      onConfirm={() => (gridDialog === "snap" ? snapAll() : alignGrid())}
+      onJustTurnOn={() =>
+        void configure({ ...settings, snap: true }, () => {
+          setGridDialog(null);
+          resultToast("Grid mode on · tokens left as they are");
+        })
+      }
+      onCancel={() => {
+        setGridDialog(null);
+        setGridError("");
+      }}
+    />
+  );
+  const gridModeSelect = dm && map.grid && (
+    <label className="tabletop-grid-mode">
+      Grid mode
+      <select
+        aria-label="Grid mode"
+        value={settings.snap ? "on" : "off"}
+        disabled={disabled}
+        onChange={(event) => setGridMode(event.target.value === "on")}
+      >
+        <option value="on">On · snap to squares</option>
+        <option value="off">Off · move freely</option>
+      </select>
+    </label>
+  );
   const panel = inspector && (
     <aside className="tabletop-inspector" aria-label="Map inspector">
       <div className="world-row">
@@ -944,6 +1063,7 @@ export function useMapTabletopTools(
           )}
           {selectedTokens.length === 1 && (
             <TokenInspector
+              gridMode={gridModeSelect}
               key={selectedTokens[0].id}
               map={map}
               token={selectedTokens[0]}
@@ -1144,6 +1264,7 @@ export function useMapTabletopTools(
     selected,
     /** The move being previewed (dragging, or kept after a refused save). */
     moves,
+    gridMode: { on: settings.snap, set: setGridMode, dialog: gridModeDialog, select: gridModeSelect },
     showPreview,
     session,
     busy: disabled,

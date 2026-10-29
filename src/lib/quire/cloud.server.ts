@@ -43,13 +43,12 @@ import { referenceAccess, referenceSection } from "./reference-access.ts";
 import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
 import { SUBMIT_LIMIT_MESSAGE, takeSubmitAllowance } from "./room-submit-limit.ts";
 import {
-  FOOTPRINT_PROTOCOL,
   IMAGE_REFERENCE_PROTOCOL,
   PARTY_GROUPS_PROTOCOL,
   ROOM_IMAGE_SOURCES_KEY,
   groupCommandText,
   refuseOldClientGroupActions,
-  upgradeFootprintCommands,
+  upgradeOldClientCommands,
 } from "./tabletop-protocol.ts";
 
 /**
@@ -1002,9 +1001,9 @@ export async function submitCommands(input: {
       selected.add(key);
       return true;
     });
-    // Footprints (tabletop protocol 12): older apps send footprint tokens in their centre form.
-    const applied =
-      (input.tabletopProtocol ?? 0) < FOOTPRINT_PROTOCOL ? upgradeFootprintCommands(table, unapplied) : unapplied;
+    // Map tokens (tabletop protocols 12+): older apps send footprint tokens in their centre form
+    // and scene settings without the fields they can't see; they are applied in stored form.
+    const applied = upgradeOldClientCommands(table, unapplied, input.tabletopProtocol ?? 0);
     table = applyCommandBatch(table, seat, applied, (command) => ({
       source: "server",
       manualRolls,

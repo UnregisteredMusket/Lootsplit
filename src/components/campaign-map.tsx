@@ -69,9 +69,10 @@ import { MapArtwork } from "./map-artwork";
 import { MapBrowser, MapSessionBar } from "./map-session-bar";
 import { useMapTabletopTools } from "./map-tabletop-tools";
 import { MapTokenLayer } from "./map-token-layer";
+import { imageSize } from "@/lib/quire/image-size";
 import { discToken } from "@/lib/quire/token-display";
 import { MapPlayerPreview } from "./map-player-preview";
-import { sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
+import { automaticGrid, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm, CommandButton } from "./world-tools";
 import { LocationOptions, MarketLocationsPanel } from "./market-locations";
@@ -999,6 +1000,28 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
                 ? "Combat tokens are placed and moved in tile mode."
                 : "This map has no combat grid yet. Add one in Grid & scale."}
             </p>
+            {!map.grid && (
+              // Ungridded maps get an automatic hidden grid (owner, 2026-10-29): grid mode off,
+              // so tokens move freely; show it later in Inspector › Scene permissions & vision.
+              <CommandForm
+                label="Add tokens with an automatic grid"
+                submit={async () => ({
+                  kind: "map-save",
+                  mapId: map.id,
+                  before: map,
+                  map: {
+                    ...map,
+                    grid: automaticGrid(await imageSize(map.image), map.scale),
+                    tabletop: { ...readMapTabletop(map), snap: false, gridHidden: true },
+                  },
+                })}
+              >
+                <p>
+                  Adds a hidden grid of 5 ft squares over the whole image (from the scale bar when
+                  the map has one). Grid mode stays off, so tokens move freely.
+                </p>
+              </CommandForm>
+            )}
             {tileToggle}
           </>
         )
@@ -2972,6 +2995,9 @@ function MapViewport({
           });
         }}
         compactSearch={!!setup}
+        subtitle={
+          readMarketLocations(recordTable.journal?.market).locations.find((l) => l.id === map?.locationId)?.name
+        }
         settingsOpen={drawerOpen}
         toggleSettings={openSettings}
         parent={parentMap}
@@ -3587,8 +3613,23 @@ function MapViewport({
                   <span>{tileMode && (gridLocked || gridVisible) ? "On" : "Off"}</span>
                 </button>
               )}
+              {map.grid && useDm && (
+                // Grid mode (map tokens 1b): the shared snap setting, for everyone at the table.
+                <button
+                  className="map-layer-toggle"
+                  aria-label="Grid mode"
+                  aria-pressed={tools.gridMode.on}
+                  disabled={tools.busy}
+                  onClick={() => tools.gridMode.set(!tools.gridMode.on)}
+                >
+                  <Grid3X3 size={18} aria-hidden="true" />
+                  Grid mode
+                  <span>{tools.gridMode.on ? "On" : "Off"}</span>
+                </button>
+              )}
             </aside>
           )}
+          {tools.gridMode.dialog}
           {contextOpen && !drawerOpen && (
             <aside
               className={`map-tool-context map-glass${revealTool ? " map-tool-context-setup" : ""}`}
@@ -4029,7 +4070,12 @@ function MapViewport({
                   })}
                 </svg>
               )}
-              {tileMode && (gridLocked || gridVisible) && map.grid && (
+              {/* Grid mode (map tokens 1b): lines are drawn while grid mode is on, unless the
+                  map's automatic grid is hidden; an encounter's grid presentation always shows them. */}
+              {tileMode &&
+                (gridLocked ||
+                  (gridVisible && !map.tabletop?.gridHidden && readMapTabletop(map).snap)) &&
+                map.grid && (
                 <svg
                   className="map-tile-grid"
                   viewBox="0 0 1000 1000"

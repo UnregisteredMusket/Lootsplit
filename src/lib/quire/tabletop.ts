@@ -138,6 +138,7 @@ export function projectTabletopMap(
     playerMovement: settings.playerMovement,
     playerTemplates: settings.playerTemplates,
     snap: settings.snap,
+    ...(settings.gridHidden ? { gridHidden: true } : {}),
     unitLabel: settings.unitLabel,
     unitsPerFoot: settings.unitsPerFoot,
     initialView: settings.initialView,
@@ -389,6 +390,33 @@ export function applyTabletopCommand(
       throw Error("A map supports up to 200 saved area templates.");
     map.tabletop = settings;
     event("Map area template updated");
+  } else if (command.kind === "map-grid-snap") {
+    dm();
+    if (!map.grid) throw Error("Configure a combat grid before turning on grid mode.");
+    if (canonicalJson(map.grid) !== command.grid)
+      throw Error("The combat grid changed. Refresh before turning on grid mode.");
+    if (!same(map.tabletop ?? null, command.before))
+      throw Error("Map configuration changed. Refresh before changing grid mode.");
+    if (new Set(command.moves.map((m) => m.tokenId)).size !== command.moves.length)
+      throw Error("Select each token only once.");
+    const next = structuredClone(map.tokens ?? []);
+    for (const move of command.moves) {
+      const token = next.find((t) => t.id === move.tokenId);
+      if (!token || !same(position(token), position(move.before)))
+        throw Error("A token moved or changed. Refresh before changing grid mode.");
+      const placed = { ...token, ...move.after };
+      if (move.after.offsetX === undefined) delete placed.offsetX;
+      if (move.after.offsetY === undefined) delete placed.offsetY;
+      if (!tokenInsideGrid(map.grid, placed)) throw Error("Keep tokens inside the combat grid.");
+      if (command.snap && !tokenSnapped(placed))
+        throw Error("Grid mode needs every moved token on a square.");
+      Object.assign(token, placed);
+      if (move.after.offsetX === undefined) delete token.offsetX;
+      if (move.after.offsetY === undefined) delete token.offsetY;
+    }
+    map.tokens = next;
+    map.tabletop = { ...settings, snap: command.snap, revision: settings.revision + 1 };
+    event(command.snap ? "Grid mode turned on; tokens snapped" : "Grid mode change undone");
   } else if (command.kind === "map-token-move") {
     if (!map.grid) throw Error("Configure a combat grid before moving tokens.");
     if (

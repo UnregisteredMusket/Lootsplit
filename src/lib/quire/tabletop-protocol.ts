@@ -86,8 +86,16 @@ export const VIEW_SECTIONS_PROTOCOL = 11;
  * updated website.
  */
 export const FOOTPRINT_PROTOCOL = 12;
+/**
+ * Protocol 13 (2026-10-29, map tokens: grid mode): a map's tabletop settings may carry
+ * `gridHidden` (the automatic grid of an ungridded map). Older clients have a strict tabletop
+ * schema, so protocols 0-12 receive settings without it; their scene saves and map saves keep it
+ * (`upgradeOldClientCommands`). Pending `map-grid-snap` drafts ask them to finish on the updated
+ * website.
+ */
+export const GRID_MODE_PROTOCOL = 13;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = FOOTPRINT_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = GRID_MODE_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -98,6 +106,7 @@ const commands = new Set([
   "map-fog",
   "map-template",
   "map-render",
+  "map-grid-snap",
 ]);
 /**
  * Tabletop protocol 2 and older apps (Android 1.10.0 and earlier) have no `alternating` diagonal
@@ -737,7 +746,100 @@ export function upgradeFootprintCommands<C extends { kind: string }>(table: Clou
     return command;
   });
 }
+// Protocol 13 (grid mode).
+const gridHiddenText = (text: string) => text.includes('"gridHidden":');
+/** Tabletop settings without the hidden-grid flag (protocols 0-12). The same object without it. */
+export function withoutGridHidden<T>(settings: T): T {
+  if (!settings || typeof settings !== "object" || !("gridHidden" in settings)) return settings;
+  const plain = { ...settings } as T & { gridHidden?: boolean };
+  delete plain.gridHidden;
+  return plain;
+}
+/** Whether a table (or a stored backup body) holds hidden automatic grids. */
+export function hasHiddenGrids(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.tabletop?.gridHidden !== undefined) ||
+    !!table.journal?.reports?.some((r) => gridHiddenText(r.snapshot ?? ""))
+  );
+}
+function gridHiddenFreeTable(table: CloudTable): CloudTable {
+  if (!hasHiddenGrids(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!gridHiddenText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(gridHiddenFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world
+        ? {
+            world: {
+              ...world,
+              maps: world.maps.map((m) =>
+                m.tabletop?.gridHidden !== undefined ? { ...m, tabletop: withoutGridHidden(m.tabletop) } : m,
+              ),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
+/**
+ * Protocols 0-12 can't see `gridHidden`: their scene saves (`map-tabletop`) and map saves compare
+ * against the settings without it and keep it. Commands about other maps are untouched.
+ */
+function upgradeGridHiddenCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
+  const maps = table.journal?.world?.maps ?? [];
+  if (!maps.some((m) => m.tabletop?.gridHidden !== undefined)) return commands;
+  return commands.map((command) => {
+    const c = command as C & Record<string, unknown>;
+    const map = maps.find((m) => m.id === c.mapId);
+    const current = map?.tabletop;
+    if (!current || current.gridHidden === undefined) return command;
+    // Protocol 2 sent full-snapshot fog history; tabletop.ts accepts either form.
+    const forms = [current, expandTabletopHistory(current)];
+    const match = (sent: unknown) => forms.find((form) => sameJson(withoutGridHidden(form), sent));
+    const keep = <T extends object | null | undefined>(next: T) =>
+      next && !("gridHidden" in next) ? { ...next, gridHidden: current.gridHidden } : next;
+    if (c.kind === "map-tabletop") {
+      const before = match(c.before);
+      return before ? { ...c, before, settings: keep(c.settings as object) } : command;
+    }
+    if (c.kind === "map-save") {
+      const before = c.before as CampaignMap | null,
+        sent = c.map as CampaignMap | null;
+      const found = before?.tabletop && match(before.tabletop);
+      if (!found) return command;
+      return {
+        ...c,
+        before: { ...before, tabletop: found },
+        ...(sent?.tabletop ? { map: { ...sent, tabletop: keep(sent.tabletop) } } : {}),
+      };
+    }
+    return command;
+  });
+}
+/** Every older-client conversion, applied to a batch before it runs (cloud.server.ts). */
+export function upgradeOldClientCommands<C extends { kind: string }>(
+  table: CloudTable,
+  commands: C[],
+  protocol = 0,
+): C[] {
+  let result = commands;
+  if (protocol < GRID_MODE_PROTOCOL) result = upgradeGridHiddenCommands(table, result);
+  if (protocol < FOOTPRINT_PROTOCOL) result = upgradeFootprintCommands(table, result);
+  return result;
+}
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= GRID_MODE_PROTOCOL) return table;
+  table = gridHiddenFreeTable(table);
   if (protocol >= FOOTPRINT_PROTOCOL) return table;
   table = footprintFreeTable(table);
   if (protocol >= PARTY_GROUPS_PROTOCOL) return table;
@@ -819,12 +921,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= FOOTPRINT_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= GRID_MODE_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 13: grid mode commands and the hidden-grid flag.
+      if (c.kind === "map-grid-snap" || gridHiddenText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= FOOTPRINT_PROTOCOL) return false;
       // Protocol 12: footprint fields older apps cannot read.
       if (footprintCommandText(c)) return true;
       if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return false;

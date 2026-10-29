@@ -404,3 +404,109 @@ export function sizedToken(size: TokenSizeClass | undefined): Partial<TokenPlace
   if (size === "tiny") return { sizeClass: size, offsetX: -0.25, offsetY: -0.25 };
   return { sizeClass: size, anchor: "corner" };
 }
+/**
+ * Turning grid mode on, option (a) (owner, 2026-10-29): the nearest snapped position, which is at
+ * most half a square away, with the footprint kept inside the grid. Tiny tokens take the nearest
+ * quadrant of the square their centre is in.
+ */
+export function nearestSnapped(grid: Pick<GridGeometry, "columns" | "rows">, token: TokenPlace): TokenPlace {
+  const n = tokenFootprint(token),
+    clamp = (value: number, max: number) => Math.max(0, Math.min(max, value));
+  if (n < 1) {
+    const centre = tokenCentre(token),
+      column = clamp(Math.floor(centre.x), grid.columns - 1),
+      row = clamp(Math.floor(centre.y), grid.rows - 1);
+    return {
+      column,
+      row,
+      offsetX: centre.x - column < 0.5 ? -QUADRANT : QUADRANT,
+      offsetY: centre.y - row < 0.5 ? -QUADRANT : QUADRANT,
+    };
+  }
+  const box = tokenBox(token),
+    side = Math.max(1, Math.round(box.size));
+  return {
+    column: clamp(Math.round(box.left), grid.columns - side),
+    row: clamp(Math.round(box.top), grid.rows - side),
+  };
+}
+/**
+ * Turning grid mode on, option (b): the grid shifted (by the circular mean of the tokens'
+ * sub-square offsets) so most tokens sit inside squares, with every token re-expressed at exactly
+ * the same place on the image. A column or row is dropped only when the shifted grid would leave
+ * the image. Undefined when no shift keeps every token inside the grid.
+ */
+export function alignedGrid<G extends GridGeometry, T extends TokenPlace>(
+  grid: G,
+  tokens: readonly T[],
+): { grid: G; tokens: T[] } | undefined {
+  const sized = tokens.filter((t) => tokenFootprint(t) >= 1);
+  if (!sized.length) return;
+  const mean = (values: number[]) => {
+    const angle = Math.atan2(
+      values.reduce((s, v) => s + Math.sin(2 * Math.PI * v), 0),
+      values.reduce((s, v) => s + Math.cos(2 * Math.PI * v), 0),
+    );
+    const turn = angle / (2 * Math.PI);
+    return turn > 0.5 ? turn - 1 : turn <= -0.5 ? turn + 1 : turn;
+  };
+  const frac = (v: number) => v - Math.floor(v);
+  const sx = mean(sized.map((t) => frac(tokenBox(t).left))),
+    sy = mean(sized.map((t) => frac(tokenBox(t).top)));
+  const cw = grid.width / grid.columns,
+    ch = grid.height / grid.rows;
+  const fit = (start: number, span: number, count: number, cell: number, shift: number) => {
+    for (const s of [shift, shift - 1, shift + 1])
+      for (const drop of [0, 1]) {
+        const at = start + s * cell,
+          length = (count - drop) * cell;
+        if (count - drop >= 1 && at >= -1e-9 && at + length <= 1 + 1e-9)
+          return { at: Math.max(0, at), length: Math.min(length, 1 - Math.max(0, at)), count: count - drop, s };
+      }
+  };
+  const x = fit(grid.x, grid.width, grid.columns, cw, sx),
+    y = fit(grid.y, grid.height, grid.rows, ch, sy);
+  if (!x || !y) return;
+  const next = { ...grid, x: x.at, width: x.length, columns: x.count, y: y.at, height: y.length, rows: y.count };
+  const moved = tokens.map((t) => {
+    const box = tokenBox(t),
+      exact = (v: number) => (Math.abs(v - Math.round(v)) < 1e-6 ? Math.round(v) : v);
+    const place = placeFromBox(t, exact(box.left - x.s), exact(box.top - y.s));
+    const result = { ...t, column: place.column, row: place.row } as T;
+    delete result.offsetX;
+    delete result.offsetY;
+    if (place.offsetX) result.offsetX = place.offsetX;
+    if (place.offsetY) result.offsetY = place.offsetY;
+    return result;
+  });
+  if (moved.some((t) => !tokenInsideGrid(next, t))) return;
+  return { grid: next, tokens: moved };
+}
+/**
+ * An automatic grid for an ungridded map (owner, 2026-10-29): squares of the scale bar's 5 ft when
+ * the map has one, else about 40 image pixels, covering the image. `aspect` is width ÷ height.
+ */
+export function automaticGrid(
+  image: { width: number; height: number },
+  scale?: { a: ScenePoint; b: ScenePoint; distance: number; unit: string; aspect: number },
+) {
+  const aspect = image.width / Math.max(1, image.height);
+  let columns = Math.round(image.width / 40);
+  if (scale && scale.unit === "ft") {
+    const across = Math.hypot((scale.b.x - scale.a.x) * scale.aspect, scale.b.y - scale.a.y) / scale.aspect;
+    const feet = scale.distance / Math.max(1e-6, across);
+    if (feet / 5 >= 4 && feet / 5 <= 200) columns = Math.round(feet / 5);
+  } // A regional scale (miles, km) keeps the pixel-based squares.
+  columns = Math.max(4, Math.min(200, columns));
+  const rows = Math.max(1, Math.min(200, Math.floor(columns / aspect + 1e-6)));
+  return {
+    columns,
+    rows,
+    feetPerTile: 5,
+    diagonal: "equal" as const,
+    x: 0,
+    y: 0,
+    width: 1,
+    height: Math.min(1, (rows / columns) * aspect),
+  };
+}

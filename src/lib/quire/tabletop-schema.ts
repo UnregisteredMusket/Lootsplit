@@ -145,6 +145,11 @@ export const mapTabletopSchema = z
     playerMovement: z.boolean().default(false),
     playerTemplates: z.boolean().default(false),
     snap: z.boolean().default(true),
+    /**
+     * Tabletop protocol 13 (grid mode): the automatic grid of an ungridded map is hidden until the
+     * DM shows it. Absent means the lines are drawn as before.
+     */
+    gridHidden: z.boolean().optional(),
     unitLabel: z.string().trim().min(1).max(20).default("ft"),
     unitsPerFoot: z.number().finite().positive().max(1000000).default(1),
     initialView: sceneCameraSchema.optional(),
@@ -225,6 +230,24 @@ export const tabletopCommands = [
         .min(1)
         .max(100),
       ignoreWalls: z.boolean().default(false),
+    })
+    .strict(),
+  /**
+   * Grid mode on with "Snap tokens to the nearest squares" (owner, 2026-10-29), and its Undo: one
+   * DM command that sets grid mode and moves the listed tokens, revision-checked by the map's
+   * settings and every token's position. Moves into grid mode must already be snapped.
+   */
+  z
+    .object({
+      id,
+      kind: z.literal("map-grid-snap"),
+      mapId: id,
+      grid: z.string().max(1000),
+      before: mapTabletopSchema.nullable(),
+      snap: z.boolean(),
+      moves: z
+        .array(z.object({ tokenId: id, before: tile, after: tile }).strict())
+        .max(200),
     })
     .strict(),
   z

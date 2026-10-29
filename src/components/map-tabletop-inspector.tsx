@@ -59,11 +59,14 @@ export function TokenInspector({
   token,
   canMove,
   move,
+  gridMode,
 }: {
   map: CampaignMap;
   token: MapToken;
   canMove: boolean;
   move: (move: Move) => void;
+  /** The DM's Grid mode control (map tokens 1b), shown under the size controls. */
+  gridMode?: React.ReactNode;
 }) {
   const table = useWorldTable(),
     dm = useSeat().role === "dm",
@@ -177,6 +180,7 @@ export function TokenInspector({
               {draft.column + 1}, row {draft.row + 1}
             </output>
           </label>
+          {gridMode}
           <label>
             <input
               type="checkbox"
@@ -416,6 +420,16 @@ export function SceneConfiguration({ map }: { map: CampaignMap }) {
             onChange={(event) => setDraft({ ...draft, snap: event.target.checked })}
           />
           Snap movement to grid cells
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={draft.gridHidden ?? false}
+            onChange={(event) =>
+              setDraft({ ...draft, gridHidden: event.target.checked ? true : undefined })
+            }
+          />
+          Hide grid lines from everyone
         </label>
         <label>
           Automatic vision
