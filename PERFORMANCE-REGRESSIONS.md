@@ -16,7 +16,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run npm ci | open | 4 | 7s → 280s | +273s | +3900% |
 | Development / desktop / Run npm ci | open | 4 | 11s → 304s | +293s | +2663.64% |
 | Development / gameplay / Run npm ci | open | 6 | 11s → 424s | +413s | +3754.55% |
-| Code checks and immutable builds / unit-tests | open | 13 | 8s → 115s | +107s | +1337.5% |
+| Code checks and immutable builds / unit-tests | open | 14 | 8s → 134s | +126s | +1575% |
 | Code checks and immutable builds / typecheck | open | 8 | 7s → 40s | +33s | +471.43% |
 | Code checks and immutable builds / lint | open | 7 | 5s → 21s | +16s | +320% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 5 | 21s → 566s | +545s | +2595.24% |
@@ -783,7 +783,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Player references / development / account shard 2 | open | 3 | 31s → 599s | +568s | +1832.26% |
 | Player references / worker / account shard 2 / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Player references / worker / account shard 1 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 4 | 4s → 16s | +12s | +300% |
-| Player references / development / account shard 1 / Start disposable development server | open | 2 | 6s → 10s | +4s | +66.67% |
+| Player references / development / account shard 1 / Start disposable development server | open | 3 | 6s → 12s | +6s | +100% |
 | Player references / worker / account shard 2 / Verify complete account fixtures | open | 3 | 39s → 81s | +42s | +107.69% |
 | Player references / development / account shard 1 / Verify player references and Help | open | 3 | 50s → 80s | +30s | +60% |
 | Packaged Worker / pull request / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 3 | 3s → 29s | +26s | +866.67% |
@@ -913,6 +913,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-29T11:40:29Z | step: Code checks and immutable builds / unit-tests | 115s → 134s | +19s | +16.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40832361366/job/123309245671) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40866848358/job/123423651640) |
+| 2026-10-29T11:38:58Z | step: Development / world / dev-map-radial | 50s → 65s | +15s | +30% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40862826965/job/123410147441) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40865481866/job/123419135458) |
+| 2026-10-29T11:38:32Z | step: Player references / development / account shard 1 / Start disposable development server | 10s → 12s | +2s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40269771401/job/121399856389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40866848341/job/123423652084) |
+| 2026-10-29T11:37:53Z | step: Development / world / dev-map-context-menu | 15s → 19s | +4s | +26.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40858827103/job/123396602781) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40865481866/job/123419135458) |
 | 2026-10-29T10:40:19Z | step: Code checks and immutable builds / web-build | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166992904/job/114551600974) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40858827103/job/123396537976) |
 | 2026-10-29T10:18:33Z | step: Development / world / dev-map-player-move | 19s → 25s | +6s | +31.58% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40849588966/job/123365503893) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40855200398/job/123384378435) |
 | 2026-10-29T10:18:08Z | step: Development / world / dev-map-grid-mode | 10s → 14s | +4s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40844433199/job/123348413936) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40855200398/job/123384378435) |
