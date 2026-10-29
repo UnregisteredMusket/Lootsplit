@@ -45,6 +45,15 @@ export function database(): Database | undefined {
   return undefined;
 }
 const STORED_BODY = Symbol("authoritative-room-body");
+const READ_VERSION = Symbol("room-read-version");
+/**
+ * The storage version (revision and `write_id`) a room was read at, or `null` for a derived or
+ * local room. Internal and non-enumerable; used only to key the per-seat projected section cache
+ * (view-sections.server.ts), never serialized or used as a write guard.
+ */
+export function roomReadVersion(room: CloudRoom): { revision: number; writeId: string | null } | null {
+  return (room as CloudRoom & { [READ_VERSION]?: { revision: number; writeId: string | null } })[READ_VERSION] ?? null;
+}
 /** Internal, per-read SQL guard; never serialized or returned as campaign data. */
 export function roomStorageBody(room: CloudRoom): string {
   return (room as CloudRoom & { [STORED_BODY]?: string })[STORED_BODY] ?? JSON.stringify(room);
@@ -58,6 +67,8 @@ export function keepStoredBody<T extends CloudRoom>(source: CloudRoom, derived: 
   // The descriptor, not the value: a sectioned room's body is assembled only if someone asks.
   const stored = Object.getOwnPropertyDescriptor(source, STORED_BODY);
   if (stored) Object.defineProperty(derived, STORED_BODY, stored);
+  const version = Object.getOwnPropertyDescriptor(source, READ_VERSION);
+  if (version) Object.defineProperty(derived, READ_VERSION, version);
   const sources = roomImageSources(source);
   if (sources.size)
     Object.defineProperty(derived, ROOM_IMAGE_SOURCES, { value: sources, configurable: true });
@@ -71,7 +82,10 @@ export function keepStoredBody<T extends CloudRoom>(source: CloudRoom, derived: 
 export function roomImageSources(room: CloudRoom): Map<string, string> {
   return (room as CloudRoom & { [ROOM_IMAGE_SOURCES]?: Map<string, string> })[ROOM_IMAGE_SOURCES] ?? new Map();
 }
-export type RoomAccess = Pick<CloudRoom, "code" | "revision" | "ownerId" | "sessionId" | "closed" | "seats">;
+export type RoomAccess = Pick<CloudRoom, "code" | "revision" | "ownerId" | "sessionId" | "closed" | "seats"> & {
+  /** The row's write_id (D1 only): with the revision, identifies one written room. */
+  writeId?: string | null;
+};
 /** Read authorization/revision only, without private campaign/media hydration. */
 export async function readRoomAccess(code: string): Promise<RoomAccess | null> {
   const canonicalCode = code.trim().toUpperCase(), db = database();
@@ -83,12 +97,12 @@ export async function readRoomAccess(code: string): Promise<RoomAccess | null> {
   }
   // Top-level fields only (they stay on the room row in sectioned storage).
   const row = await db.prepare(
-    "SELECT revision,json_extract(body,'$.ownerId') AS ownerId,json_extract(body,'$.sessionId') AS sessionId,json_extract(body,'$.closed') AS closed,json_extract(body,'$.seats') AS seats FROM campaign_rooms WHERE code=?",
-  ).bind(canonicalCode).first<{ revision: number; ownerId: string | null; sessionId: string | null; closed: number | null; seats: string }>();
+    "SELECT revision,write_id AS writeId,json_extract(body,'$.ownerId') AS ownerId,json_extract(body,'$.sessionId') AS sessionId,json_extract(body,'$.closed') AS closed,json_extract(body,'$.seats') AS seats FROM campaign_rooms WHERE code=?",
+  ).bind(canonicalCode).first<{ revision: number; writeId: string | null; ownerId: string | null; sessionId: string | null; closed: number | null; seats: string }>();
   if (!row) return null;
   const seats: unknown = JSON.parse(row.seats);
   if (!Array.isArray(seats)) throw Error("The shared campaign's seat records are incomplete.");
-  return { code: canonicalCode, revision: row.revision, ownerId: row.ownerId ?? undefined,
+  return { code: canonicalCode, revision: row.revision, writeId: row.writeId, ownerId: row.ownerId ?? undefined,
     sessionId: row.sessionId ?? undefined, closed: row.closed === 1, seats: seats as RoomAccess["seats"] };
 }
 const FILE = path.join(process.cwd(), "data", "cloud-rooms.json");
@@ -179,6 +193,11 @@ export async function readRoom(code: string, options: ReadRoomOptions = {}): Pro
     });
     // Lazy: a sectioned room's exact body is only assembled if a caller asks for it.
     Object.defineProperty(hydrated, STORED_BODY, { get: () => upgraded ?? read.body });
+    // A read that upgraded the room (campaign characters) is not the stored version.
+    if (!upgraded)
+      Object.defineProperty(hydrated, READ_VERSION, {
+        value: { revision: read.version.revision, writeId: read.version.writeId },
+      });
     ensureCityExchanges(hydrated.table);
     return hydrated;
   }

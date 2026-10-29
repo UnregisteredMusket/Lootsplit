@@ -15,8 +15,10 @@ import {
   roomImageSources,
   lookupReceipts,
   recentAcknowledged,
+  roomReadVersion,
   type RoomReceipt,
 } from "./room-store.server.ts";
+import { VIEW_VERSION_KEY } from "./view-sections.server.ts";
 import { syncTimer } from "./sync-timing.server.ts";
 import { retryRoomWrite } from "./room-write-retry.ts";
 import {
@@ -387,6 +389,8 @@ export async function roomState(input: {
 }
 export type RoomPollInput = {
   tabletopProtocol?: number;
+  /** Protocol 11: section hashes this client holds (view-sections.ts). */
+  viewSections?: string[];
   code: string;
   token: string;
   knownRevision?: number;
@@ -625,12 +629,16 @@ async function seatTable(room: CloudRoom, seat: CloudSeat) {
     directory: true,
   });
   const journal = record.journal;
+  // Map posters come from the owner's account assets, which the room version does not cover.
+  let posters = false;
   if (seat.role !== "dm" && room.ownerId) {
     const { projectedMapPoster } = await import("./map-assets.server.ts");
     await Promise.all(
       (journal?.world?.maps ?? []).map(async (map) => {
-        if (map.tabletop?.media)
+        if (map.tabletop?.media) {
+          posters = true;
           map.image = (await projectedMapPoster(room.ownerId!, map.tabletop.media)) ?? map.image;
+        }
       }),
     );
   }
@@ -642,14 +650,14 @@ async function seatTable(room: CloudRoom, seat: CloudSeat) {
           notes: room.table.notes.filter((note) => canReadNote(note, seat)),
         }
       : playerTable(room.table, record, seat);
-  return { record, table };
+  return { record, table, posters };
 }
 
 /** `read` is the room as read from storage when `room` is a derived next state of it. */
 async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): Promise<RoomView> {
   const current = room.seats[room.turn];
-  const { record, table } = await seatTable(room, seat);
-  return withImageSources(read, {
+  const { record, table, posters } = await seatTable(room, seat);
+  const result = withImageSources(read, {
     encounterActive: await activeEncounter(room.code),
     userId: seat.userId,
     code: room.code,
@@ -686,6 +694,13 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
     table,
   });
+  // The storage version this view projects (only when it is the room as read, not a derived next
+  // state): keys the per-seat projected section cache (view-sections.server.ts). Non-enumerable.
+  // A view with map posters is never cached: posters follow the owner's account assets, which
+  // the room's revision and write_id do not cover.
+  const version = room === read && !posters ? roomReadVersion(room) : null;
+  if (version) Object.defineProperty(result, VIEW_VERSION_KEY, { value: version });
+  return result;
 }
 
 /** Protocol 4 clients receive map images as references (tabletop-protocol.ts). */
