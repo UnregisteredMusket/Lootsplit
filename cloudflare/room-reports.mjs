@@ -338,10 +338,10 @@ export const ARCHIVED_BYTES_SQL = `SELECT COALESCE(SUM(CASE WHEN substr(body,1,$
  * Release order (integrity review of #382). Reading deltas ships first, with writes still full:
  * an older Worker (deploy overlap, or a revert) reads a delta row's body as if it were the
  * snapshot, so delta rows may only be written once every Worker that can serve this database
- * decodes them. `REPORT_DELTA_WRITES` is false in the reader release and turned on by the next
- * release (the writer PR), after the reader is live.
+ * decodes them. `REPORT_DELTA_WRITES` was false in the reader release (#382) and is turned on by
+ * this release, which merges only after the reader release is live.
  */
-export const REPORT_DELTA_WRITES = false;
+export const REPORT_DELTA_WRITES = true;
 let reportDeltas = REPORT_DELTA_WRITES;
 /** Test-only: write new snapshots as deltas (true) or in full (false). */
 export function setReportDeltasForTests(/** @type {boolean} */ on) {
