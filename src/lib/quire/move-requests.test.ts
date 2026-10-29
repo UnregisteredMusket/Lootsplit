@@ -1,6 +1,6 @@
 // "Ask the DM" movement (map tokens PR 8): on an approval map a player's move waits for the DM;
 // the same rules as Automatic apply when asked; approving checks the token hasn't moved; deny,
-// withdraw and replace; players see only their own requests; protocol 18.
+// withdraw and replace; players see only their own requests; protocol 19.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { canonicalJson } from "./canonical-json.ts";
@@ -78,9 +78,9 @@ test("withdraw and replace; players see only their own requests", () => {
   assert.equal(projectRecord(both, dm).journal!.world!.moveRequests!.length, 3);
 });
 
-test("protocol 18: older clients get no move requests; their drafts are refused", () => {
+test("protocol 19: older clients get no move requests; their drafts are refused", () => {
   const t = ask(fixture());
-  assert.equal(MOVE_APPROVAL_PROTOCOL, 18);
-  assert.equal(tableForProtocol(t, 17).journal!.world!.moveRequests, undefined);
-  assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-move-request" }]) }, 17), /unfinished map actions/);
+  assert.equal(MOVE_APPROVAL_PROTOCOL, 19);
+  assert.equal(tableForProtocol(t, 18).journal!.world!.moveRequests, undefined);
+  assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-move-request" }]) }, 18), /unfinished map actions/);
 });

@@ -406,7 +406,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
             ...(current.world?.groups ? { groups: current.world.groups } : {}),
             ...(current.world?.mainGroup ? { mainGroup: current.world.mainGroup } : {}),
             ...(current.world?.groupRequests ? { groupRequests: current.world.groupRequests } : {}),
-            // Zones (tabletop protocol 17) change only through their commands.
+            // Zones (tabletop protocol 18) change only through their commands.
             ...(current.world?.zones ? { zones: current.world.zones } : {}),
             ...(current.world?.splitRule ? { splitRule: current.world.splitRule } : {}),
             ...(current.world?.zoneRequests ? { zoneRequests: current.world.zoneRequests } : {}),

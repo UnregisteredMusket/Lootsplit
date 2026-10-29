@@ -1,7 +1,7 @@
 // Zones and the DM's split rule (map tokens PR 7A, plan 6A): saved zones over derived ones,
 // adjacency, trip estimates, split / join / merge inside the token follow, Block, Wait until end of
 // session, Party vote (majority, unanimous, tie, timeout, DM override, withdraw, replace), requests
-// that no longer apply, combat, privacy of votes, and protocol 17.
+// that no longer apply, combat, privacy of votes, and protocol 18.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { canonicalJson } from "./canonical-json.ts";
@@ -206,15 +206,15 @@ test("combat blocks leaving the zone", () => {
   assert.equal(crossing(t, "mira", "Mira", "commons", "city").kind, "same");
 });
 
-test("privacy and protocol 17: hidden maps never show; older clients get no zones", () => {
+test("privacy and protocol 18: hidden maps never show; older clients get no zones", () => {
   let t = fixture();
   t = ask(t);
   t.journal!.world!.zoneRequests!.push({ ...t.journal!.world!.zoneRequests![0], id: "hidden", toMapId: "secret", toZone: "map:secret" });
   const seen = projectRecord(t, { ...torv }).journal!.world!.zoneRequests!;
   assert.deepEqual(seen.map((r) => r.id), [t.journal!.world!.zoneRequests![0].id]);
-  assert.equal(ZONES_PROTOCOL, 17);
-  const old = tableForProtocol(t, 16).journal!.world!;
+  assert.equal(ZONES_PROTOCOL, 18);
+  const old = tableForProtocol(t, 17).journal!.world!;
   assert.equal(old.zoneRequests, undefined);
   for (const draft of [[{ kind: "zone-vote" }], [{ kind: "zone-save" }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 16), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 17), /unfinished map actions/);
 });

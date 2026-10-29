@@ -1,6 +1,6 @@
 // Group placement and group commands (map tokens PR 3): the formation planner, map-tokens-place
 // (atomic, before-checked, Send to map), map-tokens-edit, the party formation default, offline
-// parity of the shared engine, and protocol 15.
+// parity of the shared engine, and protocol 16.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
@@ -104,17 +104,17 @@ test("the same batch gives the same result on the device and in a room (shared e
   assert.deepEqual(mapOf(server, "keep").tokens, mapOf(device, "keep").tokens);
 });
 
-test("protocol 15: the party formation default is kept from older clients' session saves", () => {
-  assert.equal(GROUP_COMMANDS_PROTOCOL, 15);
+test("protocol 16: the party formation default is kept from older clients' session saves", () => {
+  assert.equal(GROUP_COMMANDS_PROTOCOL, 16);
   const t = fixture();
   const set = run(t, { kind: "tabletop-session", before: null, session: { ...readTabletopSession(t), partyFormation: { shape: "line", spacing: 1, rotation: 90 } } });
   assert.deepEqual(readTabletopSession(set).partyFormation, { shape: "line", spacing: 1, rotation: 90 });
-  const old = tableForProtocol(set, 14).journal!.world!.tabletop!;
+  const old = tableForProtocol(set, 15).journal!.world!.tabletop!;
   assert.equal("partyFormation" in old, false);
-  const [c] = upgradeOldClientCommands(set, [{ id: "s", kind: "tabletop-session", before: old, session: { ...old, tvEnabled: true } }], 14);
+  const [c] = upgradeOldClientCommands(set, [{ id: "s", kind: "tabletop-session", before: old, session: { ...old, tvEnabled: true } }], 15);
   const saved = run(set, c as CommandInput);
   assert.equal(readTabletopSession(saved).tvEnabled, true);
   assert.deepEqual(readTabletopSession(saved).partyFormation, { shape: "line", spacing: 1, rotation: 90 });
   for (const draft of [[{ kind: "map-tokens-place" }], [{ kind: "map-tokens-edit" }], [{ kind: "tabletop-session", session: { partyFormation: {} } }]])
-    assert.throws(() => tabletopResponse({ table: set, draft: JSON.stringify(draft) }, 14), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: set, draft: JSON.stringify(draft) }, 15), /unfinished map actions/);
 });
