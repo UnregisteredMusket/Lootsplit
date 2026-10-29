@@ -98,6 +98,9 @@ try {
     await page.locator("[data-sonner-toast]").evaluateAll((all) => all.forEach((t) => t.remove()));
     await rowFor(page, "Hempen rope").getByRole("button", { name: /^Buy / }).click();
     bought = toast(page, "Purchase recorded.");
+    // Rest the pointer on the toast so its 10 s Undo window pauses (as it does for a player
+    // reading it) while the ledger check runs; slow runners took longer than 10 s here.
+    await bought.hover();
     await expect.poll(async () => (await books(page)).rope).toBe(start.rope - 2);
     await bought.getByRole("button", { name: "Undo", exact: true }).click();
     await expect(toast(page, "Purchase undone.")).toBeVisible();
