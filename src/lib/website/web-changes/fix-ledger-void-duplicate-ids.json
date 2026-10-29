@@ -1,0 +1,7 @@
+{
+  "title": "Undo never reverses the same entry twice",
+  "summary": "Fixed a rare case where Undo could reverse a ledger entry a second time.",
+  "items": [
+    "If an earlier Undo of an entry had been recorded under an ID that another, unrelated entry also used, Undo could miss it and reverse the entry again. Undo now checks every copy, so an entry is only ever reversed once."
+  ]
+}

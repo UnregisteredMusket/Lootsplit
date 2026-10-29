@@ -116,12 +116,13 @@ test("a damaged delta or a missing base is an error, never history", async () =>
   await assert.rejects(readRoom(seats.dm.code), /missing|incomplete/);
 });
 
-test("this release writes archived sessions in full; it only reads deltas", async () => {
-  assert.equal(REPORT_DELTA_WRITES, false, "delta writes ship in the next release, after readers are live");
+test("this release writes archived sessions as deltas (after the reader release is live)", async () => {
+  assert.equal(REPORT_DELTA_WRITES, true);
   setReportDeltasForTests(REPORT_DELTA_WRITES);
-  const seats = await campaign("Reader release DM");
+  const seats = await campaign("Writer release DM");
   for (let n = 1; n <= 3; n++) await playSession(seats, n);
-  assert.ok((await rows(seats.dm.code)).every((row) => !reportDeltaMarker(row.body)));
+  const stored = await rows(seats.dm.code);
+  assert.deepEqual(stored.map((row) => !!reportDeltaMarker(row.body)), [false, true, true]);
 });
 
 // Unit-level storage on a bare room row (the reviewer's stand-in).
