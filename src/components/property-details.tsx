@@ -1,3 +1,4 @@
+import { HistoryCoverage } from "./history-loader";
 import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
 import { MapRecordStrip } from "./map-record-strip";
 import { readArchiveResult } from "@/lib/quire/archive-reader";
@@ -50,7 +51,8 @@ export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean
   for (const report of journal.reports || []) {
     const result = readArchiveResult(report, archiveSeat);
     if (result.available) records.push(...result.snapshot.ledger);
-    else unavailable++;
+    // Archived sessions not loaded yet (history on demand) are offered by HistoryCoverage below.
+    else if (!("deferred" in result && result.deferred)) unavailable++;
   }
   return (
     <section id="campaign-operations">
@@ -120,6 +122,7 @@ export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean
           )}
         </p>
       )}
+      <HistoryCoverage what="Property records" />
       {unavailable > 0 && (
         <p role="status">
           {unavailable} archived report{unavailable === 1 ? " is" : "s are"} unavailable; no history

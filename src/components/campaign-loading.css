@@ -3,36 +3,50 @@
   position: fixed;
   inset: 0;
   z-index: 70;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
-  backdrop-filter: blur(3px);
+  display: flex;
+  overflow-y: auto;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  /* A full loading screen: the page behind does not compete with the text. */
+  background: var(--color-bg);
 }
 .campaign-loading-card {
-  width: min(28rem, 100%);
+  margin: auto;
+  width: min(30rem, 100%);
+  min-width: 0;
   display: grid;
   justify-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem 1.25rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.9rem;
-  background: var(--color-elevated);
+  gap: 0.6rem;
   color: var(--color-fg);
   text-align: center;
-  box-shadow: 0 12px 36px color-mix(in srgb, var(--color-bg) 60%, transparent);
-}
-.campaign-loading-card h2 {
-  font-size: 1.6rem;
-  line-height: 1.15;
 }
 .campaign-loading-card p {
   color: var(--color-muted);
-  font-size: 0.92rem;
+  font-size: 0.85rem;
+  max-width: 26rem;
+}
+.campaign-loading-line {
+  margin-top: 0.25rem;
+  font-size: clamp(1.15rem, 5.4vw, 1.5rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.campaign-loading-percent {
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 600;
+  color: var(--color-lead);
+  white-space: nowrap;
+}
+.campaign-loading-line .campaign-loading-percent {
+  font-size: 0.8em;
 }
 .campaign-loading-card .campaign-loading-detail {
   font-variant-numeric: tabular-nums;
-  color: var(--color-fg);
+  font-size: 0.78rem;
+  color: var(--color-faint);
+}
+.campaign-loading-card > .campaign-loading-bar {
+  width: min(16rem, 100%);
+  height: 0.35rem;
 }
 .campaign-loading-bar {
   width: 100%;
@@ -73,11 +87,231 @@
   font-size: 0.85rem;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--color-bg) 50%, transparent);
 }
+
+/*
+ * The brand chase, running in place. Both layers share the mascot's canvas (640 × 460), so
+ * stacked at rest they are the logo art. Positions below are percentages of that canvas.
+ */
+.campaign-loading-chase {
+  --chase-step: 0.56s;
+  position: relative;
+  width: min(21rem, 82vw);
+  aspect-ratio: 640 / 460;
+  flex: none;
+}
+.chase-figure,
+.chase-figure img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.chase-figure img {
+  will-change: transform;
+}
+/* The gap breathes: the adventurer lunges and the kobold pulls away, both staying centred. */
+.chase-adventurer {
+  animation: chase-lunge 3.36s ease-in-out infinite;
+}
+.chase-kobold {
+  animation: chase-escape 3.36s ease-in-out infinite;
+}
+.chase-adventurer img {
+  transform-origin: 28% 92%;
+  animation: chase-stride-adventurer var(--chase-step) linear infinite;
+  animation-delay: calc(var(--chase-step) * -0.4);
+}
+.chase-kobold img {
+  transform-origin: 68% 94%;
+  animation: chase-stride-kobold var(--chase-step) linear infinite;
+}
+@keyframes chase-stride-kobold {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg) scale(1.025, 0.975);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  25% {
+    transform: translateY(-4.5%) rotate(1deg) scale(0.985, 1.025);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4);
+  }
+  50% {
+    transform: translateY(0) rotate(-2deg) scale(1.03, 0.97);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  75% {
+    transform: translateY(-3.5%) rotate(2deg) scale(0.985, 1.025);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4);
+  }
+}
+@keyframes chase-stride-adventurer {
+  0%,
+  100% {
+    transform: translateY(0) rotate(1deg) scale(1.02, 0.98);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  25% {
+    transform: translateY(-3%) rotate(-1.5deg) scale(0.99, 1.02);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4);
+  }
+  50% {
+    transform: translateY(0) rotate(0.5deg) scale(1.025, 0.975);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  75% {
+    transform: translateY(-3.5%) rotate(-2deg) scale(0.99, 1.02);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4);
+  }
+}
+@keyframes chase-lunge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  45% {
+    transform: translateX(3%);
+  }
+  60% {
+    transform: translateX(3.5%);
+  }
+}
+@keyframes chase-escape {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(1%);
+  }
+  62% {
+    transform: translateX(3.5%);
+  }
+  80% {
+    transform: translateX(1.5%);
+  }
+}
+/* Ground dashes scroll backwards under their feet. */
+.chase-ground {
+  position: absolute;
+  left: 2%;
+  right: 2%;
+  bottom: 1%;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-muted) 55%, transparent) 0 14px,
+    transparent 14px 30px
+  );
+  mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent);
+  animation: chase-ground calc(var(--chase-step) / 2) linear infinite;
+}
+@keyframes chase-ground {
+  to {
+    background-position: -30px 0;
+  }
+}
+/* Dust kicked up at each landing. */
+.chase-dust {
+  position: absolute;
+  width: 9%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 55%, color-mix(in srgb, var(--color-muted) 60%, transparent) 0 30%, transparent 32%),
+    radial-gradient(circle at 70% 40%, color-mix(in srgb, var(--color-muted) 45%, transparent) 0 22%, transparent 24%),
+    radial-gradient(circle at 60% 78%, color-mix(in srgb, var(--color-muted) 40%, transparent) 0 18%, transparent 20%);
+  opacity: 0;
+  pointer-events: none;
+  animation: chase-dust var(--chase-step) ease-out infinite;
+}
+.chase-dust-kobold {
+  left: 44%;
+  top: 86%;
+}
+.chase-dust-adventurer {
+  left: 30%;
+  top: 88%;
+  animation-delay: calc(var(--chase-step) * -0.4);
+}
+@keyframes chase-dust {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.35);
+  }
+  12% {
+    opacity: 0.9;
+  }
+  50%,
+  100% {
+    opacity: 0;
+    transform: translate(-140%, -45%) scale(1.3);
+  }
+}
+/* Motion streaks trailing each runner. */
+.chase-streak {
+  position: absolute;
+  height: 2px;
+  width: 14%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-fg) 55%, transparent));
+  opacity: 0;
+  animation: chase-streak 0.84s linear infinite;
+}
+.chase-streak-a {
+  left: 0;
+  top: 46%;
+}
+.chase-streak-b {
+  left: 3%;
+  top: 58%;
+  animation-delay: -0.42s;
+}
+.chase-streak-c {
+  left: 33%;
+  top: 74%;
+  width: 10%;
+  animation-delay: -0.21s;
+}
+@keyframes chase-streak {
+  0% {
+    opacity: 0;
+    transform: translateX(40%);
+  }
+  25% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-60%);
+  }
+}
+
+/* Landscape phones: a smaller chase so the text and buttons fit. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .campaign-loading-chase {
+    width: min(12rem, 60vw);
+  }
+  .campaign-loading-card {
+    gap: 0.4rem;
+  }
+  .campaign-loading-line {
+    font-size: 1.2rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .campaign-loading-bar > span {
     transition: none;
   }
-  .campaign-loading {
-    backdrop-filter: none;
+  /* The still mascot: no stride, lunge, dust, streaks or ground. */
+  .chase-figure,
+  .chase-figure img {
+    animation: none;
+    transform: none;
+  }
+  .chase-dust,
+  .chase-streak,
+  .chase-ground {
+    display: none;
   }
 }

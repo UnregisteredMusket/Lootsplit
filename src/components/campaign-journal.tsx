@@ -1,3 +1,4 @@
+import { LedgerCoverage, LoadArchivedSession, LoadEarlierEntries, SearchEarlierEntries } from "./history-loader";
 import { ServiceRequests } from "./service-providers";
 import { LoanReviewCard, PaymentReviewCard } from "./review-cards-finance";
 import { GroupRequestInbox } from "./party-groups";
@@ -81,9 +82,18 @@ function ArchivedReportDownload({
     <div className="journal-entry">
       <strong>{report.name}</strong>
       <small>{new Date(report.at).toLocaleString()}</small>
-      {!result.available && <p role="alert">{result.error}</p>}
+      {!result.available &&
+        ("deferred" in result && result.deferred ? (
+          <LoadArchivedSession id={report.id} name={report.name} />
+        ) : (
+          <p role="alert">{result.error}</p>
+        ))}
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={() => setOpen(true)}>
+        <Button
+          variant="secondary"
+          disabled={"deferred" in result && !!result.deferred}
+          onClick={() => setOpen(true)}
+        >
           Read session report
         </Button>
         <Button
@@ -477,10 +487,15 @@ export function CampaignJournal({
                       Received {formatCopper(result.summary.received)} · Spent{" "}
                       {formatCopper(result.summary.spent)} · Net {formatCopper(result.summary.net)}
                     </p>
+                  ) : "deferred" in result && result.deferred && archived ? (
+                    <LoadArchivedSession id={archived.id} name={session.name} />
                   ) : (
                     <p role="alert">{result.error}</p>
                   )}
-                  {archived && (
+                  {result.available && !session.endedAt && (
+                    <LedgerCoverage since={session.startedAt} ledger={ledger} />
+                  )}
+                  {archived && !archived.deferred && (
                     <Button variant="secondary" onClick={() => setOpenedReportId(archived.id)}>
                       Read session report
                     </Button>
@@ -882,6 +897,10 @@ export function CampaignJournal({
           <p className="text-sm text-muted">
             {shownEvents.length} of {events.length} records
           </p>
+          <SearchEarlierEntries
+            list="ledger"
+            active={!!activitySearch.trim() || activityFilter !== "all"}
+          />
           {shownEvents.map((x, i) =>
             x.kind === "treasure pool" && "lines" in x ? (
               <LootActivityRow key={`${x.id}-${i}`} row={x as LootActivity} />
@@ -902,6 +921,8 @@ export function CampaignJournal({
           {!!events.length && !shownEvents.length && (
             <p>No activity matches. Clear the search or choose All activity.</p>
           )}
+          {/* The oldest end of the list: earlier ledger entries load here (history on demand). */}
+          <LoadEarlierEntries list="ledger" />
         </Fold>
       )}
       {openedReport && (

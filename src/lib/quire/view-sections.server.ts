@@ -78,7 +78,12 @@ export function clearViewSectionCacheForTests() {
   cachedChars = 0;
 }
 
-type SectionRequest = { tabletopProtocol?: number; viewSections?: unknown };
+/**
+ * `unsectioned`: the whole projected view in one response, for a client that could not assemble
+ * sections (room-sync.ts falls back to it). It is the view of the client's own protocol (since
+ * protocol 12 the working set, not the whole campaign).
+ */
+type SectionRequest = { tabletopProtocol?: number; viewSections?: unknown; unsectioned?: boolean };
 type ViewLike = { code: string; seatId: string; table: CloudTable; draft: string };
 
 /**
@@ -93,7 +98,7 @@ export async function roomViewResponse<T extends ViewLike>(
   const protocol = data.tabletopProtocol ?? 0;
   const version = viewVersion(view);
   const value = tabletopResponse(view, protocol);
-  if (protocol < VIEW_SECTIONS_PROTOCOL) return value;
+  if (protocol < VIEW_SECTIONS_PROTOCOL || data.unsectioned === true) return value;
   const split = await splitViewTable(
     value.table,
     viewSectionSalt(value.code, value.seatId, protocol),

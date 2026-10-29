@@ -1,3 +1,4 @@
+import { LoadEarlierEntries } from "./history-loader";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MessageCircle, Send, RotateCcw, Lock } from "lucide-react";
@@ -363,6 +364,8 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
             <span>Say hello to {active.id === "party" ? "your party" : active.name}.</span>
           </div>
         ) : null}
+        {/* The oldest end of the conversation: earlier messages load here (history on demand). */}
+        <LoadEarlierEntries list="notes" />
         <ol className="chat-messages">
           {visible.map((note) => {
             const own = isOwnNote(note, seat);

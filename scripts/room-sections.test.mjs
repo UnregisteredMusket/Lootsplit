@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { assertAdditiveSql } from "./production-migrations.mjs";
 import {
+  ROOM_HISTORY_PAGE_ITEMS,
   ROOM_SECTION_MIN_BYTES,
   ROOM_SECTION_PART_BYTES,
   ROOM_SECTION_THRESHOLD,
@@ -27,7 +28,7 @@ import {
 
 // This file states its own limits: the production ones, even when the suites run with the
 // LOOTSPLIT_TEST_ROOM_SECTION_* overrides that force every room write onto the sectioned path.
-const DEFAULT_LIMITS = { threshold: ROOM_SECTION_THRESHOLD, min: ROOM_SECTION_MIN_BYTES, part: ROOM_SECTION_PART_BYTES };
+const DEFAULT_LIMITS = { threshold: ROOM_SECTION_THRESHOLD, min: ROOM_SECTION_MIN_BYTES, part: ROOM_SECTION_PART_BYTES, page: ROOM_HISTORY_PAGE_ITEMS };
 setRoomSectionLimitsForTests(DEFAULT_LIMITS);
 
 /** Every room's table fields, as site analytics iterates them. */
@@ -126,18 +127,29 @@ test("a room above the threshold is stored sectioned and round-trips byte for by
     assert.ok(paths.includes(path), `${path} is its own section`);
   assert.ok(!paths.includes("table.purses"), "small parts stay in their parent section");
   assert.ok(rows.every((r) => r.n <= ROOM_SECTION_PART_BYTES), "every part fits the part size");
-  assert.ok(manifest.find((e) => e.path.join(".") === "table.ledger").parts >= 2, "the ledger is chunked");
+  // Step 4: the long ledger and chat are cut into sealed history pages of 512 lines; the room
+  // keeps the newest one to two pages (a window of its own section here).
+  const pages = (list) => manifest.filter((e) => e.path.join(".") === `$history.table.${list}`);
+  assert.deepEqual(pages("ledger").map((e) => e.page), Array.from({ length: Math.floor(9000 / 512) - 1 }, (_, i) => i), "the ledger is paged");
+  assert.ok(pages("ledger").every((e) => e.items === 512));
+  assert.equal(pages("notes").length, Math.floor(3000 / 512) - 1, "the chat is paged");
   const read = await readStoredRoom(db, "BIG");
   assert.equal(read.body, body, "the stored body is byte-identical");
   assert.deepEqual(read.room, room);
   assert.deepEqual(read.version, write.version);
-  assert.deepEqual(roomStorageSizes(body), {
+  const sizes = roomStorageSizes(body);
+  assert.deepEqual(sizes, {
     sectioned: true,
     bytes: bytes(body),
+    workingBytes: sizes.workingBytes,
+    historyBytes: [...pages("ledger"), ...pages("notes")].reduce((sum, e) => sum + e.bytes, 0),
+    liveBytes: sizes.workingBytes + sizes.historyBytes,
     rowBytes: bytes(row.body),
-    sectionBytes: roomStorageSizes(body).sectionBytes,
+    sectionBytes: sizes.sectionBytes,
     sections: new Set(manifest.map((e) => e.hash)).size,
+    pages: pages("ledger").length + pages("notes").length,
   });
+  assert.ok(Math.abs(sizes.liveBytes - bytes(body)) < bytes(body) / 50, "working set and history pages add up to the campaign");
   // Light reads never touch sections.
   const queries = [];
   const metered = { ...db, prepare: (sql) => (queries.push(sql), db.prepare(sql)) };
@@ -201,8 +213,9 @@ test("a write uploads only the sections whose content changed", async () => {
   next.table.notes.push({ id: "new", at: 1e6, from: "dm", to: "party", purseId: "party", text: "One more line" });
   const write = roomWriteStatements(db, next, { expect: read.version });
   const notes = write.version.sections.find((e) => e.path.join(".") === "table.notes");
-  // The row, the changed chat section's parts, and the cleanup of what it replaced.
-  assert.equal(write.statements.length, 1 + notes.parts + 1);
+  // The row, the changed chat section's parts, and the cleanup of what it replaced (sections, and
+  // the line IDs of history pages it no longer references, step 4).
+  assert.equal(write.statements.length, 1 + notes.parts + 2);
   assert.equal(write.changed(await db.batch(write.statements), write.statements), true);
   const after = await sectionRows(db, "DELTA");
   assert.equal(after.length, before.length, "the replaced chat section was removed, nothing else changed");
@@ -217,7 +230,7 @@ test("a write uploads only the sections whose content changed", async () => {
   again.table.notes.at(-1).text = "Edited";
   const present = await readRoomSectionHashes(db, "DELTA");
   const revisionOnly = roomWriteStatements(db, again, { expect: { revision: 2 }, present });
-  assert.equal(revisionOnly.statements.length, 1 + notes.parts + 1);
+  assert.equal(revisionOnly.statements.length, 1 + notes.parts + 2);
   assert.equal(revisionOnly.changed(await db.batch(revisionOnly.statements), revisionOnly.statements), true);
   assert.deepEqual((await readStoredRoom(db, "DELTA")).room, again);
   // Without what is stored, every section is sent again (still correct, never duplicated).
@@ -501,7 +514,8 @@ test("partial reads return only the requested values, from only the sections tha
   );
   assert.deepEqual(read.values, [room.seats, room.table.purses, { activeMapId: "m1" }, { id: "m1", name: "Keep" }, null]);
   assert.equal(read.version.revision, 1);
-  assert.ok(received < 5_000, `a map-signal style read receives ${received} bytes of a ${bytes(JSON.stringify(room))}-byte room`);
+  // The row's manifest lists the history pages too (step 4), about 150 bytes each.
+  assert.ok(received < 8_000, `a map-signal style read receives ${received} bytes of a ${bytes(JSON.stringify(room))}-byte room`);
 
   // A value with larger parts split out below it (the journal) is assembled from just those sections.
   received = 0;

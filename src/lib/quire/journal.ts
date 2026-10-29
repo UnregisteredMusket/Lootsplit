@@ -95,6 +95,11 @@ const journalFields = z.object({
         seatIds: z.array(id).optional(),
         snapshot: z.string(),
         error: z.string().optional(),
+        /**
+         * History on demand (step 4): a current client's room view lists archived sessions without
+         * their snapshot (`snapshot` is empty); the client reads one when someone opens it.
+         */
+        deferred: z.literal(true).optional(),
       }),
     )
     .optional(),
