@@ -5,6 +5,7 @@ import {
   inParty,
   seatInParty,
 } from "./character-position.ts";
+import { fairnessEligible } from "./loot-fairness.ts";
 import {
   readRoom,
   readRoomAccess,
@@ -52,7 +53,7 @@ import { characterControl, type Purse } from "./types.ts";
 import type { BillFile } from "./table.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
-import { manualCharacterRolls, database } from "./room-store.server.ts";
+import { manualCharacterRolls, database, storedLiveBytes } from "./room-store.server.ts";
 import { referenceAccess, referenceSection } from "./reference-access.ts";
 import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
 import { SUBMIT_LIMIT_MESSAGE, takeSubmitAllowance } from "./room-submit-limit.ts";
@@ -422,9 +423,10 @@ export const LEGACY_HISTORY_NOTICE_ID = "lootsplit-history-notice";
 async function legacyView(working: CloudRoom): Promise<CloudRoom> {
   if (!roomHasHistory(working)) return working;
   const pages = roomPages(working);
-  const historyBytes = [...pages.values()].flat().reduce((sum, page) => sum + (page as { bytes?: number }).bytes!, 0);
-  const workingBytes = new TextEncoder().encode(JSON.stringify(working.table)).length;
-  if (!pages.size || workingBytes + historyBytes <= ROOM_BODY_LIMIT) return withRoomHistory(working, { reports: true });
+  // Measured on the stored campaign, as the size caps measure it (room-size.ts): map images and
+  // resource packs restored for older clients are stored separately and never counted.
+  const live = storedLiveBytes(working);
+  if (!pages.size || live === null || live <= ROOM_BODY_LIMIT) return withRoomHistory(working, { reports: true });
   const { $history: _pages, ...newest } = working as CloudRoom & { $history?: unknown };
   const complete = await withRoomHistory(newest as CloudRoom, { reports: true });
   const first = working.table.notes[0]?.at ?? Date.now();
@@ -765,7 +767,7 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
     table,
   });
   // History on demand: where this seat's ledger and chat continue (absent for a whole room).
-  const history = await historyCursors(room, seat);
+  const history = await historyCursors(room, seat, await historyProjector(room.table, seat, room.code));
   if (history) result.history = history;
   // The storage version this view projects (only when it is the room as read, not a derived next
   // state): keys the per-seat projected section cache (view-sections.server.ts). Non-enumerable.
@@ -864,19 +866,59 @@ function playerLedgerLine(table: CloudTable, seat: CloudSeat) {
  * The view's rules for older history lines of one seat (`readCloudHistory`): the DM reads every
  * ledger line and the messages `canReadNote` allows; a player the ledger lines `playerLedgerLine`
  * allows and the messages `projectRecord` keeps (for the seat's visible characters).
+ *
+ * `visible` answers the same rules for a whole page from its visibility keys (room-storage.mjs
+ * `pageVisibilityKeys`), so pages the seat can read nothing of are skipped unread. `fingerprint`
+ * digests everything these rules and archived-session projection read from the current table for
+ * this seat (its role, visible characters, the purses whose ledger lines it reads, whether it
+ * compares party totals and the eligible party's names), salted with room and seat: it changes
+ * whenever what the seat may read changes, and the browser then drops what it loaded before.
  */
-function historyProjector(table: CloudTable, seat: CloudSeat): HistoryProjector {
-  if (seat.role === "dm")
-    return { ledger: (lines) => lines, notes: (notes) => notes.filter((note) => canReadNote(note, seat)) };
-  const visible = {
-    ...seat,
-    purseIds: seat.purseIds.filter((id) => {
-      const p = table.purses.find((p) => p.id === id);
-      return p && characterVisible(table, p);
-    }),
+async function historyProjector(table: CloudTable, seat: CloudSeat, code: string): Promise<HistoryProjector> {
+  const dm = seat.role === "dm";
+  const visible = dm
+    ? seat
+    : {
+        ...seat,
+        purseIds: seat.purseIds.filter((id) => {
+          const p = table.purses.find((p) => p.id === id);
+          return p && characterVisible(table, p);
+        }),
+      };
+  const line = dm ? () => true : playerLedgerLine(table, seat);
+  const readNote = (note: Pick<CloudTable["notes"][number], "to" | "purseId" | "recipientId">) =>
+    canReadNote(note as CloudTable["notes"][number], visible);
+  const ledgerPurses = dm
+    ? ["*"]
+    : [...new Set([...table.purses.map((p) => p.id), ...seat.purseIds, ...(table.journal?.world?.npcs ?? []).map((n) => n.id)])]
+        .filter((purseId) => line({ purseId } as CloudTable["ledger"][number]))
+        .sort();
+  const compares = !dm && seatInParty(table, visible);
+  const party = compares
+    ? table.purses.filter((p) => fairnessEligible(table, p)).map((p) => [p.id, p.name]).sort()
+    : [];
+  const fingerprint = (
+    await sha256Hex(
+      JSON.stringify(["lootsplit-history-projection-v1", code, seat.id, seat.role, [...visible.purseIds].sort(), ledgerPurses, compares, party]),
+    )
+  ).slice(0, 32);
+  return {
+    ledger: (lines) => lines.filter(line),
+    notes: (notes) => notes.filter((note) => readNote(note)),
+    visible: (list, keys) => {
+      if (!keys) return true;
+      if (list === "ledger") return dm || keys.some((key) => line({ purseId: JSON.parse(key)[0] } as CloudTable["ledger"][number]));
+      return keys.some((key) => {
+        const [to, purseId, recipientId] = JSON.parse(key) as string[];
+        return readNote({ to, purseId, recipientId: recipientId || undefined } as CloudTable["notes"][number]);
+      });
+    },
+    fingerprint,
   };
-  const line = playerLedgerLine(table, seat);
-  return { ledger: (lines) => lines.filter(line), notes: (notes) => notes.filter((note) => canReadNote(note, visible)) };
+}
+async function sha256Hex(text: string) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): CloudTable {
   const npcs = table.journal?.world?.npcs ?? [];
@@ -1261,7 +1303,7 @@ export async function readRoomHistory(input: {
   const room = await must(input.code, { working: true });
   const seat = room.seats.find((s) => s.token === input.token);
   if (!seat) throw Error("This browser is not seated at that table.");
-  return readHistory(room, seat, historyProjector(room.table, seat), input);
+  return readHistory(room, seat, await historyProjector(room.table, seat, room.code), input);
 }
 
 /** NPC barter quote for one seat. Players get the public quote only: no valuation or rules. */

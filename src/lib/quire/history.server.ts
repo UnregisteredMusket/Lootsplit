@@ -18,16 +18,20 @@ import { findReceipt, questsOf, type ReceiptLine } from "./quests.ts";
 import type { QuestRewardLink } from "./quests-schema.ts";
 import { projectArchivedReport } from "./session-records.ts";
 
-type PageEntry = { hash: string; parts: number; items: number; page: number };
+type PageEntry = { hash: string; parts: number; items: number; page: number; keys?: string[] };
 
 async function sha256(text: string): Promise<string> {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 const CURSOR = /^[0-9a-f]{32}$/;
-/** The opaque cursor naming one stored page for one seat (it reveals no count or content). */
-async function cursorOf(code: string, seatId: string, list: HistoryList, page: PageEntry) {
-  return (await sha256(`lootsplit-history-cursor-v1\n${code}\n${seatId}\n${list}\n${page.hash}`)).slice(0, 32);
+/**
+ * The opaque cursor naming one stored page for one seat under its current projection (it reveals
+ * no count or content). A change to what the seat may read changes every cursor, so a browser
+ * never keeps lines projected under rules that no longer apply (history-pages.ts).
+ */
+async function cursorOf(code: string, seatId: string, list: HistoryList, page: PageEntry, projection: string) {
+  return (await sha256(`lootsplit-history-cursor-v2\n${code}\n${seatId}\n${projection}\n${list}\n${page.hash}`)).slice(0, 32);
 }
 /** The hash a seat caches a projected page or report under (salted like view sections). */
 async function projectedHash(code: string, seatId: string, text: string) {
@@ -57,12 +61,19 @@ export function roomHasHistory(room: CloudRoom): boolean {
   return roomPages(room).size > 0 || (room.table.journal?.reports ?? []).some((r) => isDeferredSnapshot(r.snapshot));
 }
 
-/** The view's cursors: for each paged list, the newest stored page this seat does not hold. */
-export async function historyCursors(room: CloudRoom, seat: Pick<CloudSeat, "id">): Promise<HistoryCursors | undefined> {
+/**
+ * The view's cursors: for each paged list, the newest stored page holding a line this seat may
+ * read (pages it can read nothing of are never named, so their number is not revealed), and the
+ * seat's projection fingerprint (`projection`), which changes whenever what it may read changes.
+ */
+export async function historyCursors(room: CloudRoom, seat: Pick<CloudSeat, "id">, project: HistoryProjector): Promise<HistoryCursors | undefined> {
   const pages = roomPages(room);
   if (!pages.size) return undefined;
-  const cursors: HistoryCursors = {};
-  for (const [list, entries] of pages) cursors[list] = await cursorOf(room.code, seat.id, list, entries.at(-1)!);
+  const cursors: HistoryCursors = { projection: project.fingerprint };
+  for (const [list, entries] of pages) {
+    const newest = await nextCursor(room.code, seat.id, list, entries, entries.length - 1, project);
+    if (newest) cursors[list] = newest;
+  }
   return cursors;
 }
 
@@ -152,6 +163,10 @@ export async function questReceiptResolver(
 export type HistoryProjector = {
   ledger: (lines: CloudTable["ledger"]) => CloudTable["ledger"];
   notes: (notes: CloudTable["notes"]) => CloudTable["notes"];
+  /** Whether a page with these visibility keys (room-storage.mjs) holds a line the seat reads. */
+  visible: (list: HistoryList, keys: readonly string[] | undefined) => boolean;
+  /** A short, seat-salted digest of what the seat may read (purses, role, party comparisons). */
+  fingerprint: string;
 };
 
 /** Lines per history response (at least one page is always sent, and pages are never split). */
@@ -217,7 +232,7 @@ export async function readHistory(
   const pages = roomPages(room).get(list) ?? [];
   let index = -1;
   for (let i = pages.length - 1; i >= 0; i--)
-    if ((await cursorOf(room.code, seat.id, list, pages[i]!)) === input.before) {
+    if (project.visible(list, pages[i]!.keys) && (await cursorOf(room.code, seat.id, list, pages[i]!, project.fingerprint)) === input.before) {
       index = i;
       break;
     }
@@ -227,6 +242,8 @@ export async function readHistory(
     chars = 0;
   for (; index >= 0; index--) {
     const page = pages[index]!;
+    // A page the seat can read nothing of is skipped unread and never named.
+    if (!project.visible(list, page.keys)) continue;
     const text = (await readRoomSectionTexts(db, room.code, [page])).get(page.hash);
     if (text === undefined) return { ...base, missing: true };
     // Map images or resource references inside lines are restored as a whole read restores them.
@@ -254,6 +271,12 @@ export async function readHistory(
     ...base,
     list,
     pages: result,
-    next: index >= 0 ? await cursorOf(room.code, seat.id, list, pages[index]!) : null,
+    next: await nextCursor(room.code, seat.id, list, pages, index, project),
   };
+}
+
+/** The cursor of the newest page at or before `index` that the seat may read, or null. */
+async function nextCursor(code: string, seatId: string, list: HistoryList, pages: PageEntry[], index: number, project: HistoryProjector) {
+  for (let i = index; i >= 0; i--) if (project.visible(list, pages[i]!.keys)) return cursorOf(code, seatId, list, pages[i]!, project.fingerprint);
+  return null;
 }

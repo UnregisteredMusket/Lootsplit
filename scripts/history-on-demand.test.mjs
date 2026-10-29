@@ -357,6 +357,71 @@ test("a player can never read another seat's or DM-only history", async () => {
   assert.equal((await readRoomHistory({ ...seats.a, ...NEW, list: "ledger", before: "0".repeat(32) })).missing, true);
 });
 
+test("pages a player can read nothing of are never named: no cursor reveals how many there are", async () => {
+  const seats = await liveRoom("Quiet pages DM");
+  const block = async (prefix, from, to, text) => {
+    for (let i = 0; i < 320; i += 80)
+      await send(from, `${prefix}-${i}`, Array.from({ length: 80 }, (_, n) => message(`${prefix}-${i + n}`, from === seats.a ? "a" : "b", `${text} ${i + n}`, to)));
+  };
+  // Briar's private messages to the DM, Arden's party chat, then Briar's again: whole pages Arden
+  // can read nothing of, before and after the pages Arden can read.
+  await block("b1", seats.b, "dm", "Briar private");
+  await block("a1", seats.a, "party", "Arden party");
+  await block("b2", seats.b, "dm", "Briar private");
+  await block("b3", seats.b, "dm", "Briar private");
+  const pages = await pagesOf(seats.dm.code, "notes");
+  const readable = pages.filter((page) => page.keys.some((key) => JSON.parse(key)[0] === "party"));
+  assert.ok(readable.length > 0 && readable.length < pages.length - 2, "the room has pages Arden can read nothing of");
+  const view = await roomState({ ...seats.a, ...NEW });
+  const walked = await allHistory(seats.a, "notes", view.history.notes);
+  const named = walked.calls.flatMap((call) => call.pages);
+  assert.equal(named.length, readable.length, "only pages with a line Arden may read are ever returned");
+  assert.ok(named.every((page) => page.items.length > 0), "no empty page reveals a count");
+  assert.ok(!walked.items.some((n) => n.text.startsWith("Briar private")));
+  const complete = (await full(seats.a)).notes;
+  assert.deepEqual([...walked.items, ...view.table.notes], complete, "still exactly the complete view");
+  // The DM walks every page (it reads both kinds).
+  const dmView = await roomState({ ...seats.dm, ...NEW });
+  const dmWalk = await allHistory(seats.dm, "notes", dmView.history.notes);
+  assert.equal(dmWalk.calls.flatMap((call) => call.pages).length, pages.length);
+});
+
+test("when what a player may read changes, every cursor and the projection fingerprint change", async () => {
+  const seats = await liveRoom("Projection DM");
+  await history(seats, 1500, "pj");
+  const setBriarAway = async (away) => {
+    const room = await readRoom(seats.dm.code);
+    room.table.purses.find((p) => p.id === "b").nonParty = away;
+    room.revision++;
+    await updateRoom(room, room.revision - 1);
+  };
+  const walk = async () => {
+    const view = await roomState({ ...seats.a, ...NEW });
+    const { items } = await allHistory(seats.a, "ledger", view.history.ledger);
+    assert.deepEqual([...items, ...view.table.ledger], (await full(seats.a)).ledger, "history plus view is the complete view");
+    return { view, items };
+  };
+  const first = await walk();
+  assert.ok(first.items.some((l) => l.purseId === "b"), "Briar travels with the party: Arden reads Briar's lines");
+  assert.match(first.view.history.projection, /^[0-9a-f]{32}$/);
+  // Access lost: Briar leaves the party.
+  await setBriarAway(true);
+  const lost = await walk();
+  assert.notEqual(lost.view.history.projection, first.view.history.projection);
+  assert.notEqual(lost.view.history.ledger, first.view.history.ledger);
+  assert.equal((await readRoomHistory({ ...seats.a, ...NEW, list: "ledger", before: first.view.history.ledger })).missing, true, "an old cursor names nothing");
+  assert.ok(!lost.items.some((l) => l.purseId === "b"), "no line of Briar's any more");
+  // Access gained: Briar is back.
+  await setBriarAway(false);
+  const gained = await walk();
+  assert.notEqual(gained.view.history.projection, lost.view.history.projection);
+  assert.ok(gained.items.some((l) => l.purseId === "b"), "Briar's lines again");
+  // The DM's projection does not depend on the party.
+  const dm = await roomState({ ...seats.dm, ...NEW });
+  await setBriarAway(true);
+  assert.equal((await roomState({ ...seats.dm, ...NEW })).history.projection, dm.history.projection);
+});
+
 test("older clients (protocol 11 and earlier) receive the complete campaign, as before", async () => {
   const seats = await liveRoom();
   await history(seats, 300);
@@ -395,6 +460,39 @@ test("an older client of a campaign that has grown past what it could load gets 
   assert.deepEqual(old.table.notes.slice(1), (await roomState({ ...seats.a, ...NEW })).table.notes, "the newest lines, as a current client gets them");
   // Nothing was lost: the whole campaign is still stored.
   assert.equal((await readRoom(seats.dm.code)).table.notes.length, room.table.notes.length);
+});
+
+test("an older client of a paged campaign with large resource packs still gets the complete view", async () => {
+  const seats = await liveRoom("Packs DM");
+  await history(seats, 600, "pk");
+  const room = await readRoom(seats.dm.code);
+  // About 6 MB of resource packs: stored in their own table, outside every size cap, and restored
+  // into older clients' views. They must not count toward what an older client can load.
+  room.table.journal.resourceLibrary = {
+    packs: Array.from({ length: 5 }, (_, i) => ({
+      format: "lootsplit.resource-pack",
+      version: 1,
+      id: `pack-${i}`,
+      revision: "1",
+      title: `Pack ${i}`,
+      description: "",
+      attribution: "",
+      entries: Array.from({ length: 100 }, (_, e) => ({ id: `r-${i}-${e}`, name: `Entry ${e}`, text: "p".repeat(12_000), sources: [{ book: "Test book", pdfPage: 1, printedPage: null }], warnings: [], tags: [], kind: "reference" })),
+    })),
+  };
+  room.revision++;
+  await updateRoom(room, room.revision - 1);
+  assert.ok((await pagesOf(seats.dm.code, "notes")).length > 0, "history is paged");
+  for (const seat of [seats.dm, seats.a]) {
+    const old = await roomState({ ...seat, ...OLD });
+    assert.notEqual(old.table.notes[0]?.id, LEGACY_HISTORY_NOTICE_ID, "no cut");
+    const complete = (await readRoom(seats.dm.code)).table;
+    if (seat === seats.dm) {
+      assert.equal(old.table.notes.length, complete.notes.length, "every chat line");
+      assert.equal(old.table.ledger.length, complete.ledger.length, "every ledger line");
+      assert.equal(old.table.journal.resourceLibrary.packs.length, 5, "the packs, restored");
+    }
+  }
 });
 
 test("an existing large room migrates to history pages on its next write, keeping every line", async () => {
@@ -458,4 +556,45 @@ test("exports and deletion copies hold the complete history, byte for byte as wi
   assert.ok(strip(payloads[0]) === strip(payloads[1]), "the exported campaign is the same with and without history pages");
   assert.ok(payloads[0].exported.ledger.length >= 120 && payloads[0].exported.journal.reports.length === 1);
   assert.ok(JSON.parse(payloads[0].exported.journal.reports[0].snapshot).ledger.length >= 200, "the archived session is complete");
+});
+
+test("ending a session past the total cap is refused with Download a copy, logged, and changes nothing", async () => {
+  const { ROOM_TOTAL_LIMIT, ROOM_TOTAL_REFUSAL } = await import("../src/lib/quire/room-size.ts");
+  const seats = await liveRoom("Total cap DM");
+  await send(seats.dm, "cap-s1", [{ id: "cap-s1", kind: "session", name: "One", end: false }]);
+  await history(seats, 100, "cap");
+  // Archived sessions already stored up to the cap (a stand-in row: only its size counts here).
+  await db.prepare("INSERT INTO campaign_room_reports(code,reference,body) VALUES (?,?,?)").bind(seats.dm.code, "session-report:padding", "x".repeat(ROOM_TOTAL_LIMIT)).run();
+  const before = await readStoredRoom(db, seats.dm.code);
+  const logsBefore = (await db.prepare("SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE source='room-storage'").first()).n;
+  await assert.rejects(send(seats.dm, "cap-e1", [{ id: "cap-e1", kind: "session", name: "One", end: true }]), (error) => {
+    assert.ok(error.message.startsWith(ROOM_TOTAL_REFUSAL), error.message);
+    assert.match(error.message, /Download a copy/);
+    assert.match(error.message, /Download session report/);
+    assert.match(error.message, /Nothing was changed/);
+    return true;
+  });
+  const after = await readStoredRoom(db, seats.dm.code);
+  assert.equal(after.body, before.body, "the campaign is unchanged");
+  const logs = await db.prepare("SELECT body FROM owner_monitor_logs WHERE source='room-storage'").all();
+  assert.equal(logs.results.length, logsBefore + 1);
+  const body = JSON.parse(logs.results.at(-1).body);
+  assert.equal(body.refusal, "total");
+  assert.equal(body.totalLimit, ROOM_TOTAL_LIMIT);
+  assert.ok(body.totalBytes > ROOM_TOTAL_LIMIT);
+  // Everything else still works at the cap: a purchase and a message are not refused.
+  await send(seats.dm, "cap-more", [buy("cap-more-buy"), message("cap-more-msg", "a", "Still playing")]);
+  // Below the cap (the largest production campaign is 2.5 MB in total), the session ends as before.
+  await db.prepare("DELETE FROM campaign_room_reports WHERE reference='session-report:padding'").run();
+  await send(seats.dm, "cap-e2", [{ id: "cap-e2", kind: "session", name: "One", end: true }]);
+  assert.ok((await readRoom(seats.dm.code)).table.journal.reports.some((r) => r.name === "One"));
+});
+
+test("a table whose archived sessions are not loaded is never uploaded as a campaign", async () => {
+  const { readJournal } = await import("../src/lib/quire/journal.ts");
+  const table = shopTable();
+  table.journal = readJournal({ ...(table.journal ?? {}), reports: [{ id: "r1", name: "One", at: 1, snapshot: "", deferred: true }] });
+  await assert.rejects(openRoom({ name: "Rehost DM", table }), /not loaded on this device.*Nothing was changed/);
+  table.journal.reports = [{ id: "r1", name: "One", at: 1, snapshot: "\u0000lootsplit-deferred-report:session-report:abc" }];
+  await assert.rejects(openRoom({ name: "Rehost DM", table }), /not loaded on this device/);
 });
