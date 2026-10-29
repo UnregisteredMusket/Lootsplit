@@ -140,7 +140,7 @@ export function projectRecord(
       delete world.partyPosition.y;
     }
     projectPartyGroups(table, world, seat);
-    projectZones(world, seat);
+    projectZones(world, seat, table);
     world.npcs = world.npcs.filter((npc) => readableNpcs.has(npc.id));
     projectNpcBarter(world, seat);
     if (t.journal.downtimeActivities) {

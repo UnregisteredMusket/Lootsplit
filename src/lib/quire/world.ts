@@ -374,7 +374,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     return;
   }
   if (cmd.kind === "map-token-follow") {
-    applyTokenFollow(t, seat, cmd, at);
+    applyTokenFollow(t, seat, cmd, at, false, execution);
     return;
   }
   if (MOVE_REQUEST_KINDS.has(cmd.kind)) {
@@ -528,7 +528,9 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     }
     map.tokens = next;
     if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
-    event(`${cmd.place.length} ${cmd.place.length === 1 ? "token" : "tokens"} placed on ${map.name}`);
+    // Generic, like "Combat map tokens updated": players see every event without a purse, so it
+    // never names a map or counts tokens they may not see (privacy review, 2026-10-29).
+    event("Map tokens updated");
   } else if (cmd.kind === "map-tokens-edit") {
     dm();
     const map = w.maps.find((m) => m.id === cmd.mapId);
@@ -546,7 +548,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     }
     map.tokens = next;
     if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
-    event(`${cmd.edits.length} ${cmd.edits.length === 1 ? "token" : "tokens"} changed on ${map.name}`);
+    event("Map tokens updated");
   } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;

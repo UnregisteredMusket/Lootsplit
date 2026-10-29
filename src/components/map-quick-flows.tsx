@@ -5,6 +5,7 @@ import { blankEncounter } from "@/lib/encounters/model.mjs";
 import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
 import type { CloudTable } from "@/lib/quire/cloud";
 import type { CommandInput } from "@/lib/quire/commands";
+import { attemptKey, creatureAttempt, withCombatants, type CreatureAttempt } from "@/lib/quire/add-creatures";
 import { DEFAULT_FORMATION, planFormation } from "@/lib/quire/formation";
 import { snapTokenPosition, sizedToken, type TokenSizeClass } from "@/lib/quire/tabletop-geometry";
 import { readMapTabletop, readTabletopSession } from "@/lib/quire/tabletop";
@@ -57,7 +58,9 @@ export function AddCreaturesPanel({
     [encounterId, setEncounterId] = useState(bound || "new"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    searchRef = useRef<HTMLInputElement>(null);
+    searchRef = useRef<HTMLInputElement>(null),
+    // One attempt's IDs, kept for a retry with the same picks (never duplicates combatants).
+    attempt = useRef<CreatureAttempt | null>(null);
   useEffect(() => {
     searchRef.current?.focus();
     let cancelled = false;
@@ -101,35 +104,43 @@ export function AddCreaturesPanel({
     setBusy(true);
     setError("");
     try {
-      let id = encounterId;
-      if (id === "new") {
+      const pickKeys = picks.map((p) => ({ key: p.creature.sourceKey, count: p.count }));
+      const run = (attempt.current = creatureAttempt(attempt.current, pickKeys, encounterId, () => crypto.randomUUID()));
+      let id = run.encounterId;
+      if (encounterId === "new") {
         id = (
           await encounterRequest<{ id: string }>("encounters/create", {
             code,
-            id: crypto.randomUUID(),
+            id,
             encounter: { ...blankEncounter(), name: `${map.name} encounter` },
           })
         ).id;
         setEncounterId(id);
+        // The retry now names the created encounter; it keeps this attempt's IDs.
+        attempt.current = { ...run, key: attemptKey(pickKeys, id), encounterId: id };
       }
       const detail = await encounterRequest<Detail>("encounters/detail", { id });
+      let next = 0;
       const joining = picks.flatMap(({ creature, count }) =>
         Array.from({ length: count }, (_, i) => {
           const { type: _type, environments: _environments, ...combatant } = creature;
-          return { ...combatant, id: crypto.randomUUID(), name: count > 1 ? `${creature.name} ${i + 1}` : creature.name };
+          return { ...combatant, id: run.combatantIds[next++]!, name: count > 1 ? `${creature.name} ${i + 1}` : creature.name };
         }),
       );
-      if (detail.body.combatants.length + joining.length > 100) throw Error("An encounter can contain up to 100 combatants.");
-      await encounterRequest("encounters/save", {
-        id: detail.id,
-        revision: detail.revision,
-        encounter: { ...detail.body, combatants: [...detail.body.combatants, ...joining] },
-      });
+      const merged = withCombatants(detail.body.combatants, joining);
+      if (merged.combatants.length > 100) throw Error("An encounter can contain up to 100 combatants.");
+      if (merged.added)
+        await encounterRequest("encounters/save", {
+          id: detail.id,
+          revision: detail.revision,
+          encounter: { ...detail.body, combatants: merged.combatants },
+        });
       encounterDetailPoller.refresh(detail.id);
       // DM-only tokens in a cluster at the point, sized from the stat blocks.
       const anchor = snapTokenPosition(map.grid, {}, point) ?? { column: 0, row: 0 };
-      const tokens: MapToken[] = joining.map((c) => ({
-        id: crypto.randomUUID(),
+      const placedIds = new Set((map.tokens ?? []).map((t) => t.id));
+      const tokens: MapToken[] = joining.map((c, i) => ({
+        id: run.tokenIds[i]!,
         kind: "creature",
         label: c.name,
         encounterId: id,
@@ -139,7 +150,15 @@ export function AddCreaturesPanel({
         visibility: "dm",
         ...sizedToken((c as Creature).size),
       }));
-      const plan = planFormation(map.grid, map.tokens ?? [], tokens, { column: anchor.column, row: anchor.row }, readTabletopSession(table).partyFormation ?? DEFAULT_FORMATION, readMapTabletop(map).walls);
+      const missing = tokens.filter((t) => !placedIds.has(t.id));
+      const done = () => {
+        attempt.current = null;
+        resultToast(`Added ${joining.length} ${joining.length === 1 ? "creature" : "creatures"} to the encounter, hidden from players`);
+        close();
+      };
+      // A retry whose placement already landed: nothing left to place.
+      if (!missing.length) return done();
+      const plan = planFormation(map.grid, map.tokens ?? [], missing, { column: anchor.column, row: anchor.row }, readTabletopSession(table).partyFormation ?? DEFAULT_FORMATION, readMapTabletop(map).walls);
       if (plan.unplaced) throw Error("There is no room here for every creature. Choose another spot.");
       await act(
         {
@@ -147,14 +166,11 @@ export function AddCreaturesPanel({
           mapId: map.id,
           grid: map.grid,
           place: plan.places.map((p) => {
-            const token = tokens.find((t) => t.id === p.id)!;
+            const token = missing.find((t) => t.id === p.id)!;
             return { tokenId: p.id, before: null, token: { ...token, column: p.column, row: p.row } };
           }),
         },
-        () => {
-          resultToast(`Added ${joining.length} ${joining.length === 1 ? "creature" : "creatures"} to the encounter, hidden from players`);
-          close();
-        },
+        done,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "The creatures could not be added. Try again.");

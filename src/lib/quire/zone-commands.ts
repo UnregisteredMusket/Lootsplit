@@ -10,7 +10,7 @@ import { characterVisible } from "./character-position.ts";
 import { groupMembers, MAIN_GROUP, purseGroup, resolveGroup } from "./party-groups.ts";
 import { applyTokenFollow, mapAccessible, readTabletopSession, type TabletopExecution } from "./tabletop.ts";
 import { DEFAULT_SPLIT_RULE, type SplitRuleSettings, type Zone, type ZoneRequest } from "./world-schema.ts";
-import { crossing, zoneName } from "./zones.ts";
+import { crossing, splitRuleFor, zoneName, zoneOf } from "./zones.ts";
 
 type Seat = Pick<CloudSeat, "id" | "role" | "purseIds">;
 export type ZoneCommand =
@@ -25,19 +25,25 @@ export const ZONE_COMMAND_KINDS = new Set(["zone-save", "zone-request", "zone-re
 export const zonesFingerprint = (t: Pick<CloudTable, "journal">) =>
   canonicalJson({ zones: t.journal?.world?.zones ?? [], splitRule: t.journal?.world?.splitRule ?? null });
 
-/** The vote's state: decided (pass or fail) or still open. */
-export function voteOutcome(r: Pick<ZoneRequest, "votes" | "majority" | "deadline">, now: number): "pass" | "fail" | "open" {
-  const votes = r.votes ?? [];
-  const yes = votes.filter((v) => v.vote === "yes").length,
-    no = votes.filter((v) => v.vote === "no").length,
-    waiting = votes.length - yes - no;
+/**
+ * The vote's state: decided (pass or fail) or still open. Only the other players' ballots count
+ * (privacy review 2026-10-29; owner rule: a tie or no votes keeps the party together), so a vote
+ * nobody else answered fails when it closes. When the mover is the only eligible voter (nobody
+ * else in their group has a seat), nobody is left behind and it passes.
+ */
+export function voteOutcome(r: Pick<ZoneRequest, "votes" | "majority" | "deadline" | "seatId">, now: number): "pass" | "fail" | "open" {
+  const ballots = (r.votes ?? []).filter((v) => v.seatId !== r.seatId);
+  if (!ballots.length) return "pass";
+  const yes = ballots.filter((v) => v.vote === "yes").length,
+    no = ballots.filter((v) => v.vote === "no").length,
+    waiting = ballots.length - yes - no;
   const closed = r.deadline !== undefined && now >= r.deadline;
   if (r.majority === "unanimous") {
     if (no > 0) return "fail";
     if (waiting === 0) return "pass";
     return closed ? "fail" : "open";
   }
-  // Majority: more yes than no; a tie, or no votes, keeps the party together.
+  // Majority of the ballots cast: more yes than no. A tie, or no ballots cast, fails.
   if (yes > no + waiting) return "pass";
   if (yes + waiting <= no) return "fail";
   if (waiting === 0 || closed) return yes > no ? "pass" : "fail";
@@ -86,15 +92,18 @@ export function applyZoneCommand(t: CloudTable, seat: Seat, cmd: ZoneCommand, at
     if (!seat.purseIds.includes(cmd.purseId)) throw Error("You can only move your own character's token.");
     const person = t.purses.find((p) => p.id === cmd.purseId && p.kind === "character");
     if (!person || !characterVisible(t, person)) throw Error("This character is unavailable.");
+    // Both maps must be ones the player can open, checked first (privacy review 2026-10-29), and
+    // a move that can't be requested gets one generic answer, so zones of hidden maps can't be probed.
     const to = w.maps.find((m) => m.id === cmd.toMapId);
-    if (!to || !mapAccessible(t, to, seat)) throw Error("This map is unavailable.");
+    const from = cmd.fromMapId ? w.maps.find((m) => m.id === cmd.fromMapId) : undefined;
+    if (!to || !mapAccessible(t, to, seat) || (cmd.fromMapId && (!from || !mapAccessible(t, from, seat))))
+      throw Error("This map is unavailable.");
     if (!readTabletopSession(t).followView) throw Error("The DM hasn't turned on tokens following your map view.");
     const move = crossing(t, person.id, person.name, to.id, cmd.fromMapId ?? undefined);
-    if (move.kind !== "split") throw Error("This move doesn't split the party. Refresh and try again.");
-    if (move.rule.allow) throw Error("This zone lets characters split off freely. Refresh and try again.");
-    if (move.rule.rule === "block") throw Error(`The DM is keeping the party together here. Ask your DM if ${person.name} should split off to ${to.name}.`);
+    if ((move.kind !== "split" && move.kind !== "join") || move.rule.allow || move.rule.rule === "block")
+      throw Error("This move can't be requested now. Refresh and try again.");
     const combat = w.combat?.phase === "active" ? w.combat : undefined;
-    if (combat && (combat.mapId === cmd.fromMapId || combat.mapId === to.id)) throw Error(`Finish the encounter before leaving ${zoneName(t, move.from)}.`);
+    if (combat && [move.from, move.to].includes(zoneOf(t, combat.mapId))) throw Error("Finish the encounter before leaving.");
     const requests = (w.zoneRequests ??= []);
     if (requests.some((r) => r.id === cmd.requestId)) throw Error("This request was already sent.");
     // One open request per character: a new one replaces the old.
@@ -118,6 +127,8 @@ export function applyZoneCommand(t: CloudTable, seat: Seat, cmd: ZoneCommand, at
       mode: rule.rule === "vote" ? "vote" : "session-end",
       status: "open",
       createdAt: at,
+      groupId: group,
+      tokenAt: tokenAt(t, person.id, cmd.fromMapId),
       ...(t.journal!.sessions.find((x) => !x.endedAt) ? { sessionId: t.journal!.sessions.find((x) => !x.endedAt)!.id } : {}),
     };
     if (rule.rule === "vote") {
@@ -149,7 +160,10 @@ export function applyZoneCommand(t: CloudTable, seat: Seat, cmd: ZoneCommand, at
   if (cmd.kind === "zone-vote") {
     if (request.mode !== "vote") throw Error("This request isn't a vote.");
     const ballot = request.votes?.find((v) => v.seatId === seat.id);
-    if (!ballot || seat.role === "dm") throw Error("You don't have a vote on this request.");
+    // A ballot counts only while the voter still has a character in the mover's group.
+    const members = new Set(groupMembers(t, resolveGroup(t, purseGroup(t, request.purseId) ?? MAIN_GROUP)).map((p) => p.id));
+    if (!ballot || seat.role === "dm" || ballot.seatId === request.seatId || !seat.purseIds.some((id) => members.has(id)))
+      throw Error("You don't have a vote on this request.");
     if (request.deadline !== undefined && at >= request.deadline) {
       settle(t, request, at, `${cmd.id}-apply`, event);
       return;
@@ -177,21 +191,27 @@ export function applyZoneCommand(t: CloudTable, seat: Seat, cmd: ZoneCommand, at
 function settle(t: CloudTable, r: ZoneRequest, at: number, id: string, event: (s: string, purseId?: string) => void) {
   const outcome = voteOutcome(r, at);
   if (outcome === "open") return;
-  if (outcome === "pass") return apply(t, r, at, id, event);
+  if (outcome === "pass") return apply(t, r, at, id, event, true);
   const name = t.purses.find((p) => p.id === r.purseId)?.name ?? "The character";
-  const { yes, no } = voteTally(r);
+  // The other players' ballots (the mover's own yes isn't counted).
+  const ballots = (r.votes ?? []).filter((v) => v.seatId !== r.seatId);
+  const yes = ballots.filter((v) => v.vote === "yes").length,
+    no = ballots.filter((v) => v.vote === "no").length;
   r.status = "failed";
   r.decidedAt = at;
-  r.reason = yes === no ? `${name} stays with the party: the vote tied.` : `${name} stays with the party: the vote didn't pass.`;
+  r.reason = !yes && !no
+    ? `${name} stays with the party: nobody else voted.`
+    : yes === no
+      ? `${name} stays with the party: the vote tied.`
+      : `${name} stays with the party: the vote didn't pass.`;
   event(r.reason, r.purseId);
-  void no;
 }
 
 /**
  * Apply a request from the character's current state ("send Mira there", not a replay): checked
  * again now. A request that no longer applies is closed with the reason instead.
  */
-function apply(t: CloudTable, r: ZoneRequest, at: number, id: string, event: (s: string, purseId?: string) => void) {
+function apply(t: CloudTable, r: ZoneRequest, at: number, id: string, event: (s: string, purseId?: string) => void, byVote = false) {
   const w = t.journal!.world!;
   const person = t.purses.find((p) => p.id === r.purseId && p.kind === "character");
   const to = w.maps.find((m) => m.id === r.toMapId);
@@ -206,6 +226,10 @@ function apply(t: CloudTable, r: ZoneRequest, at: number, id: string, event: (s:
   const move = crossing(t, person.id, person.name, to.id, from?.id);
   if (move.kind === "same") return close("not-needed", `No longer needed: ${person.name} is already in ${zoneName(t, move.kind === "same" ? r.toZone : r.toZone)}.`);
   if (move.kind !== "split" && move.kind !== "join") return close("cancelled", `Can't apply: ${to.name} is no longer next to ${person.name}'s place.`);
+  // A passed vote applies only under the rule as it is now: if the DM switched to Block, it's
+  // refused (the DM's own approval always applies).
+  if (byVote && !move.rule.allow && splitRuleFor(t, move.from).rule === "block")
+    return close("cancelled", "Can't apply: the DM is keeping the party together now.");
   const seat = { role: "player" as const, purseIds: [person.id] };
   const beforeFrom = from?.tokens?.find((x) => x.kind === "character" && x.entityId === person.id) ?? null;
   const beforeTo = to.tokens?.find((x) => x.kind === "character" && x.entityId === person.id) ?? null;
@@ -237,3 +261,47 @@ function apply(t: CloudTable, r: ZoneRequest, at: number, id: string, event: (s:
 
 /** Default split rule shown in Settings. */
 export const readSplitRule = (t: Pick<CloudTable, "journal">): SplitRuleSettings => t.journal?.world?.splitRule ?? DEFAULT_SPLIT_RULE;
+
+/** The mover's token on the map being left, as a request saw it (null when there is none). */
+function tokenAt(t: CloudTable, purseId: string, fromMapId: string | null) {
+  const token = fromMapId
+    ? t.journal?.world?.maps.find((m) => m.id === fromMapId)?.tokens?.find((x) => x.kind === "character" && x.entityId === purseId)
+    : undefined;
+  return canonicalJson(token ? { mapId: fromMapId, column: token.column, row: token.row, offsetX: token.offsetX ?? 0, offsetY: token.offsetY ?? 0 } : null);
+}
+
+/**
+ * After every command (commands.ts): open split requests that no longer fit are cancelled with the
+ * reason (privacy review 2026-10-29): the mover's group changed, their token moved or left the map,
+ * or combat started in either zone. Votes keep only ballots from seats with a character still in
+ * the mover's group (when the room's seats are known).
+ */
+export function cancelStaleZoneRequests(t: CloudTable, at: number, commandId: string, playerSeats?: { id: string; purseIds: string[] }[]) {
+  const w = t.journal?.world;
+  if (!w?.zoneRequests?.some((r) => r.status === "open")) return;
+  const combat = w.combat?.phase === "active" ? w.combat : undefined;
+  for (const r of w.zoneRequests) {
+    if (r.status !== "open") continue;
+    const name = t.purses.find((p) => p.id === r.purseId)?.name ?? "The character";
+    const group = resolveGroup(t, purseGroup(t, r.purseId) ?? MAIN_GROUP);
+    const reason =
+      r.groupId !== undefined && r.groupId !== group
+        ? `Cancelled: ${name}'s group changed.`
+        : r.tokenAt !== undefined && r.tokenAt !== tokenAt(t, r.purseId, r.fromMapId)
+          ? `Cancelled: ${name}'s token moved.`
+          : combat && [r.fromZone, r.toZone].includes(zoneOf(t, combat.mapId))
+            ? "Cancelled: combat started."
+            : undefined;
+    if (reason) {
+      r.status = "cancelled";
+      r.decidedAt = at;
+      r.reason = reason;
+      t.journal!.events.push({ id: `${commandId}-zone-${r.id}`.slice(0, 150), at, kind: "management", summary: reason, purseId: r.purseId });
+      continue;
+    }
+    if (r.votes && playerSeats) {
+      const members = new Set(groupMembers(t, group).map((p) => p.id));
+      r.votes = r.votes.filter((v) => v.seatId === r.seatId || playerSeats.some((s) => s.id === v.seatId && s.purseIds.some((id) => members.has(id))));
+    }
+  }
+}

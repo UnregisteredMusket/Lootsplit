@@ -183,8 +183,12 @@ export function groupInZone(table: Pick<CloudTable, "journal" | "purses">, zone:
 
 export type Crossing =
   | { kind: "same" }
-  /** Into the zone of another of the party's groups: the character joins it (never split-ruled). */
-  | { kind: "join"; group: string; from: string; to: string }
+  /**
+   * Into an adjacent zone where another of the party's groups is: the character joins it. Like a
+   * split, it is decided by the leaving zone's rule (privacy review 2026-10-29; plan 6A.2: joining
+   * is the destination case of an adjacent crossing).
+   */
+  | { kind: "join"; group: string; from: string; to: string; rule: ReturnType<typeof splitRuleFor> }
   /** Into an adjacent zone: a split, decided by the leaving zone's rule. */
   | { kind: "split"; from: string; to: string; rule: ReturnType<typeof splitRuleFor> }
   | { kind: "far"; from: string; to: string; miles: number; days: number; pace: number }
@@ -206,10 +210,12 @@ export function crossing(
   if (place.kind === "unknown") return { kind: "refused", message: `Viewing only — ${name} has no place yet. Use Place my token.` };
   const to = zoneOf(table, toMapId);
   if (to === place.zone) return { kind: "same" };
-  const join = groupInZone(table, to, place.group);
-  if (join) return { kind: "join", group: join, from: place.zone, to };
+  // Adjacency and journeys first: a group far away is never joined by following a map view.
   if (!zonesAdjacent(table, place.zone, to)) return { kind: "far", from: place.zone, to, ...tripEstimate(table, place.zone, to) };
-  return { kind: "split", from: place.zone, to, rule: splitRuleFor(table, place.zone) };
+  const rule = splitRuleFor(table, place.zone);
+  const join = groupInZone(table, to, place.group);
+  if (join) return { kind: "join", group: join, from: place.zone, to, rule };
+  return { kind: "split", from: place.zone, to, rule };
 }
 
 /** Whether a token may follow onto this map without a split (null), or the message why not. */
