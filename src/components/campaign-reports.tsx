@@ -1,3 +1,4 @@
+import { LedgerCoverage, LoadArchivedSession } from "./history-loader";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { readFinance } from "@/lib/quire/finance";
@@ -75,9 +76,12 @@ export function CampaignReports() {
                 Received {formatCopper(result.summary.received)} · Spent{" "}
                 {formatCopper(result.summary.spent)} · Net {formatCopper(result.summary.net)}
               </p>
+            ) : "deferred" in result && result.deferred ? (
+              <LoadArchivedSession id={session.id} name={session.name} />
             ) : (
               <p role="alert">{result.error}</p>
             )}
+            {result.available && !session.endedAt && <LedgerCoverage since={session.startedAt} ledger={ledger} />}
           </div>
         );
       })}

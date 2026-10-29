@@ -25,6 +25,12 @@ public class OwnerWidgetJob extends JobService {
     static void cancel(Context context) { context.getSystemService(JobScheduler.class).cancel(ID); }
     @Override public boolean onStartJob(JobParameters params) {
         stopped = false;
+        // No widget is placed (all removed; the connection is kept for when one is added again, and
+        // onEnabled restarts this job then): no background readings meanwhile.
+        if (OwnerWidgetProvider.ids(this).length + CompanionWidgetProvider.ids(this).length == 0) {
+            cancel(this);
+            return false;
+        }
         // A transient failure (no response, timeout) asks Android to retry with backoff instead of
         // leaving a failed reading until the next ~30-minute period; sign-in problems never retry.
         work = WidgetRefresh.request(getApplicationContext(), false, error -> {

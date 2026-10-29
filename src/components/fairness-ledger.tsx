@@ -1,10 +1,12 @@
+import { HistoryCoverage, useRoomHistory } from "./history-loader";
+import { historyIncomplete, loadAllHistory } from "@/lib/quire/room-history";
 /**
  * Party → Fairness (future-development prompt 2, phase 3; mockups approved by the owner on
  * 2026-10-24). A read-only view of the loot each party character has received, per session and
  * campaign to date, with a breakdown of the receipts behind each total. Everything is derived by
  * loot-fairness.ts from the table this seat already has (its own projection for players).
  */
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Coins, Gem, Minus, RotateCcw, Swords } from "lucide-react";
 import { AppLink } from "@/components/app-link";
 import { LedgerArt } from "@/components/ledger-art";
@@ -109,6 +111,13 @@ export function FairnessLedger({
 }) {
   const { table, viewer, ready } = useFairness();
   const economy = useEconomy();
+  // Totals cover every archived session: opening Fairness in a shared room loads the history
+  // (history on demand), with progress in HistoryCoverage below.
+  useRoomHistory();
+  const incomplete = historyIncomplete();
+  useEffect(() => {
+    if (incomplete) void loadAllHistory().catch(() => undefined);
+  }, [incomplete]);
   const view = useMemo(() => fairnessLedger(table, viewer, period), [table, viewer, period]);
   // Nothing handed out yet, campaign to date (design plan P10): explain instead of zero rows.
   const campaign = useMemo(
@@ -117,6 +126,7 @@ export function FairnessLedger({
   );
   if (!ready) return <p className="mt-6 text-muted">Loading…</p>;
   const all = [...view.rows, ...view.others];
+  const coverage = <HistoryCoverage what="Fairness totals" />;
   if (character && all.some((r) => r.purseId === character))
     return <Breakdown table={table} viewer={viewer} view={view} purseId={character} onPeriod={onPeriod} />;
   const portrait = (id: string) => economy.purses.find((p) => p.id === id)?.portrait;
@@ -146,6 +156,7 @@ export function FairnessLedger({
   if (nothingYet && all.length > 0)
     return (
       <div className="fair-ledger" id="fairness">
+        {coverage}
         <div className="mt-4">
           <EmptyState
             title="No loot handed out yet"
@@ -174,6 +185,7 @@ export function FairnessLedger({
           ) : null
         }
       />
+      {coverage}
       {view.unreadable > 0 && (
         <div className="loot-warn" role="note">
           {view.unreadable} archived session{view.unreadable === 1 ? "" : "s"} could not be read, so {view.unreadable === 1 ? "its" : "their"} receipts are not in these totals. Keep the original backup for recovery.
@@ -586,7 +598,15 @@ export function WhatCounts({ details = false }: { details?: boolean }) {
 /** One line for the treasure pool's summary card: who is furthest behind, campaign to date. */
 export function FurthestBehindLine() {
   const { table, viewer, ready } = useFairness();
+  useRoomHistory();
   const view = useMemo(() => (ready ? fairnessLedger(table, viewer, "campaign") : null), [table, viewer, ready]);
+  // Until the campaign's history is loaded (history on demand) the comparison would be partial.
+  if (historyIncomplete())
+    return (
+      <p className="mt-2 text-sm">
+        Fairness, campaign to date: <AppLink href="/party?section=fairness">Open Fairness to compare →</AppLink>
+      </p>
+    );
   if (!view || view.n < 2) return null;
   const row = view.rows[0]!;
   if (!row.gap || row.gap.num >= 0) return null;

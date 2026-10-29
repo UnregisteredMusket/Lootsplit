@@ -145,6 +145,17 @@ export async function navigateApplication(page, destination) {
 export async function afterJoining(page) {
   await page.waitForURL((u) => u.pathname === "/" && u.searchParams.get("view") === "home");
   await page.locator(".player-home").waitFor();
+  // A fresh guest context has no "quire.guide.offer.v3" preference, so the first-run
+  // "View the instructions?" offer opens about 1.5 s after Home and covers the header (main
+  // 53dd339, Packaged Worker / library). Answer it "Not now" whenever it blocks an action, as a
+  // new player would; audits that test the offer itself run in their own contexts.
+  if (!page.guideOfferHandled) {
+    page.guideOfferHandled = true;
+    await page.addLocatorHandler(
+      page.getByRole("dialog", { name: "View the instructions?", exact: true }),
+      async (offer) => { await offer.getByRole("button", { name: "Not now", exact: true }).click(); },
+    );
+  }
   // The top-centre "You're playing …" toast can sit over the header's room link, and a pointer
   // resting on it pauses its timer, so a click there would wait forever. Move the pointer clear
   // and let it time out (4 s) rather than clicking near the header, where a close button that is

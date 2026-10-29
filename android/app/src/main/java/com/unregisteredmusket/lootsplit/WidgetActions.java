@@ -23,11 +23,15 @@ final class WidgetActions {
             // Agent activity: My account → Field monitor → Development & deployments (GitHub events).
             case "activity": return "field-development";
             case "account": return "account-sign-in";
+            // A widget's Sign in (SIGN IN, its footer, "Not connected" rows): the app's widget Connect
+            // screen (My account → Field monitor → Home-screen Field monitor). Signed out, My account
+            // shows its sign-in form first and opens that screen once the owner has signed in.
+            case "connect": return "home-screen-widget";
             default: return "home-screen-widget";
         }
     }
     /** Destinations a log row may open (the same in-app screens as before rows expanded). */
-    static final String[] ROW_ACTIONS = {"logs", "report", "task", "diagnostics", "account", "activity"};
+    static final String[] ROW_ACTIONS = {"logs", "report", "task", "diagnostics", "account", "activity", "connect"};
     static String rowAction(String action) { for (String known : ROW_ACTIONS) if (known.equals(action)) return known; return "logs"; }
     /** Short name of a row's destination for its OPEN button: "logs", "daily report", "task", "diagnostics", "My account". */
     static String rowLabel(String action) {
@@ -36,6 +40,7 @@ final class WidgetActions {
             case "task": return "task";
             case "diagnostics": return "diagnostics";
             case "account": return "My account";
+            case "connect": return "widget settings";
             case "activity": return "activity";
             default: return "logs";
         }
