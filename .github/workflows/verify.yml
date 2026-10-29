@@ -378,6 +378,9 @@ jobs:
       - name: dev-map-party-move
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-map-party-move 300 node scripts/map-party-move-browser-audit.mjs
+      - name: dev-map-follow-view
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-map-follow-view 240 node scripts/map-follow-view-browser-audit.mjs
       - name: dev-quest-log
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-quest-log 300 node scripts/quest-log-browser-audit.mjs

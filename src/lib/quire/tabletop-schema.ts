@@ -194,6 +194,11 @@ export const tabletopSessionSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * Tabletop protocol 16 (map tokens PR 7, owner 2026-10-29): "Character tokens follow players'
+     * map view", off by default. Players keep their own "Follow me" switch on their device.
+     */
+    followView: z.boolean().optional(),
     activeMapId: id.nullable().default(null),
     activationId: id.optional(),
     playerBrowsing: z.boolean().default(true),
@@ -204,7 +209,7 @@ export const tabletopSessionSchema = z
       .default(null),
   })
   .strict();
-const tile = z
+export const tile = z
   .object({
     column: z.number().int().min(0).max(199),
     row: z.number().int().min(0).max(199),

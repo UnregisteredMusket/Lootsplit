@@ -154,6 +154,8 @@ import {
   type PartyMoveOptions,
 } from "@/lib/quire/party-move";
 import { AddCharactersPanel, AddCreaturesPanel } from "./map-quick-flows";
+import { FollowViewSettings } from "./map-follow-view";
+import { useTokenFollow } from "@/lib/quire/use-token-follow";
 import { mapEncounterId, removeFromInitiative } from "@/lib/quire/map-initiative-link";
 import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
 import { requestConfirm } from "@/lib/quire/confirm-store";
@@ -3248,6 +3250,9 @@ function MapViewport({
     [partyMoveOptions, setPartyMoveOptions] = useState<PartyMoveOptions>({ follow: true, placeTokens: true }),
     encounterId = useDm ? mapEncounterId(recordTable, map) : undefined,
     [combatantIds, setCombatantIds] = useState<{ id: string; ids: Set<string> }>();
+  // Token follows the player's map view (map tokens PR 7): the DM's setting and the player's own switch.
+  const followScope = `${cloudCode}:${seatNow.purseIds.join(",")}`;
+  useTokenFollow({ map, maps, table: recordTable, seat: seatNow, scope: followScope, viewOnly: !!cloudNow.viewOnly });
   const menuTokenCount = (mapMenu ?? radial)?.tokenIds.length ?? 0;
   // "Start encounter here" applies to the panel it opened; the next opening starts plain.
   useEffect(() => {
@@ -3860,6 +3865,12 @@ function MapViewport({
           </SettingsGroup>
           <SettingsGroup id="players" title="Players & display">
             {useDm && <MovementNotice map={map} />}
+            <FollowViewSettings
+              table={recordTable}
+              dm={useDm}
+              scope={followScope}
+              character={recordTable.purses.find((p) => p.kind === "character" && seatNow.purseIds.includes(p.id))?.name}
+            />
             {setupSettings.players}
             <div className="map-tile-control-area">{controls.session}</div>
             {tools.sceneControls}

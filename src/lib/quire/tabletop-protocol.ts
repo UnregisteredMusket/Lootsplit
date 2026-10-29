@@ -112,8 +112,16 @@ export const PLAYER_MOVEMENT_PROTOCOL = 14;
  * website.
  */
 export const GROUP_COMMANDS_PROTOCOL = 15;
+/**
+ * Protocol 16 (2026-10-29, map tokens: token follows view): the tabletop session may carry
+ * `followView` ("Character tokens follow players' map view"), and players may send
+ * `map-token-follow`. Protocols 0-15 receive the session without it; their session saves compare
+ * without it and keep it. Pending drafts with the new command ask them to finish on the updated
+ * website.
+ */
+export const FOLLOW_VIEW_PROTOCOL = 16;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = GROUP_COMMANDS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = FOLLOW_VIEW_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -126,6 +134,7 @@ const commands = new Set([
   "map-render",
   "map-grid-snap",
   "map-token-claim",
+  "map-token-follow",
 ]);
 /**
  * Tabletop protocol 2 and older apps (Android 1.10.0 and earlier) have no `alternating` diagonal
@@ -979,6 +988,59 @@ function upgradeFormationCommands<C extends { kind: string }>(table: CloudTable,
     };
   });
 }
+// Protocol 16 (token follows view): the same treatment as the formation default, for `followView`.
+const followText = (text: string) => text.includes('"followView":');
+/** Whether a table (or a stored backup body) holds the follow-view setting. */
+export function hasFollowView(table: CloudTable): boolean {
+  return (
+    table.journal?.world?.tabletop?.followView !== undefined ||
+    !!table.journal?.reports?.some((r) => followText(r.snapshot ?? ""))
+  );
+}
+function followFreeTable(table: CloudTable): CloudTable {
+  if (!hasFollowView(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!followText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(followFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world?.tabletop?.followView !== undefined) {
+    const tabletop = { ...world.tabletop };
+    delete tabletop.followView;
+    plainWorld = { ...world, tabletop };
+  }
+  return {
+    ...table,
+    journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
+  };
+}
+/** Protocols 0-15 save the session without `followView`; it is compared without it and kept. */
+function upgradeFollowCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
+  const current = table.journal?.world?.tabletop;
+  if (current?.followView === undefined) return commands;
+  const plain = { ...current };
+  delete plain.followView;
+  const variants = [plain, { ...plain, presentation: undefined }].map((v) => {
+    const copy = { ...v } as Record<string, unknown>;
+    if (copy.presentation === undefined) delete copy.presentation;
+    return copy;
+  });
+  return commands.map((command) => {
+    const c = command as C & Record<string, unknown>;
+    if (c.kind !== "tabletop-session") return command;
+    const match = variants.findIndex((v) => sameJson(v, c.before));
+    if (match < 0) return command;
+    const full = { ...current } as Record<string, unknown>;
+    if (match === 1) delete full.presentation;
+    const session = c.session as Record<string, unknown>;
+    return { ...c, before: full, session: "followView" in session ? session : { ...session, followView: current.followView } };
+  });
+}
 /** Every older-client conversion, applied to a batch before it runs (cloud.server.ts). */
 export function upgradeOldClientCommands<C extends { kind: string }>(
   table: CloudTable,
@@ -986,6 +1048,7 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   protocol = 0,
 ): C[] {
   let result = commands;
+  if (protocol < FOLLOW_VIEW_PROTOCOL) result = upgradeFollowCommands(table, result);
   if (protocol < GROUP_COMMANDS_PROTOCOL) result = upgradeFormationCommands(table, result);
   if (protocol < PLAYER_MOVEMENT_PROTOCOL) result = upgradeMovementCommands(table, result);
   if (protocol < GRID_MODE_PROTOCOL) result = upgradeGridHiddenCommands(table, result);
@@ -993,6 +1056,8 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   return result;
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= FOLLOW_VIEW_PROTOCOL) return table;
+  table = followFreeTable(table);
   if (protocol >= GROUP_COMMANDS_PROTOCOL) return table;
   table = formationFreeTable(table);
   if (protocol >= PLAYER_MOVEMENT_PROTOCOL) return table;
@@ -1080,12 +1145,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= GROUP_COMMANDS_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= FOLLOW_VIEW_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 16: token follows and the follow-view setting.
+      if (c.kind === "map-token-follow" || followText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= GROUP_COMMANDS_PROTOCOL) return false;
       // Protocol 15: group placement commands and the formation default.
       if (c.kind === "map-tokens-place" || c.kind === "map-tokens-edit" || formationText(JSON.stringify(c)))
         return true;

@@ -22,7 +22,7 @@ import {
   roomVersionSql,
   roomWriteStatements,
 } from "./room-storage.mjs";
-import { CURRENT_TABLETOP_PROTOCOL, GROUP_COMMANDS_PROTOCOL, hasPartyFormation, FOOTPRINT_PROTOCOL, GRID_MODE_PROTOCOL, PLAYER_MOVEMENT_PROTOCOL, hasFootprintTokens, hasHiddenGrids, hasMovementSettings, hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
+import { CURRENT_TABLETOP_PROTOCOL, FOLLOW_VIEW_PROTOCOL, hasFollowView, GROUP_COMMANDS_PROTOCOL, hasPartyFormation, FOOTPRINT_PROTOCOL, GRID_MODE_PROTOCOL, PLAYER_MOVEMENT_PROTOCOL, hasFootprintTokens, hasHiddenGrids, hasMovementSettings, hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 /** Tabletop protocol the account client declared: 0 (none) to 9 (current; 4 adds nothing here,
  * 5 adds placement pin styles, 6 map scale bars, 7 journeys, 8 NPC service lists, 9 services
@@ -752,7 +752,8 @@ export async function handleAccounts(request, env, context = null) {
         (protocol < FOOTPRINT_PROTOCOL && hasFootprintTokens(stored)) ||
         (protocol < GRID_MODE_PROTOCOL && hasHiddenGrids(stored)) ||
         (protocol < PLAYER_MOVEMENT_PROTOCOL && hasMovementSettings(stored)) ||
-        (protocol < GROUP_COMMANDS_PROTOCOL && hasPartyFormation(stored))
+        (protocol < GROUP_COMMANDS_PROTOCOL && hasPartyFormation(stored)) ||
+        (protocol < FOLLOW_VIEW_PROTOCOL && hasFollowView(stored))
       )
         fail(
           "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",

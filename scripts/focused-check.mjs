@@ -36,6 +36,7 @@ const featureAudits = {
   "map-context-menu": "scripts/map-context-menu-browser-audit.mjs",
   "map-radial": "scripts/map-radial-browser-audit.mjs",
   "map-party-move": "scripts/map-party-move-browser-audit.mjs",
+  "map-follow-view": "scripts/map-follow-view-browser-audit.mjs",
   "review-inbox": "scripts/review-inbox-browser-audit.mjs",
   "command-palette": "scripts/command-palette-browser-audit.mjs",
   "player-onboarding": "scripts/player-onboarding-browser-audit.mjs",

@@ -4,7 +4,7 @@ import { mapCombatBindingSchema } from "./map-combat-schema.ts";
 import { connectedMapSchema } from "./connected-maps-schema.ts";
 import { artworkSchema } from "./artwork.ts";
 import { npcBarterConfigSchema, npcBarterStateSchema } from "./npc-barter-schema.ts";
-import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tokenTabletopFields } from "./tabletop-schema.ts";
+import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tile, tokenTabletopFields } from "./tabletop-schema.ts";
 import { tokenFootprint } from "./tabletop-geometry.ts";
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
@@ -548,6 +548,28 @@ export const worldCommands = [
       .max(50)
       .optional(),
   }),
+  /**
+   * A character's token follows the player's map view (map tokens PR 7): the token leaves the map
+   * it was on and arrives on the map being viewed, in one command. Only when the DM turned
+   * following on, for a character the seat controls, onto a shared gridded map in the
+   * character's zone (or the map with the party marker while travelling), never during combat on
+   * either map, with movement on and the character unlocked on both. An existing token on the
+   * destination is used.
+   */
+  z
+    .object({
+      id,
+      kind: z.literal("map-token-follow"),
+      mapId: id,
+      grid: z.string().max(1000),
+      purseId: id,
+      fromMapId: id.nullable(),
+      beforeFrom: mapTokenSchema.nullable(),
+      beforeTo: mapTokenSchema.nullable(),
+      tokenId: id,
+      at: tile,
+    })
+    .strict(),
   /** Group commands (map tokens PR 3): hide/show, lock, size, controllers, initiative links. */
   z.object({
     id,

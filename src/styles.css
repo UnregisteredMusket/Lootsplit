@@ -5126,6 +5126,17 @@ button.map-claim-chip { min-height:44px; cursor:pointer; font-weight:600; }
 .map-quick-field select { min-height:40px; border-radius:10px; border:1px solid var(--map-edge); background:var(--color-bg); color:var(--color-fg); padding:0 8px; }
 .map-quick-primary { width:100%; min-height:44px; margin-top:8px; border:0; border-radius:12px; background:var(--color-accent); color:var(--color-bg); font-weight:600; }
 .map-quick-primary:disabled { opacity:.5; }
+/* Map tokens PR 7: follow-view switches (mockup player-token-move frame 4). */
+.map-follow-setting { margin:6px 0 10px; }
+.map-switch-row { display:flex; align-items:flex-start; gap:12px; width:100%; padding:8px 0; border:0; background:transparent; color:var(--color-fg); text-align:left; cursor:pointer; }
+.map-switch-row b { display:block; font-size:13.5px; font-weight:600; }
+.map-switch-row small { display:block; margin-top:2px; color:var(--color-muted); font-size:12px; line-height:1.35; }
+.map-switch { position:relative; flex:none; width:38px; height:22px; margin-top:1px; border-radius:11px; background:color-mix(in srgb, var(--color-fg) 22%, transparent); transition:background .15s; }
+.map-switch::after { content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:var(--color-fg); transition:transform .15s; }
+.map-switch.on { background:var(--color-accent); }
+.map-switch.on::after { transform:translateX(16px); background:var(--color-bg); }
+.map-switch-row:focus-visible { outline:2px solid var(--color-accent); outline-offset:2px; border-radius:8px; }
+@media (prefers-reduced-motion: reduce) { .map-switch, .map-switch::after { transition:none; } }
 .map-select-box { position:absolute; z-index:5; border:2px dashed var(--color-select); background:color-mix(in srgb, var(--color-select) 12%, transparent); border-radius:4px; pointer-events:none; }
 .map-token-foot.fogged { background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-fg) 18%, transparent) 0 4px, transparent 4px 9px); }
 @media (max-width:650px) { .map-group-dock { bottom:calc(84px + env(safe-area-inset-bottom)); } .map-group-dock.raised { z-index:45; bottom:auto; top:calc(124px + env(safe-area-inset-top)); } .map-group-action { min-width:54px; } .map-placing-hint { white-space:normal; } }

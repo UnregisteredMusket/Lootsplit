@@ -959,7 +959,7 @@ export async function submitCommands(input: {
     // Players move their own tokens outside their room turn too (owner, 2026-10-29); encounter
     // initiative still applies (tabletop.ts).
     const playerToken = (c: (typeof commands)[number]) =>
-      seat.role === "player" && (c.kind === "map-token-move" || c.kind === "map-token-claim");
+      seat.role === "player" && (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-token-follow");
     const messagesOnly =
       commands.length > 0 &&
       commands.every(

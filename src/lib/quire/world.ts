@@ -17,7 +17,7 @@ import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
 import { legacyServiceKinds, serviceKinds } from "./services-schema.ts";
-import { applyTabletopCommand, keepMovement, validateTabletop, readTabletopSession, type TabletopExecution } from "./tabletop.ts";
+import { applyTabletopCommand, applyTokenFollow, keepMovement, validateTabletop, readTabletopSession, type TabletopExecution } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
 import { tokenInsideGrid } from "./tabletop-geometry.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
@@ -369,6 +369,10 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     w = (journal.world = readWorld(journal.world));
   if (tabletopCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
     applyTabletopCommand(t, seat, cmd as TabletopCommand, at, execution);
+    return;
+  }
+  if (cmd.kind === "map-token-follow") {
+    applyTokenFollow(t, seat, cmd, at);
     return;
   }
   if (applyCharacterPosition(t, seat, cmd, at)) return;

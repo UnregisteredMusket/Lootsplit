@@ -27,6 +27,7 @@ import {
 } from "./fog-history.ts";
 import { consolidateFog } from "./fog-consolidate.ts";
 import { legacyDiagonals } from "./tabletop-protocol.ts";
+import { followRefusal } from "./zones.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
 
@@ -635,4 +636,108 @@ export function keepMovement(map: CampaignMap, previous: CampaignMap["tabletop"]
   if (next.lockedPurseIds === undefined && previous?.lockedPurseIds?.length)
     next.lockedPurseIds = previous.lockedPurseIds;
   if (next.movement) next.playerMovement = next.movement !== "off";
+}
+
+/** `map-token-follow` (map tokens PR 7): the shape the world command schema accepts. */
+export type TokenFollowCommand = {
+  id: string;
+  kind: "map-token-follow";
+  mapId: string;
+  grid: string;
+  purseId: string;
+  fromMapId: string | null;
+  beforeFrom: MapToken | null;
+  beforeTo: MapToken | null;
+  tokenId: string;
+  at: { column: number; row: number; offsetX?: number; offsetY?: number };
+};
+/**
+ * A character's token follows the player's map view (owner, 2026-10-29; plan section 6). The
+ * token arrives on the viewed map and leaves the map it was on, in one command; nothing else
+ * moves (party location, groups, journeys). Checked here for every seat and protocol:
+ * following is on; the seat controls the character; both maps are accessible (a hidden map gets
+ * the generic "This map is unavailable."); the destination is in the character's zone, or is the
+ * map with the party marker while travelling; no combat is active on either map; movement is on
+ * and the character unlocked on both; a snapped, footprint-aware, visible square.
+ */
+export function applyTokenFollow(table: CloudTable, seat: CloudSeat, command: TokenFollowCommand, at: number) {
+  const world = table.journal!.world!;
+  const map = world.maps.find((m) => m.id === command.mapId);
+  if (!map || !mapAccessible(table, map, seat)) throw Error("This map is unavailable.");
+  const from = command.fromMapId ? world.maps.find((m) => m.id === command.fromMapId) : undefined;
+  if (command.fromMapId && (!from || !mapAccessible(table, from, seat))) throw Error("This map is unavailable.");
+  if (command.fromMapId === command.mapId) throw Error("Your token is already on this map.");
+  if (!readTabletopSession(table).followView) throw Error("The DM hasn't turned on tokens following your map view.");
+  const person = table.purses.find((p) => p.id === command.purseId && p.kind === "character");
+  if (!person || !characterVisible(table, person)) throw Error("This character is unavailable.");
+  if (seat.role !== "dm" && !seat.purseIds.includes(person.id)) throw Error("You can only move your own character's token.");
+  if (!map.grid) throw Error("This map has no combat grid. Tokens follow only onto gridded maps.");
+  if (canonicalJson(map.grid) !== command.grid && canonicalJson(legacyDiagonals(map.grid)) !== command.grid)
+    throw Error("The combat grid changed. Refresh before moving your token.");
+  for (const m of [map, from]) {
+    if (!m) continue;
+    const combat = combatOnMap(table, m.id);
+    if (combat) throw Error(`In combat: your token stays on ${from?.name ?? m.name}.`);
+    if (seat.role !== "dm") {
+      if (movementMode(m) !== "auto") throw Error(`The DM moves the tokens on ${m.name}.`);
+      if (m.tabletop?.lockedPurseIds?.includes(person.id)) throw Error(`The DM has locked ${person.name}'s movement on ${m.name}.`);
+    }
+  }
+  const refusal = followRefusal(table, person.id, person.name, map.id, from?.id);
+  if (refusal) throw Error(refusal);
+  // The token on the map being left goes, exactly as the client saw it.
+  if (from) {
+    const current = (from.tokens ?? []).find((t) => t.kind === "character" && t.entityId === person.id) ?? null;
+    if (!same(current, command.beforeFrom)) throw Error("Your token moved or changed. Refresh before following.");
+    if (current) {
+      if (current.locked && seat.role !== "dm") throw Error(`The DM has locked ${person.name}'s token.`);
+      from.tokens = (from.tokens ?? []).filter((t) => t.id !== current.id);
+    }
+  } else if (command.beforeFrom) throw Error("Your token moved or changed. Refresh before following.");
+  const settings = readMapTabletop(map);
+  const existing = (map.tokens ?? []).find((t) => t.kind === "character" && t.entityId === person.id) ?? null;
+  if (!same(existing, command.beforeTo)) throw Error("Your token moved or changed. Refresh before following.");
+  const viewers = sceneViewers(table, map, seat);
+  if (existing) {
+    // A token already here stays where it is unless the player can't see it (then it comes along).
+    if (existing.locked && seat.role !== "dm") throw Error(`The DM has locked ${person.name}'s token.`);
+    const seen = scenePointVisible(sceneTokenPoint(map.grid, existing), settings, map.grid, viewers);
+    if (!seen) {
+      const moved = { ...existing, column: command.at.column, row: command.at.row };
+      delete moved.offsetX;
+      delete moved.offsetY;
+      if (command.at.offsetX !== undefined) moved.offsetX = command.at.offsetX;
+      if (command.at.offsetY !== undefined) moved.offsetY = command.at.offsetY;
+      placeChecked(moved);
+      map.tokens = (map.tokens ?? []).map((t) => (t.id === existing.id ? moved : t));
+    }
+  } else {
+    if ((map.tokens ?? []).some((t) => t.id === command.tokenId)) throw Error("Choose a new token. Refresh and try again.");
+    // A token from the map being left keeps its size and look; otherwise a new one is made.
+    const carried = command.beforeFrom && command.beforeFrom.id === command.tokenId ? command.beforeFrom : undefined;
+    const token: MapToken = {
+      ...(carried ?? { kind: "character" as const, entityId: person.id, label: person.name, visibility: "party" as const }),
+      id: command.tokenId,
+      column: command.at.column,
+      row: command.at.row,
+    };
+    delete token.offsetX;
+    delete token.offsetY;
+    delete token.encounterId;
+    delete token.combatantId;
+    if (command.at.offsetX !== undefined) token.offsetX = command.at.offsetX;
+    if (command.at.offsetY !== undefined) token.offsetY = command.at.offsetY;
+    placeChecked(token);
+    map.tokens = [...(map.tokens ?? []), token];
+  }
+  for (const m of [map, from])
+    if (m?.tabletop && readMapTabletop(m).vision !== "off") m.tabletop = { ...readMapTabletop(m), revision: readMapTabletop(m).revision + 1 };
+  table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary: `${person.name}'s token followed to ${map.name}` });
+
+  function placeChecked(token: MapToken) {
+    if (!tokenInsideGrid(map!.grid!, token)) throw Error("Keep tokens inside the combat grid.");
+    if (settings.snap && !tokenSnapped(token)) throw Error("This map requires movement snapped to the grid.");
+    if (seat.role !== "dm" && !scenePointVisible(sceneTokenPoint(map!.grid!, token), settings, map!.grid!, viewers))
+      throw Error("Choose a visible square.");
+  }
 }
