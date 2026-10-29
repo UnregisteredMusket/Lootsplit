@@ -982,28 +982,6 @@ function formationFreeTable(table: CloudTable): CloudTable {
     journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
   };
 }
-/** Protocols 0-15 save the session without the formation; it is compared without it and kept. */
-function upgradeFormationCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
-  const current = table.journal?.world?.tabletop;
-  if (current?.partyFormation === undefined) return commands;
-  const plain = { ...current };
-  delete plain.partyFormation;
-  const withoutPresentation = { ...plain };
-  delete withoutPresentation.presentation;
-  const fullWithoutPresentation = { ...current };
-  delete fullWithoutPresentation.presentation;
-  return commands.map((command) => {
-    const c = command as C & Record<string, unknown>;
-    if (c.kind !== "tabletop-session" || !(sameJson(plain, c.before) || sameJson(withoutPresentation, c.before)))
-      return command;
-    const session = c.session as Record<string, unknown>;
-    return {
-      ...c,
-      before: sameJson(plain, c.before) ? current : fullWithoutPresentation,
-      session: "partyFormation" in session ? session : { ...session, partyFormation: current.partyFormation },
-    };
-  });
-}
 // Protocol 17 (token follows view): the same treatment as the formation default, for `followView`.
 const followText = (text: string) => text.includes('"followView":');
 /** Whether a table (or a stored backup body) holds the follow-view setting. */
@@ -1035,26 +1013,35 @@ function followFreeTable(table: CloudTable): CloudTable {
     journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
   };
 }
-/** Protocols 0-16 save the session without `followView`; it is compared without it and kept. */
-function upgradeFollowCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
-  const current = table.journal?.world?.tabletop;
-  if (current?.followView === undefined) return commands;
+/** The newer session fields (and the protocol that introduced each), newest first. */
+const SESSION_FIELDS = [
+  ["followView", FOLLOW_VIEW_PROTOCOL],
+  ["partyFormation", GROUP_COMMANDS_PROTOCOL],
+] as const;
+/**
+ * An older client's `tabletop-session` save: it saw the session without every field newer than its
+ * protocol, so `before` is compared without all of them at once (with or without `presentation`,
+ * which protocol 2 and older never send) and the save keeps the stored values it couldn't see.
+ */
+function upgradeSessionCommands<C extends { kind: string }>(table: CloudTable, commands: C[], protocol: number): C[] {
+  const current = table.journal?.world?.tabletop as Record<string, unknown> | undefined;
+  if (!current) return commands;
+  const hidden = SESSION_FIELDS.filter(([field, since]) => protocol < since && current[field] !== undefined).map(([field]) => field);
+  if (!hidden.length) return commands;
   const plain = { ...current };
-  delete plain.followView;
-  const variants = [plain, { ...plain, presentation: undefined }].map((v) => {
-    const copy = { ...v } as Record<string, unknown>;
-    if (copy.presentation === undefined) delete copy.presentation;
-    return copy;
-  });
+  for (const field of hidden) delete plain[field];
+  const withoutPresentation = { ...plain };
+  delete withoutPresentation.presentation;
   return commands.map((command) => {
     const c = command as C & Record<string, unknown>;
     if (c.kind !== "tabletop-session") return command;
-    const match = variants.findIndex((v) => sameJson(v, c.before));
-    if (match < 0) return command;
-    const full = { ...current } as Record<string, unknown>;
-    if (match === 1) delete full.presentation;
-    const session = c.session as Record<string, unknown>;
-    return { ...c, before: full, session: "followView" in session ? session : { ...session, followView: current.followView } };
+    const exact = sameJson(plain, c.before);
+    if (!exact && !sameJson(withoutPresentation, c.before)) return command;
+    const before = { ...current };
+    if (!exact) delete before.presentation;
+    const session = { ...(c.session as Record<string, unknown>) };
+    for (const field of hidden) if (!(field in session)) session[field] = current[field];
+    return { ...c, before, session };
   });
 }
 // Protocol 18 (zones).
@@ -1099,8 +1086,9 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   protocol = 0,
 ): C[] {
   let result = commands;
-  if (protocol < FOLLOW_VIEW_PROTOCOL) result = upgradeFollowCommands(table, result);
-  if (protocol < GROUP_COMMANDS_PROTOCOL) result = upgradeFormationCommands(table, result);
+  // The session fields a client can't see (privacy review 2026-10-29): stripped in one pass, so a
+  // client older than several of them still matches `before` (it never sees any of them).
+  if (protocol < FOLLOW_VIEW_PROTOCOL) result = upgradeSessionCommands(table, result, protocol);
   if (protocol < PLAYER_MOVEMENT_PROTOCOL) result = upgradeMovementCommands(table, result);
   if (protocol < GRID_MODE_PROTOCOL) result = upgradeGridHiddenCommands(table, result);
   if (protocol < FOOTPRINT_PROTOCOL) result = upgradeFootprintCommands(table, result);

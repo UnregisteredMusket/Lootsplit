@@ -7,8 +7,9 @@ import { canonicalJson } from "./canonical-json.ts";
 import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { applyCommand, commandSchema, type CommandInput } from "./commands.ts";
 import { readJournal } from "./journal.ts";
+import { projectRecord } from "./session-records.ts";
 import { readTabletopSession } from "./tabletop.ts";
-import { FOLLOW_VIEW_PROTOCOL, tableForProtocol, tabletopResponse, upgradeOldClientCommands } from "./tabletop-protocol.ts";
+import { FOLLOW_VIEW_PROTOCOL, FOOTPRINT_PROTOCOL, tableForProtocol, tabletopResponse, upgradeOldClientCommands } from "./tabletop-protocol.ts";
 import { mapGridSchema, type MapToken } from "./world-schema.ts";
 import { followRefusal, zoneOf } from "./zones.ts";
 
@@ -161,4 +162,30 @@ test("protocol 17: followView is kept from older clients; their drafts with foll
   assert.equal(readTabletopSession(saved).tvEnabled, true);
   for (const draft of [[{ kind: "map-token-follow" }], [{ kind: "tabletop-session", session: { followView: true } }]])
     assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 16), /unfinished map actions/);
+});
+
+// Privacy review 2026-10-29 (finding B7): a client older than several session fields matches its
+// `before` (all of them stripped in one pass) and its save keeps every field it couldn't see.
+test("old DM clients save the session with both the formation and follow-view set (protocols 13-16)", () => {
+  const t = fixture();
+  t.journal!.world!.tabletop = { ...t.journal!.world!.tabletop!, partyFormation: { shape: "line", spacing: 1, rotation: 0 } } as never;
+  for (let protocol = FOOTPRINT_PROTOCOL; protocol < FOLLOW_VIEW_PROTOCOL; protocol++) {
+    const seen = tableForProtocol(structuredClone(t), protocol).journal!.world!.tabletop!;
+    const [c] = upgradeOldClientCommands(t, [{ id: `s-${protocol}`, kind: "tabletop-session", before: seen, session: { ...seen, tvEnabled: true } }], protocol);
+    const saved = readTabletopSession(applyCommand(t, dm, commandSchema.parse(c as CommandInput)));
+    assert.equal(saved.followView, true, `protocol ${protocol}`);
+    assert.deepEqual(saved.partyFormation, { shape: "line", spacing: 1, rotation: 0 }, `protocol ${protocol}`);
+    assert.equal(saved.tvEnabled, true, `protocol ${protocol}`);
+  }
+});
+
+// Privacy review 2026-10-29 (finding B5): the follow activity line reaches the mover and the DM only.
+test("the follow event is visible to that character's player and the DM only", () => {
+  const t = fixture();
+  const keep = t.journal!.world!.maps[0];
+  const next = run(t, { kind: "map-token-follow", mapId: "commons", grid: g, purseId: "mira", fromMapId: "keep", beforeFrom: keep.tokens![0], beforeTo: null, tokenId: "mira-token", at: { column: 1, row: 1 } }, mira);
+  const sees = (seat: CloudSeat) => projectRecord(next, seat).journal!.events.some((e) => /followed to/.test(e.summary));
+  assert.equal(sees(mira), true);
+  assert.equal(sees(dm), true);
+  assert.equal(sees(bram), false);
 });

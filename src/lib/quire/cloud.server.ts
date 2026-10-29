@@ -1260,7 +1260,18 @@ export async function submitCommands(input: {
           ? (room.turn + 1) % room.seats.length
           : room.turn,
     };
-    await updateRoom(next, room.revision, { receipts });
+    // The combat turn read above must still hold when the room row is written (privacy review
+    // 2026-10-29): a turn that advanced in between fails this guard, the write is retried on a fresh
+    // read, and the move is refused with "Not your turn".
+    const guard =
+      !input.stage && mapCombat && mapCombat !== "unavailable"
+        ? {
+            where:
+              "EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND code=? AND status=? AND json_extract(body,'$.activeId') IS ?)",
+            args: [mapCombat.encounterId, room.code, mapCombat.status, mapCombat.activeId],
+          }
+        : undefined;
+    await updateRoom(next, room.revision, { receipts, ...(guard ? { guard } : {}) });
     // Only after the successful write (a retried attempt that lost the race never notifies).
     if (!input.stage) {
       const fresh = next.table.notes.filter(
