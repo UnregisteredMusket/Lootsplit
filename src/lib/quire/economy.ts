@@ -2932,7 +2932,9 @@ const groupBatchKind = (kind: string) =>
   kind === "party-map-position" ||
   // "Move party to ▸" (map tokens PR 4): the place, the players' scene and the tokens together.
   kind === "tabletop-session" ||
-  kind === "map-tokens-place";
+  kind === "map-tokens-place" ||
+  // End session (map tokens PR 7A): queued party-split requests are applied or declined first.
+  kind === "zone-request-resolve";
 /** Read, calculate and commit campaign finances under one IndexedDB write lock. */
 export async function executeFinanceCommand(
   input: CommandRequest,

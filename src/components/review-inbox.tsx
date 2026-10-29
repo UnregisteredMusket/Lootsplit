@@ -39,6 +39,7 @@ import { LoanReviewCard, PaymentReviewCard, paymentDecisionId } from "./review-c
 import { HireReviewCard, JobReviewCard, WithdrawalReviewCard } from "./property-operations";
 import { BoardingReviewCard, VoyageReviewCard } from "./ship-management";
 import { GroupRequestReview } from "./party-groups";
+import { ZoneRequestReview } from "./zone-request-review";
 import { JourneyReviewEntry } from "./map-journeys";
 import { ServiceRequestRow } from "./service-providers";
 import { TrainingReviewEntry } from "./downtime-activities";
@@ -284,6 +285,8 @@ function ReviewEntry({
     }
     case "group":
       return <GroupRequestReview requestId={item.id} {...common} />;
+    case "zone":
+      return <ZoneRequestReview requestId={item.id} {...common} />;
   }
   // Requests whose review needs more than two buttons keep their full review inside the card.
   const order = item.kind === "service" ? readServices(journal.services).orders.find((o) => o.id === item.id) : undefined;

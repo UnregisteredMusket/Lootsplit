@@ -46,7 +46,7 @@ const placeName = (t: CloudTable, locationId: string | null) =>
     ? (readMarketLocations(t.journal?.market).locations.find((l) => l.id === locationId)?.name ?? "an unknown place")
     : "no particular place";
 /** Store one character's group (main = no groupId). */
-function setGroup(t: CloudTable, purseId: string, ref: string) {
+export function setGroup(t: CloudTable, purseId: string, ref: string) {
   const w = t.journal!.world!;
   const p = t.purses.find((p) => p.id === purseId)!;
   const { shipId, shipReturnInParty, ...stored } = characterPosition(t, p);
@@ -56,7 +56,7 @@ function setGroup(t: CloudTable, purseId: string, ref: string) {
   else stored.groupId = ref;
   w.characterPositions = [...w.characterPositions.filter((s) => s.purseId !== purseId), stored];
 }
-function assertColours(t: CloudTable) {
+export function assertColours(t: CloudTable) {
   const w = t.journal!.world!;
   const colours = [w.mainGroup?.colour ?? "green", ...activeGroups(t).map((g) => g.colour)];
   if (new Set(colours).size !== colours.length) throw Error("Give each group its own colour.");

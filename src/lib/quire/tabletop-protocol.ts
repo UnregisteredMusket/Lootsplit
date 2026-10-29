@@ -120,8 +120,17 @@ export const GROUP_COMMANDS_PROTOCOL = 15;
  * website.
  */
 export const FOLLOW_VIEW_PROTOCOL = 16;
+/**
+ * Protocol 17 (2026-10-29, map tokens: zones and the split rule): the world may carry `zones`,
+ * `splitRule` and `zoneRequests`, and players may send `zone-request`, `zone-vote`,
+ * `zone-request-withdraw` and `zone-request-resolve`; the DM `zone-save`. Protocols 0-16 receive
+ * the world without them (their world saves keep them, journal.ts); the server still applies the
+ * zone rules to their token follows. Drafts with the new commands ask them to finish on the
+ * updated website.
+ */
+export const ZONES_PROTOCOL = 17;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = FOLLOW_VIEW_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = ZONES_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1041,6 +1050,41 @@ function upgradeFollowCommands<C extends { kind: string }>(table: CloudTable, co
     return { ...c, before: full, session: "followView" in session ? session : { ...session, followView: current.followView } };
   });
 }
+// Protocol 17 (zones).
+const zonesText = (text: string) => /"(zones|zoneRequests)":\[|"splitRule":\{/.test(text);
+/** Whether a table (or a stored backup body) holds zones, the split rule or split requests. */
+export function hasZones(table: CloudTable): boolean {
+  const w = table.journal?.world;
+  return (
+    w?.zones !== undefined ||
+    w?.splitRule !== undefined ||
+    w?.zoneRequests !== undefined ||
+    !!table.journal?.reports?.some((r) => zonesText(r.snapshot ?? ""))
+  );
+}
+function zonesFreeTable(table: CloudTable): CloudTable {
+  if (!hasZones(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!zonesText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(zonesFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world) {
+    plainWorld = { ...world };
+    delete plainWorld.zones;
+    delete plainWorld.splitRule;
+    delete plainWorld.zoneRequests;
+  }
+  return {
+    ...table,
+    journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
+  };
+}
 /** Every older-client conversion, applied to a batch before it runs (cloud.server.ts). */
 export function upgradeOldClientCommands<C extends { kind: string }>(
   table: CloudTable,
@@ -1056,6 +1100,8 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   return result;
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= ZONES_PROTOCOL) return table;
+  table = zonesFreeTable(table);
   if (protocol >= FOLLOW_VIEW_PROTOCOL) return table;
   table = followFreeTable(table);
   if (protocol >= GROUP_COMMANDS_PROTOCOL) return table;
@@ -1145,12 +1191,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= FOLLOW_VIEW_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= ZONES_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 17: zone commands and fields.
+      if (String(c.kind).startsWith("zone-") || zonesText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= FOLLOW_VIEW_PROTOCOL) return false;
       // Protocol 16: token follows and the follow-view setting.
       if (c.kind === "map-token-follow" || followText(JSON.stringify(c))) return true;
       if (protocol && protocol >= GROUP_COMMANDS_PROTOCOL) return false;

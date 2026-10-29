@@ -3,7 +3,7 @@
 // "Character tokens follow players' map view" (off by default); a player opening The Cellar from
 // The Old Keep sees "Your token moved to The Cellar · Still with the party: same zone
 // (Testville)" with Undo, and Undo brings the token back; opening a map in another place moves
-// nothing ("Viewing only — Mira is in Testville."); "Follow me" off browses without moving; during
+// nothing ("This trip takes about 2 days. Ask your DM to plan the journey.", zones PR 7A); "Follow me" off browses without moving; during
 // combat the token stays. Never targets a real campaign.
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
@@ -98,7 +98,7 @@ try {
   assert.equal((await mapOf(p.page, "cellar")).tokens.length, 0);
   // Another place: viewing only.
   await switchTo(p.page, "Saltmarsh Road");
-  await expect(p.page.locator("[data-sonner-toast]").filter({ hasText: "Viewing only — Mira is in Testville." })).toBeVisible({ timeout: 8000 });
+  await expect(p.page.locator("[data-sonner-toast]").filter({ hasText: "This trip takes about 2 days. Ask your DM to plan the journey." })).toBeVisible({ timeout: 8000 });
   assert.equal((await mapOf(p.page, "faraway")).tokens.length, 0);
   // Follow me off: browsing moves nothing.
   await switchTo(p.page, "The Old Keep");

@@ -27,6 +27,7 @@ import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./jour
 import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
 import { propertyAvailableToGroups } from "./property.ts";
 import { projectPartyGroups } from "./party-groups-project.ts";
+import { projectZones } from "./zones-project.ts";
 import { seatGroups } from "./party-groups.ts";
 import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
@@ -162,6 +163,7 @@ export function projectRecord(
       delete world.partyPosition.y;
     }
     projectPartyGroups(table, world, seat);
+    projectZones(world, seat);
     world.npcs = world.npcs.filter((npc) => readableNpcs.has(npc.id));
     projectNpcBarter(world, seat);
     if (t.journal.downtimeActivities) {

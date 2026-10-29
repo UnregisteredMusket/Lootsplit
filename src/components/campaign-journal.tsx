@@ -110,7 +110,7 @@ export function CampaignJournal({
 }) {
   const navigate = useNavigate();
   const reviewRef = useDisclosureAnchor("review-inbox");
-  const { journal, ledger, purses, command, commandOutcome, loans } = useEconomy();
+  const { journal, ledger, purses, command, commandOutcome, commandBatch, loans } = useEconomy();
   const seat = useSeat();
   const archiveSeat = useArchiveReaderSeat(seat);
   const dm = seat.role === "dm";
@@ -183,6 +183,10 @@ export function CampaignJournal({
   const downtime = journal.finance?.downtime.find((d) => d.status === "pending");
   const [approveDowntime, setApproveDowntime] = useState("");
   const active = journal.sessions.find((x) => !x.endedAt);
+  const queuedSplits = dm
+    ? (journal.world?.zoneRequests ?? []).filter((r) => r.status === "open" && (r.mode === "session-end" || r.deadline === undefined))
+    : [];
+  const [splitChoices, setSplitChoices] = useState<Record<string, boolean>>({});
   const accounts = dm ? purses : purses.filter((x) => seat.purseIds.includes(x.id));
   const run = async (work: () => Promise<unknown>) => {
     setBusy(true);
@@ -195,12 +199,25 @@ export function CampaignJournal({
     }
   };
   async function saveSession(end = false) {
-    const outcome = await commandOutcome({
-      kind: "session",
+    const session = {
+      kind: "session" as const,
       name: end ? active!.name : name,
       end,
       ...(!end && downtime && approveDowntime === downtime.id ? { downtimeId: downtime.id } : {}),
-    });
+    };
+    // Party-split requests waiting for the session's end (map tokens PR 7A) are applied or
+    // declined in the same batch, before the session ends.
+    const outcome =
+      active && queuedSplits.length
+        ? await commandBatch(crypto.randomUUID(), [
+            ...queuedSplits.map((r) => ({
+              kind: "zone-request-resolve" as const,
+              requestId: r.id,
+              action: splitChoices[r.id] === false ? (r.mode === "vote" ? ("reject" as const) : ("decline" as const)) : ("approve" as const),
+            })),
+            session,
+          ])
+        : await commandOutcome(session);
     if (!end) {
       forgetSessionName(draftScope);
       setName("");
@@ -397,6 +414,25 @@ export function CampaignJournal({
                     End recorded session
                   </Button>
                 ) : null}
+                {active && queuedSplits.length > 0 && (
+                  <fieldset className="session-split-requests">
+                    <legend>
+                      {queuedSplits.length} party-split {queuedSplits.length === 1 ? "request" : "requests"} for the session's end
+                    </legend>
+                    {queuedSplits.map((r) => (
+                      <label key={r.id}>
+                        <input
+                          type="checkbox"
+                          checked={splitChoices[r.id] !== false}
+                          onChange={(e) => setSplitChoices((c) => ({ ...c, [r.id]: e.target.checked }))}
+                        />{" "}
+                        Apply: {purses.find((p) => p.id === r.purseId)?.name ?? "A character"} →{" "}
+                        {journal.world?.maps.find((m) => m.id === r.toMapId)?.name ?? "another map"}
+                        <small> · {r.mode === "vote" ? "party vote" : "wait until end of session"} · unticked: declined</small>
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
               </form>
             ) : null}
             {!journal.sessions.length ? (

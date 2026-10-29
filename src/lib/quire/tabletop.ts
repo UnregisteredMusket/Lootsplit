@@ -27,7 +27,8 @@ import {
 } from "./fog-history.ts";
 import { consolidateFog } from "./fog-consolidate.ts";
 import { legacyDiagonals } from "./tabletop-protocol.ts";
-import { followRefusal } from "./zones.ts";
+import { crossing, followRefusal, zoneName, zoneOf } from "./zones.ts";
+import { applyZoneChange } from "./zone-split.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
 
@@ -146,6 +147,8 @@ export type TabletopExecution = {
   preview?: boolean;
   /** The bound encounter's turn, or "unavailable" when the server could not read it. */
   mapCombat?: MapCombatTurn | "unavailable";
+  /** Zones (map tokens PR 7A): the room's player seats (party votes). */
+  playerSeats?: { id: string; purseIds: string[] }[];
 };
 export function sceneViewers(
   table: Pick<CloudTable, "journal" | "purses">,
@@ -660,14 +663,21 @@ export type TokenFollowCommand = {
  * map with the party marker while travelling; no combat is active on either map; movement is on
  * and the character unlocked on both; a snapped, footprint-aware, visible square.
  */
-export function applyTokenFollow(table: CloudTable, seat: CloudSeat, command: TokenFollowCommand, at: number) {
+export function applyTokenFollow(
+  table: CloudTable,
+  seat: Pick<CloudSeat, "role" | "purseIds">,
+  command: TokenFollowCommand,
+  at: number,
+  /** A split request being applied (vote passed, the DM approved, the session ended). */
+  zoneApply = false,
+) {
   const world = table.journal!.world!;
   const map = world.maps.find((m) => m.id === command.mapId);
   if (!map || !mapAccessible(table, map, seat)) throw Error("This map is unavailable.");
   const from = command.fromMapId ? world.maps.find((m) => m.id === command.fromMapId) : undefined;
   if (command.fromMapId && (!from || !mapAccessible(table, from, seat))) throw Error("This map is unavailable.");
   if (command.fromMapId === command.mapId) throw Error("Your token is already on this map.");
-  if (!readTabletopSession(table).followView) throw Error("The DM hasn't turned on tokens following your map view.");
+  if (!zoneApply && !readTabletopSession(table).followView) throw Error("The DM hasn't turned on tokens following your map view.");
   const person = table.purses.find((p) => p.id === command.purseId && p.kind === "character");
   if (!person || !characterVisible(table, person)) throw Error("This character is unavailable.");
   if (seat.role !== "dm" && !seat.purseIds.includes(person.id)) throw Error("You can only move your own character's token.");
@@ -683,8 +693,21 @@ export function applyTokenFollow(table: CloudTable, seat: CloudSeat, command: To
       if (m.tabletop?.lockedPurseIds?.includes(person.id)) throw Error(`The DM has locked ${person.name}'s movement on ${m.name}.`);
     }
   }
-  const refusal = followRefusal(table, person.id, person.name, map.id, from?.id);
-  if (refusal) throw Error(refusal);
+  // Zones (plan 6A): the same zone moves the token only; another group's zone joins it; an
+  // adjacent zone splits the character off under the DM's split rule; anything else is a journey.
+  const move = crossing(table, person.id, person.name, map.id, from?.id);
+  if (move.kind === "refused") throw Error(move.message);
+  if (move.kind === "far") throw Error(followRefusal(table, person.id, person.name, map.id, from?.id)!);
+  if (move.kind === "join" || move.kind === "split") {
+    const combat = world.combat?.phase === "active" ? world.combat : undefined;
+    if (combat && zoneOf(table, combat.mapId) === move.from) throw Error(`Finish the encounter before leaving ${zoneName(table, move.from)}.`);
+  }
+  if (move.kind === "split" && !zoneApply && !move.rule.allow)
+    throw Error(
+      move.rule.rule === "block"
+        ? `The DM is keeping the party together here. Ask your DM if ${person.name} should split off to ${map.name}.`
+        : `Going to ${map.name} would split ${person.name} off: ask the party first.`,
+    );
   // The token on the map being left goes, exactly as the client saw it.
   if (from) {
     const current = (from.tokens ?? []).find((t) => t.kind === "character" && t.entityId === person.id) ?? null;
@@ -733,6 +756,7 @@ export function applyTokenFollow(table: CloudTable, seat: CloudSeat, command: To
   for (const m of [map, from])
     if (m?.tabletop && readMapTabletop(m).vision !== "off") m.tabletop = { ...readMapTabletop(m), revision: readMapTabletop(m).revision + 1 };
   table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary: `${person.name}'s token followed to ${map.name}` });
+  if (move.kind === "join" || move.kind === "split") applyZoneChange(table, person, move, map, command.at, command.id, at);
 
   function placeChecked(token: MapToken) {
     if (!tokenInsideGrid(map!.grid!, token)) throw Error("Keep tokens inside the combat grid.");

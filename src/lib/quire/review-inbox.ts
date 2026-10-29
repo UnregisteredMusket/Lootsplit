@@ -54,6 +54,7 @@ export type ReviewKind =
   | "pool"
   | "training"
   | "group"
+  | "zone"
   | "imports";
 
 export type ReviewItem = {
@@ -192,6 +193,20 @@ export function reviewItems(t: ReviewTable, imports: number | null = null): Revi
         id: r.id,
         who: purseName(t, r.purseId, "A player"),
         what: `Move their group to ${place(r.locationId)}`,
+        at: r.createdAt,
+        count: 1,
+      });
+
+  // Party-split requests (map tokens PR 7A): votes and moves queued for the session's end.
+  for (const r of journal?.world?.zoneRequests ?? [])
+    if (r.status === "open")
+      items.push({
+        key: `zone:${r.id}`,
+        type: "groups",
+        kind: "zone",
+        id: r.id,
+        who: purseName(t, r.purseId, "A player"),
+        what: `Split off to ${journal?.world?.maps.find((m) => m.id === r.toMapId)?.name ?? "another map"}`,
         at: r.createdAt,
         count: 1,
       });
@@ -373,6 +388,10 @@ export function reviewOutcome(t: ReviewTable, item: Pick<ReviewItem, "kind" | "i
         return j?.world?.journeys?.find((x) => x.id === item.id)?.status;
       case "group":
         return j?.world?.groupRequests?.find((r) => r.id === item.id)?.status;
+      case "zone": {
+        const status = j?.world?.zoneRequests?.find((r) => r.id === item.id)?.status;
+        return status === "open" ? "pending" : status === "rejected" || status === "declined" || status === "failed" ? "denied" : status === "applied" ? "approved" : status;
+      }
       case "training":
         return readDowntimeActivities(j?.downtimeActivities).requests.find((r) => r.id === item.id)?.status;
       case "hire":
@@ -418,6 +437,7 @@ export function reviewReceiptHref(item: Pick<ReviewItem, "kind" | "id" | "proper
     case "journey":
       return "/maps";
     case "group":
+    case "zone":
       return "/party?section=characters";
     default:
       return undefined;

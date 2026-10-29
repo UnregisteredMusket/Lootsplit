@@ -1,0 +1,11 @@
+{
+  "title": "Zones: maps that count as one place, and party splits your way",
+  "summary": "DMs decide which maps are the same place and what happens when a player's move would split the party.",
+  "items": [
+    "A new Zones editor groups maps into one place: a city with its districts and the maps under it, or any maps you choose.",
+    "Moving inside a zone never splits the party; coming back to the party's place rejoins it.",
+    "When a player heads into a neighbouring zone, your rule decides: block it, wait until the end of the session, or let the party vote.",
+    "Party votes are anonymous, a tie keeps the party together, and you can approve or reject any vote.",
+    "Places further away say how long the trip takes and offer to propose a journey."
+  ]
+}

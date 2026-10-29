@@ -397,6 +397,80 @@ export const groupColours = ["green", "blue", "amber", "plum", "teal", "red"] as
 export const groupLetters = ["A", "B", "C", "D", "E", "F"] as const;
 /** Up to six groups while split: the main group (A) and five more. */
 export const MAX_PARTY_GROUPS = 6;
+/**
+ * Zones (map tokens PR 7A, owner 2026-10-29; plan section 6A): maps that count as one place.
+ * Derived from the location tree unless the DM saves a zone here (`zones.ts` zoneOf). A zone id
+ * stored in settings is `zone:<id>` for these, or a derived `loc:<id>` / `map:<id>`.
+ */
+export const ZONE_KINDS = ["district", "town", "city", "dungeon", "wilderness", "region", "custom"] as const;
+/** "When a player's move would split the party" (owner, 2026-10-29). */
+export const SPLIT_RULES = ["block", "session-end", "vote"] as const;
+export const zoneRefSchema = z.string().min(3).max(160).regex(/^(zone|loc|map):/);
+export const zoneSchema = z
+  .object({
+    id,
+    name: z.string().trim().min(1).max(80),
+    kind: z.enum(ZONE_KINDS),
+    parentZoneId: zoneRefSchema.optional(),
+    /** Maps in this zone ahead of the derived rule (a map is in at most one zone). */
+    mapIds: z.array(id).max(500).default([]),
+    /** Locations (with their areas) in this zone ahead of the derived rule. */
+    locationIds: z.array(id).max(500).default([]),
+    /** A derived zone the DM customised: which one (its settings live here). */
+    derivedFrom: zoneRefSchema.optional(),
+    settings: z
+      .object({
+        travel: z.enum(["free", "journey"]),
+        /** About this many miles across; estimates trips only. */
+        sizeMiles: z.number().min(0).max(5000).optional(),
+        /** Marked adjacent with no link, and links the DM unticked. */
+        adjacent: z.array(zoneRefSchema).max(200).optional(),
+        notAdjacent: z.array(zoneRefSchema).max(200).optional(),
+        /** Per-zone split rule; absent = the campaign setting. "allow" splits immediately. */
+        splitRule: z.enum([...SPLIT_RULES, "allow"]).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type Zone = z.infer<typeof zoneSchema>;
+export const splitRuleSettingsSchema = z
+  .object({
+    rule: z.enum(SPLIT_RULES),
+    /** Party vote: majority (default) or unanimous; minutes until it closes (0 = session end). */
+    majority: z.enum(["majority", "unanimous"]),
+    minutes: z.union([z.literal(2), z.literal(5), z.literal(15), z.literal(0)]),
+  })
+  .strict();
+export type SplitRuleSettings = z.infer<typeof splitRuleSettingsSchema>;
+export const DEFAULT_SPLIT_RULE: SplitRuleSettings = { rule: "vote", majority: "majority", minutes: 5 };
+/** A player's move that would split the party, waiting for the session's end or a vote. */
+export const zoneRequestSchema = z
+  .object({
+    id,
+    purseId: id,
+    /** The seat that asked (its own vote is yes). */
+    seatId: z.string().max(150),
+    fromMapId: id.nullable(),
+    toMapId: id,
+    at: z.object({ column: z.number().int().min(0).max(199), row: z.number().int().min(0).max(199) }).strict(),
+    fromZone: zoneRefSchema,
+    toZone: zoneRefSchema,
+    mode: z.enum(["session-end", "vote"]),
+    status: z.enum(["open", "applied", "declined", "withdrawn", "cancelled", "failed", "rejected", "not-needed"]),
+    reason: z.string().max(300).optional(),
+    createdAt: z.number(),
+    /** Party vote: when it closes (server time); absent = at the session's end. */
+    deadline: z.number().optional(),
+    majority: z.enum(["majority", "unanimous"]).optional(),
+    /** One vote per eligible player seat (never shown to players with the seat). */
+    votes: z.array(z.object({ seatId: z.string().max(150), vote: z.enum(["yes", "no"]).nullable() }).strict()).max(20).optional(),
+    /** Players' projection: the tally only. */
+    tally: z.object({ yes: z.number().int(), no: z.number().int(), waiting: z.number().int(), mine: z.enum(["yes", "no"]).nullable().optional() }).strict().optional(),
+    sessionId: z.string().max(150).optional(),
+    decidedAt: z.number().optional(),
+  })
+  .strict();
+export type ZoneRequest = z.infer<typeof zoneRequestSchema>;
 export const partyGroupSchema = z
   .object({
     id,
@@ -473,6 +547,10 @@ export const worldSchema = z
     mainGroup: mainGroupSchema.optional(),
     /** Players' requests to move their group (the DM approves). */
     groupRequests: z.array(groupRequestSchema).max(1000).optional(),
+    /** Zones (tabletop protocol 17): DM-saved zones, the split rule, and split requests (history kept). */
+    zones: z.array(zoneSchema).max(200).optional(),
+    splitRule: splitRuleSettingsSchema.optional(),
+    zoneRequests: z.array(zoneRequestSchema).max(2000).optional(),
     npcs: z.array(npcSchema).max(500).default([]),
     trades: z.array(tradeSchema).default([]),
     conversations: z.array(conversationSchema).default([]),
@@ -570,6 +648,33 @@ export const worldCommands = [
       at: tile,
     })
     .strict(),
+  /** Zones (map tokens PR 7A): the DM saves the zones and the campaign's split rule together. */
+  z.object({
+    id,
+    kind: z.literal("zone-save"),
+    /** canonicalJson({ zones, splitRule }) as the DM saw it. */
+    before: z.string().max(400000),
+    zones: z.array(zoneSchema).max(200),
+    splitRule: splitRuleSettingsSchema.nullable(),
+  }),
+  /** A player's move that would split the party: queued for the session's end or put to a vote. */
+  z.object({
+    id,
+    kind: z.literal("zone-request"),
+    requestId: id,
+    purseId: id,
+    fromMapId: id.nullable(),
+    toMapId: id,
+    grid: z.string().max(1000),
+    at: tile,
+  }),
+  z.object({ id, kind: z.literal("zone-request-withdraw"), requestId: id }),
+  z.object({ id, kind: z.literal("zone-vote"), requestId: id, vote: z.enum(["yes", "no"]) }),
+  /**
+   * Settle a request: anyone once its vote is decided or past its deadline ("settle"); the DM at
+   * any time ("approve" applies it, "reject"/"decline" closes it).
+   */
+  z.object({ id, kind: z.literal("zone-request-resolve"), requestId: id, action: z.enum(["approve", "reject", "decline", "settle"]) }),
   /** Group commands (map tokens PR 3): hide/show, lock, size, controllers, initiative links. */
   z.object({
     id,
