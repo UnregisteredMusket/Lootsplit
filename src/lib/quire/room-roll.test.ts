@@ -14,6 +14,7 @@ for (const name of [
   "0013_campaign_resource_documents.sql",
   "0019_campaign_room_reports.sql",
   "0029_campaign_room_report_parts.sql",
+  "0030_campaign_room_archive_keys.sql",
 ])
   sql.exec(readFileSync(new URL(`../../../cloudflare/migrations/${name}`, import.meta.url), "utf8"));
 // Simulates another action landing between the roll's room read and its save.

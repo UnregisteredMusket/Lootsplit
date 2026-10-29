@@ -29,6 +29,7 @@ for (const file of [
   "0013_campaign_resource_documents.sql",
   "0019_campaign_room_reports.sql",
   "0029_campaign_room_report_parts.sql",
+  "0030_campaign_room_archive_keys.sql",
 ])
   sql.exec(readFileSync(new URL(`../../../cloudflare/migrations/${file}`, import.meta.url), "utf8"));
 (globalThis as any).__env__ = {

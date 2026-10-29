@@ -583,6 +583,7 @@ sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0013_campaign_reso
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0014_campaign_map_pings.sql",import.meta.url),"utf8"));
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0019_campaign_room_reports.sql",import.meta.url),"utf8"));
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0029_campaign_room_report_parts.sql",import.meta.url),"utf8"));
+sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0030_campaign_room_archive_keys.sql",import.meta.url),"utf8"));
 (globalThis as any).__env__ = {
   DB: {
     async batch(statements: {run:()=>Promise<unknown>}[]) {

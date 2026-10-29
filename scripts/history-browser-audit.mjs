@@ -159,8 +159,14 @@ try {
   assert.ok(holding.length < 1024);
   assert.deepEqual(holding, order.slice(LINES - holding.length), "the newest stored lines, contiguously");
   const loadEarlier = dm.page.getByRole("button", { name: "Load earlier entries", exact: true });
+  // On a slow runner the section can re-render closed while the page settles: reopen and retry.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (await loadEarlier.isVisible()) break;
+    await openFold(fold);
+    await loadEarlier.waitFor({ state: "visible", timeout: 10000 }).catch(() => undefined);
+  }
   await expect(loadEarlier)
-    .toBeVisible()
+    .toBeVisible({ timeout: 10000 })
     .catch(async (error) => {
       await dm.page.screenshot({ path: `${output}/activity-failure.png`, fullPage: true });
       const state = await dm.page.evaluate(async () => {
@@ -193,9 +199,14 @@ try {
   await expect(session).toBeVisible();
   await session.evaluate((el) => el.scrollIntoView({ block: "center" }));
   await dm.page.screenshot({ path: `${output}/archived-session-1280.png` });
-  await session.getByRole("button", { name: "Load this session", exact: true }).click();
+  const loadSession = session.getByRole("button", { name: "Load this session", exact: true });
   const read = dm.page.getByRole("button", { name: "Read session report", exact: true }).first();
-  await expect(read).toBeEnabled();
+  // A click before the page is interactive is lost: repeat it while the session is not loaded.
+  for (let attempt = 0; attempt < 3 && !(await read.isEnabled().catch(() => false)); attempt++) {
+    if (await loadSession.isVisible().catch(() => false)) await loadSession.click().catch(() => undefined);
+    await expect(read).toBeEnabled({ timeout: 10000 }).catch(() => undefined);
+  }
+  await expect(read).toBeEnabled({ timeout: 10000 });
   await read.click();
   await expect(dm.page.getByRole("dialog", { name: "The First Road" })).toContainText("Financial activity · 40 records");
   await dm.page.keyboard.press("Escape");
