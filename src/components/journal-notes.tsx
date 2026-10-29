@@ -1,3 +1,4 @@
+import { LoadArchivedSession } from "./history-loader";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { playSound } from "@/lib/quire/sound";
 import { useEffect, useState } from "react";
@@ -316,6 +317,8 @@ export function JournalNotes() {
                 {formatCopper(linkedSummary.summary.spent)} · Net{" "}
                 {formatCopper(linkedSummary.summary.net)}
               </p>
+            ) : linkedSummary && "deferred" in linkedSummary && linkedSummary.deferred ? (
+              <LoadArchivedSession id={linkedSession.id} name={linkedSession.name} />
             ) : (
               <p role="alert">{linkedSummary?.error}</p>
             )}

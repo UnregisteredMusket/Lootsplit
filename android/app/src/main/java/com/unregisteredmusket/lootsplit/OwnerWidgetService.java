@@ -28,13 +28,13 @@ public class OwnerWidgetService extends RemoteViewsService {
             JSONObject snapshot = generation != null && generation.equals(state.optString("generation")) ? OwnerWidgetProvider.current(state) : null;
             // Expanded rows and tiles survive a refresh by ID; IDs no longer in the reading are pruned.
             expanded = WidgetRowState.prune(context, id, WidgetRows.rows(snapshot, WidgetRowState.expanded(context, id)));
-            rows = WidgetRows.rows(snapshot, expanded);
+            rows = snapshot == null ? WidgetRows.placeholder(context, state) : WidgetRows.rows(snapshot, expanded);
         }
         public int getCount() { return rows.length(); }
         public RemoteViews getViewAt(int position) {
             JSONObject state = WidgetStore.read(context);
             JSONObject row = rows.optJSONObject(position);
-            if (generation == null || !generation.equals(state.optString("generation")) || OwnerWidgetProvider.current(state) == null) row = WidgetRows.rows(null).optJSONObject(0);
+            if (generation == null || !generation.equals(state.optString("generation")) || OwnerWidgetProvider.current(state) == null) row = WidgetRows.placeholder(context, state).optJSONObject(0);
             return rowView(context, row, id, expanded);
         }
         public RemoteViews getLoadingView() { return rowView(context, null,id); }
@@ -188,7 +188,7 @@ public class OwnerWidgetService extends RemoteViewsService {
         view.setTextViewText(R.id.widget_row_detail,expanded?detail:detail.replace("\n"," · "));view.setTextColor(R.id.widget_row_detail,muted);
         view.setTextColor(R.id.widget_row_chevron,muted);
         String rowId=row==null?"":row.optString("id");
-        String action=row==null?"account":row.optString("action");
+        String action=row==null?OwnerWidgetProvider.CONNECT:row.optString("action");
         boolean toggles=!rowId.isEmpty();
         view.setContentDescription(R.id.widget_row,(status?WidgetRows.statusWord(color)+". ":"")+title+(time.isEmpty()?"":", "+time)+". "+detail.replace("\n",". ")
             +(toggles?(expanded?" Expanded; tap to collapse.":" Tap to expand."):""));

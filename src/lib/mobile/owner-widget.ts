@@ -8,7 +8,31 @@ export type OwnerWidgetStatus = {
   mainWidgets?: number[];
   mainAvailable?: boolean;
   companionAvailable?: boolean;
+  /**
+   * Why the widget was last disconnected, while it is not connected: "Disconnected in app",
+   * "Owner access rejected", "Encryption key reset", "App sign-out ended an older connection" or
+   * "Connection did not finish". Removing or re-adding widgets never disconnects it.
+   */
+  disconnectReason?: string;
+  disconnectedAt?: number;
 };
+
+/** "Owner access rejected · 29 Oct, 10:41" for the widget screen; "" when nothing was recorded. */
+export function disconnectNote(
+  status: Pick<OwnerWidgetStatus, "connected" | "disconnectReason" | "disconnectedAt"> | null,
+) {
+  if (!status || status.connected || !status.disconnectReason) return "";
+  const at =
+    typeof status.disconnectedAt === "number" && status.disconnectedAt > 0
+      ? new Date(status.disconnectedAt).toLocaleString(undefined, {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
+  return at ? `${status.disconnectReason} · ${at}` : status.disconnectReason;
+}
 export const OwnerWidget = registerPlugin<{
   status(): Promise<OwnerWidgetStatus>;
   refreshRegistration(): Promise<OwnerWidgetStatus>;
