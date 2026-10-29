@@ -1,3 +1,31 @@
+# Lootsplitter 1.14.1
+
+Android version code **22**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. A patch for the site owner's home-screen widget; nothing else in the app changes.
+
+## Added
+
+- None in this release.
+
+## Improved
+
+- **Widget Sign in opens the Connect screen** (site owners only). SIGN IN, the footer, the status block and the "Not connected" row on the Field monitor (and the companion's sign-in lines) open My account → Home-screen Field monitor, where Connect widget connects it in one tap; when the app is signed out, My account asks you to sign in first and then opens that screen. Up to 1.14.0 they opened My account without reaching the widget controls.
+- **Why it disconnected** (site owners only). The widget records why its connection last ended (Disconnected in app, Owner access rejected, Encryption key reset, App sign-out ended an older connection, Connection did not finish) and when. A disconnected widget says "Not connected — tap Sign in · <reason> · <time>", My account → Home-screen Field monitor shows "Last disconnected: …", and tapping Refresh while disconnected says "Not connected — tap Sign in" instead of implying a reading is on its way.
+
+## Fixed
+
+- **Removing widgets no longer disconnects the owner widget** (site owners only; owner report 2026-10-29). Up to 1.14.0, removing the last Field monitor and companion from the home screen deleted the widget's stored owner session, so widgets added afterwards showed "No current owner reading · Sign in or tap Refresh" and "OWNER · SIGN IN" although the server session was still valid. Now removing every widget keeps the encrypted connection and only pauses background checks; adding a widget again restarts them and fetches a reading at once when the last one is no longer current. Only Disconnect widget (which also revokes the session on the server), a 401/403 from the server or an unusable encryption key ends the connection. Every widget route still requires the owner role on the server.
+- An app sign-out while the phone's secure storage was momentarily busy could remove the widget's own session; it is now kept (a widget still holding an older app token ends on its next server check).
+
+## After updating
+
+If the widget currently shows SIGN IN, tap it (or open My account → Home-screen Field monitor) and choose Connect widget once. From then on, removing and re-adding widgets keeps it connected.
+
+## Release verification
+
+Pending: published by `android-release.yml` (started by the owner), then independently inspected before `release.json` is updated.
+
+---
+
 # Lootsplitter 1.14.0
 
 Android version code **21**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.

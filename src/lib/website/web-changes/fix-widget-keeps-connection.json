@@ -1,0 +1,9 @@
+{
+  "title": "Owner widget stays connected when widgets are re-added",
+  "summary": "For the site owner: removing and re-adding the Android home-screen Field monitor no longer disconnects it, and its Sign in opens the widget's Connect screen (needs the Android 1.14.1 update).",
+  "items": [
+    "Removing every widget keeps the widget's owner connection; a widget added again shows the reading at once, and no background checks run while none is placed.",
+    "Only Disconnect widget, a rejected owner session or a reset of the phone's encryption key ends the connection, and the widget and My account show which one and when.",
+    "SIGN IN on the widget opens My account → Home-screen Field monitor, where Connect widget connects it in one tap. Every widget route still requires the owner role on the server."
+  ]
+}

@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.14.1",
+    "date": "2026-10-29",
+    "summary": "The owner's home-screen Field monitor stays connected when widgets are removed and added again, and its Sign in opens the widget's Connect screen.",
+    "features": ["None in this release."],
+    "improvements": [
+      "Site owners: tapping SIGN IN, the footer or the \"Not connected\" row on the home-screen Field monitor opens My account → Home-screen Field monitor, where Connect widget connects it in one tap (sign in first if the app is signed out).",
+      "Site owners: a disconnected widget says \"Not connected — tap Sign in\" with the reason and time (for example \"Owner access rejected\" or \"Disconnected in app\"), and My account shows the same as \"Last disconnected\". Tapping Refresh while disconnected says so instead of waiting for a reading."
+    ],
+    "fixes": [
+      "Site owners: removing every Field monitor and companion from the home screen no longer disconnects the owner widget, so widgets added afterwards show the reading straight away instead of \"No current owner reading\" and SIGN IN. Background checks pause while no widget is placed. Only Disconnect widget, a rejected owner session or a reset of the phone's encryption key ends the connection.",
+      "Signing out of the app while the phone's secure storage is momentarily busy no longer disconnects the widget's own session."
+    ]
+  },
+  {
     "version": "1.14.0",
     "date": "2026-10-28",
     "summary": "A quest log you can pin to the map, redesigned map controls, a tidier Desk with a session chip, Review Inbox and party inventory, search everywhere, and an Android Back button that behaves.",
