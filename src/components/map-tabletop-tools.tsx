@@ -4,7 +4,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
-import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
+import { readMapTabletop, readTabletopSession, canMoveMapToken, alignUndoMap } from "@/lib/quire/tabletop";
 import {
   alignedGrid,
   freeTokenPosition,
@@ -1246,19 +1246,15 @@ export function useMapTabletopTools(
     void act({ kind: "map-save", mapId: map.id, before: map, map: next }, () => {
       setGridDialog(null);
       resultToast("Grid mode on · grid aligned under the tokens", {
+        // Only while nothing changed since the align; the save is checked against `current`.
         undo: () => {
           const current = latest.current;
-          void act({
-            kind: "map-save",
-            mapId: map.id,
-            before: current,
-            map: {
-              ...current,
-              grid: previous.grid,
-              tokens: previous.tokens,
-              tabletop: { ...readMapTabletop(current), snap: settings.snap },
-            },
-          });
+          const restored = alignUndoMap(current, next, previous);
+          if (!restored) {
+            setError("The map changed since; undo not available.");
+            return;
+          }
+          void act({ kind: "map-save", mapId: map.id, before: current, map: restored });
         },
       });
     });

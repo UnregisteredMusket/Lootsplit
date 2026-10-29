@@ -6,7 +6,7 @@ import { readJournal } from "./journal.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { mapGridSchema, type MapToken } from "./world-schema.ts";
 import { mapTabletopSchema } from "./tabletop-schema.ts";
-import { readMapTabletop } from "./tabletop.ts";
+import { alignUndoMap, readMapTabletop } from "./tabletop.ts";
 import {
   alignedGrid,
   automaticGrid,
@@ -200,4 +200,33 @@ test("protocol 14: older clients don't see the hidden-grid flag and their saves 
   for (const draft of [[{ kind: "map-grid-snap" }], [{ kind: "map-tabletop", settings: { gridHidden: true } }]])
     assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 13), /unfinished map actions/);
   assert.doesNotThrow(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-grid-snap" }]) }, 14));
+});
+
+// Privacy review 2026-10-29 (finding A2): the align-grid Undo never erases later changes.
+test("align-grid Undo restores the grid only while nothing changed since the align", () => {
+  const player: CloudSeat = { id: "p", token: "p", name: "P", role: "player", purseIds: ["mira"] };
+  const tok: MapToken = { id: "tv", kind: "character", entityId: "torvald", label: "torvald", column: 4, row: 4, offsetX: 0.3, offsetY: 0.3, visibility: "party" };
+  let t: CloudTable = {
+    ...emptyCloudTable(),
+    purses: ["mira", "torvald"].map((id) => ({ id, kind: "character" as const, name: id, coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 } })),
+    journal: readJournal({ world: { maps: [{ id: "m", name: "M", image: "data:image/png;base64,AAAA", locationId: null, visible: true, anchors: [], markers: [], grid: mapGridSchema.parse({ columns: 20, rows: 12 }), tokens: [tok], tabletop: { ...readMapTabletop({}), snap: false } }] } }),
+  };
+  const run = (c: object, seat: CloudSeat = { id: "dm", token: "dm", name: "DM", role: "dm", purseIds: [] }) =>
+    (t = applyCommand(t, seat, commandSchema.parse({ ...c, id: `align-${Math.random()}` })));
+  const previous = t.journal!.world!.maps[0];
+  const aligned = alignedGrid(previous.grid!, previous.tokens!)!;
+  const next = { ...previous, grid: aligned.grid, tokens: aligned.tokens, tabletop: { ...readMapTabletop(previous), snap: true } };
+  run({ kind: "map-save", mapId: "m", before: previous, map: next });
+  // Nothing changed: Undo restores the grid and the tokens' places.
+  const restored = alignUndoMap(t.journal!.world!.maps[0], next, previous)!;
+  assert.ok(restored);
+  assert.deepEqual(restored.grid, previous.grid);
+  assert.equal(readMapTabletop(restored).snap, false);
+  // A token moves after the align: Undo is no longer available, so the move stays.
+  const placed = t.journal!.world!.maps[0].tokens![0];
+  const at = { column: placed.column, row: placed.row, ...(placed.offsetX !== undefined ? { offsetX: placed.offsetX } : {}), ...(placed.offsetY !== undefined ? { offsetY: placed.offsetY } : {}) };
+  run({ kind: "map-token-move", mapId: "m", grid: canonicalJson(t.journal!.world!.maps[0].grid), moves: [{ tokenId: "tv", before: at, after: { column: placed.column + 1, row: placed.row } }] });
+  assert.equal(alignUndoMap(t.journal!.world!.maps[0], next, previous), undefined);
+  assert.equal(t.journal!.world!.maps[0].tokens![0].column, placed.column + 1);
+  void player;
 });
