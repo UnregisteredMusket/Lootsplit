@@ -28,6 +28,7 @@ import { syncTimer } from "./sync-timing.server.ts";
 import { retryRoomWrite } from "./room-write-retry.ts";
 import {
   claimSeat,
+  emptyCloudTable,
   readCloudTableForImport,
   setRoomLive,
   skipTurn,
@@ -37,6 +38,8 @@ import {
 } from "./cloud.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
 import { HistoryNeeded, runOnWorkingSet } from "./history-window.server.ts";
+import { receiptForLine } from "./ledger-reversal.ts";
+import { DEFERRED_REPORT_PREFIX, isDeferredSnapshot } from "./history-pages.ts";
 import {
   historyCursors,
   historyOffsets,
@@ -1181,23 +1184,52 @@ export async function submitCommands(input: {
     let table = room.table;
     let pages = historyNeedsPages(unapplied),
       sessions = historyNeedsSessions(unapplied);
+    // Archived sessions the batch can touch, from their lookup keys (archive-keys.mjs): Undo of an
+    // archived line or a quest reward link loads only those, not every session. `undefined`: not
+    // planned yet; `null`: load every session (the index cannot answer, or the attempt needed more).
+    let selection: Set<string> | null | undefined = undefined;
     for (let attempt = 0; ; attempt++) {
-      if (pages || sessions) source = await withRoomHistory(source, { reports: sessions });
+      let runOn = source;
+      let stubbed: Map<string, string> | null = null;
+      if (pages || sessions) {
+        if (sessions && selection === undefined) selection = await archiveSelection(source, unapplied);
+        if (sessions && selection) {
+          const partial = await withRoomHistory(source, { reports: selection });
+          const plan = selectionSafe(partial, unapplied) ? stubArchives(partial, selection) : null;
+          if (plan) {
+            source = partial;
+            ({ room: runOn, stubbed } = plan);
+          } else {
+            selection = null;
+            source = runOn = await withRoomHistory(partial, { reports: true });
+          }
+        } else source = runOn = await withRoomHistory(source, { reports: sessions });
+      }
       try {
-        const result = runOnWorkingSet(source.table, historyOffsets(source), run);
+        const result = runOnWorkingSet(runOn.table, historyOffsets(runOn), run);
         // Ledger lines added on the working set must have IDs no older (unloaded) line has.
-        if (result.pendingIds.ledger && (await ledgerIdsTaken(source, result.pendingIds.ledger)))
+        if (result.pendingIds.ledger && (await ledgerIdsTaken(runOn, result.pendingIds.ledger)))
           throw new HistoryNeeded("ledger-id");
-        table = result.table;
+        table = stubbed ? restoreArchives(result.table, stubbed) : result.table;
+        if (stubbed) {
+          historyEngineStats.selections.push({ kinds: unapplied.map((c) => c.kind), loaded: selection!.size, archived: stubbed.size + selection!.size });
+          if (historyEngineStats.selections.length > 50) historyEngineStats.selections.shift();
+        }
         break;
       } catch (error) {
-        if (!(error instanceof HistoryNeeded) || attempt >= 2) throw error;
-        historyEngineStats.fallbacks.push({ kinds: unapplied.map((c) => c.kind), reason: error.reason });
+        if (!(error instanceof HistoryNeeded) || attempt >= 3) throw error;
+        historyEngineStats.fallbacks.push({ kinds: unapplied.map((c) => c.kind), reason: stubbed ? "selection" : error.reason });
         if (historyEngineStats.fallbacks.length > 50) historyEngineStats.fallbacks.shift();
-        if (error.reason === "reports") sessions = true;
+        // A batch that needed more than the selected sessions runs on every session.
+        if (stubbed) {
+          selection = null;
+          sessions = true;
+        } else if (error.reason === "reports") sessions = true;
         else pages = true;
       }
     }
+    // Archived sessions read in full here that are not indexed yet (archived before 0030).
+    if (sessions && selection === null) void indexReadArchives(room, source);
     for (const command of unapplied) {
       const key = seat.id + ":" + command.id;
       seen.add(key);
@@ -1272,7 +1304,122 @@ async function ledgerIdsTaken(room: CloudRoom, ids: string[]) {
   return roomHistoryIdsTaken(db, room.code, pages.map((page) => page.hash), ids);
 }
 /** Diagnostics for tests: the latest batches (at most 50) that needed history after starting on the working set. */
-export const historyEngineStats: { fallbacks: { kinds: string[]; reason: string }[] } = { fallbacks: [] };
+export const historyEngineStats: {
+  fallbacks: { kinds: string[]; reason: string }[];
+  /** Batches that ran on the selected archived sessions only (loaded of archived). */
+  selections: { kinds: string[]; loaded: number; archived: number }[];
+} = { fallbacks: [], selections: [] };
+let archiveSelections = true;
+/** Test-only: plan archive selections (true) or always load every archived session (false). */
+export function setArchiveSelectionForTests(on: boolean) {
+  archiveSelections = on;
+}
+
+/**
+ * The archived sessions (report IDs) a batch can read, from their lookup keys (archive-keys.mjs),
+ * or null when every session must be loaded: a command other than Undo of a ledger line or a quest
+ * reward link, or a session that is not completely indexed. Every session left out holds none of
+ * the lines, reversals, voids, receipts or resolutions these commands look for.
+ */
+async function archiveSelection(room: CloudRoom, commands: { kind: string }[]): Promise<Set<string> | null> {
+  const db = database();
+  if (!db || !archiveSelections) return null;
+  const keys: string[] = [];
+  for (const command of commands) {
+    const c = command as { kind: string; target?: { kind: string; id: string }; link?: { kind: string; id: string } };
+    if (c.kind === "ledger-void" && c.target?.kind === "ledger") keys.push("id:" + c.target.id, "rev:" + c.target.id, "void");
+    else if (c.kind === "quest-link-reward" && c.link)
+      keys.push((c.link.kind === "ledger" ? "id:" : c.link.kind === "encounter-award" ? "award:" : "loot:") + c.link.id);
+    else return null;
+  }
+  const deferred = (room.table.journal?.reports ?? []).filter((r) => isDeferredSnapshot(r.snapshot));
+  if (!deferred.length) return null;
+  const reference = (r: { snapshot: string }) => r.snapshot.slice(DEFERRED_REPORT_PREFIX.length);
+  const { archiveReferencesWith } = await import("../../../cloudflare/archive-keys.mjs");
+  const hit = await archiveReferencesWith(db, room.code, deferred.map(reference), keys);
+  if (!hit) return null;
+  return new Set(deferred.filter((r) => hit.has(reference(r))).map((r) => r.id));
+}
+/**
+ * An Undo of a line linked to a market receipt reads every leg of the trade by receipt, which the
+ * keys do not plan for: such a batch loads every session. (Found in the current ledger, its pages
+ * or a selected session; a line in none of them is not in the campaign, as the full run finds.)
+ */
+function selectionSafe(room: CloudRoom, commands: { kind: string }[]): boolean {
+  for (const command of commands) {
+    const c = command as { kind: string; target?: { kind: string; id: string } };
+    if (c.kind !== "ledger-void") continue;
+    const lines = [...room.table.ledger];
+    for (const report of room.table.journal?.reports ?? [])
+      if (!isDeferredSnapshot(report.snapshot))
+        try {
+          lines.push(...((JSON.parse(report.snapshot) as Partial<CloudTable>).ledger ?? []));
+        } catch {
+          // Unreadable: the engine skips it, as on the whole campaign.
+        }
+    for (const line of lines)
+      if (line.id === c.target!.id && (line.trade || receiptForLine(room.table, line))) return false;
+  }
+  return true;
+}
+/** The snapshot an irrelevant archived session is read as in a selected run: no lines or events. */
+const IRRELEVANT_ARCHIVE = JSON.stringify(emptyCloudTable());
+/**
+ * The room to run a selected batch on: every archived session not selected (still deferred) reads
+ * as an empty archive, which is exactly what it is to these commands. Returns the stand-ins' report
+ * IDs and their deferred markers, so they are put back (`restoreArchives`) before anything is kept.
+ */
+function stubArchives(room: CloudRoom, selection: Set<string>): { room: CloudRoom; stubbed: Map<string, string> } | null {
+  const reports = room.table.journal?.reports ?? [];
+  const ids = new Set<string>();
+  for (const report of reports) {
+    if (ids.has(report.id)) return null; // duplicate report IDs: no selection
+    ids.add(report.id);
+  }
+  const stubbed = new Map<string, string>();
+  const next = reports.map((report) => {
+    if (!isDeferredSnapshot(report.snapshot) || selection.has(report.id)) return report;
+    stubbed.set(report.id, report.snapshot);
+    return { ...report, snapshot: IRRELEVANT_ARCHIVE };
+  });
+  if (!stubbed.size) return { room, stubbed };
+  return {
+    room: keepStoredBody(room, { ...room, table: { ...room.table, journal: { ...room.table.journal!, reports: next } } }),
+    stubbed,
+  };
+}
+/**
+ * The batch's result with every stand-in archived session back as its deferred marker. Anything
+ * else about those sessions changed, added or removed means the batch was not what the selection
+ * planned for: it then runs again on every session.
+ */
+function restoreArchives(table: CloudTable, stubbed: Map<string, string>): CloudTable {
+  if (!stubbed.size) return table;
+  let seen = 0;
+  const reports = (table.journal?.reports ?? []).map((report) => {
+    const marker = stubbed.get(report.id);
+    if (marker === undefined) {
+      if (report.snapshot === IRRELEVANT_ARCHIVE) throw new HistoryNeeded("selection");
+      return report;
+    }
+    seen++;
+    if (report.snapshot !== IRRELEVANT_ARCHIVE) throw new HistoryNeeded("selection");
+    return { ...report, snapshot: marker };
+  });
+  if (seen !== stubbed.size) throw new HistoryNeeded("selection");
+  return { ...table, journal: { ...table.journal!, reports } };
+}
+/** Indexes archived sessions a batch read in full (archive-keys.mjs `backfillArchiveKeys`). */
+async function indexReadArchives(working: CloudRoom, whole: CloudRoom) {
+  const db = database();
+  if (!db) return;
+  const markers = new Map((working.table.journal?.reports ?? []).filter((r) => isDeferredSnapshot(r.snapshot)).map((r) => [r.id, r.snapshot.slice(DEFERRED_REPORT_PREFIX.length)]));
+  const entries = (whole.table.journal?.reports ?? [])
+    .filter((r) => markers.has(r.id) && !isDeferredSnapshot(r.snapshot))
+    .map((r) => ({ reference: markers.get(r.id)!, text: r.snapshot }));
+  const { backfillArchiveKeys } = await import("../../../cloudflare/archive-keys.mjs");
+  await backfillArchiveKeys(db, working.code, entries);
+}
 const PAGE_KINDS = new Set(["ledger-void", "session", "downtime-apply"]);
 function historyNeedsPages(commands: { kind: string }[]) {
   return commands.some((c) => PAGE_KINDS.has(c.kind));

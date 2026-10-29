@@ -1,5 +1,6 @@
 import { roomCommittedSql } from "./room-storage.mjs";
 import { DEFERRED_REPORT_PREFIX } from "../src/lib/quire/history-pages.ts";
+import { archiveKeyStatements } from "./archive-keys.mjs";
 import { decodeReportDelta, encodeReportDelta, reportDeltaMarker, REPORT_DELTA_KEY } from "./report-delta.mjs";
 /**
  * Archived session snapshots (`table.journal.reports[].snapshot`) live in campaign_room_reports,
@@ -284,6 +285,8 @@ export async function roomReportStatements(db, room, encoded, writeId) {
       base = { reference: doc.reference, text: doc.body };
     }
   }
+  // Lookup keys of the new sessions (archive-keys.mjs, migration 0030), from their full text.
+  const keys = archiveKeyStatements(db, room.code, fresh, committed);
   return docs
     .flatMap((doc) => {
       const parts = reportDeltaMarker(doc.body) ? null : reportParts(doc.body);
@@ -305,7 +308,8 @@ export async function roomReportStatements(db, room, encoded, writeId) {
             .bind(room.code, doc.reference, index, part, ...committed.args, room.code, doc.reference),
         ),
       ];
-    });
+    })
+    .concat(keys);
 }
 
 /**

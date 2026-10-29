@@ -87,7 +87,8 @@ function exactLine(index: LedgerIndex, id: string): LedgerLine | undefined {
 function wasVoided(index: LedgerIndex, id: string) {
   return index.lines.some(line => line.reversalOf === id || line.summary.includes("(void:" + id + ")"));
 }
-function receiptForLine(table: CloudTable, line: LedgerLine): TradeReceipt | undefined {
+/** The market receipt a ledger line belongs to, if any (also used by the server to plan which archives an Undo reads). */
+export function receiptForLine(table: CloudTable, line: LedgerLine): TradeReceipt | undefined {
   const receipts = table.journal?.tradeEconomy?.receipts ?? [];
   if (line.trade) return receipts.find(receipt => receipt.id === line.trade!.receiptId);
   return receipts.find(receipt =>
