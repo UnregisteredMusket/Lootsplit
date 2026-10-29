@@ -5,7 +5,7 @@ import {
   inParty,
   seatInParty,
 } from "./character-position.ts";
-import { fairnessEligible } from "./loot-fairness.ts";
+import { fairnessDigestOfSnapshot, fairnessEligible, withArchivedFairness, type ArchivedFairnessDigest } from "./loot-fairness.ts";
 import {
   readRoom,
   readRoomAccess,
@@ -56,7 +56,7 @@ import { characterControl, type Purse } from "./types.ts";
 import type { BillFile } from "./table.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
-import { manualCharacterRolls, database, storedLiveBytes } from "./room-store.server.ts";
+import { manualCharacterRolls, database, storedLiveBytes, hydrateDeferredReports } from "./room-store.server.ts";
 import { referenceAccess, referenceSection } from "./reference-access.ts";
 import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
 import { SUBMIT_LIMIT_MESSAGE, takeSubmitAllowance } from "./room-submit-limit.ts";
@@ -1191,12 +1191,21 @@ export async function submitCommands(input: {
     // archived line or a quest reward link loads only those, not every session. `undefined`: not
     // planned yet; `null`: load every session (the index cannot answer, or the attempt needed more).
     let selection: Set<string> | null | undefined = undefined;
+    // "Favour whoever is behind" compares every archived session's fairness digest, not the
+    // sessions themselves: each session is read on its own, digested, and released
+    // (loot-fairness.ts `withArchivedFairness`). `undefined`: not planned yet; null: not used.
+    let digests: Map<string, ArchivedFairnessDigest> | null | undefined = undefined;
     for (let attempt = 0; ; attempt++) {
       let runOn = source;
       let stubbed: Map<string, string> | null = null;
+      let usingDigests: Map<string, ArchivedFairnessDigest> | null = null;
       if (pages || sessions) {
         if (sessions && selection === undefined) selection = seat.role === "dm" ? await archiveSelection(source, unapplied) : null;
-        if (sessions && selection) {
+        if (sessions && !selection && digests === undefined) digests = archiveSelections && favourOnly(unapplied) ? await archivedDigests(source) : null;
+        if (sessions && !selection && digests) {
+          source = runOn = await withRoomHistory(source, { reports: false });
+          usingDigests = digests;
+        } else if (sessions && selection) {
           const partial = await withRoomHistory(source, { reports: selection });
           const plan = selectionSafe(partial, unapplied) ? stubArchives(partial, selection) : null;
           if (plan) {
@@ -1209,7 +1218,8 @@ export async function submitCommands(input: {
         } else source = runOn = await withRoomHistory(source, { reports: sessions });
       }
       try {
-        const result = runOnWorkingSet(runOn.table, historyOffsets(runOn), run);
+        const execute = () => runOnWorkingSet(runOn.table, historyOffsets(runOn), run);
+        const result = usingDigests ? withArchivedFairness(usingDigests, execute) : execute();
         // Ledger lines added on the working set must have IDs no older (unloaded) line has.
         if (result.pendingIds.ledger && (await ledgerIdsTaken(runOn, result.pendingIds.ledger)))
           throw new HistoryNeeded("ledger-id");
@@ -1218,21 +1228,28 @@ export async function submitCommands(input: {
           historyEngineStats.selections.push({ kinds: unapplied.map((c) => c.kind), loaded: selection!.size, archived: stubbed.size + selection!.size });
           if (historyEngineStats.selections.length > 50) historyEngineStats.selections.shift();
         }
+        if (usingDigests) {
+          historyEngineStats.selections.push({ kinds: unapplied.map((c) => c.kind), loaded: 0, archived: usingDigests.size });
+          if (historyEngineStats.selections.length > 50) historyEngineStats.selections.shift();
+        }
         break;
       } catch (error) {
         if (!(error instanceof HistoryNeeded) || attempt >= 3) throw error;
         historyEngineStats.fallbacks.push({ kinds: unapplied.map((c) => c.kind), reason: stubbed ? "selection" : error.reason });
         if (historyEngineStats.fallbacks.length > 50) historyEngineStats.fallbacks.shift();
-        // A batch that needed more than the selected sessions runs on every session.
+        // A batch that needed more than the selected sessions (or their digests) runs on every session.
         if (stubbed) {
           selection = null;
+          sessions = true;
+        } else if (usingDigests) {
+          digests = null;
           sessions = true;
         } else if (error.reason === "reports") sessions = true;
         else pages = true;
       }
     }
     // Archived sessions read in full here that are not indexed yet (archived before 0030).
-    if (sessions && selection === null) void indexReadArchives(room, source);
+    if (sessions && selection === null && !digests) void indexReadArchives(room, source);
     for (const command of unapplied) {
       const key = seat.id + ":" + command.id;
       seen.add(key);
@@ -1313,7 +1330,7 @@ export const historyEngineStats: {
   selections: { kinds: string[]; loaded: number; archived: number }[];
 } = { fallbacks: [], selections: [] };
 let archiveSelections = true;
-/** Test-only: plan archive selections (true) or always load every archived session (false). */
+/** Test-only: plan archive selections and favour digests (true) or always load every archived session (false). */
 export function setArchiveSelectionForTests(on: boolean) {
   archiveSelections = on;
 }
@@ -1364,6 +1381,27 @@ function selectionSafe(room: CloudRoom, commands: { kind: string }[]): boolean {
       if (line.id === c.target!.id && (line.trade || receiptForLine(room.table, line))) return false;
   }
   return true;
+}
+/** Whether every command of the batch that reads archived sessions is "favour whoever is behind". */
+function favourOnly(commands: { kind: string; changes?: { store: string; id: string }[] }[]): boolean {
+  const reading = commands.filter((c) => historyNeedsSessions([c]));
+  return reading.length > 0 && reading.every((c) => c.kind === "loot-resolve" && !!(c as { favour?: unknown }).favour);
+}
+/**
+ * The fairness digest of every deferred archived session, by stored reference: each session read on
+ * its own (as a whole read restores it) and released before the next, so memory holds one session
+ * and the small digests, not the campaign.
+ */
+async function archivedDigests(room: CloudRoom): Promise<Map<string, ArchivedFairnessDigest>> {
+  const digests = new Map<string, ArchivedFairnessDigest>();
+  for (const report of room.table.journal?.reports ?? []) {
+    if (!isDeferredSnapshot(report.snapshot)) continue;
+    const reference = report.snapshot.slice(DEFERRED_REPORT_PREFIX.length);
+    if (digests.has(reference)) continue;
+    const [read] = await hydrateDeferredReports(room.code, [report]);
+    digests.set(reference, fairnessDigestOfSnapshot(read!.snapshot));
+  }
+  return digests;
 }
 /** The snapshot an irrelevant archived session is read as in a selected run: no lines or events. */
 const IRRELEVANT_ARCHIVE = JSON.stringify(emptyCloudTable());
