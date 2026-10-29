@@ -24,6 +24,7 @@ import {
   pollCloudTable as pollServer,
   previewCloudTable,
   pullCloudTable as pullServer,
+  readCloudHistory,
   readCloudSections,
   setCloudPace as paceServer,
   skipCloudTurn as skipServer,
@@ -31,7 +32,7 @@ import {
 } from "./cloud-api.ts";
 import { createRoomSync } from "./room-sync.ts";
 
-export { closeCloudTable, joinCloudTable, openCloudTable, previewCloudTable };
+export { closeCloudTable, joinCloudTable, openCloudTable, previewCloudTable, readCloudHistory };
 
 const sync = createRoomSync({ readSections: readCloudSections, fullRead: pullServer });
 export const { clearViewSectionCache } = sync;

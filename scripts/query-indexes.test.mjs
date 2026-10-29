@@ -87,3 +87,18 @@ test("0027 backup parts and step 3 partial room reads use primary keys", () => {
   );
   db.close();
 });
+
+test("0029 serves the history-on-demand lookups from keys and indexes", () => {
+  assertAdditiveSql("0029_campaign_room_report_parts.sql", readFileSync(`${directory}/0029_campaign_room_report_parts.sql`, "utf8"));
+  const db = schema();
+  // room-reports.mjs: the parts of one archived session (by room and reference).
+  assert.match(plan(db, "SELECT reference,part,body FROM campaign_room_report_parts WHERE code=? AND reference IN (?,?)"), /USING INDEX sqlite_autoindex_campaign_room_report_parts_1/);
+  // room-storage.mjs roomHistoryIdsTaken: new ledger IDs against a room's sealed pages.
+  const taken = plan(db, "SELECT 1 FROM campaign_room_history_ids WHERE code=? AND id IN (?,?) AND hash IN (?,?)");
+  assert.match(taken, /USING (COVERING )?INDEX (campaign_room_history_ids_by_id|sqlite_autoindex_campaign_room_history_ids_1)/);
+  assert.doesNotMatch(taken, /SCAN campaign_room_history_ids/);
+  // Its completeness check and the write's cleanup of pages it no longer references.
+  assert.match(plan(db, "SELECT COUNT(DISTINCT hash) FROM campaign_room_history_ids WHERE code=? AND hash IN (?,?)"), /USING (COVERING )?INDEX sqlite_autoindex_campaign_room_history_ids_1/);
+  assert.match(plan(db, "DELETE FROM campaign_room_history_ids WHERE code = ? AND hash NOT IN (?,?)"), /USING (COVERING )?INDEX sqlite_autoindex_campaign_room_history_ids_1/);
+  db.close();
+});

@@ -3,20 +3,24 @@ import { readArchivedSnapshot, sessionSummary, type Journal } from "./journal.ts
 import { projectRecord } from "./session-records.ts";
 import type { LedgerLine } from "./types.ts";
 
-export type ArchiveInput = { snapshot: unknown; error?: string };
+export type ArchiveInput = { snapshot: unknown; error?: string; deferred?: true };
 export type ArchiveSeat = Pick<CloudSeat, "role" | "purseIds"> & {
   id?: string;
   ownedDevice?: boolean;
   tabletopProjected?: boolean;
 };
 export type ArchiveResult =
-  { available: true; snapshot: CloudTable } | { available: false; error: string };
+  | { available: true; snapshot: CloudTable }
+  | { available: false; error: string; deferred?: true };
 
 const unavailable =
   "This archived report cannot be read. Totals are unavailable. Keep its original backup for recovery.";
 
 /** A reader never repairs, replaces or interprets a diagnostic placeholder as history. */
+/** History on demand: an archived session a shared room listed without its contents. */
+export const notLoaded = "This archived session is kept online. Load it to read it.";
 export function readArchiveResult(report: ArchiveInput, seat?: ArchiveSeat): ArchiveResult {
+  if (report.deferred) return { available: false, error: notLoaded, deferred: true };
   if (report.error !== undefined) return { available: false, error: unavailable };
   try {
     const snapshot = readArchivedSnapshot(

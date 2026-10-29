@@ -33,13 +33,20 @@ import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
 import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
 import { projectJourneys } from "./journey-engine.ts";
-import { projectQuestMapLinks, projectQuests, questNamedPurses } from "./quests.ts";
+import { projectQuestMapLinks, projectQuests, questNamedPurses, type QuestProjectionContext } from "./quests.ts";
+import { isDeferredSnapshot } from "./history-pages.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
   table: CloudTable,
   seat: Pick<CloudSeat, "role" | "purseIds"> & { id?: string },
-  options: { ownedDevice?: boolean; directory?: boolean; tabletopProjected?: boolean } = {},
+  options: {
+    ownedDevice?: boolean;
+    directory?: boolean;
+    tabletopProjected?: boolean;
+    /** Quest reward receipts resolved over the whole campaign (quests.ts `QuestProjectionContext`). */
+    questReceipt?: QuestProjectionContext["receipt"];
+  } = {},
 ): CloudTable {
   const t = structuredClone(table);
   const dm = seat.role === "dm";
@@ -59,46 +66,16 @@ export function projectRecord(
       e.visibility === "party" ||
       (dm ? e.visibility === "dm" : e.visibility === "player" && seat.purseIds.includes(e.purseId)),
   );
-  // Fairness ledger (phase 3): whether this seat compares party totals is decided on the
-  // current table (owner decision, 2026-10-24: players away from the party see only their own).
-  const comparesParty = !dm && seatInParty(table, seat);
   t.journal.reports = t.journal.reports
     ?.filter((r) => ownedDevice || !r.seatIds || (seat.id && r.seatIds.includes(seat.id)))
     .map((r) => {
-      try {
-        const raw = readArchivedSnapshot(r.snapshot);
-        const projected = projectRecord(raw, seat, {
-          ownedDevice,
-          tabletopProjected: options.tabletopProjected,
-        });
-        return {
-          ...r,
-          snapshot: JSON.stringify(
-            dm
-              ? projected
-              : {
-                  ...projected,
-                  fairness: fairnessProjection(r.snapshot, raw, table, seat, comparesParty, projected.ledger),
-                },
-          ),
-        };
-      } catch {
-        return {
-          ...r,
-          snapshot: JSON.stringify({
-            purses: [],
-            holdings: [],
-            shops: [],
-            stock: [],
-            ledger: [],
-            notes: [],
-            sheets: [],
-            loans: [],
-            listings: [],
-          }),
-          error: "This archived report cannot be read. Keep its original backup for recovery.",
-        };
+      // History on demand (step 4): an archived session not read with the room is listed by its
+      // name and date only; `projectArchivedReport` projects it when someone opens it.
+      if (isDeferredSnapshot(r.snapshot)) {
+        const { snapshot: _snapshot, ...listed } = r;
+        return { ...listed, snapshot: "", deferred: true as const };
       }
+      return projectArchivedReport(r, table, seat, { ownedDevice, tabletopProjected: options.tabletopProjected });
     });
   t.journal.editReports = t.journal.editReports?.filter(
     (r) => dm || seat.purseIds.includes(r.purseId),
@@ -245,6 +222,7 @@ export function projectRecord(
     );
     const questPlaces = projectQuests(table, t.journal, seat, {
       tabletopProjected: options.tabletopProjected,
+      ...(options.questReceipt ? { receipt: options.questReceipt } : {}),
       readableNpcs,
       // A hidden group's place, unless the seat's own group or the party is there too.
       hiddenPlaces: new Set(
@@ -571,6 +549,68 @@ export function projectRecord(
   if (!dm && t.journal) projectQuestMapLinks(t.journal);
   for (const p of t.purses) delete p.editBaseline;
   return t;
+}
+type ArchivedReport = NonNullable<NonNullable<CloudTable["journal"]>["reports"]>[number];
+type RecordSeat = Pick<CloudSeat, "role" | "purseIds"> & { id?: string };
+/**
+ * One archived session as `projectRecord` projects it for `seat` on the current `table`: its
+ * snapshot projected by the same rules (players also get their fairness ledger figures), or the
+ * unreadable-archive placeholder. Does not check the report's seat list (callers filter by it).
+ * Used by `projectRecord` and, for history on demand (step 4), when a client opens one report.
+ */
+export function projectArchivedReport(
+  r: ArchivedReport,
+  table: CloudTable,
+  seat: RecordSeat,
+  options: { ownedDevice?: boolean; tabletopProjected?: boolean } = {},
+): ArchivedReport {
+  const dm = seat.role === "dm";
+  if (!dm)
+    seat = {
+      ...seat,
+      purseIds: seat.purseIds.filter((id) => {
+        const p = table.purses.find((p) => p.id === id);
+        return p && characterVisible(table, p);
+      }),
+    };
+  const ownedDevice = options.ownedDevice === true && dm;
+  // Fairness ledger (phase 3): whether this seat compares party totals is decided on the
+  // current table (owner decision, 2026-10-24: players away from the party see only their own).
+  const comparesParty = !dm && seatInParty(table, seat);
+  try {
+    const raw = readArchivedSnapshot(r.snapshot);
+    const projected = projectRecord(raw, seat, {
+      ownedDevice,
+      tabletopProjected: options.tabletopProjected,
+    });
+    return {
+      ...r,
+      snapshot: JSON.stringify(
+        dm
+          ? projected
+          : {
+              ...projected,
+              fairness: fairnessProjection(r.snapshot, raw, table, seat, comparesParty, projected.ledger),
+            },
+      ),
+    };
+  } catch {
+    return {
+      ...r,
+      snapshot: JSON.stringify({
+        purses: [],
+        holdings: [],
+        shops: [],
+        stock: [],
+        ledger: [],
+        notes: [],
+        sheets: [],
+        loans: [],
+        listings: [],
+      }),
+      error: "This archived report cannot be read. Keep its original backup for recovery.",
+    };
+  }
 }
 /**
  * A player's copy of the split settings. It must plan the same split the server will: the

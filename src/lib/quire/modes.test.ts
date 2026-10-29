@@ -32,6 +32,9 @@ sql.exec(
 sql.exec(
   readFileSync(new URL("../../../cloudflare/migrations/0019_campaign_room_reports.sql", import.meta.url), "utf8"),
 );
+sql.exec(
+  readFileSync(new URL("../../../cloudflare/migrations/0029_campaign_room_report_parts.sql", import.meta.url), "utf8"),
+);
 (globalThis as any).__env__ = {
   DB: {
     prepare(query: string) {
