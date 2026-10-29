@@ -1,0 +1,10 @@
+{
+  "title": "Long campaigns open faster: earlier history loads when you ask",
+  "summary": "Shared campaigns with long ledgers, chats and many archived sessions now open with their newest lines, and older history loads on request.",
+  "items": [
+    "The ledger, Full activity, Finances and Chat open with their newest lines. Load earlier entries and Load earlier messages fetch older ones, and a search or filter loads them by itself.",
+    "Archived sessions in Journal and Reports show Load this session and open their full record when chosen.",
+    "Totals that span the whole campaign say when they only cover what is loaded and offer Load all history. Fairness and favour-whoever-is-behind load what they need before comparing.",
+    "Download a copy, online backups and returning to Local Mode load the whole campaign first, so this device keeps every entry; if that fails, nothing changes. Players only ever receive what their own view includes."
+  ]
+}

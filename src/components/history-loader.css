@@ -1,0 +1,34 @@
+/* History on demand controls (history-loader.tsx): "Load earlier entries" and friends. App tokens only. */
+.history-loader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--color-elevated) 70%, transparent);
+}
+.history-loader-note {
+  flex: 1 1 14rem;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+.history-loader-spin {
+  animation: history-loader-spin 0.9s linear infinite;
+}
+@keyframes history-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .history-loader-spin {
+    animation: none;
+  }
+}
+.chat-history .history-loader {
+  margin: 0.25rem 0.5rem 0.75rem;
+}

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { App } from "@capacitor/app";
 import { ShieldCheck, Smartphone } from "lucide-react";
 import {
   connectOwnerWidget,
+  disconnectNote,
   disconnectOwnerWidget,
   hasOwnerWidget,
   OwnerWidget,
@@ -46,10 +47,21 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const supported = hasOwnerWidget();
+  const connectButton = useRef<HTMLButtonElement>(null);
+  // A widget's Sign in opens /account#home-screen-widget: scroll here and, while the widget is not
+  // connected, put focus on Connect widget so connecting is one tap.
+  const [openedFromWidget] = useState(
+    () => typeof window !== "undefined" && window.location.hash === "#home-screen-widget",
+  );
   useEffect(() => {
-    if (window.location.hash === "#home-screen-widget")
+    if (openedFromWidget)
       document.getElementById("home-screen-widget")?.scrollIntoView({ block: "start" });
-  }, []);
+  }, [openedFromWidget]);
+  useEffect(() => {
+    if (openedFromWidget && status && !status.connected)
+      connectButton.current?.focus({ preventScroll: true });
+  }, [openedFromWidget, status]);
+  const lastDisconnect = disconnectNote(status);
   useEffect(() => {
     if (!supported) return;
     let alive = true;
@@ -115,9 +127,10 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
       </p>
       <p className="text-sm text-muted">
         Your name and private totals will be visible on your home screen. The widget keeps its own
-        owner session (valid for a year), so signing out of the app or switching accounts no longer
-        stops its automatic readings; only Disconnect widget, removing the final widget or losing
-        owner access ends it. Server-revoked access clears on its next server check.
+        owner session (valid for a year), so signing out of the app, switching accounts, updating
+        the app or removing and re-adding widgets does not stop it; only Disconnect widget, losing
+        owner access or a reset of the phone’s encryption key ends it. Server-revoked access clears
+        on its next server check. While no widget is placed, no background checks run.
       </p>
       {!supported ? (
         <p className="text-sm">
@@ -130,8 +143,15 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
               ? `${status.connected ? "Connected" : "Not connected"} · ${status.installed} on home screen`
               : "Checking widget…"}
           </p>
+          {status && !status.connected && (
+            <p className="text-sm" role="note">
+              {lastDisconnect ? `Last disconnected: ${lastDisconnect}. ` : ""}
+              Tap Connect widget to give the home-screen widget its own owner session.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
+              ref={connectButton}
               type="button"
               className="portal-button"
               disabled={busy}
@@ -144,7 +164,7 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
                 })
               }
             >
-              {status?.connected ? "Reconnect owner account" : "Connect owner account"}
+              {status?.connected ? "Reconnect owner account" : "Connect widget"}
             </button>
             <button
               type="button"

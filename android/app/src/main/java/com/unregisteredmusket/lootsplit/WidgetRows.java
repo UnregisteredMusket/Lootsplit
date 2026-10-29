@@ -29,7 +29,7 @@ final class WidgetRows {
     static JSONArray rows(JSONObject snapshot, java.util.Set<String> expanded) {
         JSONArray rows = new JSONArray();
         try {
-            if (snapshot == null) { add(rows, "No current owner reading", "Sign in or tap Refresh. Backend logging continues independently.", "account"); return identify(rows); }
+            if (snapshot == null) { add(rows, "No current owner reading", "Sign in or tap Refresh. Backend logging continues independently.", OwnerWidgetProvider.CONNECT); return identify(rows); }
             java.util.List<JSONObject> items = attentionItems(snapshot);
             int active = 0; for (JSONObject item : items) if (!"info".equals(item.optString("severity"))) active++;
             section(rows, "attention", active > 0 ? "Needs attention" : "Attention", active > 0 ? active + " active" : "none active");
@@ -43,6 +43,23 @@ final class WidgetRows {
             more(rows, snapshot);
         } catch (Exception ignored) { }
         return identify(rows);
+    }
+    /**
+     * The list without a current reading. Disconnected: "Not connected — tap Sign in" and why (the
+     * recorded disconnect reason). Connected: awaiting a reading, tap Refresh. The row has no ID, so a
+     * tap opens the app's widget Connect screen at once instead of expanding the row.
+     */
+    static JSONArray placeholder(android.content.Context context, JSONObject state) {
+        JSONArray rows = new JSONArray();
+        boolean connected = !state.optString("token").isEmpty() || state.optBoolean(WidgetStore.UNAVAILABLE);
+        try {
+            if (connected) add(rows, "No current owner reading", "Connected. Tap Refresh to check now. Backend logging continues independently.", OwnerWidgetProvider.CONNECT);
+            else {
+                String note = WidgetStore.disconnectNote(context);
+                add(rows, WidgetRefresh.NOT_CONNECTED, (note.isEmpty() ? "" : note + ". ") + "Opens the app to connect your owner account. Backend logging continues independently.", OwnerWidgetProvider.CONNECT);
+            }
+        } catch (Exception ignored) { }
+        return rows;
     }
     private static void section(JSONArray rows, String id, String title, String detail) throws Exception {
         rows.put(new JSONObject().put("kind", "section").put("id", "section:" + id).put("title", title).put("detail", detail));

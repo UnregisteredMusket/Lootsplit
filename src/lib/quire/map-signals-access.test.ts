@@ -316,7 +316,12 @@ test("a signal read costs one light query and no write, even in a megabyte room"
     assert.equal(meter.queries.length, sectioned ? 4 : 2, "authorization read (row, then sections) plus the ping read");
     assert.ok(!meter.queries.some((q) => /DELETE|INSERT|UPDATE/i.test(q)), "a read never writes");
     assert.ok(!meter.queries.some((q) => /SELECT\s+body\s*,\s*revision/i.test(q)), "the room body is never fetched");
-    assert.ok(meter.bytes < 8_000, `a signal read returned ${meter.bytes} bytes from a ${body}-byte room`);
+    // The row's manifest lists every history page (step 4) with its visibility keys, a few hundred
+    // bytes each; a megabyte of chat is two pages at the real page size, hundreds when suites
+    // force tiny pages. Nothing beyond the manifest is read.
+    const entries = (stored.version.sections ?? []).filter((e) => e.path[0] === "$history");
+    const manifestBytes = entries.reduce((sum, e) => sum + JSON.stringify(e).length + 40, 0);
+    assert.ok(meter.bytes < 8_000 + manifestBytes, `a signal read returned ${meter.bytes} bytes from a ${body}-byte room (${entries.length} history pages)`);
   }
 });
 

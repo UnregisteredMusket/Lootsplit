@@ -1,3 +1,4 @@
+import { LedgerCoverage, LoadArchivedSession, LoadEarlierEntries, SearchEarlierEntries } from "./history-loader";
 import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
@@ -47,13 +48,15 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
   const selectedSession = journal.sessions.find((s) => s.id === session),
     archive = journal.reports?.find((r) => r.id === session);
   let source = ledger,
-    archiveError = "";
+    archiveError = "",
+    archiveDeferred = false;
   if (archive) {
     const result = readArchiveResult(archive, archiveSeat);
     if (result.available) source = result.snapshot.ledger;
     else {
       source = [];
       archiveError = result.error;
+      archiveDeferred = !!("deferred" in result && result.deferred);
     }
   }
   const rows = financialRows(
@@ -326,7 +329,17 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
           >
             Clear financial filters
           </Button>
-          {archiveError && <p role="alert">{archiveError}</p>}
+          {archiveDeferred && archive ? (
+            <LoadArchivedSession id={archive.id} name={archive.name} />
+          ) : (
+            archiveError && <p role="alert">{archiveError}</p>
+          )}
+          {!archive && (
+            <SearchEarlierEntries list="ledger" active={!!query.trim() || !!account || !!type} />
+          )}
+          {!archive && selectedSession && !selectedSession.endedAt && (
+            <LedgerCoverage since={selectedSession.startedAt} ledger={ledger} />
+          )}
           <p>
             {rows.length} original records · Received {formatCopper(totals.received)} · Spent{" "}
             {formatCopper(totals.spent)} · Net {formatCopper(totals.net)}. Internal transfers are
@@ -385,6 +398,7 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
               </Button>
             </nav>
           )}
+          {!archive && <LoadEarlierEntries list="ledger" />}
         </section>
       )}
       <FeatureLink feature={bank ? "finances" : "bank"} />
