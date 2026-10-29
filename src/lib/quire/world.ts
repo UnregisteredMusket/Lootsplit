@@ -549,7 +549,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       if (w.tabletop.activeMapId === cmd.mapId) w.tabletop.activeMapId = null;
       if (w.tabletop.camera?.mapId === cmd.mapId) w.tabletop.camera = null;
     }
-    // Player movement (protocol 14): a save without the movement choice keeps the stored one.
+    // Player movement (protocol 15): a save without the movement choice keeps the stored one.
     if (cmd.map) keepMovement(cmd.map, current?.tabletop);
     w.maps = w.maps.filter((m) => m.id !== cmd.mapId);
     if (cmd.map) w.maps.push(cmd.map);
