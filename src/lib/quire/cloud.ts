@@ -73,6 +73,12 @@ export type CloudRoom = {
   invitations?: Record<string, string>;
   blockedUsers?: Record<string, "kicked" | "banned">;
   drafts?: Record<string, import("./commands.ts").Command[]>;
+  /**
+   * Set when an archived session took the campaign past `ROOM_TOTAL_LIMIT` (room-size.ts): the
+   * total stored with archived sessions. A notice only (nothing is refused); the DM's view carries
+   * it. Cleared when a later archive finds the total below the threshold.
+   */
+  storageWarning?: { totalBytes: number; limit: number };
   /** Server-only per-seat submit budget (room-submit-limit.ts); never projected to clients. */
   submitAllowance?: Record<string, import("./room-submit-limit.ts").SubmitAllowance>;
 };

@@ -16,12 +16,14 @@
  * - **Total** (`ROOM_TOTAL_LIMIT`): the live campaign plus every archived session snapshot. A room
  *   read never loads it, but whole-campaign operations do: Download a copy and other exports,
  *   deletion copies, account records, older apps' complete views, and commands that read archived
- *   sessions (Undo of an archived line, favour, quest reward links). The cap is the largest total
- *   at which each of those still fits comfortably in a 128 MB Worker isolate (two at once fit;
- *   measured with scripts/room-memory-measure.mjs, asserted by scripts/room-memory-cap.test.mjs),
- *   so no campaign can grow to where its own export or Undo fails. Checked when a session is
- *   archived (the only write that adds to the archive). Raising it needs streaming exports and
- *   whole-campaign reads first.
+ *   sessions (Undo of an archived line, favour, quest reward links). This is a **warning
+ *   threshold, never a refusal** (owner rule: no feature is reduced; a session can always be
+ *   archived): the largest total at which each of those still fits comfortably in a 128 MB Worker
+ *   isolate, two at once (measured with scripts/room-memory-measure.mjs, documented and checked by
+ *   scripts/room-memory-warning.test.mjs). Past it, the archive goes ahead, the owner monitor gets
+ *   a `room-storage` warning and the DM a notice recommending Download a copy; a whole-campaign
+ *   operation that cannot fit fails loudly with nothing changed. Streaming exports, delta session
+ *   archives and an archived-ledger index are what let it rise.
  *
  * `ROOM_ROW_LIMIT` caps every single D1 row a room write stores (D1 rejects rows above 2,000,000
  * bytes): the room row of a sectioned campaign. Section parts, history pages and archived
@@ -36,10 +38,5 @@ const mb = (bytes: number) => `${bytes / 1_000_000} MB`;
 export const ROOM_LIMIT_TEXT = mb(ROOM_BODY_LIMIT);
 /** The live campaign cap as the app states it. */
 export const ROOM_LIVE_LIMIT_TEXT = mb(ROOM_LIVE_LIMIT);
-/** The total storage cap as the app states it. */
+/** The total-size warning threshold as the app states it. */
 export const ROOM_TOTAL_LIMIT_TEXT = mb(ROOM_TOTAL_LIMIT);
-/**
- * The start of the message a session archive refused by `ROOM_TOTAL_LIMIT` carries, so the
- * browser can offer Download a copy next to it.
- */
-export const ROOM_TOTAL_REFUSAL = "This campaign has reached its online storage limit";

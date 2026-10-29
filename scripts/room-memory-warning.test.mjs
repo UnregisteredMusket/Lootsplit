@@ -1,11 +1,11 @@
-// The total campaign cap (ROOM_TOTAL_LIMIT, owner decision 2026-10-29: "I don't want to keep
-// fighting storage issues") must stay at or below what whole-campaign operations can handle: a
-// campaign at the cap, with the largest live campaign allowed, is read whole (as Download a copy,
-// deletion copies and account records read it) and has an archived line undone (a command that
-// reads every archived session), each twice at once, inside a 128 MB heap
-// (scripts/room-memory-measure.mjs; a Worker isolate has 128 MB). Two at once is the margin: one
-// such operation uses at most about half the isolate. Raising the cap needs streaming exports and
-// whole-campaign reads first. Disposable local database only; never a real campaign.
+// The total-size warning threshold (ROOM_TOTAL_LIMIT; a notice, never a refusal) documents the
+// measured safe size of whole-campaign operations: a campaign at the threshold, in the two shapes
+// that cost most, is read whole (as Download a copy, deletion copies and account records read it)
+// and has a line undone (a command that reads every archived session), each twice at once, inside
+// a 128 MB heap (scripts/room-memory-measure.mjs; a Worker isolate has 128 MB). Two at once is the
+// margin: one such operation uses at most about half the isolate. If the threshold is raised past
+// what fits, this fails: raise it only after streaming exports, delta session archives and an
+// archived-ledger index make whole-campaign operations bounded. Disposable local database only.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -22,10 +22,10 @@ const run = (heap, ...args) =>
     maxBuffer: 1e8,
   });
 
-// Two shapes at the cap: the largest live campaign with a few archived sessions, and a small live
+// Two shapes at the threshold: the largest live campaign with a few archived sessions, and a small live
 // campaign with many (archived sessions cost more memory per byte: they are projected one by one).
 for (const [shape, live] of [["the largest live campaign", Math.round(ROOM_LIVE_LIMIT * 0.95)], ["a small live campaign", 1_000_000]])
-  test(`${shape} at the total cap: whole-campaign reads and Undo fit twice at once in 128 MB`, { timeout: 600_000 }, () => {
+  test(`${shape} at the total-size warning threshold: whole-campaign reads and Undo fit twice at once in 128 MB`, { timeout: 600_000 }, () => {
     const dir = mkdtempSync(join(tmpdir(), "lootsplit-cap-"));
     try {
       const file = join(dir, "cap.sqlite");
@@ -33,7 +33,7 @@ for (const [shape, live] of [["the largest live campaign", Math.round(ROOM_LIVE_
       const reports = Math.floor((ROOM_TOTAL_LIMIT - probe.storedBytes) / probe.reportBytes);
       const sizes = JSON.parse(run(1024, "setup", file, "--live", String(live), "--reports", String(reports)).stdout);
       const total = sizes.storedBytes + sizes.reportBytes;
-      assert.ok(total <= ROOM_TOTAL_LIMIT && total >= ROOM_TOTAL_LIMIT - probe.reportBytes, `fixture at the cap (${total} bytes)`);
+      assert.ok(total <= ROOM_TOTAL_LIMIT && total >= ROOM_TOTAL_LIMIT - probe.reportBytes, `fixture at the threshold (${total} bytes)`);
       for (const op of ["whole", "undo"]) {
         const copy = join(dir, `${op}.sqlite`);
         copyFileSync(file, copy);
