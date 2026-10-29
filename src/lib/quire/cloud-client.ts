@@ -8,6 +8,9 @@ import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
 import { loadSeatLock } from "./lock.ts";
 import { notify } from "./notify.ts";
+import { toast } from "sonner";
+/** The storage notice this tab has shown (room code and size), so it is shown once. */
+let storageWarningShown = "";
 import {
   closeCloudTable,
   joinCloudTable,
@@ -20,7 +23,16 @@ import {
   skipCloudTurn,
   submitCloudCommands,
   manageCloudRoom,
+  readCloudHistory,
 } from "./room-transport.ts";
+import {
+  connectRoomHistory,
+  historyIncomplete,
+  loadAllHistory,
+  mergeHistory,
+  noteRoomView,
+  onRoomHistoryLoaded,
+} from "./room-history.ts";
 import { setCloudWatch } from "./cloud-turn.ts";
 import { applyCloudTable, economySnapshot, snapshot } from "./economy.ts";
 import { getSeat, setSeat, downloadJson, resumedPlayerSeat } from "./table.ts";
@@ -82,6 +94,8 @@ const initialView = {
   departed: [] as NonNullable<RoomView["departed"]>,
   testMode: false,
   viewOnly: false,
+  /** DM only: the campaign passed the total size warning threshold (storage-warning-notice.tsx). */
+  storageWarning: null as { totalBytes: number; limit: number } | null,
   /** The DM's name for the shared campaign ("" when unnamed); campaign-name.ts shows it. */
   campaignName: "",
   encounterActive: undefined as boolean | undefined,
@@ -457,6 +471,10 @@ async function accept(value: RoomView, committed = false) {
     throw Error(
       "The campaign response belongs to a different room or seat. Your pending actions are retained.",
     );
+  // History on demand (protocol 12): the view holds the newest lines; the older pages and
+  // archived sessions this tab has opened are put back before the device table is written.
+  noteRoomView({ code: s.code, token: s.token }, remote);
+  lastRemote = { code: remote.code, seatId: remote.seatId, revision: remote.revision, table: remote.table, purseIds: remote.purseIds, seats: remote.seats };
   if (remote.userId && s.userId && remote.userId !== s.userId)
     throw Error(
       "This seat now belongs to a different account. Export your original pending work before switching.",
@@ -502,25 +520,11 @@ async function accept(value: RoomView, committed = false) {
   let applied = false;
   let conflict: string | undefined;
   if (!s.pending.length && (changed || committed)) {
-    await applyCloudTable(remote.table);
+    await applyCloudTable(mergeHistory(remote.table));
     applied = true;
   } else if (changed) {
     try {
-      let preview = remote.table;
-      for (const cmd of s.pending)
-        preview = applyCommand(
-          preview,
-          {
-            id: s.seatId,
-            token: s.token,
-            name: remote.seats.find((x) => x.id === s.seatId)?.name ?? "Player",
-            role: s.role,
-            purseIds: remote.purseIds,
-          },
-          cmd,
-          { preview: true },
-        );
-      await applyCloudTable(preview);
+      await applyCloudTable(previewTable(s, lastRemote));
       applied = true;
     } catch (error) {
       s.revision = previousRevision;
@@ -566,6 +570,18 @@ async function accept(value: RoomView, committed = false) {
       purseIds: remote.purseIds,
       shopIds: remote.shopIds,
     });
+  // The campaign passed the total size warning threshold: tell the DM once per tab and size
+  // (the Desk keeps the notice; storage-warning-notice.tsx). Never blocks anything.
+  if (s.role === "dm" && remote.storageWarning) {
+    const shown = `${remote.code}:${remote.storageWarning.totalBytes}`;
+    if (shown !== storageWarningShown && typeof window !== "undefined") {
+      storageWarningShown = shown;
+      toast("This campaign is getting large", {
+        description: "With its archived sessions it now passes the size at which every download and undo always works online. Download a copy (My account → Campaigns) to keep the whole campaign safe. Nothing was refused.",
+        duration: 10000,
+      });
+    }
+  }
   publish(
     {
       joined: true,
@@ -579,6 +595,10 @@ async function accept(value: RoomView, committed = false) {
       departed: remote.departed || [],
       testMode: remote.testMode === true,
       viewOnly: remote.viewOnly === true,
+      storageWarning:
+        s.role === "dm" && remote.storageWarning && Number.isFinite(remote.storageWarning.totalBytes) && Number.isFinite(remote.storageWarning.limit)
+          ? { totalBytes: remote.storageWarning.totalBytes, limit: remote.storageWarning.limit }
+          : null,
       // The server stores a cleaned name (campaign-name.ts); absent means unnamed.
       campaignName: typeof remote.campaignName === "string" ? remote.campaignName : "",
       encounterActive: remote.encounterActive,
@@ -626,6 +646,57 @@ async function withRoomImages(value: RoomView): Promise<RoomView> {
       data: { tabletopProtocol: 3, code: s.code, token: s.token },
     });
   }
+}
+/** The latest accepted room view's table (unmerged), for re-merging loaded history. */
+let lastRemote:
+  | { code: string; seatId: string; revision: number; table: CloudTable; purseIds: string[]; seats: RoomView["seats"] }
+  | undefined;
+/** The device's table for a view with this seat's pending actions applied as a preview. */
+function previewTable(s: Session, remote: NonNullable<typeof lastRemote>) {
+  let preview = mergeHistory(remote.table);
+  for (const cmd of s.pending)
+    preview = applyCommand(
+      preview,
+      {
+        id: s.seatId,
+        token: s.token,
+        name: remote.seats.find((x) => x.id === s.seatId)?.name ?? "Player",
+        role: s.role,
+        purseIds: remote.purseIds,
+      },
+      cmd,
+      { preview: true },
+    );
+  return preview;
+}
+/**
+ * Earlier history finished loading (room-history.ts): write the latest view again with it merged,
+ * so every screen sees the older lines. Reads nothing from the room; changes nothing in it.
+ */
+async function applyLoadedHistory() {
+  const s = session();
+  if (!s || !lastRemote || lastRemote.code !== s.code || lastRemote.seatId !== s.seatId || lastRemote.revision !== s.revision)
+    return;
+  try {
+    await applyCloudTable(s.pending.length ? previewTable(s, lastRemote) : mergeHistory(lastRemote.table));
+  } catch {
+    // A pending preview that no longer applies is reported by the next sync, as before.
+    return;
+  }
+  publish({ lastSync: Date.now() }, true);
+}
+/** Coalesced: batches loaded while one merge waits are written by that one merge. */
+let reapplyQueued: Promise<void> | null = null;
+function reapplyRoomHistory() {
+  reapplyQueued ??= serial(async () => {
+    reapplyQueued = null;
+    await applyLoadedHistory();
+  });
+  return reapplyQueued;
+}
+if (typeof window !== "undefined") {
+  connectRoomHistory(readCloudHistory);
+  onRoomHistoryLoaded(() => void reapplyRoomHistory().catch(() => undefined));
 }
 async function refresh(conditional = false) {
   const s = session();
@@ -684,6 +755,7 @@ async function refresh(conditional = false) {
       )
     ) {
       if (s.pending.length) rememberRevokedRecovery(s, isEphemeralCampaign());
+      if (s.role !== "player") await noteIncompleteDeviceCopy();
       await detachTable(s.role === "player");
       notify(
         "Campaign access ended",
@@ -742,8 +814,66 @@ export function captureDeviceBackup() {
           "Submit or resolve your pending actions before saving a campaign backup. Use Export pending actions to preserve an unfinished turn.",
         );
       }
+      // History on demand: a copy holds every older line and archived session this seat may
+      // read, as before, so they are loaded (with progress) and merged first.
+      await loadWholeCampaign("the copy would be incomplete. Nothing was saved");
     }
     return snapshot();
+  });
+}
+/**
+ * History on demand (protocol 12): this device's copy of a shared campaign holds the newest
+ * ledger and chat lines, plus the older lines and archived sessions loaded in this tab. Before
+ * the copy becomes the whole campaign (a backup or download, the DM's local campaign after
+ * closing or leaving the room, signing out or deleting the room while keeping the DM's copy,
+ * a safety save before joining another room), every older line and archived session is loaded
+ * and merged. When that fails, the caller stops and nothing changes (the room stays open).
+ */
+async function loadWholeCampaign(failure: string) {
+  if (!session()) return assertWholeDeviceCampaign(failure);
+  await refresh();
+  if (session()) {
+    await loadAllHistory();
+    if (historyIncomplete())
+      throw new Error(`Part of this campaign's earlier history could not be loaded, so ${failure}. Check the connection and try again.`);
+    await applyLoadedHistory();
+  }
+  await assertWholeDeviceCampaign(failure);
+}
+async function assertWholeDeviceCampaign(failure: string) {
+  if ((await economySnapshot()).journal?.reports?.some((r) => r.deferred))
+    throw new Error(`Part of this campaign's earlier history is not loaded on this device, so ${failure}. Open the shared campaign and try again.`);
+}
+/**
+ * For account flows that end this device's room access while keeping the DM's copy (signing
+ * out, deleting the shared campaign): loads the whole campaign onto the device first, or throws.
+ */
+export function keepWholeCampaignOnDevice() {
+  return serial(() => loadWholeCampaign("nothing was changed"));
+}
+export const DEVICE_HISTORY_NOTICE_ID = "lootsplit-history-device-notice";
+/**
+ * When the room ended before its whole history reached this device (closed elsewhere, access
+ * revoked) and the DM keeps the device's copy: the copy says so in its chat, so it never passes
+ * silently for the whole campaign. The whole campaign stays with the shared campaign online.
+ */
+async function noteIncompleteDeviceCopy() {
+  const table = await economySnapshot();
+  const partial = historyIncomplete() || (table.journal?.reports ?? []).some((r) => r.deferred);
+  if (!partial || table.notes.some((n) => n.id === DEVICE_HISTORY_NOTICE_ID)) return;
+  await applyCloudTable({
+    ...table,
+    notes: [
+      {
+        id: DEVICE_HISTORY_NOTICE_ID,
+        at: table.notes[0]?.at ?? Date.now(),
+        from: "dm",
+        to: "party",
+        purseId: "",
+        text: "Lootsplitter: this device's copy ended before all of the shared campaign's earlier messages, ledger lines and archived sessions were loaded. The whole campaign is kept online with the shared campaign: My account → Campaigns (Download a copy). Nothing was deleted.",
+      },
+      ...table.notes,
+    ],
   });
 }
 /** The campaign name the DM's device would send to this room (undefined: a device default). */
@@ -807,6 +937,8 @@ export async function joinTable(
     if (hasPendingChanges())
       throw new Error("Resolve pending changes before joining another campaign.");
     if (!isEphemeralCampaign() && !(await loadSeatLock())?.protectSaves) {
+      // A safety save is a whole campaign (history on demand).
+      if (session()) await loadWholeCampaign("you did not join and nothing was changed");
       await rememberSave({
         name: `Before joining room ${code.trim().toUpperCase()}`,
         campaignId: activeCampaignId(),
@@ -1174,6 +1306,8 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
     if (mode === "local") {
       const s = session();
       if (s) {
+        // The DM's device keeps the campaign: load all of it while the room can still serve it.
+        await loadWholeCampaign("the room was not closed and nothing was changed");
         await closeCloudTable({ data: { code: s.code, token: s.token } });
         await detachTable(false);
       }
@@ -1205,6 +1339,7 @@ export function leaveViewableRoom() {
       throw Error("End the session and resolve pending actions before leaving the room online.");
     await refresh();
     if (!view.viewOnly) throw Error("The session has resumed. End it before leaving.");
+    await loadWholeCampaign("you are still in the room and nothing was changed");
     await detachTable(false);
   });
 }
@@ -1277,6 +1412,7 @@ export async function disconnectClosedRoom() {
   const s = requireSession();
   s.pending = [];
   remember(s);
+  if (s.role !== "player") await noteIncompleteDeviceCopy();
   await detachTable(s.role === "player");
 }
 export function resumeTable() {
@@ -1494,6 +1630,7 @@ export async function resumeAccountMembership(
 }
 
 export async function clearAccountRoom(preserveDmCopy = false) {
+  if (preserveDmCopy && session()?.role === "dm") await noteIncompleteDeviceCopy();
   await detachTable(!(preserveDmCopy && session()?.role === "dm"));
 }
 

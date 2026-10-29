@@ -71,6 +71,7 @@ import {
   resumeAccountMembership,
   hasPendingChanges,
   clearAccountRoom,
+  keepWholeCampaignOnDevice,
 } from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
@@ -233,6 +234,8 @@ function Account() {
     if (!(await confirmContextChange())) return;
     if (hasPendingChanges())
       throw new Error("Submit or resolve your pending campaign actions before signing out.");
+    // The DM keeps this device's copy: its whole history is loaded while the seat can read it.
+    if (cloud.joined && cloud.role === "dm") await keepWholeCampaignOnDevice();
     await accountRequest("auth/sign-out", {});
     if (cloud.joined) await clearAccountRoom(true);
     for (const k of Object.keys(localStorage))
@@ -761,6 +764,8 @@ function Account() {
                                     value === m.code ? null : `Type ${m.code} exactly to delete.`,
                                 });
                                 if (confirm !== m.code) return;
+                                if (cloud.joined && cloud.code === m.code && cloud.role === "dm")
+                                  await keepWholeCampaignOnDevice();
                                 await accountRequest("campaign", {
                                   action: "delete",
                                   code: m.code,

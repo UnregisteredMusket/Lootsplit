@@ -43,6 +43,51 @@ final class WidgetStore {
         return new File(context.getNoBackupFilesDir(), "owner-widget.enc");
     }
 
+    // Why the connection last ended. Removing or re-adding widgets never ends it (2026-10-29): only
+    // the app's Disconnect widget, a 401/403 from the server, or an unusable key/file does. The reason
+    // is kept outside the encrypted file, so it survives a lost key, and holds no credential.
+    static final String REASON_IN_APP = "Disconnected in app";
+    static final String REASON_REJECTED = "Owner access rejected";
+    static final String REASON_KEY = "Encryption key reset";
+    static final String REASON_LEGACY = "App sign-out ended an older connection";
+    static final String REASON_CONNECT = "Connection did not finish";
+
+    static File reasonFile(Context context) {
+        return new File(context.getNoBackupFilesDir(), "owner-widget-disconnect.json");
+    }
+
+    /** Records why the stored connection was removed (best effort; never blocks the clear). */
+    static synchronized void recordReason(Context context, String reason) {
+        try {
+            AtomicFile file = new AtomicFile(reasonFile(context));
+            FileOutputStream stream = file.startWrite();
+            try {
+                stream.write(new JSONObject().put("reason", reason).put("at", System.currentTimeMillis()).toString().getBytes(StandardCharsets.UTF_8));
+                file.finishWrite(stream);
+            } catch (Exception failure) { file.failWrite(stream); }
+        } catch (Exception ignored) { }
+    }
+
+    /** The last recorded disconnect ({reason, at}), or null when none was recorded. */
+    static synchronized JSONObject lastDisconnect(Context context) {
+        try {
+            AtomicFile file = new AtomicFile(reasonFile(context));
+            if (!file.getBaseFile().exists()) return null;
+            byte[] bytes = file.readFully();
+            if (bytes.length > 4096) return null;
+            JSONObject value = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+            return value.optString("reason").isEmpty() ? null : value;
+        } catch (Exception ignored) { return null; }
+    }
+
+    /** "Owner access rejected · 29/10/2026 10:41", or "" when no disconnect was recorded. */
+    static String disconnectNote(Context context) {
+        JSONObject last = lastDisconnect(context);
+        if (last == null) return "";
+        long at = last.optLong("at");
+        return last.optString("reason") + (at > 0 ? " · " + WidgetRows.clock(at) : "");
+    }
+
     private static SecretKey key() throws Exception {
         KeyStore keys = KeyStore.getInstance("AndroidKeyStore");
         keys.load(null);
@@ -86,6 +131,7 @@ final class WidgetStore {
                 if (failure != null && permanent(failure)) {
                     // A restored/corrupt file or invalidated key cannot restore owner access.
                     new AtomicFile(file(context)).delete();
+                    recordReason(context, REASON_KEY);
                     try { state = empty(); } catch (Exception impossible) { state = new JSONObject(); }
                     return new JSONObject();
                 }
@@ -119,7 +165,7 @@ final class WidgetStore {
         } catch (Exception failure) {
             if (stream != null) file.failWrite(stream);
             // failWrite keeps the previous file; only an unusable key also ends the connection.
-            if (permanent(failure)) clear(context, null);
+            if (permanent(failure)) remove(context, REASON_KEY);
             throw failure;
         }
     }
@@ -127,6 +173,7 @@ final class WidgetStore {
     static synchronized String connect(Context context, String token) throws Exception {
         JSONObject next = empty().put("token", token).put("message", "Checking owner access…");
         save(context, next);
+        new AtomicFile(reasonFile(context)).delete(); // Connected again: the old reason no longer applies.
         return next.getString("generation");
     }
 
@@ -153,22 +200,37 @@ final class WidgetStore {
         return true;
     }
 
+    /**
+     * The app's explicit Disconnect widget ({@code expectedToken} null), or the app clearing a legacy
+     * widget that still holds the app's own token ({@code expectedToken} given: sign-out, sign-in,
+     * a rejected app session). The widget's own session never matches the app token, so app sign-in
+     * and sign-out leave it connected; a token that cannot be compared (busy Keystore) is kept too,
+     * because a legacy token the server no longer accepts ends on its next check (401) anyway.
+     */
     static synchronized boolean clear(Context context, String expectedToken) {
-        JSONObject current = expectedToken == null ? null : read(context);
-        // Sign-out wins when the stored token cannot be compared: the connection is removed.
-        if (current != null && !current.optBoolean(UNAVAILABLE) && !expectedToken.equals(current.optString("token"))) return false;
+        if (expectedToken != null) {
+            JSONObject current = read(context);
+            if (current.optBoolean(UNAVAILABLE) || !expectedToken.equals(current.optString("token"))) return false;
+        }
+        return remove(context, expectedToken == null ? REASON_IN_APP : REASON_LEGACY);
+    }
+
+    /** Removes the stored connection and records why; the only place the encrypted file is deleted on purpose. */
+    static synchronized boolean remove(Context context, String reason) {
+        boolean existed = file(context).exists();
         new AtomicFile(file(context)).delete();
         try { state = empty(); } catch (Exception ignored) { state = new JSONObject(); }
+        if (existed && reason != null) recordReason(context, reason);
         return true;
     }
 
-    static synchronized boolean clearGeneration(Context context, String generation) {
+    static synchronized boolean clearGeneration(Context context, String generation, String reason) {
         if (!generation.equals(read(context).optString("generation"))) return false;
-        return clear(context, null);
+        return remove(context, reason);
     }
     static synchronized boolean revoke(Context context, String generation, String reason) throws Exception {
         if (!generation.equals(read(context).optString("generation"))) return false;
-        clear(context, null);
+        remove(context, REASON_REJECTED);
         save(context, empty().put("message", reason));
         return true;
     }

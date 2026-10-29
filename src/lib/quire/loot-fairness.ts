@@ -21,6 +21,7 @@
  * - Away and former characters are DM-only rows and are not compared. A player away from the
  *   party sees only their own totals. Party members see only counted receipts of others.
  */
+import { isDeferredSnapshot } from "./history-pages.ts";
 import { characterVisible, inParty } from "./character-position.ts";
 import { isNpc } from "./coin-split.ts";
 import type { CloudTable } from "./cloud.ts";
@@ -322,6 +323,10 @@ function snapshotKey(snapshot: string): string {
   return `${snapshot.length}:${step}:${h.toString(16)}`;
 }
 function cached(snapshot: string, build: () => Digest | null): Digest | null {
+  // A room read without its archived sessions (history on demand, step 4) must never be digested
+  // or cached as an unreadable session: the Worker reads those sessions before using fairness.
+  if (isDeferredSnapshot(snapshot))
+    throw Error("An archived session was not read with this campaign. Nothing was changed; try again.");
   const key = snapshotKey(snapshot);
   const hit = snapshotCache.get(key);
   if (hit !== undefined) {

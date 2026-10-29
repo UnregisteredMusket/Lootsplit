@@ -285,6 +285,9 @@ jobs:
       - name: dev-campaign-loading
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-campaign-loading 240 node scripts/campaign-loading-browser-audit.mjs
+      - name: dev-history-on-demand
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-history-on-demand 240 node scripts/history-browser-audit.mjs
       - name: dev-finance
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs
