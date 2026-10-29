@@ -6,9 +6,11 @@ import test from "node:test";
 import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { applyCommand, applyCommandBatch, commandSchema, type CommandInput } from "./commands.ts";
 import { readJournal } from "./journal.ts";
+import { canonicalJson } from "./canonical-json.ts";
 import { mapGridSchema, type MapToken } from "./world-schema.ts";
-import { DEFAULT_FORMATION, planFormation } from "./formation.ts";
+import { DEFAULT_FORMATION, placeUndo, planFormation } from "./formation.ts";
 import { readTabletopSession } from "./tabletop.ts";
+import { projectRecord } from "./session-records.ts";
 import { GROUP_COMMANDS_PROTOCOL, tableForProtocol, tabletopResponse, upgradeOldClientCommands } from "./tabletop-protocol.ts";
 
 const dm: CloudSeat = { id: "dm", token: "dm", name: "DM", role: "dm", purseIds: [] };
@@ -117,4 +119,36 @@ test("protocol 16: the party formation default is kept from older clients' sessi
   assert.deepEqual(readTabletopSession(saved).partyFormation, { shape: "line", spacing: 1, rotation: 90 });
   for (const draft of [[{ kind: "map-tokens-place" }], [{ kind: "map-tokens-edit" }], [{ kind: "tabletop-session", session: { partyFormation: {} } }]])
     assert.throws(() => tabletopResponse({ table: set, draft: JSON.stringify(draft) }, 15), /unfinished map actions/);
+});
+
+// Privacy review 2026-10-29 (finding A1): group placement and edits leave a generic activity line,
+// never a map name or a count of tokens players may not see (DM-only maps, hidden tokens).
+test("privacy: placing on a DM-only map or hiding tokens names no map and counts nothing", () => {
+  const t = fixture();
+  t.journal!.world!.maps.push({ id: "lair", name: "Secret Dragon Lair", image: "data:image/png;base64,AAAA", locationId: null, visible: false, anchors: [], markers: [], grid, tokens: [] });
+  const ambush: MapToken = { id: "amb", kind: "other", label: "Ambusher", column: 3, row: 3, visibility: "dm" };
+  const placed = run(t, { kind: "map-tokens-place", mapId: "lair", grid, place: [{ tokenId: "amb", before: null, token: ambush }] });
+  const [a, b] = mapOf(placed, "keep").tokens!;
+  const hidden = run(placed, { kind: "map-tokens-edit", mapId: "keep", edits: [a, b].map((x) => ({ tokenId: x.id, before: x, token: { ...x, visibility: "dm" } })) });
+  const seen = projectRecord(hidden, player).journal!.events.map((e) => e.summary);
+  assert.equal(seen.some((s) => /Lair|keep|\d+ tokens?/.test(s)), false, seen.join(" | "));
+  assert.deepEqual(seen.filter((s) => s === "Map tokens updated").length, 2);
+});
+
+// Privacy review 2026-10-29 (finding A2): the Place Undo checks every token against the placed
+// state, so a move made after the placement is never overwritten.
+test("Place Undo: restores only while every token is as placed", () => {
+  const t = fixture();
+  const keep = mapOf(t, "keep");
+  const entries = [
+    { tokenId: "mira-token", before: keep.tokens![0], token: { ...keep.tokens![0], column: 8, row: 5 } },
+    { tokenId: "bram-token", before: null, token: ch("bram", 9, 5) },
+  ];
+  const placed = run(t, { kind: "map-tokens-place", mapId: "keep", grid, place: entries });
+  const undone = run(placed, placeUndo("keep", grid, entries));
+  assert.deepEqual(mapOf(undone, "keep").tokens!.map((x) => [x.id, x.column]), [["mira-token", 1], ["torvald-token", 2]]);
+  // Mira moves after the placement: Undo is refused and her move stays.
+  const moved = run(placed, { kind: "map-token-move", mapId: "keep", grid: canonicalJson(grid), moves: [{ tokenId: "mira-token", before: { column: 8, row: 5 }, after: { column: 10, row: 5 } }], ignoreWalls: false });
+  assert.throws(() => run(moved, placeUndo("keep", grid, entries)), /moved or changed/);
+  assert.equal(mapOf(moved, "keep").tokens!.find((x) => x.id === "mira-token")!.column, 10);
 });

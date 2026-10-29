@@ -13,11 +13,16 @@ import { canonicalJson } from "./canonical-json.ts";
 import { readRoom, updateRoom } from "./room-store.server.ts";
 
 const sql = new DatabaseSync(":memory:");
+let beforeBatch: (() => void) | undefined;
 for (const file of ["0001_campaign_rooms.sql", "0024_campaign_room_receipts.sql", "0026_campaign_room_sections.sql", "0029_campaign_room_report_parts.sql", "0003_accounts.sql", "0007_character_play.sql", "0008_encounters.sql"])
   sql.exec(readFileSync(new URL(`../../../cloudflare/migrations/${file}`, import.meta.url), "utf8"));
 (globalThis as any).__env__ = {
   DB: {
     async batch(statements: { run: () => Promise<unknown> }[]) {
+      // A racer: something that happens after the room was read and before it is written.
+      const racer = beforeBatch;
+      beforeBatch = undefined;
+      racer?.();
       sql.exec("BEGIN");
       try {
         const results = [];
@@ -138,4 +143,24 @@ test("combat: the server reads the tracker turn and fails closed", async () => {
   sql.prepare("DELETE FROM dm_encounters WHERE id=?").run("fight");
   await submitCommands({ ...seat, batchId: "m4", commands: [moveCmd("m4", 5, 6)] });
   assert.equal(await column(seat), 6);
+});
+
+// Privacy review 2026-10-29 (finding A4b): the turn is read outside the room's revision check, so
+// the room write also requires that turn; a turn that advances in between refuses the move.
+test("combat: a turn that advances between the read and the write refuses the move", async () => {
+  const dm = await openRoom({ name: "Race DM", table: campaign() });
+  const player = await joinRoom({ code: dm.code, purseId: "mira", name: "Mira's player" });
+  await choosePace({ ...dm, live: true });
+  const seat = { code: dm.code, token: player.token };
+  const binding = { id: "b", encounterId: "race", encounterRevision: 0, mapId: "keep", returnMapId: "keep", returnCamera: { x: 0.5, y: 0.5, zoom: 1 }, mode: "theatre", phase: "active", scaleConfirmed: false, showPlayers: true };
+  await submitCommands({ ...dm, batchId: "start", commands: [{ id: "start", kind: "map-combat-transition", before: null, binding, beforeSession: null }] });
+  sql.prepare("INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',1,1,1)").run("race", "synthetic-owner", dm.code, JSON.stringify({ activeId: "mira", round: 1 }));
+  // Mira's turn when the move is read; the DM advances to the Ogre before the room is written.
+  beforeBatch = () => sql.prepare("UPDATE dm_encounters SET body=? WHERE id=?").run(JSON.stringify({ activeId: "ogre", round: 1 }), "race");
+  await assert.rejects(submitCommands({ ...seat, batchId: "race-1", commands: [moveCmd("race-1", 1, 2)] }), /Not your turn/);
+  assert.equal(await column(seat), 1);
+  // Without a race the move on her turn lands.
+  sql.prepare("UPDATE dm_encounters SET body=? WHERE id=?").run(JSON.stringify({ activeId: "mira", round: 2 }), "race");
+  await submitCommands({ ...seat, batchId: "race-2", commands: [moveCmd("race-2", 1, 2)] });
+  assert.equal(await column(seat), 2);
 });

@@ -7,6 +7,7 @@ import {
   type TokenPlace,
 } from "./tabletop-geometry.ts";
 import type { SceneWall } from "./tabletop-schema.ts";
+import type { MapGrid, MapToken } from "./world-schema.ts";
 
 /** A party formation for Place party (map tokens PR 3, mockup group-placement). */
 export type Formation = {
@@ -111,4 +112,24 @@ export function planFormation(
     places.push({ id: member.id, ...found });
   });
   return { places, displaced, unplaced };
+}
+
+/**
+ * The Undo of a Place party / Place / Move (map tokens PR 3; privacy review 2026-10-29): moved
+ * tokens go back and new ones are removed, with each token's `before` being the token exactly as
+ * it was placed. The server refuses the whole Undo if any of them moved or changed since, so a
+ * later move, claim or edit is never overwritten.
+ */
+export function placeUndo(
+  mapId: string,
+  grid: MapGrid,
+  entries: readonly { tokenId: string; before: MapToken | null; token: MapToken }[],
+) {
+  return {
+    kind: "map-tokens-place" as const,
+    mapId,
+    grid,
+    place: entries.filter((e) => e.before).map((e) => ({ tokenId: e.tokenId, before: e.token, token: e.before! })),
+    remove: entries.filter((e) => !e.before).map((e) => ({ mapId, grid, tokenId: e.tokenId, before: e.token })),
+  };
 }
