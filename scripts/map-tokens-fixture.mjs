@@ -7,9 +7,9 @@ import { continueIntoApp } from "./title-screen-navigation.mjs";
 export const KEEP = { columns: 28, rows: 18, cell: 44 };
 
 /** Seed the campaign; `tokens` and `tabletop` override the defaults for one audit. */
-export async function seedKeep(page, { tokens, tabletop, extraMaps = [], world = {}, sheets = [] } = {}) {
+export async function seedKeep(page, { tokens, tabletop, extraMaps = [], world = {}, sheets = [], keep = {} } = {}) {
   await page.evaluate(
-    async ({ KEEP, tokens, tabletop, extraMaps, world, sheets }) => {
+    async ({ KEEP, tokens, tabletop, extraMaps, world, sheets, keep }) => {
       const { applyCloudTable } = await import("/src/lib/quire/economy.ts");
       const { readJournal } = await import("/src/lib/quire/journal.ts");
       const { fromCopper } = await import("/src/lib/quire/money.ts");
@@ -91,6 +91,7 @@ export async function seedKeep(page, { tokens, tabletop, extraMaps = [], world =
                   character("bram", "Bram", 13, 8),
                 ],
                 ...(tabletop ? { tabletop } : {}),
+                ...keep,
               },
               ...extraMaps.map((m) => ({ ...m, image: m.image ?? image })),
             ],
@@ -99,7 +100,7 @@ export async function seedKeep(page, { tokens, tabletop, extraMaps = [], world =
         }),
       });
     },
-    { KEEP, tokens, tabletop, extraMaps, world, sheets },
+    { KEEP, tokens, tabletop, extraMaps, world, sheets, keep },
   );
 }
 

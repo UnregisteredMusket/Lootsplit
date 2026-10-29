@@ -33,6 +33,7 @@ const featureAudits = {
   "map-grid-mode": "scripts/map-grid-mode-browser-audit.mjs",
   "map-player-move": "scripts/map-player-move-browser-audit.mjs",
   "map-group-place": "scripts/map-group-place-browser-audit.mjs",
+  "map-context-menu": "scripts/map-context-menu-browser-audit.mjs",
   "review-inbox": "scripts/review-inbox-browser-audit.mjs",
   "command-palette": "scripts/command-palette-browser-audit.mjs",
   "player-onboarding": "scripts/player-onboarding-browser-audit.mjs",

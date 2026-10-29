@@ -81,7 +81,13 @@ import { playerMovement, sheetSpeedFeet } from "@/lib/quire/map-movement";
 import { imageSize } from "@/lib/quire/image-size";
 import { discToken } from "@/lib/quire/token-display";
 import { MapPlayerPreview } from "./map-player-preview";
-import { automaticGrid, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
+import {
+  automaticGrid,
+  sceneTokenPoint,
+  SIZE_NAMES,
+  snapTokenPosition,
+  TOKEN_SIZE_CLASSES,
+} from "@/lib/quire/tabletop-geometry";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm, CommandButton } from "./world-tools";
 import { LocationOptions, MarketLocationsPanel } from "./market-locations";
@@ -122,7 +128,18 @@ import {
   ChevronDown,
   Menu,
   Route as RouteIcon,
+  Map as MapIcon,
 } from "lucide-react";
+import { toast } from "sonner";
+import { MapContextMenu } from "./map-context-menu";
+import { menuFromActions } from "./map-action-items";
+import { mapActions } from "@/lib/quire/map-actions";
+import { partyDestinations, partyEntry, partyMoveCommands, type PartyDestination } from "@/lib/quire/party-move";
+import { mapEncounterId, removeFromInitiative } from "@/lib/quire/map-initiative-link";
+import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
+import { requestConfirm } from "@/lib/quire/confirm-store";
+import { resultToast } from "@/lib/quire/result-toast";
+import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { useRoutePlanner } from "./map-route-planner";
 import {
   JourneyPlanActions,
@@ -258,6 +275,7 @@ const MAP_SHORTCUTS: [string, string, boolean][] = [
   ["H", "Hide or show the interface", false],
   ["+ / − / Home", "Zoom in, zoom out, fit the map", false],
   ["Esc", "Close a panel, then return to Pan", false],
+  ["Shift+F10 / Menu key", "Map actions here (also right-click)", false],
 ];
 
 /**
@@ -1448,12 +1466,13 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               dm
                 ? {
                     tool: setupTool,
-                    arm: (tool) => {
+                    arm: (tool, at) => {
                       setSetupTool(tool);
                       setPlacement(
                         tool === "token" && !effectiveTileMode ? "" : SETUP_PLACEMENT[tool],
                       );
-                      setPoint(undefined);
+                      // The map menu arms a tool with its point already chosen (its panel opens).
+                      setPoint(at);
                     },
                     panel: setupPanel,
                     closePanel: () => setPoint(undefined),
@@ -1890,7 +1909,7 @@ function MapViewport({
   /** DM map setup rail (map controls): the armed tool, its panel once placed. */
   setup?: {
     tool: SetupTool | "";
-    arm: (tool: SetupTool) => void;
+    arm: (tool: SetupTool, point?: { x: number; y: number }) => void;
     panel?: ReactNode;
     closePanel: () => void;
   };
@@ -2647,7 +2666,7 @@ function MapViewport({
     });
   };
   const setupPanelRef = useRef<HTMLElement>(null);
-  const armSetup = (tool: SetupTool) => {
+  const armSetup = (tool: SetupTool, at?: { x: number; y: number }) => {
     if (!setup) return;
     afterContextChange(() => {
       tools.cancel();
@@ -2656,7 +2675,7 @@ function MapViewport({
       setContextOpen(false);
       setMoreTools(false);
       if (planner.active) planner.close();
-      setup.arm(tool);
+      setup.arm(tool, at);
       root.current?.focus();
     });
   };
@@ -3087,6 +3106,277 @@ function MapViewport({
       </MapToolGroup>
     </>
   );
+  // Group commands (map tokens PR 3), shared by the group bar and the map menu (PR 4): each is
+  // one authoritative command for the given tokens.
+  const groupActions = {
+    hide: (tokens: MapToken[], hide: boolean) =>
+      void tools.group.act({
+        kind: "map-tokens-edit",
+        mapId: map.id,
+        edits: tokens.map((t) => ({ tokenId: t.id, before: t, token: { ...t, visibility: hide ? "dm" : "party" } })),
+      }),
+    lock: (tokens: MapToken[], lock: boolean) =>
+      void tools.group.act({
+        kind: "map-tokens-edit",
+        mapId: map.id,
+        edits: tokens.map((t) => {
+          const token: MapToken = { ...t, locked: lock };
+          if (!lock) delete token.locked;
+          return { tokenId: t.id, before: t, token };
+        }),
+      }),
+    size: (tokens: MapToken[], size: MapToken["sizeClass"]) =>
+      void tools.group.act({
+        kind: "map-tokens-edit",
+        mapId: map.id,
+        edits: tokens.map((t) => ({ tokenId: t.id, before: t, token: resizedToken(t, { sizeClass: size }, map.grid!) })),
+      }),
+    send: (tokens: MapToken[], targetId: string) => {
+      const target = maps.find((m) => m.id === targetId);
+      if (!target?.grid) return;
+      const plan = planFormation(
+        target.grid,
+        target.tokens ?? [],
+        tokens,
+        { column: Math.floor(target.grid.columns / 2), row: Math.floor(target.grid.rows / 2) },
+        readTabletopSession(recordTable).partyFormation ?? DEFAULT_FORMATION,
+        readMapTabletop(target).walls,
+      );
+      void tools.group.act(
+        {
+          kind: "map-tokens-place",
+          mapId: target.id,
+          grid: target.grid,
+          place: plan.places.map((p) => {
+            const token = { ...tokens.find((t) => t.id === p.id)!, column: p.column, row: p.row };
+            delete token.offsetX;
+            delete token.offsetY;
+            return { tokenId: p.id, before: target.tokens?.find((t) => t.id === p.id) ?? null, token };
+          }),
+          remove: tokens.map((t) => ({ mapId: map.id, grid: map.grid!, tokenId: t.id, before: t })),
+        },
+        () => tools.group.clear(),
+      );
+    },
+    remove: async (tokens: MapToken[]) => {
+      const ok = await requestConfirm({
+        title: tokens.length === 1 ? `Remove ${tokens[0].label}?` : `Remove ${tokens.length} tokens?`,
+        body:
+          tokens.length === 1
+            ? "The token leaves this map. The character, creature or record it shows is kept."
+            : "The tokens leave this map. The characters, creatures and records they show are kept.",
+        tone: "danger",
+        confirmLabel: tokens.length === 1 ? "Remove token" : "Remove tokens",
+      });
+      if (!ok || !map.grid) return;
+      void tools.group.act(
+        { kind: "map-tokens-place", mapId: map.id, grid: map.grid, place: [], remove: tokens.map((t) => ({ mapId: map.id, grid: map.grid!, tokenId: t.id, before: t })) },
+        () => tools.group.clear(),
+      );
+    },
+  };
+  const sendTargets = maps.filter((m) => m.id !== map.id && m.grid).map((m) => ({ id: m.id, label: m.name }));
+  // The map menu (map tokens PR 4; mockup context-menu-desktop): right-click, Shift+F10 or the
+  // Menu key. It shows only what this seat can do; every item opens an existing flow or sends one
+  // authoritative command (the server checks each one again).
+  const { commandBatch } = useEconomy();
+  const [mapMenu, setMapMenu] = useState<{
+      x: number;
+      y: number;
+      point: { x: number; y: number };
+      tokenIds: string[];
+      returnTo?: HTMLElement | null;
+    }>(),
+    [partyMoveOptions, setPartyMoveOptions] = useState({ follow: true, placeTokens: true }),
+    encounterId = useDm ? mapEncounterId(recordTable, map) : undefined,
+    [combatantIds, setCombatantIds] = useState<{ id: string; ids: Set<string> }>();
+  useEffect(() => {
+    // While a token menu is open, the tracker says who is already in combat.
+    if (!mapMenu?.tokenIds.length || !encounterId) return;
+    return encounterDetailPoller.subscribe(encounterId, {
+      intervalMs: 3000,
+      onResult: (row) =>
+        setCombatantIds({
+          id: encounterId,
+          ids: new Set(((row as { body?: { combatants?: { id: string }[] } }).body?.combatants ?? []).map((c) => c.id)),
+        }),
+      onError: () => undefined,
+    });
+  }, [mapMenu?.tokenIds.length, encounterId]);
+  const menuSquare = (point: { x: number; y: number }) => {
+    if (!map.grid) return undefined;
+    const at = snapTokenPosition(map.grid, {}, point);
+    return at ? { column: at.column, row: at.row } : undefined;
+  };
+  const openMapMenu = (clientX: number, clientY: number, tokenId?: string, returnTo?: HTMLElement | null) => {
+    if (sketches.active || tools.group.placing || planner.active) return;
+    let tokenIds: string[] = [];
+    const token = tokenId ? map.tokens?.find((t) => t.id === tokenId) : undefined;
+    if (token && useDm) {
+      tokenIds = tools.selected.includes(token.id) && tools.selected.length > 1 ? tools.selected : [token.id];
+      if (!tools.selected.includes(token.id)) tools.menu.selectOnly([token.id]);
+    } else if (token?.kind === "character" && token.entityId && seatNow.purseIds.includes(token.entityId))
+      tokenIds = [token.id];
+    const point = token && map.grid ? sceneTokenPoint(map.grid, token) : mapPoint(clientX, clientY);
+    setMapMenu({ x: clientX, y: clientY, point, tokenIds, returnTo: returnTo ?? root.current });
+  };
+  const closeMapMenu = (activated: boolean) => {
+    const back = mapMenu?.returnTo;
+    setMapMenu(undefined);
+    // Focus returns to the map (or the token) unless the action opened something else.
+    if (!activated || document.activeElement === document.body) (back?.isConnected ? back : root.current)?.focus({ preventScroll: true });
+  };
+  const centreOn = (point: { x: number; y: number }) =>
+    setView((v) => ({ ...v, x: size.w / 2 - point.x * w * v.scale, y: size.h / 2 - point.y * h * v.scale }));
+  const menuTokens = (mapMenu?.tokenIds ?? []).flatMap((id) => map.tokens?.find((t) => t.id === id) ?? []);
+  const destinations = useDm ? partyDestinations(maps, map) : { submaps: [], connected: [] };
+  const moveParty = async (destinationId: string) => {
+    const to = maps.find((m) => m.id === destinationId);
+    if (!to) return;
+    const steps = partyMoveCommands(recordTable, map, to, partyMoveOptions);
+    if (!steps.length) {
+      selectMap(to.id, partyEntry(map, to));
+      return;
+    }
+    try {
+      const outcome = await commandBatch(crypto.randomUUID(), steps);
+      resultToast(mutationNotice(outcome, `The party moved to ${to.name}`));
+      selectMap(to.id, partyEntry(map, to));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The party could not be moved. Nothing changed.");
+    }
+  };
+  const actionList = mapMenu
+    ? mapActions(
+        menuTokens.length ? { kind: "tokens", tokens: menuTokens } : { kind: "map", square: menuSquare(mapMenu.point) },
+        {
+          dm: useDm,
+          grid: !!map.grid,
+          selected: tools.selected.length,
+          purseIds: seatNow.purseIds,
+          canPlaceOwn: !!claimable,
+          canPing: !signals.viewOnly,
+          encounterId,
+          combatants: combatantIds?.id === encounterId ? combatantIds?.ids : undefined,
+          mapVisible: map.visible,
+          destinations: destinations.submaps.length + destinations.connected.length + sendTargets.length > 0,
+        },
+      )
+    : undefined;
+  useEffect(() => {
+    if (actionList) setPlaceAnnouncement(actionList.announce);
+    // Announced once per opened menu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapMenu]);
+  const menuElement = (() => {
+    if (!mapMenu || !actionList) return null;
+    const at = mapMenu.point,
+      tokens = menuTokens,
+      one = tokens[0];
+    const destinationItems = (list: PartyDestination[], submap: boolean) =>
+      list.map((d) => ({
+        id: `move-party:${d.mapId}`,
+        label: d.name,
+        icon: submap ? <DoorOpen size={16} /> : <MapIcon size={16} />,
+        hint: d.hint,
+        run: () => void moveParty(d.mapId),
+      }));
+    const menu = menuFromActions(
+      actionList,
+      {
+        "start-encounter": () => (centreOn(at), openCombat()),
+        // Until the SRD quick picker (PR 6): Combat token with the point chosen.
+        "add-creatures": setup ? () => armSetup("token", at) : undefined,
+        "add-characters": map.grid ? () => (openPlaceParty(), requestAnimationFrame(() => tools.group.hover(at))) : undefined,
+        "place-party": map.grid
+          ? () => tools.menu.placeAt({ members: partyMembers(), mode: "formation", label: "party" }, at)
+          : undefined,
+        "place-selected": () =>
+          tools.menu.placeAt(
+            { members: tools.group.selectedTokens.map((token) => ({ token, before: token })), mode: "formation", label: "selection" },
+            at,
+          ),
+        "party-position": setup ? () => armSetup("party", at) : undefined,
+        "place-record": setup ? () => armSetup("record", at) : undefined,
+        marker: setup ? () => armSetup("marker", at) : undefined,
+        entrance: setup ? () => armSetup("entrance", at) : undefined,
+        ping: () => void signals.send(at, color),
+        measure: () => {
+          chooseTool("measure");
+          tools.menu.measureFrom(at);
+        },
+        "share-view": () => void tools.shareCamera({ x: at.x, y: at.y, zoom: view.scale }),
+        reveal: () => tools.menu.revealAround(at),
+        light: () => tools.menu.addLightAt(at),
+        "place-mine": claimable ? () => tools.menu.claimAt(claimable.id, at) : undefined,
+        "open-tracker": encounterId || one?.encounterId
+          ? () => void navigate({ href: `/encounters?encounter=${encodeURIComponent(one?.encounterId ?? encounterId!)}` })
+          : undefined,
+        "open-sheet": one?.entityId ? () => void navigate({ to: "/characters", search: { id: one.entityId } }) : undefined,
+        "my-sheet": one?.entityId ? () => void navigate({ to: "/characters", search: { id: one.entityId } }) : undefined,
+        centre: () => centreOn(at),
+        "move-to": () =>
+          tools.group.startPlacing({ members: tokens.map((token) => ({ token, before: token })), mode: "keep", label: tokens.length === 1 ? one.label : "selection" }),
+        hide: () => groupActions.hide(tokens, true),
+        show: () => groupActions.hide(tokens, false),
+        lock: () => groupActions.lock(tokens, true),
+        unlock: () => groupActions.lock(tokens, false),
+        "add-initiative": () => void addToInitiative(recordTable, map, tokens, tools.group.act),
+        "remove-combat": () => void removeFromInitiative(recordTable, map, tokens),
+        controllers: () => (tools.menu.selectOnly([one.id]), tools.openInspector()),
+        remove: () => void groupActions.remove(tokens),
+      },
+      {
+        "move-party": {
+          groups: [
+            ...(destinations.submaps.length ? [{ label: `Submaps of ${map.name}`, items: destinationItems(destinations.submaps, true) }] : []),
+            ...(destinations.connected.length ? [{ label: "Connected", items: destinationItems(destinations.connected, false) }] : []),
+            {
+              items: [
+                {
+                  id: "follow",
+                  label: "Players' scene follows",
+                  checked: partyMoveOptions.follow,
+                  run: () => setPartyMoveOptions((o) => ({ ...o, follow: !o.follow })),
+                  keepOpen: true,
+                },
+                {
+                  id: "place-tokens",
+                  label: "Place party tokens at the entry",
+                  checked: partyMoveOptions.placeTokens,
+                  run: () => setPartyMoveOptions((o) => ({ ...o, placeTokens: !o.placeTokens })),
+                  keepOpen: true,
+                },
+              ],
+            },
+          ],
+        },
+        size: {
+          groups: [
+            {
+              items: TOKEN_SIZE_CLASSES.map((size) => ({
+                id: `size:${size}`,
+                label: SIZE_NAMES[size],
+                checked: tokens.length > 0 && tokens.every((t) => t.sizeClass === size || (!t.sizeClass && size === "medium" && !t.footprint)),
+                run: () => groupActions.size(tokens, size),
+              })),
+            },
+          ],
+        },
+        "send-to": { groups: [{ items: sendTargets.map((m) => ({ id: `send:${m.id}`, label: m.label, icon: <MapIcon size={16} />, run: () => groupActions.send(tokens, m.id) })) }] },
+      },
+    );
+    const box = root.current?.getBoundingClientRect();
+    return (
+      <MapContextMenu
+        menu={menu}
+        x={mapMenu.x}
+        y={mapMenu.y}
+        bounds={box ? { left: box.left, top: box.top, width: box.width, height: box.height } : { left: 0, top: 0, width: innerWidth, height: innerHeight }}
+        close={closeMapMenu}
+      />
+    );
+  })();
   return (
     <MapFrame title={map.name} interfaceHidden={interfaceHidden}>
       <MapWorkspaceChrome
@@ -3799,9 +4089,7 @@ function MapViewport({
                 selectMode={tools.group.selectMode}
                 setSelectMode={tools.group.setSelectMode}
                 movement={movement.mode}
-                maps={maps
-                  .filter((m) => m.id !== map.id && m.grid)
-                  .map((m) => ({ id: m.id, label: m.name }))}
+                maps={sendTargets}
                 onPlace={() =>
                   tools.group.startPlacing({
                     members: tools.group.selectedTokens.map((token) => ({ token, before: token })),
@@ -3816,67 +4104,10 @@ function MapViewport({
                     label: "selection",
                   })
                 }
-                onHide={(hide) =>
-                  void tools.group.act({
-                    kind: "map-tokens-edit",
-                    mapId: map.id,
-                    edits: tools.group.selectedTokens.map((t) => ({
-                      tokenId: t.id,
-                      before: t,
-                      token: { ...t, visibility: hide ? "dm" : "party" },
-                    })),
-                  })
-                }
-                onLock={(lock) =>
-                  void tools.group.act({
-                    kind: "map-tokens-edit",
-                    mapId: map.id,
-                    edits: tools.group.selectedTokens.map((t) => {
-                      const token: MapToken = { ...t, locked: lock };
-                      if (!lock) delete token.locked;
-                      return { tokenId: t.id, before: t, token };
-                    }),
-                  })
-                }
-                onSize={(size) =>
-                  void tools.group.act({
-                    kind: "map-tokens-edit",
-                    mapId: map.id,
-                    edits: tools.group.selectedTokens.map((t) => ({
-                      tokenId: t.id,
-                      before: t,
-                      token: resizedToken(t, { sizeClass: size }, map.grid!),
-                    })),
-                  })
-                }
-                onSend={(targetId) => {
-                  const target = maps.find((m) => m.id === targetId);
-                  if (!target?.grid) return;
-                  const moving = tools.group.selectedTokens;
-                  const plan = planFormation(
-                    target.grid,
-                    target.tokens ?? [],
-                    moving,
-                    { column: Math.floor(target.grid.columns / 2), row: Math.floor(target.grid.rows / 2) },
-                    readTabletopSession(recordTable).partyFormation ?? DEFAULT_FORMATION,
-                    readMapTabletop(target).walls,
-                  );
-                  void tools.group.act(
-                    {
-                      kind: "map-tokens-place",
-                      mapId: target.id,
-                      grid: target.grid,
-                      place: plan.places.map((p) => {
-                        const token = { ...moving.find((t) => t.id === p.id)!, column: p.column, row: p.row };
-                        delete token.offsetX;
-                        delete token.offsetY;
-                        return { tokenId: p.id, before: target.tokens?.find((t) => t.id === p.id) ?? null, token };
-                      }),
-                      remove: moving.map((t) => ({ mapId: map.id, grid: map.grid!, tokenId: t.id, before: t })),
-                    },
-                    () => tools.group.clear(),
-                  );
-                }}
+                onHide={(hide) => groupActions.hide(tools.group.selectedTokens, hide)}
+                onLock={(lock) => groupActions.lock(tools.group.selectedTokens, lock)}
+                onSize={(size) => groupActions.size(tools.group.selectedTokens, size)}
+                onSend={(targetId) => groupActions.send(tools.group.selectedTokens, targetId)}
                 onMovement={(mode) =>
                   void tools.group.act({
                     kind: "map-tabletop",
@@ -4018,6 +4249,7 @@ function MapViewport({
           <MapCombatHud map={map} />
         ))}
       <MapAnnouncer map={map} pings={signals.pings} />
+      {menuElement}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {placeAnnouncement}
       </p>
@@ -4105,9 +4337,24 @@ function MapViewport({
             className={`map-viewport ${placing || pinging ? "placing" : ""}`}
             role="region"
             aria-label="Interactive campaign map"
+            aria-keyshortcuts="Shift+F10 ContextMenu"
             tabIndex={0}
+            onContextMenu={(e) => {
+              // The map's own menu replaces the browser's inside the map (map tokens PR 4).
+              e.preventDefault();
+              const token = (e.target as Element).closest<HTMLElement>("[data-map-token]");
+              openMapMenu(e.clientX, e.clientY, token?.dataset.mapToken, token);
+            }}
             onKeyDown={(e) => {
               if (fogHistoryKey(e)) return;
+              if ((e.key === "F10" && e.shiftKey) || e.key === "ContextMenu") {
+                // At the focused token, else the keyboard crosshair (the view centre).
+                e.preventDefault();
+                const token = (e.target as Element).closest<HTMLElement>("[data-map-token]");
+                const box = (token ?? root.current!).getBoundingClientRect();
+                openMapMenu(box.left + box.width / 2, box.top + box.height / 2, token?.dataset.mapToken, token ?? root.current);
+                return;
+              }
               if (!e.ctrlKey && !e.metaKey && !e.altKey && e.shiftKey && setupShortcut(e.key)) {
                 e.preventDefault();
                 return;

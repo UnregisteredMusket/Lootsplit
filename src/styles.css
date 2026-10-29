@@ -5051,6 +5051,29 @@ button.map-claim-chip { min-height:44px; cursor:pointer; font-weight:600; }
 .map-group-menu { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); display:grid; min-width:220px; padding:6px; border-radius:14px; border:1px solid var(--map-edge); background:var(--map-panel); }
 .map-group-menu button { min-height:40px; padding:0 10px; border:0; border-radius:9px; background:transparent; color:var(--color-fg); text-align:left; }
 .map-group-menu button:hover, .map-group-menu button:focus-visible { background:color-mix(in srgb, var(--color-accent) 18%, transparent); }
+/* Map tokens PR 4: the map's right-click menu (mockup context-menu-desktop). */
+.map-context-menu, .map-context-submenu { position:fixed; z-index:60; width:286px; padding:6px; border-radius:14px; background:color-mix(in srgb, var(--color-elevated) 96%, transparent); box-shadow:0 10px 34px color-mix(in srgb, black 65%, transparent); }
+.map-context-submenu { position:absolute; left:calc(100% + 4px); width:330px; }
+.map-context-menu.flip .map-context-submenu { left:auto; right:calc(100% + 4px); }
+.map-menu-header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px 8px; border-bottom:1px solid var(--map-edge); margin-bottom:4px; }
+.map-menu-header b { font-family:var(--font-display); font-size:17px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.map-menu-header span { font-size:11.5px; color:var(--color-muted); white-space:nowrap; }
+.map-menu-caption { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--color-faint); padding:5px 10px 2px; }
+.map-menu-group + .map-menu-group.plain { border-top:1px solid var(--map-edge); margin-top:4px; padding-top:4px; }
+.map-menu-item { display:flex; align-items:center; gap:10px; width:100%; height:30px; padding:0 10px; border:0; border-radius:9px; background:transparent; color:var(--color-fg); font-size:13px; text-align:left; cursor:pointer; }
+.map-menu-item .map-menu-icon { display:inline-flex; width:16px; color:var(--color-lead); flex:none; }
+.map-menu-item .map-menu-label { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.map-menu-item small { margin-left:auto; color:var(--color-muted); font-size:11.5px; white-space:nowrap; }
+.map-menu-item kbd { margin-left:auto; font:600 10.5px var(--font-sans); color:var(--color-muted); border:1px solid var(--map-edge); border-radius:5px; padding:1px 5px; }
+.map-menu-item small + kbd { margin-left:6px; }
+.map-menu-item .map-menu-arrow { color:var(--color-muted); flex:none; }
+.map-menu-item:hover, .map-menu-item:focus-visible, .map-menu-item.open { background:color-mix(in srgb, var(--color-accent) 22%, transparent); outline:none; }
+.map-menu-item:focus-visible { outline:2px solid color-mix(in srgb, var(--color-accent) 70%, transparent); outline-offset:-2px; }
+.map-menu-item.danger, .map-menu-item.danger .map-menu-icon { color:color-mix(in srgb, var(--color-danger) 45%, var(--color-fg)); }
+.map-menu-item[aria-disabled="true"] { color:var(--color-faint); cursor:default; background:transparent; }
+.map-menu-item[aria-disabled="true"] .map-menu-icon { color:var(--color-faint); }
+@media (prefers-reduced-motion: no-preference) { .map-context-menu { animation:map-menu-in .12s ease-out; } }
+@keyframes map-menu-in { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:none; } }
 .map-select-box { position:absolute; z-index:5; border:2px dashed var(--color-select); background:color-mix(in srgb, var(--color-select) 12%, transparent); border-radius:4px; pointer-events:none; }
 .map-token-foot.fogged { background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-fg) 18%, transparent) 0 4px, transparent 4px 9px); }
 @media (max-width:650px) { .map-group-dock { bottom:calc(84px + env(safe-area-inset-bottom)); } .map-group-dock.raised { z-index:45; bottom:auto; top:calc(124px + env(safe-area-inset-top)); } .map-group-action { min-width:54px; } .map-placing-hint { white-space:normal; } }

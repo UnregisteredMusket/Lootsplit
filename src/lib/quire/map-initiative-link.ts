@@ -68,3 +68,46 @@ export async function addToInitiative(
     toast.error(error instanceof Error ? error.message : "The tracker could not be updated. Try again.");
   }
 }
+
+/**
+ * Remove from combat (map tokens PR 4, token menu): the tokens' combatants leave the encounter
+ * running on this map through the tracker's revision-checked `encounters/save`. The tokens stay on
+ * the map; their link to the tracker is kept, so Add to initiative brings the same combatant back.
+ */
+export async function removeFromInitiative(
+  table: Pick<CloudTable, "journal">,
+  map: CampaignMap,
+  tokens: MapToken[],
+) {
+  const encounterId = table.journal?.world?.combat?.encounterId ?? map.encounterId;
+  if (!encounterId) return;
+  try {
+    const detail = await encounterRequest<Detail>("encounters/detail", { id: encounterId });
+    const leaving = new Set(tokens.map(combatantIdOf));
+    const order = detail.body.combatants;
+    const combatants = order.filter((c) => !leaving.has(c.id));
+    const removed = order.length - combatants.length;
+    if (removed) {
+      // The active combatant leaving passes the turn to the next one still in the order.
+      const active = String(detail.body.activeId ?? "");
+      let activeId = active;
+      if (active && leaving.has(active)) {
+        const at = order.findIndex((c) => c.id === active);
+        activeId = [...order.slice(at + 1), ...order.slice(0, at)].find((c) => !leaving.has(c.id))?.id ?? "";
+      }
+      await encounterRequest("encounters/save", {
+        id: detail.id,
+        revision: detail.revision,
+        encounter: { ...detail.body, combatants, activeId },
+      });
+    }
+    encounterDetailPoller.refresh(detail.id);
+    resultToast(removed ? `Removed ${removed} from combat` : "Not in combat");
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "The tracker could not be updated. Try again.");
+  }
+}
+
+/** The encounter running on this map (the tracker the token menu adds to and removes from). */
+export const mapEncounterId = (table: Pick<CloudTable, "journal">, map: CampaignMap) =>
+  table.journal?.world?.combat?.encounterId ?? map.encounterId;

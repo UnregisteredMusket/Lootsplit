@@ -1,0 +1,11 @@
+{
+  "title": "Right-click the map for quick actions",
+  "summary": "A menu on the map puts the most common DM and player actions at the square you clicked.",
+  "items": [
+    "Right-click the map, or press Shift+F10 or the Menu key, for actions at that square: start an encounter, place the party, set the party's position, place a record, marker or entrance, ping, measure, share the view, reveal fog or add a light.",
+    "Move party to sends the party to a submap or connected map in one step: the party's location, the players' scene and the party's tokens at the entry.",
+    "Right-click a token to open its sheet or tracker entry, move, hide, lock, resize, add to initiative, send it to another map or remove it. With several tokens selected the menu acts on all of them.",
+    "Players get a short menu: ping, measure, place their token, and their own sheet.",
+    "The menu works from the keyboard and with screen readers."
+  ]
+}

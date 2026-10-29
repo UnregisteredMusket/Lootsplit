@@ -159,6 +159,7 @@ export function useMapTabletopTools(
     [placeAnchor, setPlaceAnchor] = useState<{ column: number; row: number }>(),
     [box, setBox] = useState<{ a: ScenePoint; b: ScenePoint }>(),
     [selectMode, setSelectMode] = useState(false);
+  const placingNow = placing;
   // Player movement (map tokens PR 2): placing your own token, and "Not your turn" on a press.
   const [claiming, setClaiming] = useState(""),
     [notTurn, setNotTurn] = useState(""),
@@ -365,10 +366,9 @@ export function useMapTabletopTools(
     } else if (tool === "fog-rectangle" || tool === "wall") setPoints([current.point, point]);
     return true;
   }
-  const placingOthers = placing
-    ? (map.tokens ?? []).filter((t) => !placing.members.some((m) => m.token.id === t.id))
-    : [];
-  function planAt(anchor: { column: number; row: number } | undefined) {
+  const othersOf = (current: Placing) =>
+    (map.tokens ?? []).filter((t) => !current.members.some((m) => m.token.id === t.id));
+  function planAt(anchor: { column: number; row: number } | undefined, placing = placingNow) {
     if (!placing || !anchor || !map.grid) return undefined;
     if (placing.mode === "keep") {
       // Move together: the group keeps its shape, led by its first token.
@@ -388,7 +388,7 @@ export function useMapTabletopTools(
     }
     return planFormation(
       map.grid,
-      placingOthers,
+      othersOf(placing),
       placing.members.map((m) => ({ ...m.token, id: m.token.id })),
       anchor,
       placing.formation,
@@ -396,7 +396,7 @@ export function useMapTabletopTools(
     );
   }
   /** The ghost tokens of a placement plan (fogged squares are marked for the DM). */
-  function ghostsOf(current: ReturnType<typeof planAt>) {
+  function ghostsOf(current: ReturnType<typeof planAt>, placing = placingNow) {
     if (!current || !placing) return [];
     return current.places.flatMap((p) => {
       const member = placing.members.find((m) => m.token.id === p.id);
@@ -427,12 +427,11 @@ export function useMapTabletopTools(
         : current,
     );
   }
-  function commitPlacing(anchor?: { column: number; row: number }) {
-    if (!placing || !map.grid || !anchor) return;
+  function commitPlacing(anchor?: { column: number; row: number }, current = placingNow) {
+    if (!current || !map.grid || !anchor) return;
     setPlaceAnchor(anchor);
-    const current = placing,
-      planned = planAt(anchor),
-      ready = ghostsOf(planned);
+    const planned = planAt(anchor, current),
+      ready = ghostsOf(planned, current);
     if (!ready.length || planned?.unplaced) {
       setError("There is no room here for every token. Choose another spot.");
       return;
@@ -489,6 +488,14 @@ export function useMapTabletopTools(
         });
       },
     );
+  }
+  /** The map menu's "Place party here" / "Place selected here": one placement at a point. */
+  function placeAt(next: Omit<Placing, "formation"> & { formation?: Formation }, point: ScenePoint) {
+    setError("");
+    commitPlacing(squareAt(point), {
+      ...next,
+      formation: next.formation ?? session.partyFormation ?? DEFAULT_FORMATION,
+    });
   }
   /** Place party, Place (the selection in a formation) or Move (the selection, same shape). */
   function startPlacing(next: Omit<Placing, "formation"> & { formation?: Formation }) {
@@ -1557,6 +1564,48 @@ export function useMapTabletopTools(
     shareCamera,
     saveInitialView,
     selected,
+    /** The map menu (map tokens PR 4): actions at a chosen point. */
+    menu: {
+      /** Measure from here: the ruler starts at the point (after Measure is chosen). */
+      measureFrom: (point: ScenePoint) => {
+        setPoints([point]);
+        setCursor(point);
+      },
+      /** Reveal around here: one brush circle with the current brush radius (Fog brush). */
+      revealAround: (point: ScenePoint) => {
+        if (!dm) return;
+        if (settings.fog.shapes.length + 1 > 500) {
+          setError(`This map already has ${settings.fog.shapes.length} of 500 fog shapes. Consolidate fog in Exploration & lighting first.`);
+          return;
+        }
+        void act({
+          kind: "map-fog",
+          mapId: map.id,
+          before: settings.fog,
+          action: "shape",
+          shape: { id: crypto.randomUUID(), reveal: true, kind: "brush", points: [roundScenePoint(point)], radius },
+        });
+      },
+      /** Add light here: a light with the Lights tool's current radius and colour. */
+      addLightAt: (point: ScenePoint) => {
+        if (!dm) return;
+        void configure({
+          ...settings,
+          lights: [
+            ...settings.lights,
+            { id: crypto.randomUUID(), at: roundScenePoint(point), radiusFeet: lightRadius / settings.unitsPerFoot, color: lightColor, visible: true },
+          ],
+        });
+      },
+      /** Select exactly these tokens (right-click on a token that is not in the selection). */
+      selectOnly: (ids: string[]) => {
+        setSelected(ids);
+        selectToken?.(ids[0] ?? "");
+      },
+      placeAt,
+      /** Place my token here (players): the same map-token-claim as "Place my token". */
+      claimAt,
+    },
     /** The move being previewed (dragging, or kept after a refused save). */
     moves,
     gridMode: { on: settings.snap, set: setGridMode, dialog: gridModeDialog, select: gridModeSelect },
