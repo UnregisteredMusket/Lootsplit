@@ -706,6 +706,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Unused files, exports and dependencies (knip) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 5 | 2s → 7s | +5s | +250% |
 | Code health and security scans / initial queue | open | 3 | 64s → 507s | +443s | +692.19% |
 | Development / gameplay / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 5s | +3s | +150% |
+| Development / accounts / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 3s → 133s | +130s | +4333.33% |
 | Development / economy / dev-property-operations | open | 2 | 32s → 44s | +12s | +37.5% |
 | Unused files, exports and dependencies (knip) / Set up job | open | 2 | 1s → 5s | +4s | +400% |
 | Unused files, exports and dependencies (knip) / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 7s → 17s | +10s | +142.86% |
@@ -900,6 +901,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-29T03:28:26Z | step: Development / accounts / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 6s → 133s | +127s | +2116.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39746242461/job/119715353882) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40811509279/job/123242707524) |
 | 2026-10-29T00:57:16Z | step: Development / gameplay / dev-undo-toasts | 42s → 72s | +30s | +71.43% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40633560065/job/122640032998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40796916976/job/123195567771) |
 | 2026-10-29T00:23:01Z | step: Development / accounts / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 7s → 10s | +3s | +42.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40260180478/job/121370695786) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40793477436/job/123184170049) |
 | 2026-10-29T00:10:18Z | step: Development / desktop / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683519617) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40792241895/job/123180082288) |
