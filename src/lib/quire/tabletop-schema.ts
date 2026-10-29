@@ -130,7 +130,7 @@ export const tokenTabletopFields = {
     .strict()
     .optional(),
   /**
-   * Tabletop protocol 12 (footprints): the creature size, the DM's custom squares per side (0.25
+   * Tabletop protocol 13 (footprints): the creature size, the DM's custom squares per side (0.25
    * is a Tiny-style quarter square) and `anchor: "corner"`, which stores the token by its
    * top-left square. Tokens without `anchor` keep their centre square. Older clients receive
    * footprint tokens in that centre form (tabletop-protocol.ts).
@@ -146,7 +146,7 @@ export const mapTabletopSchema = z
     playerTemplates: z.boolean().default(false),
     snap: z.boolean().default(true),
     /**
-     * Tabletop protocol 13 (grid mode): the automatic grid of an ungridded map is hidden until the
+     * Tabletop protocol 14 (grid mode): the automatic grid of an ungridded map is hidden until the
      * DM shows it. Absent means the lines are drawn as before.
      */
     gridHidden: z.boolean().optional(),

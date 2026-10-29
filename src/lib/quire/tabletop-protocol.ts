@@ -76,24 +76,24 @@ export const PARTY_GROUPS_PROTOCOL = 10;
  */
 export const VIEW_SECTIONS_PROTOCOL = 11;
 /**
- * Protocol 12 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
+ * Protocol 13 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
  * `footprint` and `anchor: "corner"` (stored by their top-left square). Older clients have a strict
- * token schema, so protocols 0-11 receive footprint tokens in the centre form they know (the
+ * token schema, so protocols 0-12 receive footprint tokens in the centre form they know (the
  * centre square plus a half-square offset for even sizes) without those fields
  * (`centreFormToken`). Their token moves, token saves and map saves come back in that form and the
  * server converts them to the stored form before applying them (`upgradeFootprintCommands`);
  * their saves keep the fields. Pending drafts with footprint fields ask them to finish on the
  * updated website.
  */
-export const FOOTPRINT_PROTOCOL = 12;
+export const FOOTPRINT_PROTOCOL = 13;
 /**
- * Protocol 13 (2026-10-29, map tokens: grid mode): a map's tabletop settings may carry
+ * Protocol 14 (2026-10-29, map tokens: grid mode): a map's tabletop settings may carry
  * `gridHidden` (the automatic grid of an ungridded map). Older clients have a strict tabletop
- * schema, so protocols 0-12 receive settings without it; their scene saves and map saves keep it
+ * schema, so protocols 0-13 receive settings without it; their scene saves and map saves keep it
  * (`upgradeOldClientCommands`). Pending `map-grid-snap` drafts ask them to finish on the updated
  * website.
  */
-export const GRID_MODE_PROTOCOL = 13;
+export const GRID_MODE_PROTOCOL = 14;
 /** The protocol current clients declare. */
 export const CURRENT_TABLETOP_PROTOCOL = GRID_MODE_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
@@ -579,13 +579,13 @@ export function refuseOldClientGroupActions(
     }
   }
 }
-// Protocol 12 (footprints and snapping).
+// Protocol 13 (footprints and snapping).
 const footprintFields = ["sizeClass", "footprint", "anchor"] as const;
 const hasFootprint = (token: Partial<MapToken> | null | undefined) =>
   !!token && footprintFields.some((key) => token[key] !== undefined);
 const footprinted = (text: string) => /"(sizeClass|footprint|anchor)":/.test(text);
 /**
- * A token as protocols 0-11 read it: without its size fields, and a corner-anchored footprint
+ * A token as protocols 0-12 read it: without its size fields, and a corner-anchored footprint
  * token at its centre square (plus half a square for even sizes), so older apps draw it at its
  * true centre. The same object when the token has no footprint fields.
  */
@@ -692,7 +692,7 @@ function storedToken(stored: MapToken, sent: MapToken, snap: boolean): MapToken 
   return { ...result, ...storedPlace(stored, sent, snap) };
 }
 /**
- * Protocols 0-11 send footprint tokens in their centre form. Before a batch from such a client is
+ * Protocols 0-12 send footprint tokens in their centre form. Before a batch from such a client is
  * applied, the server rewrites its token moves, token saves and map saves into the stored form
  * (against the current table). Nothing else changes; commands about other tokens are untouched.
  */
@@ -720,7 +720,7 @@ export function upgradeFootprintCommands<C extends { kind: string }>(table: Clou
       const token = stored(c.tokenId);
       if (!token) return command;
       const before = c.before as MapToken | null;
-      // Protocols 1-11 sent the centre form; protocol 0 the centre form without tabletop fields,
+      // Protocols 1-12 sent the centre form; protocol 0 the centre form without tabletop fields,
       // which world.ts already accepts as legacyTabletopToken(current) and merges.
       const fromCentre = sameJson(centreFormToken(token), before);
       if (!fromCentre && !sameJson(legacyTabletopToken(token), before)) return command;
@@ -746,9 +746,9 @@ export function upgradeFootprintCommands<C extends { kind: string }>(table: Clou
     return command;
   });
 }
-// Protocol 13 (grid mode).
+// Protocol 14 (grid mode).
 const gridHiddenText = (text: string) => text.includes('"gridHidden":');
-/** Tabletop settings without the hidden-grid flag (protocols 0-12). The same object without it. */
+/** Tabletop settings without the hidden-grid flag (protocols 0-13). The same object without it. */
 export function withoutGridHidden<T>(settings: T): T {
   if (!settings || typeof settings !== "object" || !("gridHidden" in settings)) return settings;
   const plain = { ...settings } as T & { gridHidden?: boolean };
@@ -792,7 +792,7 @@ function gridHiddenFreeTable(table: CloudTable): CloudTable {
   };
 }
 /**
- * Protocols 0-12 can't see `gridHidden`: their scene saves (`map-tabletop`) and map saves compare
+ * Protocols 0-13 can't see `gridHidden`: their scene saves (`map-tabletop`) and map saves compare
  * against the settings without it and keep it. Commands about other maps are untouched.
  */
 function upgradeGridHiddenCommands<C extends { kind: string }>(table: CloudTable, commands: C[]): C[] {
@@ -927,10 +927,10 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
-      // Protocol 13: grid mode commands and the hidden-grid flag.
+      // Protocol 14: grid mode commands and the hidden-grid flag.
       if (c.kind === "map-grid-snap" || gridHiddenText(JSON.stringify(c))) return true;
       if (protocol && protocol >= FOOTPRINT_PROTOCOL) return false;
-      // Protocol 12: footprint fields older apps cannot read.
+      // Protocol 13: footprint fields older apps cannot read.
       if (footprintCommandText(c)) return true;
       if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return false;
       // Protocol 10: split-the-party commands and group fields older apps cannot read.

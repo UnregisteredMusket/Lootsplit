@@ -1001,7 +1001,7 @@ export async function submitCommands(input: {
       selected.add(key);
       return true;
     });
-    // Map tokens (tabletop protocols 12+): older apps send footprint tokens in their centre form
+    // Map tokens (tabletop protocols 13+): older apps send footprint tokens in their centre form
     // and scene settings without the fields they can't see; they are applied in stored form.
     const applied = upgradeOldClientCommands(table, unapplied, input.tabletopProtocol ?? 0);
     table = applyCommandBatch(table, seat, applied, (command) => ({
