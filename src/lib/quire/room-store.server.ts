@@ -332,14 +332,14 @@ export async function readCombatView(code: string): Promise<CombatViewRead | nul
 export { ROOM_BODY_LIMIT, ROOM_ROW_LIMIT };
 type Encoded = Awaited<ReturnType<typeof encodeRoomImages>>;
 const utf8 = (text: string) => new TextEncoder().encode(text).length;
-/** Stored bytes of this room's archived sessions (parts included); read only when a write archives one. */
+/**
+ * Bytes of the snapshots this room's archived sessions stand for (parts included; a delta-stored
+ * session counts its whole snapshot, which is what whole-campaign operations load); read only when
+ * a write archives one.
+ */
 async function archivedBytes(db: Database, code: string): Promise<number> {
-  const row = await db
-    .prepare(
-      "SELECT (SELECT COALESCE(SUM(length(body)),0) FROM campaign_room_reports WHERE code=?1)+(SELECT COALESCE(SUM(length(body)),0) FROM campaign_room_report_parts WHERE code=?1) AS n",
-    )
-    .bind(code)
-    .first<{ n: number }>();
+  const { ARCHIVED_BYTES_SQL } = await import("../../../cloudflare/room-reports.mjs");
+  const row = await db.prepare(ARCHIVED_BYTES_SQL).bind(code).first<{ n: number }>();
   return Number(row?.n ?? 0);
 }
 type StorageSizes = ReturnType<typeof roomStorageSizes>;
