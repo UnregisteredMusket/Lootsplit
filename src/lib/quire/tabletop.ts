@@ -408,7 +408,7 @@ export function applyTabletopCommand(
         throw Error("You cannot move one of these tokens.");
       if (!same(position(token), position(move.before)))
         throw Error("A selected token moved or changed. Refresh before moving it.");
-      // Footprints (protocol 12): the whole footprint stays inside the grid, and with grid mode
+      // Footprints (protocol 13): the whole footprint stays inside the grid, and with grid mode
       // on the position must already be snapped. The server refuses; it never relocates a token.
       const placed = { ...token, ...move.after };
       if (move.after.offsetX === undefined) delete placed.offsetX;

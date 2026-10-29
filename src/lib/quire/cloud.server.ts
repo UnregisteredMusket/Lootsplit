@@ -1002,7 +1002,7 @@ export async function submitCommands(input: {
       selected.add(key);
       return true;
     });
-    // Footprints (tabletop protocol 12): older apps send footprint tokens in their centre form.
+    // Footprints (tabletop protocol 13): older apps send footprint tokens in their centre form.
     const applied =
       (input.tabletopProtocol ?? 0) < FOOTPRINT_PROTOCOL ? upgradeFootprintCommands(table, unapplied) : unapplied;
     table = applyCommandBatch(table, seat, applied, (command) => ({

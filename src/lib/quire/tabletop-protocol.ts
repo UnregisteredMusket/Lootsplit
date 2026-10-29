@@ -76,16 +76,16 @@ export const PARTY_GROUPS_PROTOCOL = 10;
  */
 export const VIEW_SECTIONS_PROTOCOL = 11;
 /**
- * Protocol 12 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
+ * Protocol 13 (2026-10-29, map tokens: footprints and snapping): tokens may carry `sizeClass`,
  * `footprint` and `anchor: "corner"` (stored by their top-left square). Older clients have a strict
- * token schema, so protocols 0-11 receive footprint tokens in the centre form they know (the
+ * token schema, so protocols 0-12 receive footprint tokens in the centre form they know (the
  * centre square plus a half-square offset for even sizes) without those fields
  * (`centreFormToken`). Their token moves, token saves and map saves come back in that form and the
  * server converts them to the stored form before applying them (`upgradeFootprintCommands`);
  * their saves keep the fields. Pending drafts with footprint fields ask them to finish on the
  * updated website.
  */
-export const FOOTPRINT_PROTOCOL = 12;
+export const FOOTPRINT_PROTOCOL = 13;
 /** The protocol current clients declare. */
 export const CURRENT_TABLETOP_PROTOCOL = FOOTPRINT_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
@@ -570,13 +570,13 @@ export function refuseOldClientGroupActions(
     }
   }
 }
-// Protocol 12 (footprints and snapping).
+// Protocol 13 (footprints and snapping).
 const footprintFields = ["sizeClass", "footprint", "anchor"] as const;
 const hasFootprint = (token: Partial<MapToken> | null | undefined) =>
   !!token && footprintFields.some((key) => token[key] !== undefined);
 const footprinted = (text: string) => /"(sizeClass|footprint|anchor)":/.test(text);
 /**
- * A token as protocols 0-11 read it: without its size fields, and a corner-anchored footprint
+ * A token as protocols 0-12 read it: without its size fields, and a corner-anchored footprint
  * token at its centre square (plus half a square for even sizes), so older apps draw it at its
  * true centre. The same object when the token has no footprint fields.
  */
@@ -683,7 +683,7 @@ function storedToken(stored: MapToken, sent: MapToken, snap: boolean): MapToken 
   return { ...result, ...storedPlace(stored, sent, snap) };
 }
 /**
- * Protocols 0-11 send footprint tokens in their centre form. Before a batch from such a client is
+ * Protocols 0-12 send footprint tokens in their centre form. Before a batch from such a client is
  * applied, the server rewrites its token moves, token saves and map saves into the stored form
  * (against the current table). Nothing else changes; commands about other tokens are untouched.
  */
@@ -711,7 +711,7 @@ export function upgradeFootprintCommands<C extends { kind: string }>(table: Clou
       const token = stored(c.tokenId);
       if (!token) return command;
       const before = c.before as MapToken | null;
-      // Protocols 1-11 sent the centre form; protocol 0 the centre form without tabletop fields,
+      // Protocols 1-12 sent the centre form; protocol 0 the centre form without tabletop fields,
       // which world.ts already accepts as legacyTabletopToken(current) and merges.
       const fromCentre = sameJson(centreFormToken(token), before);
       if (!fromCentre && !sameJson(legacyTabletopToken(token), before)) return command;
@@ -825,7 +825,7 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
-      // Protocol 12: footprint fields older apps cannot read.
+      // Protocol 13: footprint fields older apps cannot read.
       if (footprintCommandText(c)) return true;
       if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return false;
       // Protocol 10: split-the-party commands and group fields older apps cannot read.

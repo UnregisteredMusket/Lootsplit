@@ -265,7 +265,7 @@ test("older clients receive footprint tokens in their centre form without the ne
     { ...ogre, id: "golem", label: "Golem", sizeClass: "huge", column: 2, row: 6 },
     { id: "rat", kind: "other", label: "Rat", column: 3, row: 3, offsetX: -0.25, offsetY: 0.25, visibility: "party", sizeClass: "tiny" },
   ]);
-  assert.equal(FOOTPRINT_PROTOCOL, 12);
+  assert.equal(FOOTPRINT_PROTOCOL, 13);
   assert.equal(CURRENT_TABLETOP_PROTOCOL, FOOTPRINT_PROTOCOL);
   assert.ok(FOOTPRINT_PROTOCOL > VIEW_SECTIONS_PROTOCOL);
   assert.equal(tableForProtocol(t, FOOTPRINT_PROTOCOL), t);

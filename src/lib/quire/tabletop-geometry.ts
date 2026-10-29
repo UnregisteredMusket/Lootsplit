@@ -151,7 +151,7 @@ export function sceneRouteDistance(
   }
   return grid.feetPerTile * total;
 }
-/** A token's position and, from tabletop protocol 12, its size and anchor (tabletop-schema.ts). */
+/** A token's position and, from tabletop protocol 13, its size and anchor (tabletop-schema.ts). */
 export type TokenPlace = {
   column: number;
   row: number;
