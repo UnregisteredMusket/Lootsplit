@@ -195,6 +195,10 @@ export type TradeExecution = {
   manualRolls?: boolean;
   /** Map tokens: the bound encounter's turn, read by the room server (tabletop.ts). */
   mapCombat?: { encounterId: string; status: string; activeId: string | null } | "unavailable";
+  /** Zones (map tokens PR 7A): the room's player seats, so a party vote knows its voters. */
+  playerSeats?: { id: string; purseIds: string[] }[];
+  /** Zones: the client predates zone requests (protocol < 18), so it can't ask the party. */
+  zoneRequestsUnsupported?: boolean;
 };
 export const readTradeEconomy = (raw?: unknown): TradeEconomy =>
   tradeEconomySchema.parse(raw ?? {});

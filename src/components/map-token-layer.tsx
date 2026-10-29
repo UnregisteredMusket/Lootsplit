@@ -73,7 +73,7 @@ export function MapTokenLayer({
   /** The player's speed from their sheet: the reach guide on their turn. */
   speedFeet?: number;
   /** Group placement ghosts (map tokens PR 3), snapped square by square. */
-  ghosts?: { token: MapToken; fogged: boolean }[];
+  ghosts?: { token: MapToken; fogged: boolean; pending?: boolean }[];
   /** The Shift+drag selection box, in scene coordinates. */
   box?: { a: { x: number; y: number }; b: { x: number; y: number } };
 }) {
@@ -237,10 +237,16 @@ export function MapTokenLayer({
           </div>
         );
       })}
-      {ghosts.map(({ token, fogged }) => {
+      {ghosts.map(({ token, fogged, pending }) => {
         const { r, d, cx, cy } = disc(token, token);
         return (
-          <div key={`ghost-${token.id}`} className="map-token-drag" aria-hidden="true">
+          <div
+            key={`ghost-${token.id}${pending ? "-pending" : ""}`}
+            className={`map-token-drag${pending ? " pending" : ""}`}
+            aria-hidden={pending ? undefined : "true"}
+            role={pending ? "img" : undefined}
+            aria-label={pending ? `${token.label}: move waiting for the DM` : undefined}
+          >
             <span
               className={`map-token-foot target${fogged ? " fogged" : ""}`}
               style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
@@ -250,6 +256,7 @@ export function MapTokenLayer({
               style={{ left: cx, top: cy, width: d, height: d, fontSize: Math.max(10, Math.round(d * 0.36)) }}
             >
               <span>{initial(token)}</span>
+              {pending && <span className="map-token-label top">Waiting for the DM</span>}
             </span>
           </div>
         );

@@ -1,0 +1,9 @@
+{
+  "title": "Ask the DM before a token moves",
+  "summary": "A new player movement setting lets players propose moves that the DM approves.",
+  "items": [
+    "Set a map's player movement to Ask the DM: a player's drag becomes a request instead of a move.",
+    "A dashed ghost shows where they want to go, and players can withdraw a request.",
+    "The DM approves or denies each move in the Review Inbox."
+  ]
+}

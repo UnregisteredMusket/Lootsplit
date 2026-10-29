@@ -156,6 +156,10 @@ import {
 import { AddCharactersPanel, AddCreaturesPanel } from "./map-quick-flows";
 import { FollowViewSettings } from "./map-follow-view";
 import { useTokenFollow } from "@/lib/quire/use-token-follow";
+import { MapZoneRequests } from "./map-zone-requests";
+import { MoveRequestChips } from "./map-move-requests";
+import { SplitRuleSetting, ZonesEditor } from "./map-zones-editor";
+import { zoneName, zoneOf } from "@/lib/quire/zones";
 import { mapEncounterId, removeFromInitiative } from "@/lib/quire/map-initiative-link";
 import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
 import { requestConfirm } from "@/lib/quire/confirm-store";
@@ -3252,7 +3256,20 @@ function MapViewport({
     [combatantIds, setCombatantIds] = useState<{ id: string; ids: Set<string> }>();
   // Token follows the player's map view (map tokens PR 7): the DM's setting and the player's own switch.
   const followScope = `${cloudCode}:${seatNow.purseIds.join(",")}`;
-  useTokenFollow({ map, maps, table: recordTable, seat: seatNow, scope: followScope, viewOnly: !!cloudNow.viewOnly });
+  useTokenFollow({ map, maps, table: recordTable, seat: seatNow, scope: followScope, viewOnly: !!cloudNow.viewOnly, proposeJourney: () => openPlanner() });
+  const [zonesOpen, setZonesOpen] = useState(false);
+  // "Ask the DM" moves waiting on this map (PR 8): dashed ghosts at their destinations.
+  const pendingMoveGhosts = (recordTable.journal?.world?.moveRequests ?? []).flatMap((r) => {
+    if (r.status !== "pending" || r.mapId !== map.id) return [];
+    const token = map.tokens?.find((t) => t.id === r.tokenId);
+    if (!token) return [];
+    const at: MapToken = { ...token, column: r.after.column, row: r.after.row };
+    delete at.offsetX;
+    delete at.offsetY;
+    if (r.after.offsetX !== undefined) at.offsetX = r.after.offsetX;
+    if (r.after.offsetY !== undefined) at.offsetY = r.after.offsetY;
+    return [{ token: at, fogged: false, pending: true }];
+  });
   const menuTokenCount = (mapMenu ?? radial)?.tokenIds.length ?? 0;
   // "Start encounter here" applies to the panel it opened; the next opening starts plain.
   useEffect(() => {
@@ -3847,6 +3864,11 @@ function MapViewport({
           </SettingsGroup>
           <SettingsGroup id="places" title="Places & party">
             {setupSettings.places}
+            {useDm && (
+              <button type="button" className="settings-link" onClick={() => setZonesOpen(true)}>
+                Zones… (maps that count as one place)
+              </button>
+            )}
             {records.length > 0 && (
               <section className="map-places-list" aria-label="Places on this map">
                 <h3>Places on this map</h3>
@@ -3865,6 +3887,7 @@ function MapViewport({
           </SettingsGroup>
           <SettingsGroup id="players" title="Players & display">
             {useDm && <MovementNotice map={map} />}
+            {useDm && <SplitRuleSetting table={recordTable} />}
             <FollowViewSettings
               table={recordTable}
               dm={useDm}
@@ -4635,6 +4658,8 @@ function MapViewport({
         ))}
       <MapAnnouncer map={map} pings={signals.pings} />
       {menuElement}
+      {!useDm && <MapZoneRequests table={recordTable} seat={seatNow} />}
+      {zonesOpen && useDm && <ZonesEditor table={recordTable} open={zonesOpen} onOpenChange={setZonesOpen} initialZone={zoneOf(recordTable, map.id)} />}
       {radialElement}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {placeAnnouncement}
@@ -4669,6 +4694,9 @@ function MapViewport({
         )}
         {!useDm && tileMode && map.grid && (
           <>
+            {movement.mode === "approval" && (
+              <MoveRequestChips map={map} requests={recordTable.journal?.world?.moveRequests ?? []} />
+            )}
             <MovementChips
               movement={movement}
               speed={speedFeet}
@@ -5046,7 +5074,7 @@ function MapViewport({
               selected={tools.selected}
               moves={tools.moves}
               movement={useDm ? undefined : movement}
-              ghosts={tools.group.ghosts}
+              ghosts={[...tools.group.ghosts, ...pendingMoveGhosts]}
               box={tools.group.box}
               notTurn={tools.notTurn}
               speedFeet={speedFeet}
@@ -5330,6 +5358,11 @@ function MapViewport({
               sheet={here}
               dm={useDm}
               partyName={partySplit(recordTable) && hereGroup ? groupInfo(recordTable, hereGroup).name : undefined}
+              tokenLine={(() => {
+                if (useDm) return undefined;
+                const on = maps.find((m) => (m.tokens ?? []).some((t) => t.kind === "character" && !!t.entityId && seatNow.purseIds.includes(t.entityId)));
+                return on ? `Your token is on ${on.name} (${zoneName(recordTable, zoneOf(recordTable, on.id))})` : undefined;
+              })()}
               quests={questsHere(recordTable, viewer, hereGroup).map((q) => ({
                 id: q.id,
                 title: q.title,

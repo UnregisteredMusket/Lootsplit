@@ -31,7 +31,10 @@ export function MapHereSheet({
   partyName = "Party",
   quests = [],
   openQuest,
+  tokenLine,
 }: {
+  /** Zones (map tokens PR 7A): "Your token is on The Commons (Testville)". */
+  tokenLine?: string;
   /** Quests here (docs/QUESTS.md): an open objective's, the quest's or its giver's place. */
   quests?: { id: string; title: string; detail: string }[];
   openQuest?: (id: string) => void;
@@ -273,6 +276,7 @@ export function MapHereSheet({
   return (
     <section className="map-record-details map-service-open map-here-sheet" aria-label="Here">
       {groupSwitch}
+      {tokenLine && <p className="map-here-token">{tokenLine}</p>}
       {body}
     </section>
   );

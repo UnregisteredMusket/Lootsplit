@@ -17,6 +17,8 @@ import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
 import { legacyServiceKinds, serviceKinds } from "./services-schema.ts";
+import { applyMoveRequestCommand, MOVE_REQUEST_KINDS, type MoveRequestCommand } from "./move-requests.ts";
+import { applyZoneCommand, ZONE_COMMAND_KINDS, type ZoneCommand } from "./zone-commands.ts";
 import { applyTabletopCommand, applyTokenFollow, keepMovement, validateTabletop, readTabletopSession, type TabletopExecution } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
 import { tokenInsideGrid } from "./tabletop-geometry.ts";
@@ -372,7 +374,15 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     return;
   }
   if (cmd.kind === "map-token-follow") {
-    applyTokenFollow(t, seat, cmd, at);
+    applyTokenFollow(t, seat, cmd, at, false, execution);
+    return;
+  }
+  if (MOVE_REQUEST_KINDS.has(cmd.kind)) {
+    applyMoveRequestCommand(t, seat, cmd as MoveRequestCommand, at, execution);
+    return;
+  }
+  if (ZONE_COMMAND_KINDS.has(cmd.kind)) {
+    applyZoneCommand(t, seat, cmd as ZoneCommand, at, execution);
     return;
   }
   if (applyCharacterPosition(t, seat, cmd, at)) return;

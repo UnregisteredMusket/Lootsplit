@@ -67,6 +67,7 @@ import {
   groupCommandText,
   refuseOldClientGroupActions,
   upgradeOldClientCommands,
+  ZONES_PROTOCOL,
 } from "./tabletop-protocol.ts";
 
 /**
@@ -1128,7 +1129,8 @@ export async function submitCommands(input: {
     // Players move their own tokens outside their room turn too (owner, 2026-10-29); encounter
     // initiative still applies (tabletop.ts).
     const playerToken = (c: (typeof commands)[number]) =>
-      seat.role === "player" && (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-token-follow");
+      seat.role === "player" &&
+      (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-token-follow" || c.kind.startsWith("zone-") || c.kind.startsWith("map-move-request"));
     const messagesOnly =
       commands.length > 0 &&
       commands.every(
@@ -1179,10 +1181,12 @@ export async function submitCommands(input: {
     // tracker's turn, read once per write attempt from the encounter store (fails closed).
     const binding = room.table.journal?.world?.combat;
     const mapCombat =
-      seat.role !== "dm" &&
       binding?.phase === "active" &&
-      unapplied.some(
-        (c) => (c.kind === "map-token-move" || c.kind === "map-token-claim") && c.mapId === binding.mapId,
+      unapplied.some((c) =>
+        seat.role !== "dm"
+          ? (c.kind === "map-token-move" || c.kind === "map-token-claim" || c.kind === "map-move-request") && c.mapId === binding.mapId
+          : // The DM's approval of a player's move is held to that token's turn too.
+            c.kind === "map-move-request-review" && c.approve,
       )
         ? await readMapCombatTurn(room.code, binding.encounterId)
         : undefined;
@@ -1194,6 +1198,9 @@ export async function submitCommands(input: {
         source: "server",
         manualRolls,
         mapCombat,
+        playerSeats: room.seats.filter((s) => s.role === "player").map((s) => ({ id: s.id, purseIds: s.purseIds })),
+        // A client older than zone requests is told to update instead of "ask the party".
+        zoneRequestsUnsupported: (input.tabletopProtocol ?? 0) < ZONES_PROTOCOL,
         random: (draw) => {
           const key = command.id + ":" + draw;
           if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());

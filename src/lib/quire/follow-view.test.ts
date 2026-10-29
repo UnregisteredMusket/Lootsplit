@@ -99,9 +99,10 @@ test("refusals: setting off, someone else's character, other zones, hidden maps 
   const t = fixture();
   assert.throws(() => run(t, follow(t, "keep", "cellar"), bram), /your own character/);
   assert.doesNotThrow(() => run(t, follow(t, "keep", "cellar"), dm));
-  assert.throws(() => run(t, follow(t, "keep", "farbury")), /Viewing only — Mira is in Testville\./);
-  assert.throws(() => run(t, follow(t, "keep", "wilds")), /Viewing only/);
-  assert.throws(() => run(t, follow(t, "keep", "loose")), /Viewing only/);
+  // Zones that aren't next to Testville need a journey (PR 7A).
+  assert.throws(() => run(t, follow(t, "keep", "farbury")), /This trip takes about 2 days\. Ask your DM to plan the journey\./);
+  assert.throws(() => run(t, follow(t, "keep", "wilds")), /plan the journey/);
+  assert.throws(() => run(t, follow(t, "keep", "loose")), /plan the journey/);
   // A hidden map and a map that doesn't exist give the same message.
   const hidden = (() => {
     try {

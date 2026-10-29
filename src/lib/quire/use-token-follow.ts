@@ -11,7 +11,7 @@ import type { CloudSeat } from "./cloud";
 import { occupiedSquares, sceneTokenPoint, snapTokenPosition, tokenFootprint } from "./tabletop-geometry";
 import { combatOnMap, mapPointVisibleTo, movementMode, readMapTabletop, readTabletopSession } from "./tabletop";
 import type { CampaignMap, MapToken } from "./world-schema";
-import { followRefusal, zoneName, zoneOf } from "./zones";
+import { crossing, zoneName, zoneOf } from "./zones";
 
 type Seat = Pick<CloudSeat, "role" | "purseIds">;
 /** Debounce: the token follows 1.5 s after the view settles, so quick browsing sends nothing. */
@@ -66,7 +66,10 @@ export function useTokenFollow({
   seat,
   scope,
   viewOnly,
+  proposeJourney,
 }: {
+  /** "Propose a journey" on the far-zone toast: opens the player's journey proposal. */
+  proposeJourney?: () => void;
   map: CampaignMap;
   maps: CampaignMap[];
   table: Pick<CloudTable, "journal" | "purses">;
@@ -75,8 +78,8 @@ export function useTokenFollow({
   viewOnly: boolean;
 }) {
   const { commandOutcome } = useEconomy();
-  const latest = useRef({ maps, table, seat, scope, viewOnly, commandOutcome });
-  latest.current = { maps, table, seat, scope, viewOnly, commandOutcome };
+  const latest = useRef({ maps, table, seat, scope, viewOnly, commandOutcome, proposeJourney });
+  latest.current = { maps, table, seat, scope, viewOnly, commandOutcome, proposeJourney };
   const previous = useRef<string | undefined>(undefined);
   useEffect(() => {
     const before = previous.current;
@@ -99,7 +102,8 @@ async function send(
 /** Builds and sends the follow for each of the seat's characters (read from the latest state). */
 async function followNow(
   toId: string,
-  { maps, table, seat, scope, viewOnly, commandOutcome }: {
+  { maps, table, seat, scope, viewOnly, commandOutcome, proposeJourney }: {
+    proposeJourney?: () => void;
     maps: CampaignMap[];
     table: Pick<CloudTable, "journal" | "purses">;
     seat: Seat;
@@ -125,13 +129,42 @@ async function followNow(
       continue;
     }
     if ([from, to].some((m) => movementMode(m) !== "auto" || m.tabletop?.lockedPurseIds?.includes(purseId)) || beforeFrom?.locked) continue;
-    const why = followRefusal(table, purseId, person.name, to.id, from.id);
-    if (why) {
-      toast.info(why, { description: "Your token stays where it is; you're just looking." });
+    // Zones (PR 7A): same zone, joining another group, an adjacent zone under the split rule,
+    // or a journey.
+    const move = crossing(table, purseId, person.name, to.id, from.id);
+    const here = zoneName(table, zoneOf(table, from.id));
+    if (move.kind === "refused") {
+      toast.info(move.message, { description: "Your token stays where it is; you're just looking." });
+      continue;
+    }
+    if (move.kind === "far") {
+      toast.info(`This trip takes about ${move.days} ${move.days === 1 ? "day" : "days"}. Ask your DM to plan the journey.`, {
+        description: `${to.name} isn't next to ${zoneName(table, move.from)} (about ${move.miles} miles at ${move.pace} mi/day). Your token stays in ${zoneName(table, move.from)}; you're just looking.`,
+        duration: 12000,
+        ...(proposeJourney ? { action: { label: "Propose a journey", onClick: proposeJourney } } : {}),
+        cancel: { label: "OK", onClick: () => undefined },
+      });
+      continue;
+    }
+    // Joining a group in an adjacent zone follows the same split rule (privacy review 2026-10-29).
+    const ruled = move.kind === "split" || move.kind === "join" ? move : undefined;
+    if (ruled && !ruled.rule.allow && ruled.rule.rule === "block") {
+      toast.info("The DM is keeping the party together here.", {
+        description: ruled.kind === "join" ? `Ask your DM if ${person.name} should go to ${to.name}.` : `Ask your DM if ${person.name} should split off to ${to.name}.`,
+      });
       continue;
     }
     const square = beforeTo ? { column: beforeTo.column, row: beforeTo.row } : followSquare(table, to, seat, arrival(table, from, to, purseId), beforeFrom ?? undefined);
     if (!square) continue;
+    if (ruled && !ruled.rule.allow) {
+      // Wait until end of session, or a party vote: the request waits; the token stays.
+      try {
+        await send(commandOutcome, { kind: "zone-request", requestId: crypto.randomUUID(), purseId, fromMapId: from.id, toMapId: to.id, grid: canonicalJson(to.grid), at: square });
+      } catch (e) {
+        toast.info(e instanceof Error ? e.message : "Your token stays where it is.");
+      }
+      continue;
+    }
     const input = {
       kind: "map-token-follow" as const,
       mapId: to.id,
@@ -146,23 +179,40 @@ async function followNow(
     try {
       await send(commandOutcome, input);
       const zone = zoneName(table, zoneOf(table, to.id));
+      if (move.kind === "split") {
+        toast.warning(`You left ${here}. You're now separate from the party.`, {
+          description: `${person.name} is in ${to.name}. Come back to ${here} to rejoin.`,
+          duration: 12000,
+          action: undoAction(),
+        });
+        continue;
+      }
+      if (move.kind === "join") {
+        toast.success(`${person.name} is back with the party`, { description: `Your token moved to ${to.name} (${zone}).` });
+        continue;
+      }
       toast.success(`Your token moved to ${to.name}`, {
         description: `Still with the party: same zone (${zone})`,
         duration: 10000,
-        action: beforeFrom
+        action: undoAction(),
+      });
+      function undoAction() {
+        const toMap = to!,
+          fromMap = from!;
+        return beforeFrom
           ? {
               label: "Undo",
               onClick: () => {
                 // The inverse follow, with the same checks; valid until something else changes the token.
                 const fresh = currentMaps();
-                const now = { to: fresh.find((m) => m.id === to.id) ?? to, from: fresh.find((m) => m.id === from.id) ?? from };
+                const now = { to: fresh.find((m) => m.id === toMap.id) ?? toMap, from: fresh.find((m) => m.id === fromMap.id) ?? fromMap };
                 const moved = now.to.tokens?.find((t) => t.kind === "character" && t.entityId === purseId) ?? null;
                 void send(commandOutcome, {
                   kind: "map-token-follow",
-                  mapId: from.id,
-                  grid: canonicalJson(now.from.grid ?? from.grid),
+                  mapId: fromMap.id,
+                  grid: canonicalJson(now.from.grid ?? fromMap.grid),
                   purseId,
-                  fromMapId: to.id,
+                  fromMapId: toMap.id,
                   beforeFrom: moved,
                   beforeTo: null,
                   tokenId: moved?.id ?? beforeFrom.id,
@@ -170,8 +220,8 @@ async function followNow(
                 }).catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Your token couldn't go back. Move it yourself."));
               },
             }
-          : undefined,
-      });
+          : undefined;
+      }
     } catch (e) {
       toast.info(e instanceof Error ? e.message : "Your token stays where it is.");
     }

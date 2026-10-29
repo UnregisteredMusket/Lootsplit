@@ -36,6 +36,8 @@
   "node scripts/recovery-step.mjs dev-map-radial 300 node scripts/map-radial-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-map-party-move 300 node scripts/map-party-move-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-map-follow-view 240 node scripts/map-follow-view-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-map-zones 300 node scripts/map-zones-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-map-move-approval 240 node scripts/map-move-approval-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot-claims 300 node scripts/loot-claims-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot-fairness 300 node scripts/loot-fairness-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-themed-confirm 180 node scripts/themed-confirm-browser-audit.mjs",

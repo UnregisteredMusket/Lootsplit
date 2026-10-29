@@ -127,8 +127,25 @@ export const GROUP_COMMANDS_PROTOCOL = 16;
  * website.
  */
 export const FOLLOW_VIEW_PROTOCOL = 17;
+/**
+ * Protocol 18 (2026-10-29, map tokens: zones and the split rule): the world may carry `zones`,
+ * `splitRule` and `zoneRequests`, and players may send `zone-request`, `zone-vote`,
+ * `zone-request-withdraw` and `zone-request-resolve`; the DM `zone-save`. Protocols 0-17 receive
+ * the world without them (their world saves keep them, journal.ts); the server still applies the
+ * zone rules to their token follows. Drafts with the new commands ask them to finish on the
+ * updated website.
+ */
+export const ZONES_PROTOCOL = 18;
+/**
+ * Protocol 19 (2026-10-29, map tokens: "Ask the DM" movement): the world may carry
+ * `moveRequests`, and players may send `map-move-request` / `-withdraw`, the DM `-review`.
+ * Protocols 0-18 receive the world without them (their world saves keep them); on an `approval`
+ * map they can't move tokens (as on Off). Drafts with the new commands ask them to finish on the
+ * updated website.
+ */
+export const MOVE_APPROVAL_PROTOCOL = 19;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = FOLLOW_VIEW_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = MOVE_APPROVAL_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1035,6 +1052,64 @@ function upgradeSessionCommands<C extends { kind: string }>(table: CloudTable, c
     return { ...c, before, session };
   });
 }
+// Protocol 19 ("Ask the DM" movement).
+const moveRequestText = (text: string) => text.includes('"moveRequests":[');
+export function hasMoveRequests(table: CloudTable): boolean {
+  return table.journal?.world?.moveRequests !== undefined || !!table.journal?.reports?.some((r) => moveRequestText(r.snapshot ?? ""));
+}
+function moveRequestFreeTable(table: CloudTable): CloudTable {
+  if (!hasMoveRequests(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!moveRequestText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(moveRequestFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world?.moveRequests !== undefined) {
+    plainWorld = { ...world };
+    delete plainWorld.moveRequests;
+  }
+  return { ...table, journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) } };
+}
+// Protocol 18 (zones).
+const zonesText = (text: string) => /"(zones|zoneRequests)":\[|"splitRule":\{/.test(text);
+/** Whether a table (or a stored backup body) holds zones, the split rule or split requests. */
+export function hasZones(table: CloudTable): boolean {
+  const w = table.journal?.world;
+  return (
+    w?.zones !== undefined ||
+    w?.splitRule !== undefined ||
+    w?.zoneRequests !== undefined ||
+    !!table.journal?.reports?.some((r) => zonesText(r.snapshot ?? ""))
+  );
+}
+function zonesFreeTable(table: CloudTable): CloudTable {
+  if (!hasZones(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!zonesText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(zonesFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world) {
+    plainWorld = { ...world };
+    delete plainWorld.zones;
+    delete plainWorld.splitRule;
+    delete plainWorld.zoneRequests;
+  }
+  return {
+    ...table,
+    journal: { ...table.journal!, ...(plainWorld ? { world: plainWorld } : {}), ...(reports ? { reports } : {}) },
+  };
+}
 /** Every older-client conversion, applied to a batch before it runs (cloud.server.ts). */
 export function upgradeOldClientCommands<C extends { kind: string }>(
   table: CloudTable,
@@ -1051,6 +1126,10 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   return result;
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= MOVE_APPROVAL_PROTOCOL) return table;
+  table = moveRequestFreeTable(table);
+  if (protocol >= ZONES_PROTOCOL) return table;
+  table = zonesFreeTable(table);
   if (protocol >= FOLLOW_VIEW_PROTOCOL) return table;
   table = followFreeTable(table);
   if (protocol >= GROUP_COMMANDS_PROTOCOL) return table;
@@ -1140,12 +1219,18 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= FOLLOW_VIEW_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= MOVE_APPROVAL_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 19: "Ask the DM" move requests.
+      if (String(c.kind).startsWith("map-move-request") || moveRequestText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= ZONES_PROTOCOL) return false;
+      // Protocol 18: zone commands and fields.
+      if (String(c.kind).startsWith("zone-") || zonesText(JSON.stringify(c))) return true;
+      if (protocol && protocol >= FOLLOW_VIEW_PROTOCOL) return false;
       // Protocol 17: token follows and the follow-view setting.
       if (c.kind === "map-token-follow" || followText(JSON.stringify(c))) return true;
       if (protocol && protocol >= GROUP_COMMANDS_PROTOCOL) return false;
