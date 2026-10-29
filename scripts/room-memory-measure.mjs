@@ -67,7 +67,9 @@ async function setup(path) {
  * `--op`: `read` (a changed-room read, default), `write` (a purchase from the DM, answered with
  * its view), `undo` (Undo of the oldest purchase: a command that needs the whole live ledger and
  * every archived session), `whole` (the whole campaign as exports and deletion copies read it:
- * every page and archived session, projected for the DM).
+ * every page and archived session, projected for the DM, as exports were built before part 2),
+ * `stream` (the DM's campaign file streamed one archived session at a time, as Download a copy and
+ * deletion copies are built since part 2).
  */
 async function read(path) {
   const { seats } = JSON.parse(readFileSync(path + ".json", "utf8"));
@@ -96,6 +98,16 @@ async function read(path) {
         const id = `undo-${process.pid}-${i}`;
         const view = await submitCommands({ ...seats[0], tabletopProtocol: protocol, batchId: id, commands: [{ id, kind: "ledger-void", target: { kind: "ledger", id: line.id }, before: canonicalJson(line), reason: "Measured." }] }).catch((error) => ({ error: String(error.message) }));
         return JSON.stringify(view).length;
+      }
+      if (op === "stream") {
+        // Download a copy / deletion copy as streamed since part 2 (campaign-file-stream.mjs).
+        const { readStoredRoom } = await import("../cloudflare/room-storage.mjs");
+        const { campaignFileStream } = await import("../cloudflare/campaign-file-stream.mjs");
+        const { room } = await readStoredRoom(globalThis.__env__.DB, seats[0].code);
+        const file = await campaignFileStream(globalThis.__env__.DB, room, room.seats[0], (projected) => projected);
+        let length = 0;
+        for await (const chunk of file.chunks()) length += chunk.length;
+        return length;
       }
       if (op === "whole") {
         const room = await readRoom(seats[0].code);

@@ -1,0 +1,8 @@
+{
+  "title": "Download a copy works for much larger campaigns",
+  "summary": "Downloading a shared campaign and the recovery copy kept when one is deleted are now built one archived session at a time.",
+  "items": [
+    "Download a copy and the recovery copy made when a shared campaign is deleted no longer need the whole campaign in server memory at once, so they keep working for campaigns with many archived sessions.",
+    "The downloaded file is exactly the same as before, and Import reads it as always."
+  ]
+}

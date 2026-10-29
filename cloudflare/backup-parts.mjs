@@ -93,3 +93,46 @@ export async function readBackupPayload(db, backupId, body) {
 /** SQL for an account's stored backup bytes, parts included (bind the user id twice). */
 export const accountBackupBytesSql =
   "(SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_backups WHERE user_id=?)+(SELECT COALESCE(SUM(LENGTH(p.body)),0) FROM library_backup_parts p JOIN library_backups b ON b.id=p.backup_id WHERE b.user_id=?)";
+
+/**
+ * `backupParts` for a campaign JSON produced as a sequence of text chunks (campaign-file-stream.mjs),
+ * without ever holding it as one string when it is stored in parts: the same parts, marker and
+ * inline decision as `backupParts(chunks.join(""))`. Returns `{ text }` when it fits inline, else
+ * `{ chunked }`.
+ * @param {AsyncIterable<string>} chunks
+ * @returns {Promise<{ text: string; chunked: null } | { text: null; chunked: { marker: { parts: number; bytes: number; sha256: string }; parts: string[] } }>}
+ */
+export async function backupPartsFromChunks(chunks) {
+  const hash = createHash("sha256");
+  /** @type {string[] | null} text while it may still fit inline */
+  let small = [];
+  let bytes = 0;
+  /** @type {string[]} */
+  const parts = [];
+  let pending = new Uint8Array(0);
+  const cut = (/** @type {boolean} */ final) => {
+    while (pending.length > BACKUP_PART_BYTES || (final && pending.length)) {
+      let end = Math.min(pending.length, BACKUP_PART_BYTES);
+      while (end < pending.length && end > 0 && (pending[end] & 0xc0) === 0x80) end--;
+      parts.push(decoder.decode(pending.subarray(0, end)));
+      pending = pending.slice(end);
+    }
+  };
+  for await (const chunk of chunks) {
+    hash.update(chunk);
+    const encoded = encoder.encode(chunk);
+    bytes += encoded.length;
+    if (small) {
+      small.push(chunk);
+      if (bytes > BACKUP_INLINE_BYTES) small = null;
+    }
+    const next = new Uint8Array(pending.length + encoded.length);
+    next.set(pending);
+    next.set(encoded, pending.length);
+    pending = next;
+    cut(false);
+  }
+  if (small) return { text: small.join(""), chunked: null };
+  cut(true);
+  return { text: null, chunked: { marker: { parts: parts.length, bytes, sha256: hash.digest("hex") }, parts } };
+}

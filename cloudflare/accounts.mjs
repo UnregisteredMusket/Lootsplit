@@ -530,7 +530,11 @@ export async function handleAccounts(request, env, context = null) {
       return cors(json(await moderation(db, userId, body, session.session.id)));
     }
     if (path === "/api/account/campaign" && request.method === "POST")
-      return cors(json(await campaignAction(db, userId, body, session.session)));
+    {
+      // Download a copy answers with a streamed response (campaign-file-stream.mjs).
+      const result = await campaignAction(db, userId, body, session.session);
+      return cors(result instanceof Response ? result : json(result));
+    }
     if (path === "/api/account/restore-backup" && request.method === "POST")
       return cors(
         json(
