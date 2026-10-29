@@ -34,6 +34,22 @@ type Seat = Pick<CloudSeat, "role" | "purseIds"> & { id?: string };
 const same = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
 export const readMapTabletop = (map: Pick<CampaignMap, "tabletop">): MapTabletop =>
   mapTabletopSchema.parse(map.tabletop ?? {});
+/**
+ * Grid mode's "align the grid" Undo (privacy review, 2026-10-29): the map as it was before the
+ * align, but only while nothing changed since (the same grid, tokens and grid mode the align left).
+ * Anything else, such as a token claimed or moved after the align, gives `undefined`: "The map
+ * changed since; undo not available". The save is still checked against `current` on the server.
+ */
+export function alignUndoMap(current: CampaignMap, aligned: CampaignMap, previous: CampaignMap): CampaignMap | undefined {
+  const now = readMapTabletop(current);
+  if (
+    !same(current.grid, aligned.grid) ||
+    !same(current.tokens ?? [], aligned.tokens ?? []) ||
+    now.snap !== readMapTabletop(aligned).snap
+  )
+    return;
+  return { ...current, grid: previous.grid, tokens: previous.tokens, tabletop: { ...now, snap: readMapTabletop(previous).snap } };
+}
 export const readTabletopSession = (table: Pick<CloudTable, "journal">) =>
   tabletopSessionSchema.parse(table.journal?.world?.tabletop ?? {});
 export function mapAccessible(table: CloudTable, map: CampaignMap, seat: Seat) {
