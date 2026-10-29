@@ -2,7 +2,11 @@ import test from "node:test";
 import { readStoredRoom, roomWriteStatements } from "../cloudflare/room-storage.mjs";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
-import { handleAccounts, LIBRARY_LIMITS } from "../cloudflare/accounts.mjs";
+import {
+  accountRateLimitClock,
+  handleAccounts,
+  LIBRARY_LIMITS,
+} from "../cloudflare/accounts.mjs";
 import { closeRoom, roomState } from "../src/lib/quire/cloud.server.ts";
 import { WIDGET_SESSION_AGENT } from "../cloudflare/monitor-journal.mjs";
 const origin = "http://localhost:8080";
@@ -1404,6 +1408,12 @@ test("the home-screen widget gets its own owner session that app sign-out leaves
 
 test("a signed-in DM's encounter polling counts against the account, not the table's shared Wi-Fi (audit 2026-10-28 F4)", async () => {
   const { DB, env, call, signup } = setup();
+  // Every request below must land in one per-minute allowance window: the later assertions
+  // count on earlier hits (e.g. the flood adds to the DM's polling). Pin the limiter's clock
+  // so a slow runner crossing a minute boundary cannot reset the counts mid-test.
+  const realClock = accountRateLimitClock.now;
+  const pinned = realClock();
+  accountRateLimitClock.now = () => pinned;
   try {
     const household = "198.51.100.7";
     const fromHome = async (path, body, cookie = "", ip = household) => {
@@ -1491,6 +1501,7 @@ test("a signed-in DM's encounter polling counts against the account, not the tab
     assert.ok(refused > 0, "the per-account allowance applies across IPs");
     assert.equal((await fromHome("encounters/detail", { id }, player.cookie)).status === 429, false);
   } finally {
+    accountRateLimitClock.now = realClock;
     DB.close();
   }
 });
