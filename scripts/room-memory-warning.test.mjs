@@ -1,11 +1,13 @@
 // The total-size warning threshold (ROOM_TOTAL_LIMIT; a notice, never a refusal) documents the
 // measured safe size of whole-campaign operations: a campaign at the threshold, in the two shapes
-// that cost most, is read whole (as Download a copy, deletion copies and account records read it)
-// and has a line undone (a command that reads every archived session), each twice at once, inside
+// that cost most, is read whole (as commands that fall back to the whole campaign read it)
+// and has a line undone, is loaded as the complete view older apps (tabletop protocol 11) receive,
+// and has its deletion copy restored, each twice at once, inside
 // a 128 MB heap (scripts/room-memory-measure.mjs; a Worker isolate has 128 MB). Two at once is the
 // margin: one such operation uses at most about half the isolate. If the threshold is raised past
-// what fits, this fails: raise it only after streaming exports, delta session archives and an
-// archived-ledger index make whole-campaign operations bounded. Disposable local database only.
+// what fits, this fails. Raised to 12 MB on 2026-10-29 (owner decision) once exports, deletion
+// copies, account records, favour and archived Undo became bounded and restores and room encoding
+// stopped copying the history; the paths above still grow with the total (about 2.8 x + 21 MB). Disposable local database only.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -34,16 +36,24 @@ for (const [shape, live] of [["the largest live campaign", Math.round(ROOM_LIVE_
       const sizes = JSON.parse(run(1024, "setup", file, "--live", String(live), "--reports", String(reports)).stdout);
       const total = sizes.storedBytes + sizes.reportBytes;
       assert.ok(total <= ROOM_TOTAL_LIMIT && total >= ROOM_TOTAL_LIMIT - probe.reportBytes, `fixture at the threshold (${total} bytes)`);
-      for (const op of ["whole", "undo"]) {
-        const copy = join(dir, `${op}.sqlite`);
+      // The paths that still read the whole campaign: a whole read, Undo, the complete view older
+      // apps (tabletop protocol 11, Android 1.14.x) load, and restoring a deletion copy (below).
+      for (const [op, protocol] of [["whole", "12"], ["undo", "12"], ["read", "11"]]) {
+        const copy = join(dir, `${op}-${protocol}.sqlite`);
         copyFileSync(file, copy);
         copyFileSync(file + ".json", copy + ".json");
-        const result = run(128, "read", copy, "--protocol", "12", "--op", op, "--concurrency", "2");
+        const result = run(128, "read", copy, "--protocol", protocol, "--op", op, "--concurrency", "2");
         assert.equal(result.status, 0, `${op} at ${(total / 1e6).toFixed(2)} MB ran out of memory: ${result.stderr.slice(-300)}`);
         const output = JSON.parse(result.stdout.trim().split("\n").at(-1));
         assert.equal(output.ok, true);
         if (op === "undo") assert.ok(!JSON.stringify(output).includes("error"), "the Undo was applied");
       }
+      // Restoring the campaign's deletion recovery copy, twice at once.
+      const backup = join(dir, "backup.sqlite");
+      run(1024, "setup", backup, "--live", String(live), "--reports", String(reports), "--backup", "1");
+      const restored = run(128, "read", backup, "--op", "restore", "--concurrency", "2");
+      assert.equal(restored.status, 0, `restore at ${(total / 1e6).toFixed(2)} MB ran out of memory: ${restored.stderr.slice(-300)}`);
+      assert.equal(JSON.parse(restored.stdout.trim().split("\n").at(-1)).ok, true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

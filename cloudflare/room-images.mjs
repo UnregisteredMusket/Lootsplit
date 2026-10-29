@@ -28,7 +28,6 @@ const reference = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
 /** @param {unknown} value */
 export async function encodeRoomImages(value) {
   const resources = await encodeRoomResources(value);
-  let body = JSON.stringify(resources.value);
   // Existing sheet/profile and recovery SQL reads raw room portraits directly, so an image that
   // also appears outside the campaign journal (a purse or sheet portrait, an NPC mirrored from
   // it) stays inline. Journal images move to campaign_room_images: map artwork, and since
@@ -96,10 +95,19 @@ export async function encodeRoomImages(value) {
       return { reference: `/art/room-image-${hash}.webp`, image };
     }),
   );
-  for (const asset of assets) body = body.split(asset.image).join(asset.reference);
-  // Archived session snapshots (already image-encoded above) move to campaign_room_reports.
-  const reports = await encodeRoomReports(JSON.parse(body));
-  if (reports.changed) body = JSON.stringify(reports.value);
+  /** Image data replaced by its reference (data URLs need no JSON escaping, so replacing in a
+   * snapshot's text or in the JSON that carries it is the same). @param {string} text */
+  const replace = (text) => {
+    for (const asset of assets) if (text.includes(asset.image)) text = text.split(asset.image).join(asset.reference);
+    return text;
+  };
+  // Archived session snapshots move to campaign_room_reports one at a time, their images replaced
+  // first (follow-up (b)): the campaign is serialized only without them, so a write (or a
+  // restore) never holds its whole history as one text, parsed copy and clone. Byte for byte what
+  // replacing in the whole text, parsing it and moving the snapshots out gave
+  // (scripts/room-encode-equivalence.test.mjs).
+  const reports = await encodeRoomReports(resources.value, { owned: true, transform: replace });
+  const body = replace(JSON.stringify(reports.value));
   // A deferred archived session (a working read's marker, history-pages.ts) is never stored.
   if (body.includes(JSON.stringify(DEFERRED_REPORT_PREFIX).slice(1, -1)))
     throw Error("An archived session was not read with this campaign. Nothing was changed; try again.");

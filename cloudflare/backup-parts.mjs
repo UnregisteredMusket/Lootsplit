@@ -74,17 +74,23 @@ export async function readBackupPayload(db, backupId, body) {
   const row = JSON.parse(body);
   const marker = row && typeof row === "object" ? row[BACKUP_PARTS_KEY] : undefined;
   if (marker === undefined) return row;
-  const rows = (
+  /** @type {{ part: number; body: string }[] | null} */
+  let rows = (
     await db.prepare("SELECT part,body FROM library_backup_parts WHERE backup_id=? ORDER BY part").bind(backupId).all()
   ).results;
-  const text = rows.map((r) => r.body).join("");
-  if (
-    rows.length !== marker.parts ||
-    rows.some((r, i) => Number(r.part) !== i) ||
-    encoder.encode(text).length !== marker.bytes ||
-    createHash("sha256").update(text).digest("hex") !== marker.sha256
-  )
+  // Size and hash part by part (parts never split a character, so they add up to the whole
+  // text's), and the parts let go once joined: the backup is held once as text, not three times
+  // (follow-up (b)).
+  const hash = createHash("sha256");
+  let bytes = 0;
+  for (const r of rows) {
+    hash.update(r.body);
+    bytes += encoder.encode(r.body).length;
+  }
+  if (rows.length !== marker.parts || rows.some((r, i) => Number(r.part) !== i) || bytes !== marker.bytes || hash.digest("hex") !== marker.sha256)
     throw Object.assign(Error("This backup is incomplete in cloud storage and cannot be read."), { status: 409 });
+  const text = rows.map((r) => r.body).join("");
+  rows = null;
   const payload = JSON.parse(text);
   delete row[BACKUP_PARTS_KEY];
   return Object.assign(payload, row);
