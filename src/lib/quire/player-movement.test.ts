@@ -208,15 +208,15 @@ test("privacy: a player sees the movement choice and only their own locks", () =
   assert.equal(keep(other).tabletop!.lockedPurseIds, undefined);
 });
 
-test("protocol 14: older clients see playerMovement only; their toggle sets Automatic or Off", () => {
-  assert.equal(PLAYER_MOVEMENT_PROTOCOL, 14);
+test("protocol 15: older clients see playerMovement only; their toggle sets Automatic or Off", () => {
+  assert.equal(PLAYER_MOVEMENT_PROTOCOL, 15);
   const t = fixture({ movement: "auto", playerMovement: true, lockedPurseIds: ["sela"] });
-  const old = keep(tableForProtocol(t, 13)).tabletop!;
+  const old = keep(tableForProtocol(t, 14)).tabletop!;
   assert.equal("movement" in old, false);
   assert.equal("lockedPurseIds" in old, false);
   assert.equal(old.playerMovement, true);
   const save = (settings: object) => {
-    const [c] = upgradeOldClientCommands(t, [{ id: "x", kind: "map-tabletop", mapId: "keep", before: old, settings: { ...old, ...settings } }], 13);
+    const [c] = upgradeOldClientCommands(t, [{ id: "x", kind: "map-tabletop", mapId: "keep", before: old, settings: { ...old, ...settings } }], 14);
     return keep(run(t, c as CommandInput)).tabletop!;
   };
   // Unrelated change: the choice and the locks are kept.
@@ -225,7 +225,7 @@ test("protocol 14: older clients see playerMovement only; their toggle sets Auto
   assert.equal(save({ playerMovement: false }).movement, "off");
   // Drafts with claims or the new fields ask older clients to update.
   for (const draft of [[{ kind: "map-token-claim" }], [{ kind: "map-tabletop", settings: { movement: "off" } }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 13), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 14), /unfinished map actions/);
   // Older clients can't skip the turn rule: the server checks every protocol.
   const fight = combat(fixture());
   assert.throws(() => move(fight, "mira-token", 5, 5, mira, turn("ogre")), /Not your turn/);
