@@ -179,12 +179,12 @@ test("ungridded maps get an automatic grid of about 40 px squares, or 5 ft from 
   assert.equal(mapGridSchema.safeParse(auto).success, true);
 });
 
-test("protocol 13: older clients don't see the hidden-grid flag and their saves keep it", () => {
-  assert.equal(GRID_MODE_PROTOCOL, 13);
+test("protocol 14: older clients don't see the hidden-grid flag and their saves keep it", () => {
+  assert.equal(GRID_MODE_PROTOCOL, 14);
   assert.ok(CURRENT_TABLETOP_PROTOCOL >= GRID_MODE_PROTOCOL);
   const t = fixture({ snap: false, gridHidden: true });
-  assert.equal(map(tableForProtocol(t, 13)).tabletop!.gridHidden, true);
-  const old = tableForProtocol(t, 12);
+  assert.equal(map(tableForProtocol(t, 14)).tabletop!.gridHidden, true);
+  const old = tableForProtocol(t, 13);
   assert.equal("gridHidden" in map(old).tabletop!, false);
   assert.equal(map(t).tabletop!.gridHidden, true, "the stored table is unchanged");
   // An older client's scene save is compared without the flag and keeps it.
@@ -198,6 +198,6 @@ test("protocol 13: older clients don't see the hidden-grid flag and their saves 
   assert.equal(map(saved).tabletop!.playerMovement, true);
   // Pending grid mode drafts ask older clients to finish on the updated website.
   for (const draft of [[{ kind: "map-grid-snap" }], [{ kind: "map-tabletop", settings: { gridHidden: true } }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 12), /unfinished map actions/);
-  assert.doesNotThrow(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-grid-snap" }]) }, 13));
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 13), /unfinished map actions/);
+  assert.doesNotThrow(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-grid-snap" }]) }, 14));
 });
