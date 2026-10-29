@@ -7,12 +7,13 @@ import assert from "node:assert/strict";
 // Actual mobile account component, synthetic native bridge. Native transport/storage/rendering
 // are independently exercised by Android instrumentation; no real account or network is used.
 const mock = `
-  let connected=false;
+  let connected=false, reason;
   export const hasOwnerWidget=()=>true;
   export const connectOwnerWidget=async()=>{ if(window.widgetFail) throw Error('Synthetic offline connection'); connected=true; };
-  export const disconnectOwnerWidget=async()=>{connected=false;};
+  export const disconnectOwnerWidget=async()=>{connected=false;reason="Disconnected in app";};
+  export const disconnectNote=(s)=>!s||s.connected||!s.disconnectReason?"":s.disconnectReason;
   export const OwnerWidget={
-    status:async()=>({connected,installed:window.widgetInstances?3:0,pinSupported:true,companions:window.widgetInstances?[101,102]:[],mainWidgets:window.widgetInstances?[201]:[]}),
+    status:async()=>({connected,disconnectReason:connected?undefined:reason,installed:window.widgetInstances?3:0,pinSupported:true,companions:window.widgetInstances?[101,102]:[],mainWidgets:window.widgetInstances?[201]:[]}),
     configure:async({widgetId})=>{window.widgetConfigured=widgetId;},
     refreshRegistration:async()=>({mainAvailable:true,companionAvailable:true}),
     pin:async(options)=>{window.widgetPinKind=options?.kind||"main";window.widgetPins=(window.widgetPins||0)+1;return {requested:true};},
@@ -101,7 +102,7 @@ try {
   assert.equal(await page.evaluate(() => window.widgetPinKind), "companion");
   await page.getByRole("button", { name: "Refresh widget list", exact: true }).click();
   await page.getByText("Android detects both Lootsplitter widgets.", { exact: false }).waitFor();
-  await page.getByRole("button", { name: "Connect owner account", exact: true }).click();
+  await page.getByRole("button", { name: "Connect widget", exact: true }).click();
   await page.getByText("Connected · 0 on home screen", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Add to home screen", exact: true }).click();
   await page.getByText("Confirm Add in Android’s home-screen prompt.", { exact: false }).waitFor();
@@ -150,6 +151,8 @@ try {
   });
   await page.getByRole("button", { name: "Disconnect widget", exact: true }).click();
   await page.getByText("Not connected · 0 on home screen", { exact: true }).waitFor();
+  // The widget screen says why it was last disconnected.
+  await page.getByText("Last disconnected: Disconnected in app.", { exact: false }).waitFor();
   assert.equal(
     await page.getByRole("button", { name: "Add to home screen", exact: true }).isDisabled(),
     false,
@@ -163,7 +166,7 @@ try {
   await page.evaluate(() => {
     window.widgetFail = true;
   });
-  await page.getByRole("button", { name: "Connect owner account", exact: true }).click();
+  await page.getByRole("button", { name: "Connect widget", exact: true }).click();
   await page.getByText("Synthetic offline connection", { exact: true }).waitFor();
   await page.getByText("Not connected · 0 on home screen", { exact: true }).waitFor();
   assert.deepEqual(errors, []);

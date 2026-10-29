@@ -20,6 +20,12 @@ public class OwnerWidgetPlugin extends Plugin {
         JSONObject state = WidgetStore.read(getContext());
         JSObject result = new JSObject();
         result.put("connected", !state.optString("token").isEmpty());
+        // Why the widget was last disconnected (shown on the app's widget screen while not connected).
+        JSONObject last = WidgetStore.lastDisconnect(getContext());
+        if (last != null && state.optString("token").isEmpty() && !state.optBoolean(WidgetStore.UNAVAILABLE)) {
+            result.put("disconnectReason", last.optString("reason"));
+            result.put("disconnectedAt", last.optLong("at"));
+        }
         result.put("mainAvailable", WidgetRegistration.available(getContext(),OwnerWidgetProvider.class));
         result.put("companionAvailable", WidgetRegistration.available(getContext(),CompanionWidgetProvider.class));
         result.put("installed", OwnerWidgetProvider.ids(getContext()).length + CompanionWidgetProvider.ids(getContext()).length);
@@ -51,7 +57,7 @@ public class OwnerWidgetPlugin extends Plugin {
                 OwnerWidgetJob.schedule(getContext());
                 call.resolve();
             } catch (WidgetClient.AccessDenied ignored) {
-                try { WidgetStore.revoke(getContext(), generation, "Owner authorization was rejected. Tap Sign in to reconnect."); } catch (Exception failure) { WidgetStore.clearGeneration(getContext(), generation); }
+                try { WidgetStore.revoke(getContext(), generation, "Owner authorization was rejected. Tap Sign in to reconnect."); } catch (Exception failure) { WidgetStore.clearGeneration(getContext(), generation, WidgetStore.REASON_REJECTED); }
                 call.reject("An active site-owner session is required.");
             } catch (Exception ignored) {
                 // A slow or failed first reading is not an authorization answer: keep the connection,
@@ -65,6 +71,10 @@ public class OwnerWidgetPlugin extends Plugin {
             } finally { OwnerWidgetProvider.renderAll(getContext()); }
         });
     }
+    /**
+     * The app's Disconnect widget (no expectedToken; the app also revokes the widget session), or the
+     * app clearing a legacy widget that still holds the app's token. Never called for widget removal.
+     */
     @PluginMethod public void disconnect(PluginCall call) {
         if (WidgetStore.clear(getContext(), call.getString("expectedToken"))) {
             OwnerWidgetJob.cancel(getContext());

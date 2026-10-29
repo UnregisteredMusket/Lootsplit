@@ -65,7 +65,10 @@ final class WidgetRefresh {
             return null;
         }
         if (token.isEmpty()) {
-            completion.finish("Connect your owner account in My account.");
+            // Not connected: nothing to fetch. Redraw so the face says so (and why) instead of
+            // implying that a reading is on its way.
+            OwnerWidgetProvider.renderAll(app);
+            completion.finish(NOT_CONNECTED);
             return null;
         }
         if (active != null && !active.done && active.generation.equals(generation)) {
@@ -133,7 +136,7 @@ final class WidgetRefresh {
     static boolean keepAfterConnectFailure(Context context, String generation) {
         try { if (WidgetStore.message(context, generation, FAILED)) return true; }
         catch (Exception ignored) { }
-        WidgetStore.clearGeneration(context, generation);
+        WidgetStore.clearGeneration(context, generation, WidgetStore.REASON_CONNECT);
         return false;
     }
 
@@ -198,6 +201,8 @@ final class WidgetRefresh {
         return true;
     }
 
+    /** Shown, with the recorded reason, wherever a disconnected widget would otherwise offer a reading. */
+    static final String NOT_CONNECTED = "Not connected — tap Sign in";
     static final String FAILED = "Could not refresh · tap Refresh to retry", TIMED_OUT = "Refresh timed out · tap Refresh to retry",
         STORAGE_BUSY = "Widget storage busy · tap Refresh to retry";
     /** Transport and transient storage failures are worth a background retry; authorization and account errors are not. */
