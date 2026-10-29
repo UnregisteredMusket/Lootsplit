@@ -212,6 +212,12 @@ export const ACCOUNT_RATE_LIMITS = Object.freeze({
   perAccount: 240,
   signedInPerIp: 1500,
 });
+/**
+ * Clock for the per-minute account allowance windows. Production always reads `Date.now()`;
+ * tests replace `now` to pin every request into one window, so a slow runner crossing a
+ * minute boundary cannot reset the counts mid-test.
+ */
+export const accountRateLimitClock = { now: () => Date.now() };
 const limitHit = (db, key, window) =>
   db
     .prepare(
@@ -225,7 +231,7 @@ const credentialPath = (path) =>
   (path.startsWith("/api/account/auth/") && path !== "/api/account/auth/update-user");
 async function rateLimit(env, request, userId = null) {
   const ip = request.headers.get("cf-connecting-ip") || "local";
-  const window = Math.floor(Date.now() / 60000);
+  const window = Math.floor(accountRateLimitClock.now() / 60000);
   if (!userId) {
     // Same key as before this change, so a deploy does not reset a running window.
     const row = await limitHit(env.DB, await digest(ip), window).first();
