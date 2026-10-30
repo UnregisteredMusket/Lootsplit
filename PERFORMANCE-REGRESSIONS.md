@@ -336,7 +336,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-ships | open | 2 | 36s → 59s | +23s | +63.89% |
 | Player references / development / Run npx playwright install --with-deps chromium | open | 3 | 24s → 149s | +125s | +520.83% |
 | Development / desktop / dev-navigation | open | 2 | 39s → 115s | +76s | +194.87% |
-| Code checks and immutable builds / web-build | open | 11 | 7s → 61s | +54s | +771.43% |
+| Code checks and immutable builds / web-build | open | 12 | 7s → 74s | +67s | +957.14% |
 | Development / desktop | open | 6 | 161s → 1008s | +847s | +526.09% |
 | Verify remote standby recovery / initial queue | open | 2 | 5s → 106s | +101s | +2020% |
 | rehearsal / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
@@ -929,6 +929,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-30T12:25:08.000Z | queue: Weekly development speed summary / initial queue | 3s → 5s | +2s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41051263387) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41055171885) |
+| 2026-10-30T11:54:47Z | step: Code checks and immutable builds / web-build | 61s → 74s | +13s | +21.31% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40714954211/job/122910605029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41050739974/job/124045859606) |
 | 2026-10-30T07:32:38Z | step: Packaged Worker / library / worker-market-locations | 62s → 72s | +10s | +16.13% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40193629882/job/121170413650) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41019887598/job/123946229251) |
 | 2026-10-30T07:24:39Z | step: Development / economy / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39696593082/job/119555386991) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41019887598/job/123944596958) |
 | 2026-10-30T07:11:24Z | step: Code checks and immutable builds / Generate current source function inventory | 30s → 35s | +5s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40249907363/job/121339331328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41018032303/job/123938697482) |
