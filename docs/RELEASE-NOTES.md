@@ -8,7 +8,7 @@ Android version code **24**, same package and permanent signing certificate. Ins
 
 ## Improved
 
-- **Owner Field monitor waits longer for its reading.** The home-screen widget waits up to 6 seconds for the server's first byte (was 4 s), with a 2.5 s connection limit and an 8.5 s overall limit; a tap or background check still ends within 9.2 s, inside Android's ten-second broadcast lifetime. On October 30 the owner's phone discarded valid readings all day: the server's own timing record (#399) measured 2.2–9.4 s per refresh, before cold start and phone network time. The server side was also made faster (#400, #401).
+- **Owner Field monitor waits longer for its reading.** The home-screen widget waits up to 6 seconds for the server's first byte (was 4 s), with a 2 s connection limit and an 8 s overall limit; a tap or background check still ends within 8.5 s, inside Android's ten-second broadcast lifetime. On October 30 the owner's phone discarded valid readings all day: the server's own timing record (#399) measured 2.2–9.4 s per refresh, before cold start and phone network time. The server side was also made faster (#400, #401).
 - **Open5e search** (#395, website side, already live): leaner requests, a shared cache, one retry and a friendly error with Retry.
 
 ## Fixed

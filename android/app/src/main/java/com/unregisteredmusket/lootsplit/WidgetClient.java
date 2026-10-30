@@ -18,10 +18,10 @@ final class WidgetClient {
     // releases the fetch thread instead of holding it past the tap/job that started it.
     // The read limit covers the server's work before its first byte. 1.16.0 (2026-10-30): at 4 s the
     // owner's phone discarded valid readings for a day; the server measured 2.2–9.4 s per refresh
-    // before cold start and phone network time. 6 s, with a shorter connect limit, is the most a
-    // tap can wait and still finish inside Android's ten-second broadcast lifetime.
-    static final int CONNECT_TIMEOUT_MILLIS = 2500, READ_TIMEOUT_MILLIS = 6000;
-    static final long TOTAL_TIMEOUT_MILLIS = 8500;
+    // before cold start and phone network time. 6 s, with a 2 s connect limit, is the most a tap can
+    // wait while the task still ends by 8.5 s (OwnerWidgetTest keeps it under 9 s of the 10 s limit).
+    static final int CONNECT_TIMEOUT_MILLIS = 2000, READ_TIMEOUT_MILLIS = 6000;
+    static final long TOTAL_TIMEOUT_MILLIS = 8000;
     // Disconnecting from another thread aborts a blocked connect/read that the per-call socket
     // timeouts alone cannot bound (a slow trickle, or a read already waiting when the total expires).
     private static final java.util.concurrent.ScheduledExecutorService WATCHDOG =
