@@ -1,0 +1,8 @@
+{
+  "title": "Chat keeps what you type while reconnecting",
+  "summary": "Typing in Chat right after opening or reloading the page is no longer interrupted when the room finishes reconnecting.",
+  "items": [
+    "The message box used to be replaced the moment the room confirmed your session, so the cursor left it and letters typed at that instant were lost. A message typed then could leave Send greyed out.",
+    "The message box now stays in place and keeps focus, your draft and any message that is still sending."
+  ]
+}

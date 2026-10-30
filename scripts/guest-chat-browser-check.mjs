@@ -184,9 +184,14 @@ try {
   // being confirmed (it used to move to a hidden recovery and empty the composer).
   let release = await reloadWithSlowRoom(guest.page, guest.context);
   await guest.page.locator("#chat-message").fill("Guest check early: typed while reconnecting.");
+  await guest.page.locator("#chat-message").evaluate((box) => (box.dataset.typing = "kept"));
   await release();
   await expect.poll(() => sessionOf(guest.page), { timeout: delivery }).not.toBe("");
   await expect(guest.page.locator("#chat-message")).toHaveValue("Guest check early: typed while reconnecting.");
+  // The player is still typing in the same box: confirming the session must not replace the
+  // composer. It used to remount, dropping focus, so keystrokes in that moment were lost and
+  // a message typed then left Send disabled (dev-guest-chat member step, CI 4f0382f).
+  await expect(guest.page.locator("#chat-message[data-typing='kept']")).toBeFocused();
   await expect(guest.page.getByRole("region", { name: "Unsent chat recovery", exact: true })).toHaveCount(0);
   await sendAndExpect("guest draft typed before the session was confirmed", guest.page, [dm.page], "Guest check early: typed while reconnecting.", "keyboard");
   // A message sent in that window is confirmed in place, not left as a phantom recovery.

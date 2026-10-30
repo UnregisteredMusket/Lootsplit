@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   adoptProvisionalChatComposer,
+  confirmsProvisionalChatScope,
   chatComposer,
   chatOutboxKey,
   legacyChatOutbox,
@@ -278,6 +279,22 @@ test("only an unknown session ID is adopted; other rooms, seats, accounts and se
   assert.equal(chatComposer(base).drafts.party, undefined);
   assert.equal(adoptProvisionalChatComposer(base, provisional), false, "Never downgrade");
   for (const s of [provisional, known, base, ...others]) discardChatRecovery(s);
+});
+
+test("only the room confirming a provisional session keeps the composer mounted", () => {
+  const confirmed = scope("account"),
+    provisional = { ...confirmed, sessionId: "" };
+  assert.equal(confirmsProvisionalChatScope(provisional, confirmed), true);
+  for (const to of [
+    { ...confirmed, accountId: "other-account" },
+    { ...confirmed, accountId: "" },
+    { ...confirmed, code: crypto.randomUUID() },
+    { ...confirmed, seatId: "other-seat" },
+    provisional,
+  ])
+    assert.equal(confirmsProvisionalChatScope(provisional, to), false);
+  assert.equal(confirmsProvisionalChatScope(confirmed, { ...confirmed, sessionId: "next" }), false);
+  assert.equal(confirmsProvisionalChatScope(confirmed, provisional), false, "Never downgrade");
 });
 
 test("adoption keeps a guest's moved messages in memory only", () => {
