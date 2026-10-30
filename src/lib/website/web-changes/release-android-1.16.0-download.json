@@ -1,0 +1,8 @@
+{
+  "title": "Android 1.16.0 download",
+  "summary": "The website's Android download is now version 1.16.0: the map's press-and-hold wheel vibrates in the app, and the owner's Field monitor widget waits longer for its reading.",
+  "items": [
+    "Downloads offers Android 1.16.0 with its checksum; install it over the existing app. Saved campaigns, sign-in and placed widgets are kept.",
+    "The app now includes the Open5e search and party chat fixes from October 30."
+  ]
+}
