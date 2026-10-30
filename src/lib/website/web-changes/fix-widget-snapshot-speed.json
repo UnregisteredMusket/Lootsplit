@@ -1,0 +1,9 @@
+{
+  "title": "Faster home-screen widget refresh",
+  "summary": "For the site owner: the Field monitor widget's refresh answers in well under its 4-second limit again, so it stops showing \"Could not refresh\" when the server was only slow.",
+  "items": [
+    "A refresh measured 4.1 seconds on the server, just past the widget's 4-second limit. The widget now waits at most 0.4 seconds for GitHub and Cloudflare before using their previous dated reading (it waited 1.2 seconds).",
+    "The phone's check-in is saved while the reading is built instead of before it, and independent database reads run together.",
+    "Readings, diagnostics and history are unchanged, and every widget route still requires the owner role."
+  ]
+}
