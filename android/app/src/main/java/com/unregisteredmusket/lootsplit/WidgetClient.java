@@ -16,11 +16,12 @@ final class WidgetClient {
     static final class AccessDenied extends Exception { }
     // Every HTTP limit ends inside WidgetRefresh's task deadline, so a slow server or network
     // releases the fetch thread instead of holding it past the tap/job that started it.
-    // The read limit covers the server's work before its first byte. Since 2026-10-25 the widget view
-    // answers within about 1.5 s (slow providers keep their previous dated reading); 4 s leaves room
-    // for a slow phone network without passing the 8 s task deadline.
-    static final int CONNECT_TIMEOUT_MILLIS = 3000, READ_TIMEOUT_MILLIS = 4000;
-    static final long TOTAL_TIMEOUT_MILLIS = 7000;
+    // The read limit covers the server's work before its first byte. 1.16.0 (2026-10-30): at 4 s the
+    // owner's phone discarded valid readings for a day; the server measured 2.2–9.4 s per refresh
+    // before cold start and phone network time. 6 s, with a 2 s connect limit, is the most a tap can
+    // wait while the task still ends by 8.5 s (OwnerWidgetTest keeps it under 9 s of the 10 s limit).
+    static final int CONNECT_TIMEOUT_MILLIS = 2000, READ_TIMEOUT_MILLIS = 6000;
+    static final long TOTAL_TIMEOUT_MILLIS = 8000;
     // Disconnecting from another thread aborts a blocked connect/read that the per-call socket
     // timeouts alone cannot bound (a slow trickle, or a read already waiting when the total expires).
     private static final java.util.concurrent.ScheduledExecutorService WATCHDOG =
