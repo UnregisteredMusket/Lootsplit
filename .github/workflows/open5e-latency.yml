@@ -1,0 +1,34 @@
+name: Open5e latency check
+# Manual diagnostic only: times the Open5e requests Lootsplitter makes (scripts/open5e-latency.mjs)
+# and writes a table to the job summary. Read-only public GETs; no secrets, no production access.
+# Never part of verify.yml or any release gate, because it depends on an external service.
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: Search text to time
+        required: false
+        default: Fire
+permissions:
+  contents: read
+concurrency:
+  group: open5e-latency
+  cancel-in-progress: false
+jobs:
+  latency:
+    name: Time Open5e requests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Time Open5e (report only)
+        env:
+          QUERY: ${{ inputs.query }}
+        run: node --experimental-strip-types scripts/open5e-latency.mjs "$QUERY"

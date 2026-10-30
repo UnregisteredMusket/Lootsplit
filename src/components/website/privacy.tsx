@@ -118,8 +118,12 @@ export function PrivacyPage() {
               run it.
             </li>
             <li>
-              <strong>Open5e:</strong> when you search monsters, spells or items from the SRD, your
-              browser asks api.open5e.com directly.
+              <strong>Open5e:</strong> when you search monsters, spells, items or conditions from
+              the SRD, the Lootsplitter server asks api.open5e.com for you, sending only the
+              section, rules edition, search text and page; it keeps a copy of the public results
+              for up to a week so repeat searches are quick. Encounters in a campaign kept on your
+              device load the public SRD creature list from api.open5e.com directly. No account, campaign or
+              character data is sent to Open5e.
             </li>
             <li>
               <strong>Ko-fi:</strong> donations are handled by Ko-fi, on its own site.

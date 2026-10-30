@@ -108,7 +108,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "references",
         title: "Read-only item, spell and creature lookup",
         paragraphs: [
-          "Library → Catalog, Items, Spells or Creatures opens searchable references. Choose the rules edition and section, enter a name, search, then expand an entry to read its description, stats and source credit. Reference results never add items, change spells or edit your character. Some recent searches may be available when the source is offline.",
+          "Library → Catalog, Items, Spells or Creatures opens searchable references. Choose the rules edition and section, enter a name, search, then expand an entry to read its description, stats and source credit. Reference results never add items, change spells or edit your character. Some recent searches may be available when the source is offline. If the source is slow or unavailable, the search says so and offers Retry.",
           "Lookup is paused by default while any encounter in your campaign is active. Your DM can disable lookup, limit individual indices or allow it during encounters. Direct Catalog links and saved reference results follow those controls. Your own saved sheet, shared maps, campaign records and handouts remain available; a reference restriction does not remove your spell list or possessions.",
           "Campaign records open the entries shared with you. Search locations, people and other visible records by name or record type. Handouts are read-only campaign references. Private source packs and books are not part of the player Library.",
         ],

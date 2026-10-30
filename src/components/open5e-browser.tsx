@@ -17,6 +17,7 @@ import {
   type OpenQuery,
 } from "@/lib/quire/open5e";
 import { searchCampaignReference } from "@/lib/quire/cloud-client";
+import { open5eErrorMessage } from "@/lib/quire/open5e-fetch.mjs";
 import { useReferenceAccess } from "@/lib/quire/use-reference-access";
 import { referenceSection } from "@/lib/quire/reference-access";
 import type { CatalogItem, ItemCategory } from "@/lib/quire/types";
@@ -40,6 +41,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
     [page, setPage] = useState(1),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [retry, setRetry] = useState(false),
     [cached, setCached] = useState("");
   const [searched, setSearched] = useState<OpenQuery | null>(null);
   const request = useRef(0);
@@ -50,6 +52,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
     setResult(null);
     setCached("");
     setError("");
+    setRetry(false);
     setBusy(false);
   }, [access.allowed, seat.role, kind]);
   useEffect(() => {
@@ -69,6 +72,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
       id = ++request.current;
     setBusy(true);
     setError("");
+    setRetry(false);
     setResult(null);
     setCached("");
     setSearched(q);
@@ -103,12 +107,15 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
         setCached(
           `Saved results from ${new Date(saved.at).toLocaleDateString()}. Open5e is unavailable; these may be out of date.`,
         );
-      } else
+      } else {
+        // Timeouts and network failures read as a short message, never a raw AbortError.
         setError(
-          e instanceof Error
-            ? e.message
+          e instanceof Error || typeof e === "string"
+            ? open5eErrorMessage(e)
             : "Could not reach Open5e. Check your connection and retry.",
         );
+        setRetry(!denied);
+      }
     } finally {
       if (id === request.current) setBusy(false);
     }
@@ -176,7 +183,20 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
         </Button>
       </form>
       <div aria-live="polite" className="mt-3 text-sm">
-        {error ? <p role="alert">{error}</p> : null}
+        {error ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <p role="alert">{error}</p>
+            {retry && searched && !changed ? (
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void search(searched.page)}
+              >
+                Retry
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {cached ? <p className="text-muted">{cached}</p> : null}
         {changed ? <p className="text-muted">Press Search to apply your new filters.</p> : null}
         {result ? (

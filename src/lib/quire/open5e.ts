@@ -44,6 +44,48 @@ export function openQuery(input: OpenQuery): OpenQuery {
     throw new Error("Invalid search.");
   return { ...input, query: input.query.trim() };
 }
+/**
+ * Only the fields `normalizeOpenPage` reads. Open5e v2 prunes its serializer and its eager
+ * loading to `fields` (GameContentSerializer.remove_unwanted_fields, EagerLoadingMixin), and a
+ * nested `<field>__fields` prunes a related object. Unknown names are ignored by Open5e, so a
+ * field missing on one section is harmless. Leaving out crossreferences, casting options,
+ * creature ability blocks and similar heavy relations keeps each search small and quick.
+ */
+export const OPEN5E_FIELDS: Record<OpenKind, Record<string, string>> = {
+  items: {
+    fields: "key,name,desc,cost,category,weight,weight_unit,weapon,armor,document",
+    category__fields: "name",
+    document__fields: "key,name",
+  },
+  magicitems: {
+    fields:
+      "key,name,desc,cost,category,rarity,weight,weight_unit,requires_attunement,attunement_detail,weapon,armor,document",
+    category__fields: "name",
+    rarity__fields: "name",
+    document__fields: "key,name",
+  },
+  spells: {
+    fields:
+      "key,name,desc,higher_level,level,school,casting_time,range_text,range,duration,verbal,somatic,material,material_specified,concentration,ritual,reaction_condition,classes,document",
+    school__fields: "name",
+    classes__fields: "name",
+    document__fields: "key,name",
+  },
+  creatures: {
+    fields:
+      "key,name,desc,type,size,armor_class,hit_points,challenge_rating,experience_points,traits,actions,document",
+    type__fields: "name",
+    size__fields: "key,name",
+    traits__fields: "name,desc",
+    actions__fields: "name,desc",
+    document__fields: "key,name",
+  },
+  conditions: {
+    fields: "key,name,document,descriptions",
+    document__fields: "key,name",
+  },
+};
+/** The exact Open5e request for a query; the same query always yields the same URL (cache key). */
 export function openUrl(input: OpenQuery) {
   const q = openQuery(input);
   const url = new URL(`https://api.open5e.com/v2/${q.kind}/`);
@@ -52,7 +94,9 @@ export function openUrl(input: OpenQuery) {
     name__icontains: q.query,
     limit: q.kind === "conditions" ? "100" : "12",
     page: String(q.page),
+    // Server-side name order keeps pages stable; it is a cheap sort over the filtered rows.
     ordering: "name",
+    ...OPEN5E_FIELDS[q.kind],
   }).toString();
   return url.toString();
 }

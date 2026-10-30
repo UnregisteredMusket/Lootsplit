@@ -1,0 +1,10 @@
+{
+  "title": "Open5e searches are faster and more reliable",
+  "summary": "Rules searches in the Catalog and the encounter creature list no longer fail with \"The operation was aborted due to timeout\" when Open5e is slow.",
+  "items": [
+    "Searches ask Open5e only for the details Lootsplitter shows, so answers arrive sooner.",
+    "Recent searches are kept for a day and answered at once, and a saved copy is used for up to a week if Open5e is down.",
+    "A slow answer is retried once; if Open5e still cannot answer, a short message explains it and a Retry button repeats the search.",
+    "This also helps the installed Android app, which uses the same website search."
+  ]
+}
