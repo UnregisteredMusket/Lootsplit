@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.16.0",
+    "date": "2026-10-30",
+    "summary": "The owner's Field monitor widget waits longer for a reading, the map's press-and-hold wheel vibrates in the app, and the fixes since 1.15.0 for Open5e search and party chat are included.",
+    "features": [
+      "On phones, pressing and holding the map now gives a short vibration as the wheel opens, as it already did in phone browsers (it respects Reduce motion)."
+    ],
+    "improvements": [
+      "Open5e reference searches ask for less data, reuse recent results and retry once, so a slow Open5e no longer shows \"The operation was aborted due to timeout\"; a search that cannot be answered offers Retry.",
+      "For the site owner: the home-screen Field monitor waits up to 6 seconds for the server's answer (it waited 4), so refreshes no longer fail with \"Could not refresh\" while the server is still answering."
+    ],
+    "fixes": [
+      "Party chat keeps the text box and what you were typing when the room reconnects just after the page opens; before, the cursor could leave the box and Send stayed greyed out until you clicked back in."
+    ]
+  },
+  {
     "version": "1.15.0",
     "date": "2026-10-29",
     "summary": "Map tokens at their real size with grid snapping, players moving their own tokens, Place party, map menus and the phone's press-and-hold wheel, zones and party votes, and long shared campaigns that open with their newest history.",

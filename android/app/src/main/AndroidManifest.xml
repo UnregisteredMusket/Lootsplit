@@ -63,4 +63,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- The map's press-and-hold wheel ticks with navigator.vibrate (1.16.0). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

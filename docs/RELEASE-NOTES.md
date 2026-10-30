@@ -1,3 +1,30 @@
+# Lootsplitter 1.16.0
+
+Android version code **24**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.15.0 build commit `a050af2` (tabletop protocol 19, unchanged).
+
+## Added
+
+- **The map wheel vibrates in the app.** The phone's press-and-hold wheel (1.15.0) now gives its short vibration tick in the app as well as in phone browsers: the app holds `android.permission.VIBRATE` (a normal permission; nothing to approve). Reduce motion still turns it off.
+
+## Improved
+
+- **Owner Field monitor waits longer for its reading.** The home-screen widget waits up to 6 seconds for the server's first byte (was 4 s), with a 2.5 s connection limit and an 8.5 s overall limit; a tap or background check still ends within 9.2 s, inside Android's ten-second broadcast lifetime. On October 30 the owner's phone discarded valid readings all day: the server's own timing record (#399) measured 2.2–9.4 s per refresh, before cold start and phone network time. The server side was also made faster (#400, #401).
+- **Open5e search** (#395, website side, already live): leaner requests, a shared cache, one retry and a friendly error with Retry.
+
+## Fixed
+
+- **Party chat after a reload** (#396, already live on the website): the text box and draft stay in place when the room confirms its session just after the page opens.
+
+## After updating
+
+Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept, and the owner widget keeps its connection (encrypted session in no-backup storage with an Android Keystore key, both surviving an update signed with the same certificate).
+
+## Release verification
+
+Pending: filled in after `android-release.yml` publishes the signed APK.
+
+---
+
 # Lootsplitter 1.15.0
 
 Android version code **23**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.14.1 build commit `407e7c6` (tabletop protocol 19; 1.14.1 used protocol 11). No native Android code changed since 1.14.1.

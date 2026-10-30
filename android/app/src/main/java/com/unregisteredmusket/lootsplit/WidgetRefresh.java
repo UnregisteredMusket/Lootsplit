@@ -24,7 +24,7 @@ final class WidgetRefresh {
     private static final ScheduledExecutorService DEADLINES = Executors.newSingleThreadScheduledExecutor();
     private static Task active;
     /** Ends every tap/job inside the ten-second broadcast lifetime; HTTP limits are shorter. */
-    static final long TASK_DEADLINE_MILLIS = 8000;
+    static final long TASK_DEADLINE_MILLIS = 9200;
     // At most one network fetch per account generation. A fetch that outlived its task deadline
     // (e.g. DNS that ignores interruption) keeps running; later taps wait for that fetch instead of
     // queueing another one behind it on the small NETWORK pool.
