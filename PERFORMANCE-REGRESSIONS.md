@@ -342,7 +342,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | rehearsal / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Development / gameplay / dev-blacksmith | open | 2 | 28s → 62s | +34s | +121.43% |
 | Packaged Worker / interface / worker-blacksmith | open | 3 | 24s → 44s | +20s | +83.33% |
-| Code checks and immutable builds / Generate current source function inventory | open | 5 | 12s → 30s | +18s | +150% |
+| Code checks and immutable builds / Generate current source function inventory | open | 6 | 12s → 35s | +23s | +191.67% |
 | Development / gameplay (balanced v2) / dev-market-locations | open | 2 | 31s → 77s | +46s | +148.39% |
 | Development / desktop (balanced v2) / dev-navigation | open | 3 | 20s → 136s | +116s | +580% |
 | Development / gameplay (balanced v2) / Run actions/upload-artifact@v4 | open | 3 | 1s → 5s | +4s | +400% |
@@ -591,6 +591,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | publish / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 1s → 6s | +5s | +500% |
 | Development / accounts-2 / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts-2 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 36s | +32s | +800% |
+| Development / economy / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 6s | +4s | +200% |
 | native-widget (35) / Run android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 | open | 2 | 10s → 16s | +6s | +60% |
 | Development / desktop / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 11s | +9s | +450% |
@@ -893,6 +894,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-coin-split | open | 3 | 23s → 40s | +17s | +73.91% |
 | Development / gameplay / dev-loot-fairness | open | 2 | 26s → 43s | +17s | +65.38% |
 | Development / accounts / dev-account-1 | open | 2 | 99s → 145s | +46s | +46.46% |
+| Packaged Worker / library / worker-market-locations | open | 2 | 53s → 72s | +19s | +35.85% |
 | Development / world / dev-party-split | open | 2 | 28s → 60s | +32s | +114.29% |
 | Development / accounts / dev-library-navigation | open | 2 | 69s → 97s | +28s | +40.58% |
 | Development / governance / Start disposable development server | open | 2 | 8s → 14s | +6s | +75% |
@@ -927,6 +929,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-30T07:32:38Z | step: Packaged Worker / library / worker-market-locations | 62s → 72s | +10s | +16.13% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40193629882/job/121170413650) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41019887598/job/123946229251) |
+| 2026-10-30T07:24:39Z | step: Development / economy / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39696593082/job/119555386991) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41019887598/job/123944596958) |
+| 2026-10-30T07:11:24Z | step: Code checks and immutable builds / Generate current source function inventory | 30s → 35s | +5s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40249907363/job/121339331328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41018032303/job/123938697482) |
 | 2026-10-30T04:50:57Z | step: Packaged Worker / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 10s → 12s | +2s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40766251792/job/123099101303) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41004702214/job/123898177344) |
 | 2026-10-30T01:14:28Z | step: release-apk / Run npm test | 117s → 162s | +45s | +38.46% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40849851166/job/123374980117) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40982551187/job/123831537088) |
 | 2026-10-30T01:11:18Z | step: release-apk / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40031758182/job/120687942546) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40982551187/job/123831537088) |
