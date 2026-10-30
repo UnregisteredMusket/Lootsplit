@@ -31,7 +31,13 @@ Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. The 
 
 ## Release verification
 
-Pending: published by `android-release.yml` after the version bump reaches main, the full preservation checks, the API 24 and API 35 widget checks and the signed-APK upgrade gate; independent inspection of the public APK follows before `release.json` advances.
+Published October 29, 2026 by `android-release.yml` (run 40982551187), started automatically by the version bump merged to main `a050af2` (#393), after the full preservation checks, the API 24 and API 35 widget checks, and the signed-APK upgrade gate passed.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `111081fd51ec085d58822998b1603ff6c8c95659230e625234959fe98f4f4ba9` (33,048,440 bytes), matching SHA256SUMS.txt.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.14.1).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.15.0 and versionCode 23.
+- The bundled web client contains history on demand (Load earlier entries) and the new map tools (Ask the DM).
 
 ---
 
