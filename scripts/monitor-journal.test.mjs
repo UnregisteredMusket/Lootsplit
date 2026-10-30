@@ -421,6 +421,39 @@ test("an unrelated successful workflow cannot clear a confirmed failure or its d
   }
 });
 
+test("a reading reused on a slow refresh is current; an old or unmarked one is still a gap", async () => {
+  // 2026-10-30, snapshots 1201–1208: each widget refresh more than 6 minutes after a half-hourly
+  // collection reused GitHub's validated reading (withinBudget) and was flagged "could not be checked".
+  const { monitorSnapshot } = await import("../cloudflare/monitor-journal.mjs");
+  const cases = [
+    { age: 18, reused: true, color: "green", symptom: /slow on this refresh.*reused/ },
+    { age: 18, reused: false, color: "yellow", symptom: /could not be checked/ },
+    { age: 40, reused: true, color: "yellow", symptom: /could not be checked/ },
+    { age: 2, reused: false, color: "green", symptom: /returned a validated reading/ },
+  ];
+  for (const c of cases) {
+    const DB = localAccountDb();
+    try {
+      const snapshot = reading();
+      snapshot.development = {
+        ...source({ runs: [], active: [], openPulls: [] }),
+        checkedAt: instant - c.age * 60000,
+        ...(c.reused ? { reused: true } : {}),
+      };
+      const result = await monitorSnapshot({ DB }, "owner", {
+        force: true,
+        now: instant,
+        collector: async () => snapshot,
+      });
+      const entry = result.diagnostics.find((d) => d.component === "GitHub workflows");
+      assert.equal(entry.color, c.color, JSON.stringify(c));
+      assert.match(entry.symptom, c.symptom, JSON.stringify(c));
+    } finally {
+      DB.close();
+    }
+  }
+});
+
 test("provider rejection does not invent expired authorization and rate limits have specific actions", async () => {
   const { monitorSnapshot } = await import("../cloudflare/monitor-journal.mjs");
   const DB = localAccountDb();

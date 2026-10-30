@@ -4,6 +4,7 @@ import {
   cloudflareTraffic,
   providerFailure,
   providerErrorCode,
+  providerReadingCurrent,
 } from "./owner-monitor.mjs";
 import { staffCommitGuard } from "./members.mjs";
 import { PROBE_FRESH_MS, runMultiplayerProbe } from "./multiplayer-probe.mjs";
@@ -908,7 +909,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     ["release", "Cloudflare deployment"],
   ]) {
     const source = snapshot[key],
-      ready = source?.state === "ready" && now - source.checkedAt <= 6 * 60000,
+      ready = providerReadingCurrent(source, now),
       code = source?.errorCode;
     const unauthorized = code === "HTTP_401";
     const limited = code?.endsWith("_RATE_LIMITED");
@@ -916,7 +917,9 @@ async function updateDiagnostics(db, snapshot, now, settings) {
       name,
       ready ? "healthy" : "unavailable",
       ready
-        ? "The source returned a validated reading."
+        ? source.reused === true && now - source.checkedAt > 6 * 60000
+          ? `The provider was slow on this refresh, so its validated reading from ${new Date(source.checkedAt).toISOString().slice(11, 16)} UTC was reused.`
+          : "The source returned a validated reading."
         : source?.state === "not-connected"
           ? `${name} is not connected.`
           : limited
@@ -939,7 +942,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     );
   }
   const traffic = snapshot.traffic;
-  const trafficCurrent = traffic?.state === "ready" && now - traffic.checkedAt <= 6 * 60000;
+  const trafficCurrent = providerReadingCurrent(traffic, now);
   // Half-hour readings let one old error read as a recent warning instead of a current failure.
   const intervals = trafficCurrent
     ? (
@@ -1710,11 +1713,12 @@ export async function collectInterval(
               state: snapshot[key]?.state,
               checkedAt: snapshot[key]?.checkedAt,
               errorCode: snapshot[key]?.errorCode,
+              reused: snapshot[key]?.reused === true,
             },
       ]),
     );
     const problems = Object.entries(sources)
-      .filter(([, source]) => source?.state !== "ready" || now - source.checkedAt > 6 * 60000)
+      .filter(([, source]) => !providerReadingCurrent(source, now))
       .map(([key]) => key);
     if (snapshot.health.status !== "healthy") problems.push("storage/assets");
     const integrationOutcomes = [];

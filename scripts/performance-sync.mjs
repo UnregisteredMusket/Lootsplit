@@ -21,22 +21,52 @@ const HISTORY_FILES = [
   "resolutions.jsonl",
   "PERFORMANCE-REGRESSIONS.md",
 ];
-export function githubClient(token = process.env.GH_TOKEN) {
+/** GitHub answers that are worth repeating: rate limits and server-side errors. */
+export const TRANSIENT_GITHUB_STATUS = new Set([429, 500, 502, 503, 504]);
+/**
+ * Reads (GET) retry transient failures — HTTP 429/5xx, network errors, timeouts — up to
+ * `attempts` times with growing pauses. The weekly summary makes hundreds of sequential reads;
+ * one HTTP 502 on 2026-10-26 failed the whole run and held the owner monitor red for a week.
+ * Writes are never repeated: a write whose answer was lost may already have happened.
+ */
+export function githubClient(
+  token = process.env.GH_TOKEN,
+  { fetchImpl = fetch, attempts = 4, pause = (ms) => new Promise((r) => setTimeout(r, ms)) } = {},
+) {
   return async (path, { method = "GET", body, missing = false } = {}) => {
-    const response = await fetch(`https://api.github.com/repos/${REPO}${path}`, {
-      method,
-      headers: {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(body ? { "Content-Type": "application/json" } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (missing && response.status === 404) return null;
-    if (!response.ok) throw Error(`GitHub ${method} ${path}: HTTP ${response.status}`);
-    return response.json();
+    const tries = method === "GET" ? attempts : 1;
+    for (let attempt = 1; ; attempt++) {
+      let response;
+      try {
+        response = await fetchImpl(`https://api.github.com/repos/${REPO}${path}`, {
+          method,
+          headers: {
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(body ? { "Content-Type": "application/json" } : {}),
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
+          signal: AbortSignal.timeout(30000),
+        });
+      } catch (error) {
+        if (attempt >= tries) throw error;
+        await pause(2000 * attempt);
+        continue;
+      }
+      if (missing && response.status === 404) return null;
+      if (response.ok) return response.json();
+      if (attempt >= tries || !TRANSIENT_GITHUB_STATUS.has(response.status))
+        throw Error(
+          `GitHub ${method} ${path}: HTTP ${response.status}${attempt > 1 ? ` after ${attempt} attempts` : ""}`,
+        );
+      const retryAfter = Number(response.headers?.get?.("retry-after"));
+      await pause(
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter, 60) * 1000
+          : 2000 * attempt,
+      );
+    }
   };
 }
 

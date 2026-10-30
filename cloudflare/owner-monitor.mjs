@@ -350,6 +350,20 @@ export const REUSE_MAX_AGE_MS = 35 * 60000;
  * keeps running through `defer` (waitUntil), which fills the per-isolate provider cache for the next
  * request. Without a budget, or with no reusable reading, this is the plain awaited read.
  */
+/** A fresh provider reading is at most this old (half-hourly collections refresh it). */
+export const PROVIDER_FRESH_MS = 6 * 60000;
+/**
+ * Whether a snapshot's provider reading counts as current: a validated reading collected within
+ * PROVIDER_FRESH_MS, or one `withinBudget` deliberately reused (still within REUSE_MAX_AGE_MS)
+ * because the provider was slow on this refresh. Diagnostics used only the 6-minute rule, so every
+ * widget refresh more than 6 minutes after a half-hourly collection reported "GitHub workflows
+ * could not be checked" although the reading was valid (snapshots 1201–1208, 2026-10-30).
+ */
+export function providerReadingCurrent(source, now) {
+  if (source?.state !== "ready" || !Number.isFinite(source.checkedAt)) return false;
+  const age = now - source.checkedAt;
+  return age <= PROVIDER_FRESH_MS || (source.reused === true && age <= REUSE_MAX_AGE_MS);
+}
 export function withinBudget(read, earlier, { budgetMs = 0, defer = null, now = Date.now() } = {}) {
   const reusable =
     budgetMs > 0 &&
@@ -448,8 +462,7 @@ export function mainRuns(runs, limit = MAIN_RUN_LIMIT) {
   if (!Array.isArray(runs)) return null;
   return runs
     .filter(
-      (run) =>
-        run?.branch === "main" && run.status === "completed" && run.event !== "schedule",
+      (run) => run?.branch === "main" && run.status === "completed" && run.event !== "schedule",
     )
     .slice(0, limit)
     .map((run) => ({
