@@ -314,6 +314,8 @@ export async function linkAccountSeat(db, userId, body, limit = hostedCampaignLi
 }
 
 export async function handleAccounts(request, env, context = null) {
+  // Arrival time for the owner widget's server-timing record (ownerMonitor).
+  const receivedAt = Date.now();
   const path = new URL(request.url).pathname;
   if (!path.startsWith("/api/account/")) return null;
   let authOrigin;
@@ -507,7 +509,9 @@ export async function handleAccounts(request, env, context = null) {
     if (path === "/api/account/monitor" && request.method === "GET")
       return cors(json(await serverMonitor(env, userId)));
     if (path === "/api/account/owner/monitor" && request.method === "GET")
-      return cors(json(await ownerMonitor(env, userId, session.session.id, request, context)));
+      return cors(
+        json(await ownerMonitor(env, userId, session.session.id, request, context, receivedAt)),
+      );
     if (path.startsWith("/api/account/owner/monitor/"))
       return cors(json(await monitorApi(env, userId, session.session.id, request, body)));
     if (path === "/api/account/profile" && request.method === "POST")
