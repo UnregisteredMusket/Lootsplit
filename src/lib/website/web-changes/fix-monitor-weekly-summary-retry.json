@@ -1,0 +1,9 @@
+{
+  "title": "Field monitor stops reporting false GitHub alerts",
+  "summary": "For the site owner: the Field monitor no longer warns \"GitHub workflows could not be checked\" when a refresh reuses a recent reading, and the weekly development speed summary retries GitHub's brief server errors instead of failing for the week.",
+  "items": [
+    "When GitHub is slow during a refresh, the monitor reuses its last validated reading (up to 35 minutes old) and now says so, with the reading's time, instead of reporting a warning.",
+    "Readings older than that, and readings that were never validated, are still reported as gaps.",
+    "The weekly development speed summary repeats a GitHub read up to four times after a rate limit, server error or dropped connection. Writes are never repeated."
+  ]
+}
