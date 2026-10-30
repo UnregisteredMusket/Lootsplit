@@ -433,3 +433,106 @@ test("the room activity migration passes the release job's additive check", asyn
   const sql = readFileSync(new URL("../cloudflare/migrations/0023_owner_monitor_room_activity.sql", import.meta.url), "utf8");
   assert.equal(assertAdditiveSql("0023_owner_monitor_room_activity.sql", sql), 2);
 });
+
+test("recently resolved reads at most 30 pre-window starts, all at once, newest recovery first", async () => {
+  const DB = localAccountDb();
+  try {
+    await initializeMonitor(DB, now - 3 * 86400000);
+    // 35 problems that began before the window and recovered inside it: each needs a lookup.
+    for (let i = 0; i < 35; i++) {
+      const component = `Workflow: Verify (old-${String(i).padStart(2, "0")})`;
+      await diagnosticLog(DB, component, now - 30 * HOUR, bad(now - 30 * HOUR));
+      await diagnosticLog(DB, component, now - (60 + i) * MIN, good(now - (60 + i) * MIN));
+    }
+    let inFlight = 0,
+      peak = 0,
+      lookups = 0;
+    const counting = {
+      prepare(sql) {
+        const statement = DB.prepare(sql);
+        if (!sql.includes("AND id>=? AND id<?")) return statement;
+        return {
+          bind: (...args) => {
+            const bound = statement.bind(...args);
+            return {
+              first: async () => {
+                lookups++;
+                peak = Math.max(peak, ++inFlight);
+                await new Promise((r) => setTimeout(r, 2));
+                try {
+                  return await bound.first();
+                } finally {
+                  inFlight--;
+                }
+              },
+            };
+          },
+        };
+      },
+    };
+    const result = await recentlyResolved(counting, now, []);
+    assert.equal(lookups, 30, "the lookup bound is unchanged");
+    assert.ok(peak > 1, `lookups run together (peak ${peak})`);
+    assert.equal(result.total, 30, "only checked components are counted");
+    assert.equal(result.complete, false, "the unchecked five make the list incomplete");
+    assert.deepEqual(
+      result.items.map((i) => i.component),
+      [0, 1, 2, 3, 4].map((i) => `Workflow: Verify (old-0${i})`),
+      "newest recovery first",
+    );
+    assert.ok(result.items.every((i) => i.startedAt === now - 30 * HOUR));
+  } finally {
+    DB.close();
+  }
+});
+
+test("each widget refresh records how long the server took, without changing the answer", async () => {
+  const { widgetTimingEntry, WIDGET_READ_TIMEOUT_MS } = await import("../cloudflare/owner-monitor.mjs");
+  const quick = widgetTimingEntry("d34d0f1f-1e48-4f8b-be26-54b292352926", 1000, { snapshot: 1400 }, 2200);
+  assert.equal(quick.source, "devices");
+  assert.equal(quick.serverMs, 1200);
+  assert.deepEqual(quick.parts, { snapshot: 400 });
+  assert.equal(quick.overPhoneLimit, false);
+  assert.match(quick.summary, /^Widget refresh answered by the server in 1200 ms\. Network time/);
+  const slow = widgetTimingEntry("d34d0f1f-1e48-4f8b-be26-54b292352926", 1000, {}, 1000 + WIDGET_READ_TIMEOUT_MS);
+  assert.equal(slow.overPhoneLimit, true);
+  assert.match(slow.summary, /past the phone's 4 s limit/);
+
+  const DB = localAccountDb();
+  try {
+    await seedOwner(DB);
+    await initializeMonitor(DB, Date.now() - 86400000);
+    const device = "d34d0f1f-1e48-4f8b-be26-54b292352926";
+    const request = new Request("https://test/api/account/owner/monitor?view=widget", {
+      headers: { "x-lootsplit-device": device, "x-lootsplit-snapshot": "0", "x-lootsplit-version": "1.15.0" },
+    });
+    const deferred = [];
+    const received = Date.now() - 50;
+    const payload = await ownerMonitor(
+      { DB, ACCOUNT_ORIGIN: "https://test" },
+      "owner",
+      "s-owner",
+      request,
+      { waitUntil: (p) => deferred.push(p) },
+      received,
+    );
+    assert.equal(payload.view, "widget");
+    await Promise.all(deferred);
+    const row = await DB.prepare(
+      "SELECT summary,body FROM owner_monitor_logs WHERE source='devices' AND id LIKE 'widget-served:%'",
+    ).first();
+    assert.ok(row, "a timing entry was recorded");
+    const body = JSON.parse(row.body);
+    assert.equal(body.deviceId, device);
+    assert.ok(body.serverMs >= 50);
+    assert.deepEqual(Object.keys(body.parts).sort(), ["routed", "snapshot", "widgetData"]);
+    // The dashboard view and requests without a device header record nothing.
+    await ownerMonitor({ DB, ACCOUNT_ORIGIN: "https://test" }, "owner", "s-owner", widgetRequest());
+    const count = await DB.prepare(
+      "SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE id LIKE 'widget-served:%'",
+    ).first();
+    assert.equal(count.n, 1);
+  } finally {
+    DB.close();
+  }
+});

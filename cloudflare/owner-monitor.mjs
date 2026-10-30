@@ -401,8 +401,39 @@ export async function collectOwnerMonitor(env, userId, options = {}) {
   ]);
   return { checkedAt: Date.now(), health, analytics, development, traffic, release };
 }
+/** The Android widget stops waiting for the server's first byte after this long (WidgetClient). */
+export const WIDGET_READ_TIMEOUT_MS = 4000;
+/**
+ * Records how long the server took to answer one widget refresh, so a phone's "Could not refresh"
+ * can be told apart from a slow server: a timed-out phone never receives the answer and cannot
+ * report it (2026-10-30: refreshes failed for hours while each one still built a snapshot).
+ */
+export function widgetTimingEntry(device, receivedAt, marks, now) {
+  const serverMs = Math.max(0, now - receivedAt);
+  const slow = serverMs >= WIDGET_READ_TIMEOUT_MS;
+  return {
+    id: `widget-served:${device}:${receivedAt}`,
+    source: "devices",
+    observedAt: now,
+    summary: `Widget refresh answered by the server in ${serverMs} ms${slow ? `, past the phone's ${WIDGET_READ_TIMEOUT_MS / 1000} s limit` : ""}. Network time to the phone is not included.`,
+    deviceId: device,
+    serverMs,
+    overPhoneLimit: slow,
+    parts: Object.fromEntries(
+      Object.entries(marks).map(([key, at]) => [key, Math.max(0, at - receivedAt)]),
+    ),
+  };
+}
 /** `context` is the Worker ExecutionContext (waitUntil), when the caller has one. */
-export async function ownerMonitor(env, userId, sessionId, request, context = null) {
+export async function ownerMonitor(
+  env,
+  userId,
+  sessionId,
+  request,
+  context = null,
+  receivedAt = Date.now(),
+) {
+  const marks = { routed: Date.now() };
   await authorizeOwner(env, userId, sessionId);
   const device = request?.headers.get("x-lootsplit-device");
   if (device && /^[a-f0-9-]{36}$/.test(device)) {
@@ -432,6 +463,7 @@ export async function ownerMonitor(env, userId, sessionId, request, context = nu
     userId,
     view === "widget" ? { budgetMs: REQUEST_PROVIDER_BUDGET_MS, defer } : {},
   );
+  marks.snapshot = Date.now();
   // The widget's charts, recovered problems and live rooms come from stored rows only (no provider
   // calls); they are read before the authorization re-check below, so a revocation still wins.
   // The website Field monitor's summary asks for the same stored-row parts (`include=widget-data`);
@@ -444,12 +476,23 @@ export async function ownerMonitor(env, userId, sessionId, request, context = nu
     const { monitorWidgetData } = await import("./monitor-journal.mjs");
     widgetData = await monitorWidgetData(env.DB, snapshot, snapshot.servedAt || Date.now());
   }
+  marks.widgetData = Date.now();
   // Role, account and session revocations during provider reads must fail closed.
   await authorizeOwner(env, userId, sessionId);
   const account = await env.DB.prepare("SELECT name,email FROM user WHERE id=?")
     .bind(userId)
     .first();
   if (!account) throw Object.assign(new Error("Sign in again."), { status: 401 });
+  if (view === "widget" && device && /^[a-f0-9-]{36}$/.test(device)) {
+    const { recordLog } = await import("./monitor-journal.mjs");
+    const now = Date.now();
+    const write = recordLog(env.DB, widgetTimingEntry(device, receivedAt, marks, now), now).catch(
+      () => undefined,
+    );
+    // Recorded after the answer is ready; it never delays the widget when waitUntil is available.
+    if (defer) defer(write);
+    else await write;
+  }
   return view === "widget"
     ? widgetSnapshot({ ...snapshot, account, ...widgetData })
     : withWidgetData

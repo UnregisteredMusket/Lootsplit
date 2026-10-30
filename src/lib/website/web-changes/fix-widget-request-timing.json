@@ -1,0 +1,9 @@
+{
+  "title": "Field monitor records how long each widget refresh takes",
+  "summary": "For the site owner: every home-screen widget refresh now records how long the server took to answer, and the Recently resolved list is read faster, to track down \"Could not refresh\" on the widget.",
+  "items": [
+    "Field monitor's Widget synchronization log lists each refresh's server time, marked when it passes the widget's 4-second limit. Time spent on the phone's network is not included.",
+    "Recently resolved reads the starts of earlier problems together instead of one at a time, with the same results.",
+    "Every widget route still requires the owner role on the server."
+  ]
+}

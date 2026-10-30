@@ -1332,24 +1332,37 @@ export async function recentlyResolved(db, now, current = []) {
   candidates.sort((a, b) => b.resolvedAt - a.resolvedAt || (a.component < b.component ? -1 : 1));
   const items = [];
   let total = 0,
-    lookups = 0,
     complete = found.length < RESOLVED_SCAN;
+  // Components whose problem began before the window need one earlier-entry lookup each. The
+  // first RESOLVED_LOOKUPS of them (newest recovery first, as before) are read in parallel: run one
+  // by one they could add 30 sequential D1 round trips to a widget refresh (2026-10-30).
+  const lookupFor = (component, before) =>
+    db
+      .prepare(
+        "SELECT observed_at,body FROM owner_monitor_logs WHERE source='diagnostics' AND id>=? AND id<? AND observed_at<? ORDER BY observed_at DESC LIMIT 1",
+      )
+      .bind(`diagnostic:${component}:`, `diagnostic:${component};`, before)
+      .first();
+  const pending = candidates
+    .filter(({ list }) => !list.slice(1).some((entry) => entry.check.color !== "green"))
+    .slice(0, RESOLVED_LOOKUPS);
+  const earlierRows = new Map(
+    await Promise.all(
+      pending.map(async ({ component, list }) => [
+        component,
+        await lookupFor(component, list[0].at),
+      ]),
+    ),
+  );
   for (const { component, list, resolvedAt } of candidates) {
     let bad = list.slice(1).find((entry) => entry.check.color !== "green");
-    if (!bad && lookups >= RESOLVED_LOOKUPS) {
+    if (!bad && !earlierRows.has(component)) {
       complete = false; // Not checked: the count says so rather than guessing.
       continue;
     }
     if (!bad) {
-      lookups++;
       // The problem began before the window: its last entry is the one just before the recovery.
-      const prefix = `diagnostic:${component}:`;
-      const earlier = await db
-        .prepare(
-          "SELECT observed_at,body FROM owner_monitor_logs WHERE source='diagnostics' AND id>=? AND id<? AND observed_at<? ORDER BY observed_at DESC LIMIT 1",
-        )
-        .bind(prefix, `diagnostic:${component};`, list[0].at)
-        .first();
+      const earlier = earlierRows.get(component);
       const check = earlier ? decode(earlier).diagnostic : null;
       if (check && check.color !== "green") bad = { at: earlier.observed_at, check };
     }
