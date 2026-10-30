@@ -837,7 +837,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / features / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 10s | +8s | +400% |
 | Android native widget verification | open | 2 | 934s → 2484s | +1550s | +165.95% |
 | Development / accounts / dev-loot | open | 2 | 10s → 14s | +4s | +40% |
-| Packaged Worker / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 10s | +8s | +400% |
+| Packaged Worker / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 2s → 12s | +10s | +500% |
 | verify / Verify identity, asset bytes and desktop/mobile behavior without deploying | open | 2 | 60s → 312s | +252s | +420% |
 | Player references / worker / account shard 1 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 5s | +3s | +150% |
 | Development / accounts-2 / dev-backup | open | 2 | 22s → 30s | +8s | +36.36% |
@@ -927,6 +927,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-30T04:50:57Z | step: Packaged Worker / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 10s → 12s | +2s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40766251792/job/123099101303) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41004702214/job/123898177344) |
 | 2026-10-30T01:14:28Z | step: release-apk / Run npm test | 117s → 162s | +45s | +38.46% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40849851166/job/123374980117) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40982551187/job/123831537088) |
 | 2026-10-30T01:11:18Z | step: release-apk / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40031758182/job/120687942546) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40982551187/job/123831537088) |
 | 2026-10-30T01:10:33Z | step: verify / verify / Require every preservation group to pass | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/115004233583) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40982551187/job/123831308636) |
