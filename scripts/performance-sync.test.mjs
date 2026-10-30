@@ -67,3 +67,16 @@ test("a missing resource still returns null without retrying", async () => {
   assert.equal(await api("/git/ref/heads/none", { missing: true }), null);
   assert.equal(s.calls.length, 1);
 });
+
+test("an exhausted rate limit (HTTP 403, none remaining) is named with its reset time", async () => {
+  const limited = {
+    status: 403,
+    ok: false,
+    headers: new Headers({ "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1793361600" }),
+    json: async () => ({}),
+  };
+  const s = scripted(limited);
+  const api = githubClient("t", { fetchImpl: s.fetchImpl, ...noPause });
+  await assert.rejects(api("/x"), /rate limit reached; it resets at 2026-10-30T12:00:00.000Z/);
+  assert.equal(s.calls.length, 1);
+});

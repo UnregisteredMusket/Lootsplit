@@ -40,3 +40,24 @@ test("a quiet week reports that nothing needs attention", () => {
   const week = summarizeWeek([run("push", "success", 400, 50)]);
   assert.match(renderSummary(week, week, "2026-10-27T00:00:00Z"), /No step of 30s or more slowed/);
 });
+
+test("job lists are read with bounded concurrency and keep run order", async () => {
+  const { collect, JOB_READ_CONCURRENCY } = await import("./performance-summary.mjs");
+  const runs = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, status: "completed", run_attempt: 1 }));
+  runs.push({ id: 99, status: "in_progress" });
+  let inFlight = 0,
+    peak = 0;
+  const api = async (path) => {
+    if (path.startsWith("/actions/workflows/")) return { total_count: runs.length, workflow_runs: runs };
+    inFlight++;
+    peak = Math.max(peak, inFlight);
+    await new Promise((r) => setTimeout(r, 5));
+    inFlight--;
+    const id = Number(path.split("/")[3]);
+    return { jobs: [{ started_at: "2026-10-30T00:00:00Z", completed_at: `2026-10-30T00:00:${String(id).padStart(2, "0")}Z` }] };
+  };
+  const result = await collect(api, "2026-10-16T00:00:00Z", "2026-10-30T00:00:00Z");
+  assert.deepEqual(result.map((r) => r.id), runs.slice(0, 25).map((r) => r.id));
+  assert.equal(result[9].wall, 10);
+  assert.ok(peak > 1 && peak <= JOB_READ_CONCURRENCY, `peak ${peak}`);
+});
