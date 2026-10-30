@@ -1,4 +1,5 @@
 import { combatantSchema } from "./model.mjs";
+import { open5eErrorMessage, readOpen5e } from "../quire/open5e-fetch.mjs";
 /** @param {string} message @param {number} status @returns {never} */
 const fail = (message, status = 503) => {
   throw Object.assign(new Error(message), { status });
@@ -16,25 +17,54 @@ export function sizeKey(size) {
 /** @typedef {import("zod").infer<typeof combatantSchema> & {type: string, environments: string}} Creature */
 /** @type {{at: number, rows: Creature[]} | null} */
 let creatureCache = null;
-export async function creatureIndex() {
+// Only the fields the combatant conversion below reads (Open5e v2 `fields` / `<field>__fields`).
+export const CREATURE_INDEX_FIELDS = {
+  fields:
+    "key,name,document,type,size,armor_class,hit_points,challenge_rating,experience_points,initiative_bonus,modifiers,traits,actions,environments",
+  document__fields: "key,name",
+  type__fields: "name",
+  size__fields: "key,name",
+  traits__fields: "name,desc",
+  actions__fields: "name,desc",
+  environments__fields: "name",
+};
+/** @param {number} page */
+export function creatureIndexUrl(page) {
+  const url = new URL("https://api.open5e.com/v2/creatures/");
+  url.search = new URLSearchParams({
+    document__key__in: "srd-2014",
+    limit: "500",
+    page: String(page),
+    ordering: "name",
+    ...CREATURE_INDEX_FIELDS,
+  }).toString();
+  return url.toString();
+}
+/**
+ * The SRD 5.1 creature list for encounters. Kept for an hour in this isolate; each page is also
+ * cached by `readOpen5e`. If Open5e fails, the last list (up to a week old) is used instead.
+ * @param {import("../quire/open5e-fetch.mjs").Open5eReadOptions} [options]
+ */
+export async function creatureIndex(options = {}) {
   if (creatureCache && Date.now() - creatureCache.at < 3600000) return creatureCache.rows;
+  try {
+    return await loadCreatureIndex(options);
+  } catch (error) {
+    if (creatureCache && Date.now() - creatureCache.at < 7 * 86400000) return creatureCache.rows;
+    if (error && typeof error === "object" && "status" in error && !("reason" in error)) throw error;
+    return fail(
+      `${open5eErrorMessage(error)} Saved encounters and custom enemies remain available.`,
+      503,
+    );
+  }
+}
+/** @param {import("../quire/open5e-fetch.mjs").Open5eReadOptions} options */
+async function loadCreatureIndex(options) {
   /** @type {Creature[]} */
   const rows = [];
   for (let page = 1; page <= 10; page++) {
-    const url = new URL("https://api.open5e.com/v2/creatures/");
-    url.search = new URLSearchParams({
-      document__key__in: "srd-2014",
-      limit: "500",
-      page: String(page),
-      ordering: "name",
-    }).toString();
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(15000),
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok)
-      fail("Open5e is unavailable. Saved encounters and custom enemies remain available.", 503);
-    const data = await response.json();
+    // The per-page list is large and the rows above are already kept in memory.
+    const data = /** @type {any} */ (await readOpen5e(creatureIndexUrl(page), { memory: false, ...options }));
     if (!Array.isArray(data.results)) fail("Open5e returned an unexpected creature index.", 503);
     for (const c of data.results) {
       if (c.document?.key !== "srd-2014") continue;

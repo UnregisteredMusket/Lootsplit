@@ -115,6 +115,7 @@ async function save(db, user, d, encounter, status = d.row.status) {
 }
 export { creatureIndex } from "../src/lib/encounters/index.mjs";
 import { creatureIndex } from "../src/lib/encounters/index.mjs";
+import { afterResponse } from "./request-context.mjs";
 export async function handleEncounters(db, user, path, body = {}) {
   if (path === "encounters") {
     // Read memberships and current seats together instead of issuing two more
@@ -198,7 +199,8 @@ export async function handleEncounters(db, user, path, body = {}) {
   if (path === "encounters/index" || path === "encounters/generate") {
     await dmMembership(db, user, text(body.code, 16));
     const g = parse(generatorSchema, body.filters);
-    const rows = (await creatureIndex()).filter(
+    // A stale creature list answers at once and refreshes after the response.
+    const rows = (await creatureIndex({ defer: (task) => void afterResponse(task) })).filter(
       (c) =>
         (!g.enemy || `${c.name} ${c.type}`.toLowerCase().includes(g.enemy.toLowerCase())) &&
         (!g.environment || c.environments.toLowerCase().includes(g.environment.toLowerCase())),
