@@ -1,6 +1,6 @@
 import { LoadEarlierEntries } from "./history-loader";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MessageCircle, Send, RotateCcw, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Confirm, TextArea } from "./ui";
@@ -29,6 +29,7 @@ import {
   chatStorageError,
   restoreAccountChatOutboxes,
   chatSenderPurseId,
+  confirmsProvisionalChatScope,
   type ChatMessage,
   type ChatScope,
   type OutgoingMessage,
@@ -48,11 +49,17 @@ export function ShareChat() {
     [room.code, room.seatId, room.sessionId, accountId],
   );
   // A reload publishes the saved seat before the server confirms the room's
-  // session ID. Carry what was typed or sent meanwhile into the confirmed scope
-  // before LiveChat remounts under it, so the composer is not emptied.
+  // session ID. Carry what was typed or sent meanwhile into the confirmed scope,
+  // so the composer is not emptied, and keep LiveChat mounted across that
+  // confirmation: remounting replaced the text box under a player who was typing,
+  // dropping focus and the keystrokes of that moment (Send then stayed disabled).
+  // Any other scope change (another account, room, seat or session) still remounts.
   const previousScope = useRef(scope);
+  const mountKey = useRef(chatScopeKey(scope));
   if (previousScope.current !== scope) {
     adoptProvisionalChatComposer(previousScope.current, scope);
+    if (!confirmsProvisionalChatScope(previousScope.current, scope))
+      mountKey.current = chatScopeKey(scope);
     previousScope.current = scope;
   }
   useEffect(() => {
@@ -80,7 +87,7 @@ export function ShareChat() {
   return (
     <>
       {room.joined ? (
-        <LiveChat key={chatScopeKey(scope)} scope={scope} library={library} />
+        <LiveChat key={mountKey.current} scope={scope} library={library} />
       ) : (
         <p className="text-sm text-muted">
           Start or join a room to chat live. Offline message files are under Manual sharing & files.
@@ -152,6 +159,18 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
   const [drafts, setDrafts] = useState(() => chatComposer(scope).drafts);
   const [outbox, setOutbox] = useState(() => chatComposer(scope).outbox);
   const [legacy, setLegacy] = useState<OutgoingMessage[]>([]);
+  // The scope can change in place when the room confirms a provisional session (see
+  // ShareChat): show the confirmed composer, which holds the adopted drafts and outbox,
+  // and let sends that finish later record their result there. A layout effect, so no
+  // event handler runs between the commit and this switch.
+  const scopeRef = useRef(scope);
+  useLayoutEffect(() => {
+    if (scopeRef.current === scope) return;
+    scopeRef.current = scope;
+    const composer = chatComposer(scope);
+    setDrafts(composer.drafts);
+    setOutbox(composer.outbox);
+  }, [scope]);
   const storage = useRef<globalThis.Storage | undefined>(undefined);
   const [sending, setSending] = useState<string[]>([]);
   const sendingRef = useRef(new Set<string>());
@@ -236,7 +255,7 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
   }, [notes, outbox, scope]);
 
   function persist(next: OutgoingMessage[]) {
-    setOutbox(updateChatOutbox(scope, next, storage.current));
+    setOutbox(updateChatOutbox(scopeRef.current, next, storage.current));
   }
   async function deliver(item: OutgoingMessage) {
     if (viewOnly || sendingRef.current.has(item.command.id)) return;
@@ -247,13 +266,13 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Connection failed. Retry when online.";
-      const next = chatComposer(scope).outbox.map((m) =>
+      const next = chatComposer(scopeRef.current).outbox.map((m) =>
         m.command.id === item.command.id ? { ...m, error: message } : m,
       );
       try {
         persist(next);
       } catch {
-        setOutbox(updateChatOutbox(scope, next));
+        setOutbox(updateChatOutbox(scopeRef.current, next));
       }
     } finally {
       sendingRef.current.delete(item.command.id);

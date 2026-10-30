@@ -55,6 +55,21 @@ export function chatComposer(scope: ChatScope): Composer {
   return composer;
 }
 /**
+ * True when `to` is the server's confirmation of the provisional scope `from`: the
+ * same account, room and seat, with the session ID the saved session lacked. The
+ * composer stays mounted across this change (see ShareChat), so a player typing at
+ * that moment keeps focus and every keystroke.
+ */
+export function confirmsProvisionalChatScope(from: ChatScope, to: ChatScope) {
+  return (
+    from.sessionId === "" &&
+    to.sessionId !== "" &&
+    from.accountId === to.accountId &&
+    from.code === to.code &&
+    from.seatId === to.seatId
+  );
+}
+/**
  * After a page load the room view is published from the saved session before
  * the first server response supplies the room's session ID. A draft typed, or
  * a message sent, in that window belongs to the same seat in the same room, so
@@ -67,14 +82,7 @@ export function chatComposer(scope: ChatScope): Composer {
  * warning) is unchanged in total, only its scope moved.
  */
 export function adoptProvisionalChatComposer(from: ChatScope, to: ChatScope) {
-  if (
-    from.sessionId !== "" ||
-    to.sessionId === "" ||
-    from.accountId !== to.accountId ||
-    from.code !== to.code ||
-    from.seatId !== to.seatId
-  )
-    return false;
+  if (!confirmsProvisionalChatScope(from, to)) return false;
   const fromKey = chatScopeKey(from);
   const provisional = composers.get(fromKey);
   if (!provisional) return false;
