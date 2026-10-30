@@ -1,0 +1,8 @@
+{
+  "title": "Widget refresh no longer waits for game statistics",
+  "summary": "For the site owner: a Field monitor widget refresh no longer waits for game statistics to be recounted across every shared campaign, which could take several seconds.",
+  "items": [
+    "If the count takes longer than 0.4 seconds, the refresh uses the previous statistics (at most 35 minutes old, shown with their time) and the fresh count finishes in the background for the next refresh.",
+    "Half-hourly collections and the website dashboard still wait for fresh statistics, and the owner role is checked before and after every refresh."
+  ]
+}

@@ -116,3 +116,53 @@ test("monitorSnapshot passes the budget and the previous reading to the collecto
     DB.close?.();
   }
 });
+
+test("slow game statistics keep their previous reading on the request path, never when forced", async () => {
+  const { collectOwnerMonitor } = await import("../cloudflare/owner-monitor.mjs");
+  const DB = localAccountDb();
+  try {
+    await DB.prepare(
+      "INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES ('owner','Owner','owner@example.com',0,0,0)",
+    ).run();
+    await DB.prepare("INSERT INTO site_roles VALUES('owner','owner',0)").run();
+    await DB.prepare("INSERT OR IGNORE INTO member_access(user_id,status) VALUES('owner','active')").run();
+    // Every campaign-room read is slow, as on a cold isolate (9.4 s widget refresh, 2026-10-30).
+    const slowRooms = {
+      prepare(sql) {
+        const statement = DB.prepare(sql);
+        if (!/testMode/.test(sql)) return statement; // the statistics room scan only
+        const delay = (p) => new Promise((r) => setTimeout(r, 600)).then(() => p);
+        const wrap = (st) => ({
+          bind: (...a) => wrap(st.bind(...a)),
+          first: (...a) => delay(st.first(...a)),
+          all: (...a) => delay(st.all(...a)),
+          raw: (...a) => delay(st.raw(...a)),
+          run: (...a) => delay(st.run(...a)),
+        });
+        return wrap(statement);
+      },
+      batch: (s) => DB.batch(s),
+    };
+    const now = Date.now();
+    const earlier = { analytics: ready({ version: 1, metrics: { sessions: 3 } }, now - 10 * 60000) };
+    const deferred = [];
+    const started = Date.now();
+    const result = await collectOwnerMonitor({ DB: slowRooms }, "owner", {
+      budgetMs: REQUEST_PROVIDER_BUDGET_MS,
+      defer: (p) => deferred.push(p),
+      now,
+      previous: earlier,
+    });
+    assert.ok(Date.now() - started < 590, `answered in ${Date.now() - started} ms`);
+    assert.equal(result.analytics.reused, true);
+    assert.equal(result.analytics.checkedAt, now - 10 * 60000, "dated with its own time");
+    assert.equal(deferred.length, 1, "the live read keeps running in the background");
+    await Promise.all(deferred);
+    // A scheduled (forced) collection has no budget and waits for the live statistics.
+    const forced = await collectOwnerMonitor({ DB: slowRooms }, "owner", { previous: earlier });
+    assert.equal(forced.analytics.state, "ready");
+    assert.notEqual(forced.analytics.reused, true);
+  } finally {
+    DB.close?.();
+  }
+});

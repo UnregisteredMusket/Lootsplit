@@ -387,7 +387,15 @@ export async function collectOwnerMonitor(env, userId, options = {}) {
   const earlier = options.previous || {};
   const [health, analytics, development, traffic, release] = await Promise.all([
     serverMonitor(env, userId),
-    capture(() => ownerAnalytics(env.DB, userId)),
+    // Game statistics read every shared campaign's ledger, funds, holdings and journal (cached 60 s
+    // per isolate). On a cold isolate that took seconds and held widget refreshes past the phone's
+    // read limit (9.4 s on 2026-10-30), so the request path reuses the previous validated reading
+    // like the providers above; the owner role is still checked before and after the collection.
+    withinBudget(
+      capture(() => ownerAnalytics(env.DB, userId)),
+      earlier.analytics,
+      options,
+    ),
     withinBudget(developmentActivity(env), earlier.development, options),
     withinBudget(cloudflareTraffic(env), earlier.traffic, options),
     capture(async () => {

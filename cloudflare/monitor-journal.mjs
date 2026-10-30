@@ -942,7 +942,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
       ready ? "healthy" : "unavailable",
       ready
         ? source.reused === true && now - source.checkedAt > 6 * 60000
-          ? `The provider was slow on this refresh, so its validated reading from ${new Date(source.checkedAt).toISOString().slice(11, 16)} UTC was reused.`
+          ? `The source was slow on this refresh, so its validated reading from ${new Date(source.checkedAt).toISOString().slice(11, 16)} UTC was reused.`
           : "The source returned a validated reading."
         : source?.state === "not-connected"
           ? `${name} is not connected.`
