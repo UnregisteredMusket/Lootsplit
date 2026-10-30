@@ -56,6 +56,14 @@ export function githubClient(
       }
       if (missing && response.status === 404) return null;
       if (response.ok) return response.json();
+      // GitHub reports an exhausted primary rate limit as HTTP 403 with no requests remaining;
+      // say so (with the reset time) instead of a bare 403 that reads like a permission problem.
+      if (response.status === 403 && response.headers?.get?.("x-ratelimit-remaining") === "0") {
+        const reset = Number(response.headers.get("x-ratelimit-reset"));
+        throw Error(
+          `GitHub ${method} ${path}: rate limit reached${Number.isFinite(reset) && reset > 0 ? `; it resets at ${new Date(reset * 1000).toISOString()}` : ""}`,
+        );
+      }
       if (attempt >= tries || !TRANSIENT_GITHUB_STATUS.has(response.status))
         throw Error(
           `GitHub ${method} ${path}: HTTP ${response.status}${attempt > 1 ? ` after ${attempt} attempts` : ""}`,

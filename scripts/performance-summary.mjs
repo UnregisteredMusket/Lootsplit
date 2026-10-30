@@ -82,14 +82,32 @@ export function renderSummary(current, previous, until) {
   return lines.join("\n") + "\n";
 }
 
-async function collect(api, since, until) {
+/** Runs `work` over `items` with at most `limit` in flight, keeping input order. */
+export async function mapLimited(items, limit, work) {
+  const results = new Array(items.length);
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await work(items[index], index);
+    }
+  });
+  await Promise.all(lanes);
+  return results;
+}
+/**
+ * Job reads run six at a time: 790 verification runs in two weeks (2026-10-30) took longer than
+ * the job's 15 minutes when read one by one. Six stays far below GitHub's concurrency limits.
+ */
+export const JOB_READ_CONCURRENCY = 6;
+export async function collect(api, since, until) {
   const runs = await paginate(
     api,
     `/actions/workflows/verify.yml/runs?created=${since.slice(0, 10)}..${until.slice(0, 10)}`,
     "workflow_runs",
   );
-  const detailed = [];
-  for (const run of runs.filter((r) => r.status === "completed")) {
+  const completed = runs.filter((r) => r.status === "completed");
+  return mapLimited(completed, JOB_READ_CONCURRENCY, async (run) => {
     const jobs = (await api(`/actions/runs/${run.id}/attempts/${run.run_attempt || 1}/jobs?per_page=100`)).jobs;
     const timed = jobs.filter((j) => j.started_at && j.completed_at);
     const wall = timed.length
@@ -97,9 +115,8 @@ async function collect(api, since, until) {
           Math.min(...timed.map((j) => Date.parse(j.started_at)))) /
         1000
       : null;
-    detailed.push({ ...run, jobs, wall });
-  }
-  return detailed;
+    return { ...run, jobs, wall };
+  });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
