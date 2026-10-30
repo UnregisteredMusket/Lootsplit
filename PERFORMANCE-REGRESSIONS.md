@@ -467,7 +467,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts-2 / dev-account-2 | open | 5 | 55s → 146s | +91s | +165.45% |
 | Development / accounts-2 / dev-bug | open | 3 | 2s → 6s | +4s | +200% |
 | Development / accounts-2 / dev-character | open | 3 | 15s → 26s | +11s | +73.33% |
-| Development / accounts-2 / dev-party-sheet | open | 4 | 16s → 37s | +21s | +131.25% |
+| Development / accounts-2 / dev-party-sheet | open | 5 | 16s → 49s | +33s | +206.25% |
 | Development / accounts-2 | open | 6 | 130s → 796s | +666s | +512.31% |
 | Development / economy / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 5 | 2s → 42s | +40s | +2000% |
 | report / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 6 | 1s → 30s | +29s | +2900% |
@@ -599,7 +599,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / economy / Run npx playwright install --with-deps chromium | open | 5 | 28s → 694s | +666s | +2378.57% |
 | native-widget (24) / Verify owner isolation, refresh transport and actual RemoteViews layouts | open | 2 | 199s → 319s | +120s | +60.3% |
 | Development / economy / Set up job | open | 2 | 1s → 3s | +2s | +200% |
-| Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 6s | +4s | +200% |
+| Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 2s → 8s | +6s | +300% |
 | native-widget (24) / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 5s → 22s | +17s | +340% |
 | Development / accounts-2 / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / world / Run npm ci | open | 2 | 18s → 402s | +384s | +2133.33% |
@@ -932,6 +932,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-30T19:23:59Z | step: Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39721251135/job/119635002201) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41114173605/job/124263986134) |
+| 2026-10-30T18:59:04Z | step: Development / accounts-2 / dev-party-sheet | 37s → 49s | +12s | +32.43% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40637943220/job/122651695692) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41110891297/job/124252790350) |
 | 2026-10-30T18:43:57Z | job: main-verification | 28s → 50s | +22s | +78.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39802895414/job/119918697730) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41107028147/job/124247163412) |
 | 2026-10-30T18:43:55Z | step: main-verification / Require successful independent main preservation checks | 22s → 44s | +22s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39802895414/job/119918697730) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41107028147/job/124247163412) |
 | 2026-10-30T18:40:39Z | job: verify / Development / world | 680s → 806s | +126s | +18.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119789544378) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41107028147/job/124239522808) |
