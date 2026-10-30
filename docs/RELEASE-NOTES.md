@@ -1,3 +1,40 @@
+# Lootsplitter 1.15.0
+
+Android version code **23**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.14.1 build commit `407e7c6` (tabletop protocol 19; 1.14.1 used protocol 11). No native Android code changed since 1.14.1.
+
+## Added
+
+- **Map tokens at their real size, with grid snapping** (#380, protocols 13–14). Tokens are drawn at their creature size (Tiny a quarter square, Small/Medium 1×1, Large 2×2, Huge 3×3, Gargantuan 4×4, or the DM's custom squares) and are placed by their top-left square. A dragged token snaps to the square under the grabbed point and keeps its footprint on the grid; the server refuses unsnapped or out-of-bounds moves. Grid mode (Layers and the Inspector) switches snapping and the grid lines; turning it on with tokens between squares offers one undoable snap or aligning the grid under them. Ungridded maps can get an automatic hidden grid.
+- **Players move their own tokens** (#380, protocol 15). Per map: Automatic (free outside combat, the tracker's turn while an encounter runs on that map), Off, and locked characters. New maps default to Automatic; maps configured before keep movement off with a one-tap Turn on Automatic. Place my token, a turn strip, a Not your turn card and a speed guide.
+- **Place party and group commands** (#380, protocol 16). Place party (Shift+A) in a Cluster, Line or Circle with spacing and rotation, as one action with Undo; the formation can be saved as the party's default. Shift+drag, Ctrl/⌘+A and a phone Select mode feed a group bar: Place, Move, Hide, Lock, Initiative, Size, Send to, Movement, Clear.
+- **Right-click map menu and the phone's radial** (#380). Right-click, Shift+F10 or the Menu key opens the map's menu at the clicked square (DM groups Encounter, Party, Place, Table and Reveal; a token menu for one token or a selection; a short player menu). On phones, holding a finger still for 500 ms opens the same actions as a wheel with a More sheet; pan, pinch and token drags still win. The wheel's vibration tick is not in this app version (the app does not yet hold the vibrate permission); it works in phone browsers.
+- **Move party to** (#380). Sends the party to a submap or connected map in one batch (party location, the players' scene and the party's tokens at the entry) after a summary, and offers each group of a split party. Add creatures here, Add characters here and Start encounter here from the same menus.
+- **Follow view** (#379, protocol 17). A DM setting, off by default: a player's character token follows them when they open another map in the same place, with Undo; never in combat, with movement off or for locked tokens. Players keep their own Follow me switch.
+- **Zones, the split rule and party votes** (#381, protocol 18). A Zones editor groups maps into one place. A move into a neighbouring zone follows the DM's rule: Block, Wait until end of session, or an anonymous Party vote (majority or unanimous) the DM can override. Far zones need a journey.
+- **Ask the DM** (#381, protocol 19). A player's drag on an approval map becomes a request with a dashed "Waiting for the DM" ghost and Withdraw; the DM approves or denies it in the Review Inbox (Token moves), and approval rechecks the movement rules, fog and the combat turn.
+- **History on demand** (#369, #375, protocol 12). Shared campaigns open with their working set (newest ledger and chat lines, archived sessions listed without contents). Load earlier entries, Load earlier messages and Load this session fetch older history; searches, filters, Load all history, Fairness and favour load what they need. Players only receive what their own view includes.
+
+## Improved
+
+- **Lighter large campaigns.** The app no longer receives every archived session when it opens a shared campaign, and commands run on the working set, rerunning on the whole campaign only when they need older history (#375).
+- **Downloads and backups include the full history.** Download a copy, online backups and returning a campaign to Local Mode load the whole campaign first and refuse if any part is missing, so nothing is left out (#375). On the server, downloads, deletion copies, session records, restores and favour whoever is behind read archived sessions one at a time (#384, #385, #387, #388, #389).
+- **Archived sessions stored more compactly.** New archived sessions are stored as the changes since an earlier archived copy, about a fifth of the space, and every one is rebuilt and checked before it is shown (#382, #383). The DM's large-campaign notice moves from 5 MB to 12 MB (#390); it is a notice only and never refuses anything.
+
+## Fixed
+
+- **Undo can no longer reverse a ledger line twice** (#386). If an earlier reversal was stored under an ID that an older, unrelated line also used, Undo missed it and reversed the line again. Every copy is now checked, in shared rooms and in the offline engine.
+- **Older app versions' complete views.** Apps on tabletop protocol 11 or older (Android 1.14.1 and earlier) still receive the complete campaign. It is cut only when the live campaign itself is too large, never because of map images or resource packs (#375), and the memory test now covers the protocol-11 view and restore at the 12 MB notice size, after restores and whole-campaign writes stopped copying the history several times (#389, #390). This version reads history on demand, so it no longer needs the complete view.
+
+## After updating
+
+Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. The owner widget keeps its 1.14.1 connection: its session is stored AES-GCM encrypted in the app's no-backup storage with a key in the Android Keystore, and both survive an update signed with the same certificate (only uninstalling removes them).
+
+## Release verification
+
+Pending: published by `android-release.yml` after the version bump reaches main, the full preservation checks, the API 24 and API 35 widget checks and the signed-APK upgrade gate; independent inspection of the public APK follows before `release.json` advances.
+
+---
+
 # Lootsplitter 1.14.1
 
 Android version code **22**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. A patch for the site owner's home-screen widget; nothing else in the app changes.

@@ -1,5 +1,29 @@
 [
   {
+    "version": "1.15.0",
+    "date": "2026-10-29",
+    "summary": "Map tokens at their real size with grid snapping, players moving their own tokens, Place party, map menus and the phone's press-and-hold wheel, zones and party votes, and long shared campaigns that open with their newest history.",
+    "features": [
+      "Map tokens are drawn at their creature size (Tiny to Gargantuan, or custom squares) and snap to the square you drop them on. Grid mode in Layers and the Inspector turns snapping and the grid lines on or off, and turning it on can snap every token in one step with Undo or shift the grid under them.",
+      "Players can move their own tokens: freely outside combat and only on their character's turn while an encounter runs on that map. DMs can set a map to Off, lock tokens or characters, or choose Ask the DM, where a player's drag becomes a request the DM approves or denies in the Review Inbox.",
+      "Place party puts the party on a map in a Cluster, Line or Circle in one click, with Undo. Select several tokens (Shift+drag, Ctrl/⌘+A, or Select more tokens on a phone) to place, move, hide, lock, resize, add to initiative or send them to another map in one step.",
+      "Right-click the map (or Shift+F10) for actions at that square, and right-click a token for its own menu. On phones, press and hold the map for half a second to open the same actions as a wheel; More lists everything.",
+      "Move party to sends the party to a submap or connected map in one step, after showing what will change, and asks which group moves when the party is split. Add creatures here, Add characters here and Start encounter here work from the same menus.",
+      "Character tokens can follow players when they open another map in the same place (a DM setting, off by default; players can turn off Follow me).",
+      "Zones group maps that count as one place. When a player's move would split the party, the DM's rule decides: block it, wait until the end of the session, or an anonymous party vote the DM can override.",
+      "Long shared campaigns open with their newest ledger and chat lines. Load earlier entries, Load earlier messages and Load this session fetch older history when you need it, and searches, filters, Fairness and Download a copy load what they need by themselves."
+    ],
+    "improvements": [
+      "Shared campaigns with long histories are lighter to open and to play, because the app no longer has to receive every past session at once.",
+      "Download a copy, online backups and returning a shared campaign to this device load the whole campaign first, so every entry is kept; if that fails, nothing changes.",
+      "Archived sessions are stored online as the changes since an earlier session, which takes about a fifth of the space, and are rebuilt and checked before they are shown. The DM's large-campaign notice now appears at 12 MB instead of 5 MB."
+    ],
+    "fixes": [
+      "Undo can no longer reverse a ledger line a second time when an earlier reversal was recorded under an ID that another, unrelated line also used. This applies to shared and offline campaigns.",
+      "Apps that have not updated yet (1.14.1 and earlier) keep receiving the complete campaign, and it is no longer cut short because of map images or resource packs; the server checks it still fits at the 12 MB notice size. This version loads history on demand and no longer needs that complete view."
+    ]
+  },
+  {
     "version": "1.14.1",
     "date": "2026-10-29",
     "summary": "The owner's home-screen Field monitor stays connected when widgets are removed and added again, and its Sign in opens the widget's Connect screen.",
