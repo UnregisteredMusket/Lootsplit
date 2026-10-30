@@ -21,7 +21,13 @@ Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept, and 
 
 ## Release verification
 
-Pending: filled in after `android-release.yml` publishes the signed APK.
+Published October 30, 2026 by `android-release.yml` (run 41107028147), started automatically by the version bump merged to main `093eafa` (#402), after the full preservation checks, the API 24 and API 35 widget checks, and the signed-APK upgrade gate passed.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `a088194f78c21cb2065a744a6bac8315d3fa230d5a08d7d1db5cc0356d32fb0e` (33,050,796 bytes), matching SHA256SUMS.txt.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.15.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.16.0 and versionCode 24, and declares `android.permission.VIBRATE`.
+- The bundled web client contains the map wheel's vibration call and the lean Open5e requests.
 
 ---
 
