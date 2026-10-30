@@ -864,6 +864,30 @@ export async function latestUsage(db, now) {
   return usage;
 }
 async function updateDiagnostics(db, snapshot, now, settings) {
+  // Reads that do not depend on each other start together: on the widget's request path each D1
+  // round trip adds to a refresh the phone abandons after 4 s (2026-10-30: 4.1 s measured).
+  const first = (sql) => db.prepare(sql).first();
+  const pending = {
+    probe: latestProbe(db),
+    last: first(
+      "SELECT slot,collected_at,outcome FROM owner_monitor_intervals WHERE outcome IN ('complete','partial','recovered') ORDER BY slot DESC LIMIT 1",
+    ),
+    latestInterval: first(
+      "SELECT slot,outcome FROM owner_monitor_intervals ORDER BY slot DESC LIMIT 1",
+    ),
+    report: first(
+      "SELECT generated_at FROM owner_monitor_reports ORDER BY generated_at DESC LIMIT 1",
+    ),
+    reportFailure: first(
+      "SELECT l.observed_at,l.summary FROM owner_monitor_logs l WHERE l.source='reports' AND json_extract(l.body,'$.outcome')='failed' AND NOT EXISTS(SELECT 1 FROM owner_monitor_reports r WHERE r.id=json_extract(l.body,'$.reportId') AND r.generated_at>=l.observed_at) ORDER BY l.observed_at DESC LIMIT 1",
+    ),
+    devices: rows(
+      db,
+      "SELECT id,reported_at,body FROM owner_monitor_devices ORDER BY reported_at DESC LIMIT 100",
+    ),
+  };
+  // Settled now so an early failure is not an unhandled rejection; awaited below where used.
+  for (const read of Object.values(pending)) read.catch(() => undefined);
   const previous = new Map(
     (await rows(db, "SELECT component,body FROM owner_monitor_incidents")).map((r) => [
       r.component,
@@ -901,7 +925,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     "Every owner API request also checks its own live session.",
     "Sign in again if your device reports an expired session.",
   );
-  add("Multiplayer", ...multiplayerCheck(await latestProbe(db), now));
+  add("Multiplayer", ...multiplayerCheck(await pending.probe, now));
   for (const [key, name] of [
     ["development", "GitHub workflows"],
     ["traffic", "Cloudflare analytics"],
@@ -969,14 +993,8 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     ),
   );
   await workflowDiagnostics(db, snapshot.development, previous, now, add);
-  const last = await db
-    .prepare(
-      "SELECT slot,collected_at,outcome FROM owner_monitor_intervals WHERE outcome IN ('complete','partial','recovered') ORDER BY slot DESC LIMIT 1",
-    )
-    .first();
-  const latestInterval = await db
-    .prepare("SELECT slot,outcome FROM owner_monitor_intervals ORDER BY slot DESC LIMIT 1")
-    .first();
+  const last = await pending.last;
+  const latestInterval = await pending.latestInterval;
   const collectionFailed = latestInterval?.outcome === "failed";
   add(
     "Scheduled collection",
@@ -994,14 +1012,8 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     "Inspect Cron Triggers and missed intervals; the scheduler records catch-up without inventing observations.",
     collectionFailed ? "COLLECTION_FAILED" : null,
   );
-  const report = await db
-    .prepare("SELECT generated_at FROM owner_monitor_reports ORDER BY generated_at DESC LIMIT 1")
-    .first();
-  const reportFailure = await db
-    .prepare(
-      "SELECT l.observed_at,l.summary FROM owner_monitor_logs l WHERE l.source='reports' AND json_extract(l.body,'$.outcome')='failed' AND NOT EXISTS(SELECT 1 FROM owner_monitor_reports r WHERE r.id=json_extract(l.body,'$.reportId') AND r.generated_at>=l.observed_at) ORDER BY l.observed_at DESC LIMIT 1",
-    )
-    .first();
+  const report = await pending.report;
+  const reportFailure = await pending.reportFailure;
   add(
     "Daily reporting",
     reportFailure
@@ -1018,10 +1030,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     "Inspect the report schedule and coverage; use Generate previous day to recover.",
     reportFailure ? "REPORT_GENERATION_FAILED" : null,
   );
-  const devices = await rows(
-    db,
-    "SELECT id,reported_at,body FROM owner_monitor_devices ORDER BY reported_at DESC LIMIT 100",
-  );
+  const devices = await pending.devices;
   add("Widget synchronization", ...widgetSyncCheck(devices, now, settings.deviceFreshMs));
   const result = checks.map((check) => diagnostic(previous.get(check.component), check, now));
   const writes = result.map((check) =>
@@ -1082,17 +1091,20 @@ export async function monitorSnapshot(
       previous: decode(previous),
     });
     const diagnostics = await updateDiagnostics(db, observed, now, settings);
-    const task = await currentTask(db, now, settings, observed.development ?? null);
-    const interval = await db
-      .prepare("SELECT * FROM owner_monitor_intervals ORDER BY slot DESC LIMIT 1")
-      .first();
-    const fullReport = decode(
-      await db
+    const [task, interval, reportRow, monitoringRows] = await Promise.all([
+      currentTask(db, now, settings, observed.development ?? null),
+      db.prepare("SELECT * FROM owner_monitor_intervals ORDER BY slot DESC LIMIT 1").first(),
+      db
         .prepare(
           "SELECT body FROM owner_monitor_reports ORDER BY day DESC,generated_at DESC LIMIT 1",
         )
         .first(),
-    );
+      rows(
+        db,
+        "SELECT id,sequence,observed_at,collected_at,summary FROM owner_monitor_logs WHERE source='monitoring' ORDER BY observed_at DESC,sequence DESC LIMIT 3",
+      ),
+    ]);
+    const fullReport = decode(reportRow);
     const latestReport = fullReport
       ? {
           id: fullReport.id,
@@ -1120,12 +1132,7 @@ export async function monitorSnapshot(
           }
         : null,
       dailyReport: latestReport,
-      recentEntries: (
-        await rows(
-          db,
-          "SELECT id,sequence,observed_at,collected_at,summary FROM owner_monitor_logs WHERE source='monitoring' ORDER BY observed_at DESC,sequence DESC LIMIT 3",
-        )
-      ).map((r) => ({
+      recentEntries: monitoringRows.map((r) => ({
         id: r.id,
         sequence: r.sequence,
         source: "monitoring",

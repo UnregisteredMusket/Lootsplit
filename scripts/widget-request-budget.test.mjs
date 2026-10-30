@@ -19,7 +19,8 @@ const ready = (data, checkedAt = instant) => ({ state: "ready", checkedAt, data 
 const slow = (value, ms) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
 test("the request budget stays well inside the installed widgets' 3 s read timeout", () => {
-  assert.ok(REQUEST_PROVIDER_BUDGET_MS > 0 && REQUEST_PROVIDER_BUDGET_MS <= 1500);
+  // 2026-10-30: at 1.2 s a widget refresh took 4.1 s on the server, past the phone's 4 s limit.
+  assert.ok(REQUEST_PROVIDER_BUDGET_MS > 0 && REQUEST_PROVIDER_BUDGET_MS <= 500);
   assert.equal(REUSE_MAX_AGE_MS, 35 * 60000);
 });
 

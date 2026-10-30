@@ -337,10 +337,12 @@ export async function authorizeOwner(env, userId, sessionId) {
 }
 /**
  * Longest a request-path collection waits for a slow provider (GitHub, Cloudflare GraphQL) before it
- * keeps that provider's previous validated reading. Installed widgets (1.10.0–1.12.0) give up after
- * a 3 s read timeout; GitHub alone took 1.7–4.6 s per request-path collection on 2026-10-24/25.
+ * keeps that provider's previous validated reading. Installed widgets give up after a 4 s read
+ * timeout (3 s up to 1.12.0); GitHub alone took 1.7–4.6 s per request-path collection on
+ * 2026-10-24/25. At 1.2 s a refresh measured 4.1 s on 2026-10-30 with GitHub reused anyway, so the
+ * wait is 400 ms: a provider that answers in time is still used live.
  */
-export const REQUEST_PROVIDER_BUDGET_MS = 1200;
+export const REQUEST_PROVIDER_BUDGET_MS = 400;
 /** A previous provider reading older than this is never reused; the live read is awaited instead. */
 export const REUSE_MAX_AGE_MS = 35 * 60000;
 /**
@@ -436,9 +438,12 @@ export async function ownerMonitor(
   const marks = { routed: Date.now() };
   await authorizeOwner(env, userId, sessionId);
   const device = request?.headers.get("x-lootsplit-device");
+  // The device report and the snapshot are independent, so they run together; before
+  // 2026-10-30 the report ran first and added its round trips to every widget refresh.
+  let deviceReport = Promise.resolve();
   if (device && /^[a-f0-9-]{36}$/.test(device)) {
     const { monitorApi } = await import("./monitor-journal.mjs");
-    await monitorApi(
+    deviceReport = monitorApi(
       env,
       userId,
       sessionId,
@@ -452,17 +457,21 @@ export async function ownerMonitor(
         delivery: "Refresh requested; reports the previously received snapshot",
       },
     );
+    deviceReport.catch(() => undefined); // awaited below; never an unhandled rejection
   }
   const { monitorSnapshot } = await import("./monitor-journal.mjs");
   const view = request?.url ? new URL(request.url).searchParams.get("view") : null;
   // The widget view must answer inside the installed widgets' 3 s read timeout, so a slow provider
   // keeps its previous validated reading (dated, marked reused) and finishes in the background.
   const defer = typeof context?.waitUntil === "function" ? (p) => context.waitUntil(p) : null;
-  const snapshot = await monitorSnapshot(
-    env,
-    userId,
-    view === "widget" ? { budgetMs: REQUEST_PROVIDER_BUDGET_MS, defer } : {},
-  );
+  const [snapshot] = await Promise.all([
+    monitorSnapshot(
+      env,
+      userId,
+      view === "widget" ? { budgetMs: REQUEST_PROVIDER_BUDGET_MS, defer } : {},
+    ),
+    deviceReport,
+  ]);
   marks.snapshot = Date.now();
   // The widget's charts, recovered problems and live rooms come from stored rows only (no provider
   // calls); they are read before the authorization re-check below, so a revocation still wins.
