@@ -277,7 +277,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | release-apk / Run npm ci | open | 2 | 14s → 21s | +7s | +50% |
 | release-apk / Run npm run typecheck | open | 4 | 12s → 36s | +24s | +200% |
 | backup / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
-| backup / Run npm ci --ignore-scripts | open | 2 | 7s → 17s | +10s | +142.86% |
+| backup / Run npm ci --ignore-scripts | open | 3 | 7s → 51s | +44s | +628.57% |
 | Development / governance / dev-backup | resolved | 3 | 7s → 23s | +16s | +228.57% |
 | Development / gameplay / dev-library-navigation | open | 4 | 17s → 51s | +34s | +200% |
 | verify:quick | open | 2 | 36.854731s → 52.084s | +15.229269s | +41.32% |
@@ -932,6 +932,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-31T09:50:20Z | step: backup / Run npm ci --ignore-scripts | 17s → 51s | +34s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37757278895/job/113244829031) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41190225439/job/124505316703) |
 | 2026-10-30T19:23:59Z | step: Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39721251135/job/119635002201) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41114173605/job/124263986134) |
 | 2026-10-30T18:59:04Z | step: Development / accounts-2 / dev-party-sheet | 37s → 49s | +12s | +32.43% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40637943220/job/122651695692) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41110891297/job/124252790350) |
 | 2026-10-30T18:43:57Z | job: main-verification | 28s → 50s | +22s | +78.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39802895414/job/119918697730) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41107028147/job/124247163412) |
