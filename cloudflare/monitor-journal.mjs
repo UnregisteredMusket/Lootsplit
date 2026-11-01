@@ -39,6 +39,7 @@ import {
   WORKFLOW_ORPHAN_MS,
   workerErrorCheck,
   widgetSeverity,
+  storageCheck,
 } from "./monitor-model.mjs";
 import { notProbeRoom } from "./probe-namespace.mjs";
 
@@ -885,6 +886,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
       db,
       "SELECT id,reported_at,body FROM owner_monitor_devices ORDER BY reported_at DESC LIMIT 100",
     ),
+    usage: latestUsage(db, now),
   };
   // Settled now so an early failure is not an unhandled rejection; awaited below where used.
   for (const read of Object.values(pending)) read.catch(() => undefined);
@@ -1032,6 +1034,16 @@ async function updateDiagnostics(db, snapshot, now, settings) {
   );
   const devices = await pending.devices;
   add("Widget synchronization", ...widgetSyncCheck(devices, now, settings.deviceFreshMs));
+  const storage = storageCheck(await pending.usage);
+  add(
+    "Database storage",
+    storage.state,
+    storage.symptom,
+    storage.impact,
+    storage.action,
+    storage.errorCode,
+    storage.extra,
+  );
   const result = checks.map((check) => diagnostic(previous.get(check.component), check, now));
   const writes = result.map((check) =>
     statement(

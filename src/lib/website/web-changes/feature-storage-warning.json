@@ -1,0 +1,8 @@
+{
+  "title": "Field monitor watches database storage",
+  "summary": "For the site owner: Field monitor has a Database storage check that turns amber when the database passes 1 GB of the 5 GB included.",
+  "items": [
+    "The check reads the database size from the hourly Cloudflare usage reading; it notes a review at 2.5 GB.",
+    "A missing reading is listed as a coverage gap and never shown as zero. Monitoring history is kept in full."
+  ]
+}
