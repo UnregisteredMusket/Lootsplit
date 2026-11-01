@@ -583,3 +583,45 @@ export function workerErrorCheck(traffic, intervals = []) {
     lastErrorWindow,
   };
 }
+
+/** Database storage warning levels (docs/FOOTPRINT.md, owner decision 2026-11-01); 5 GB is included. */
+export const STORAGE_ATTENTION_BYTES = 1_000_000_000;
+export const STORAGE_REVIEW_BYTES = 2_500_000_000;
+/**
+ * The "Database storage" diagnostic from the newest hourly Cloudflare usage reading: amber at 1 GB,
+ * with a review note at 2.5 GB. An unavailable reading is an explicit gap marked as a coverage limit,
+ * so it never sets the status by itself (the usage log already reports its own gaps).
+ */
+export function storageCheck(usage) {
+  const metric =
+    usage?.state === "ready" && Array.isArray(usage.data?.metrics)
+      ? usage.data.metrics.find((m) => m?.key === "d1StorageBytes")
+      : null;
+  const bytes = metric?.state === "ready" ? metric.current?.value : null;
+  const impact =
+    "Storage grows with players; the footprint rules in docs/FOOTPRINT.md keep it predictable.";
+  if (!Number.isSafeInteger(bytes) || bytes < 0)
+    return {
+      state: "unavailable",
+      symptom: "The database size is unavailable in the latest Cloudflare usage reading.",
+      impact,
+      action: "No action required; the hourly usage reading reports its own gaps.",
+      errorCode: usage?.errorCode || null,
+      extra: { required: false, coverageLimit: true, storageBytes: null },
+    };
+  const size = `${(bytes / 1e9).toFixed(2)} GB`;
+  const review = bytes >= STORAGE_REVIEW_BYTES;
+  const attention = bytes >= STORAGE_ATTENTION_BYTES;
+  return {
+    state: attention ? "warning" : "healthy",
+    symptom: attention
+      ? `The database is ${size}, ${review ? "past the 2.5 GB review level" : "past the 1 GB attention level"} (5 GB included).`
+      : `The database is ${bytes >= 1e7 ? `${Math.round(bytes / 1e6)} MB` : `${Math.round(bytes / 1e3)} kB`} of the 5 GB included.`,
+    impact,
+    action: attention
+      ? "Review what is growing (weekly summary storage section) and the footprint options in docs/FOOTPRINT.md."
+      : "No action required.",
+    errorCode: attention ? (review ? "STORAGE_REVIEW" : "STORAGE_ATTENTION") : null,
+    extra: { storageBytes: bytes, storageCheckedAt: usage.checkedAt ?? null, brief: size },
+  };
+}
