@@ -1,0 +1,8 @@
+{
+  "title": "Faster game statistics",
+  "summary": "Game statistics (the homepage spending total and the owner's App statistics) now recount only campaigns that changed, instead of rereading every shared campaign each time.",
+  "items": [
+    "The totals are exactly the same; each campaign's own figures are kept with the version of the campaign they were counted from.",
+    "Figures for campaigns that are deleted or in test mode are removed at the next count."
+  ]
+}

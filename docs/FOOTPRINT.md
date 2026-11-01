@@ -60,7 +60,7 @@ A pull request that adds or changes stored data, or server work on a request pat
 | Reference campaign | A synthetic year of weekly play through the real server code: 6 characters and a party fund, 300 items, 52 sessions of 24 transfers and 2 notes each | `scripts/footprint-fixture.mjs` |
 | Server work per request | No scan of every campaign or whole history on a request path | Guard tests (as the existing ban on direct `campaign_rooms` SQL) |
 | Widget and monitor requests | Under 1.5 s on the server | `widget-served` timing entries (Field monitor) |
-| Monitoring growth | No limit: kept in full | Shown in the weekly summary's storage section |
+| Monitoring growth | No limit: kept in full | Database size in the daily monitoring report (the weekly summary runs on GitHub without database access) |
 | Database size | Amber at 1 GB, review at 2.5 GB (5 GB included) | Field monitor "Database storage" check |
 | Worker CPU | Amber when the cycle's use runs ahead of its pace | Cloudflare usage gauge |
 
@@ -74,7 +74,7 @@ stores about 62 KB although it adds only 24 ledger lines and 2 notes: worth inve
 
 ## Improvements worth making (optional, in order)
 
-1. Game statistics as running totals updated on save, instead of rescanning every campaign.
+1. Done (#406): game statistics are running totals (`game_analytics_cache`, migration 0031); a collection rereads only campaigns whose revision changed.
 2. Measure the minute timer's jobs and skip work when nothing changed.
 3. Check that finished session journals leave live campaign data (the largest campaign held 1.7 MB of
    journal in its live row on 2026-11-01).
