@@ -226,6 +226,13 @@ test("the production reading reads as attention, not a failure, with Multiplayer
     await initializeMonitor(DB, now - 25 * HOUR);
     await seedHealthy(DB);
     await seedIntervals(DB, { "2026-10-22T00:30:00.000Z": 1 });
+    // Production has an hourly Cloudflare usage reading (here its database size), so the
+    // Database storage check is a real observation, not a coverage note.
+    await DB.prepare(
+      "INSERT INTO owner_monitor_logs(id,source,observed_at,collected_at,summary,body) VALUES('usage:semantics','cloudflare-usage',?,?,'usage',?)",
+    )
+      .bind(now - 60000, now - 60000, JSON.stringify({ usage: { state: "ready", checkedAt: now - 60000, data: { metrics: [{ key: "d1StorageBytes", state: "ready", current: { value: 120_000_000 } }] } } }))
+      .run();
     const snapshot = await monitorSnapshot({ DB }, "owner", {
       force: true,
       now,

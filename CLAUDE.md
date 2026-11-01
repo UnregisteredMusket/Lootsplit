@@ -36,6 +36,7 @@ This file is the required reading. Everything under "Read on demand" is consulte
 - **Privacy:** players never see other players' private data, hidden NPCs or DM-only records; guests' pending actions stay in memory; private PDFs stay on the device.
 - **Server-side authorization** for every shared write; client checks are convenience only.
 - **Never test destructive actions on real campaigns or production data.** Production D1 is read-only except for reviewed additive migrations, which only the release job applies.
+- **Footprint** (owner, 2026-11-01): new data goes in the cheapest of the six places in `docs/FOOTPRINT.md` (computed → device → live campaign → history → feature table → files); a PR that stores more or adds request-path server work answers its eight questions in a `## Footprint` section and keeps the footprint test green. No request path scans every campaign or a whole history. Monitoring is kept in full and is outside this rule.
 - **History:** never silently truncate campaign history or monitoring history. (The only approved pruning is the monitoring snapshot cache; oversized daily reports summarize long lists explicitly.)
 - **Help:** any user-visible change gets a review of `src/lib/help/content.ts` (DM) and `player-content.ts` (players — no DM setup links); record the review in the PR.
 - **Website changelog** (owner, 2026-10-23): every user-visible website or backend change adds a website changelog entry (`src/lib/website/web-changes/<branch>.json`), published automatically when it goes live; see `docs/CODING-MANUAL.md` §7.
@@ -61,6 +62,7 @@ This file is the required reading. Everything under "Read on demand" is consulte
 | What features exist (preservation baseline) | `docs/FEATURE-INVENTORY.md`, `docs/REDESIGN.md` |
 | Feature specifics and their development rules | `docs/<FEATURE>.md` (ships, trade, properties, encounters, blacksmith, downtime, maps, world features…), `ANDROID.md` |
 | Performance log rules | `docs/PERFORMANCE.md` |
+| Storage, CPU and feature footprint rules | `docs/FOOTPRINT.md` |
 | Agent hooks, skills, MCP servers, cloud environment setup | `docs/AGENT-TOOLING.md` |
 | Ready-to-use prompts for future work, with status | `docs/prompts/README.md` |
 | Custom-domain move (lootsplitter.com), rename to Lootsplitter, cutover checklist | `docs/audit/2026-10-22-domain-migration-audit.md`, `docs/plans/DOMAIN-READINESS.md` |
