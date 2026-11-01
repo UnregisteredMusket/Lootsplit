@@ -1284,21 +1284,6 @@ export async function readRoomPaths(db, code, reads, args = []) {
  * @param {{ where?: string; whereArgs?: unknown[]; pageSize?: number }} [options]
  * @returns {AsyncGenerator<{ code: string; fields: Record<string, string | null> }>}
  */
-/**
- * Code and stored revision of every room matching `options.where` (SQL on `campaign_rooms`, with
- * `options.whereArgs`), ordered by code. Reads no campaign data beyond what `where` itself tests;
- * derived caches (game statistics, cloudflare/game-analytics.mjs) use it to find changed rooms.
- * @returns {Promise<{ code: string, revision: number }[]>}
- */
-export async function roomRevisions(db, options = {}) {
-  const rows = await db
-    .prepare(
-      `SELECT code,revision FROM campaign_rooms${options.where ? ` WHERE (${options.where})` : ""} ORDER BY code`,
-    )
-    .bind(...(options.whereArgs ?? []))
-    .all();
-  return /** @type {any[]} */ (rows.results).map((row) => ({ code: row.code, revision: Number(row.revision) }));
-}
 export async function* readRoomTables(db, fields, options = {}) {
   for (const field of fields) if (!PATH_KEY.test(field)) throw Error("Invalid room table field.");
   const limit = options.pageSize ?? 100;
@@ -1329,4 +1314,22 @@ export async function* readRoomTables(db, fields, options = {}) {
     }
     if (rows.results.length < limit) return;
   }
+}
+
+/**
+ * Code and stored revision of every room matching `options.where` (SQL on `campaign_rooms`, with
+ * `options.whereArgs`), ordered by code. Reads no campaign data beyond what `where` itself tests;
+ * derived caches (game statistics, cloudflare/game-analytics.mjs) use it to find changed rooms.
+ * @param {any} db
+ * @param {{ where?: string, whereArgs?: unknown[] }} [options]
+ * @returns {Promise<{ code: string, revision: number }[]>}
+ */
+export async function roomRevisions(db, options = {}) {
+  const rows = await db
+    .prepare(
+      `SELECT code,revision FROM campaign_rooms${options.where ? ` WHERE (${options.where})` : ""} ORDER BY code`,
+    )
+    .bind(...(options.whereArgs ?? []))
+    .all();
+  return /** @type {any[]} */ (rows.results).map((row) => ({ code: row.code, revision: Number(row.revision) }));
 }
