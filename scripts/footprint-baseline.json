@@ -1,0 +1,10 @@
+{
+  "measuredOn": "2026-11-01",
+  "reason": "First baseline when the footprint rules were adopted (owner decision 2026-11-01).",
+  "values": {
+    "liveStoredBytes": 151633,
+    "dmViewBytes": 155494,
+    "playerViewBytes": 116887,
+    "archiveBytesPerSession": 61805
+  }
+}
