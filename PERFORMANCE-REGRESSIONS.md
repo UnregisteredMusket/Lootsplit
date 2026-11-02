@@ -89,7 +89,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Run actions/setup-node@v4 | open | 4 | 2s → 30s | +28s | +1400% |
 | Development / accounts / Run npm ci | open | 5 | 11s → 231s | +220s | +2000% |
 | Packaged standby / Run actions/setup-node@v4 | open | 5 | 2s → 11s | +9s | +450% |
-| Packaged Worker / interface / Run npm ci | open | 5 | 11s → 38s | +27s | +245.45% |
+| Packaged Worker / interface / Run npm ci | open | 6 | 11s → 51s | +40s | +363.64% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 4 | 1s → 6s | +5s | +500% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 3 | 1s → 7s | +6s | +600% |
 | verify | open | 2 | 5s → 40s | +35s | +700% |
@@ -114,7 +114,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | publish / Run actions/setup-node@v4 | open | 2 | 1s → 4s | +3s | +300% |
 | publish / Verify and publish the audited bytes without rebuilding | open | 3 | 5s → 13s | +8s | +160% |
 | deploy / Set up job | open | 2 | 1s → 4s | +3s | +300% |
-| deploy / Install locked deploy and verification tools (no application build) | open | 3 | 13s → 41s | +28s | +215.38% |
+| deploy / Install locked deploy and verification tools (no application build) | open | 4 | 13s → 51s | +38s | +292.31% |
 | deploy / Run npx playwright install --with-deps chromium | open | 3 | 23s → 784s | +761s | +3308.7% |
 | deploy / Verify deployed identity and read-only desktop/mobile website behavior | open | 8 | 44s → 405s | +361s | +820.45% |
 | Deploy verified website | open | 4 | 98s → 921s | +823s | +839.8% |
@@ -638,7 +638,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / library / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 8s | +7s | +700% |
 | native-widget (35) / Set up job | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / library / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 2s → 7s | +5s | +250% |
-| Packaged Worker / world / Run npm ci | open | 3 | 12s → 42s | +30s | +250% |
+| Packaged Worker / world / Run npm ci | open | 4 | 12s → 51s | +39s | +325% |
 | deploy / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 7s | +5s | +250% |
 | Packaged Worker / economy / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 5 | 1s → 16s | +15s | +1500% |
 | Verify preserved functionality | open | 2 | 438s → 815s | +377s | +86.07% |
@@ -933,6 +933,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-01T23:46:52Z | step: deploy / Install locked deploy and verification tools (no application build) | 41s → 51s | +10s | +24.39% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41358782575/job/125004459433) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41363672980/job/125019216651) |
+| 2026-11-01T23:38:06Z | step: Packaged Worker / interface / Run npm ci | 38s → 51s | +13s | +34.21% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41357535286/job/125002514131) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41362356427/job/125017104944) |
+| 2026-11-01T23:38:01Z | step: Packaged Worker / world / Run npm ci | 42s → 51s | +9s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41357535286/job/125002514083) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41362356427/job/125017104950) |
 | 2026-11-01T22:47:05Z | step: deploy / Install locked deploy and verification tools (no application build) | 19s → 41s | +22s | +115.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832/job/112354942283) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41358782575/job/125004459433) |
 | 2026-11-01T22:40:55Z | step: Packaged Worker / world / Run npm ci | 19s → 42s | +23s | +121.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39876342411/job/120163707996) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41357535286/job/125002514083) |
 | 2026-11-01T22:39:29Z | step: Packaged Worker / interface / Run npm ci | 25s → 38s | +13s | +52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40714954211/job/122914275702) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41357535286/job/125002514131) |
