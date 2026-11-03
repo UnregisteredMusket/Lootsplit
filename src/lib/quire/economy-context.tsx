@@ -677,6 +677,26 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         void playSound("coins");
       return outcome;
     };
+    // A DM coin edit or posting in a shared room: one authoritative command whose ID the form
+    // reuses on every retry. Resolves like `attempt` (true when accepted, false when refused).
+    const dmCommand = async (command: CommandRequest, ok: string): Promise<boolean> => {
+      const gate = getCloudWatch();
+      if (gate.joined && !gate.mine) {
+        toast.error(`It is ${gate.who}'s turn.`);
+        return false;
+      }
+      try {
+        dmOnly();
+        await acceptCommand(command);
+        if (!hasPendingChanges()) void playSound("coins");
+        toast.success(hasPendingChanges() ? "Action saved as pending. Check sync status." : ok);
+        return true;
+      } catch (error) {
+        await reload().catch(() => undefined);
+        fault(error, "That change could not be saved.");
+        return false;
+      }
+    };
     const lootCommand = async (
       command: CommandRequest,
       ok?: string,
@@ -936,13 +956,24 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               if (holding) ownPurse(holding.purseId);
               await sellToShop({ holdingId, shopId, quantity }, options);
             }, "Sale recorded.", true),
-      // A shared room records these as a reviewed table patch; the device
-      // receipt only guards offline retries, so the ID is used offline only.
+      // A shared room records these as DM-only commands (`set-coins`, `post`), so a retried
+      // command ID applies once there too; the device keeps its receipt-guarded writes.
       setPurseCoins: (purseId, coins, options = {}) =>
-        attempt(async () => {
-          dmOnly();
-          await setCoins(purseId, coins, undefined, getCloudWatch().joined ? {} : options);
-        }, "Coin updated."),
+        getCloudWatch().joined
+          ? dmCommand(
+              {
+                kind: "set-coins",
+                purseId,
+                before: purses.find((p) => p.id === purseId)?.coins ?? coins,
+                coins,
+                ...idOf(options),
+              },
+              "Coin updated.",
+            )
+          : attempt(async () => {
+              dmOnly();
+              await setCoins(purseId, coins, undefined, options);
+            }, "Coin updated."),
       makeChange: async (purseId, before, after, options = {}) => {
         try {
           await acceptCommand({ kind: "coin-exchange", purseId, before, after, ...idOf(options) });
@@ -955,10 +986,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }
       },
       post: (purseId, copper, summary, options = {}) =>
-        attempt(async () => {
-          dmOnly();
-          await postCopper(purseId, copper, summary, getCloudWatch().joined ? {} : options);
-        }, "Ledger updated."),
+        getCloudWatch().joined
+          ? dmCommand({ kind: "post", purseId, copper, summary: summary.trim(), ...idOf(options) }, "Ledger updated.")
+          : attempt(async () => {
+              dmOnly();
+              await postCopper(purseId, copper, summary, options);
+            }, "Ledger updated."),
       give: (input, options = {}) => {
         // One ID per transfer (the caller's, reused on retry), so its receipt can be shown.
         const commandId = options.commandId ?? newCommandId();
