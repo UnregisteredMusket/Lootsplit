@@ -16,13 +16,16 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import {
   carryUpTo,
+  exchangeCoins,
   explainPurse,
+  sameCoins,
   formatCoins,
   formatCopper,
   parsePrice,
   toCopper,
 } from "@/lib/quire/money";
 import type { Coins, Holding } from "@/lib/quire/types";
+import type { CoinUnit } from "@/lib/quire/money";
 import { useDollarText } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { characterControl, type Purse } from "@/lib/quire/types";
@@ -671,8 +674,85 @@ function PurseStrip({
   );
 }
 
+/** Make change (loot phase 4): exchange coins in one purse at book rates, as a logged command. */
+function MakeChange({ purse }: { purse: Purse }) {
+  const { makeChange } = useEconomy();
+  const [count, setCount] = useState(1);
+  const [from, setFrom] = useState<CoinUnit>("gp");
+  const [to, setTo] = useState<CoinUnit>("sp");
+  const { commandId, renew } = useCommandId(`${purse.id}:${from}:${count}:${to}:${toCopper(purse.coins)}`);
+  const exchange = exchangeCoins(purse.coins, from, count, to);
+  const units: { value: CoinUnit; label: string }[] = [
+    { value: "pp", label: "Platinum (pp)" },
+    { value: "gp", label: "Gold (gp)" },
+    { value: "ep", label: "Electrum (ep)" },
+    { value: "sp", label: "Silver (sp)" },
+    { value: "cp", label: "Copper (cp)" },
+  ];
+  const select =
+    "mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-2 text-base text-fg";
+  return (
+    <form
+      className="mt-3 rounded-lg border border-lead/20 p-3"
+      aria-label={`Make change for ${purse.name}`}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!exchange) return;
+        if (await makeChange(purse.id, purse.coins, exchange.after, { commandId })) renew();
+      }}
+    >
+      <p className="text-sm font-medium">Make change</p>
+      <p className="text-xs text-muted">Book rates: 10 cp = 1 sp, 5 sp = 1 ep, 10 sp = 1 gp, 10 gp = 1 pp. The worth never changes.</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-[5rem_1fr_1fr]">
+        <label className="text-xs text-muted">
+          Coins
+          <input
+            aria-label="Coins to exchange"
+            inputMode="numeric"
+            value={count}
+            onChange={(event) => setCount(Math.max(0, Math.floor(Number(event.target.value) || 0)))}
+            className={`${select} sm:text-center`}
+          />
+        </label>
+        <label className="text-xs text-muted">
+          From
+          <select aria-label="Exchange from" value={from} onChange={(event) => setFrom(event.target.value as CoinUnit)} className={select}>
+            {units.map((u) => (
+              <option key={u.value} value={u.value}>
+                {u.label} · {purse.coins[u.value]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-muted">
+          For
+          <select aria-label="Exchange for" value={to} onChange={(event) => setTo(event.target.value as CoinUnit)} className={select}>
+            {units.map((u) => (
+              <option key={u.value} value={u.value}>
+                {u.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="mt-2 text-sm" aria-live="polite">
+        {exchange
+          ? `Gives ${exchange.used} ${from}, gets ${exchange.got} ${to}${exchange.used < count ? ` (${count - exchange.used} ${from} stay: not enough for a whole coin)` : ""}.`
+          : from === to
+            ? "Choose two different coins."
+            : count > purse.coins[from]
+              ? `Only ${purse.coins[from]} ${from} in this purse.`
+              : `Not enough ${from} for a whole ${to}.`}
+      </p>
+      <Button type="submit" variant="secondary" className="mt-2" disabled={!exchange}>
+        Exchange
+      </Button>
+    </form>
+  );
+}
+
 function PurseCard({ purse }: { purse: Purse }) {
-  const { updatePurse, setPurseCoins, deletePurse } = useEconomy();
+  const { updatePurse, setPurseCoins, deletePurse, makeChange } = useEconomy();
   const nameSaved = useSavedTick();
   const seat = useSeat();
   const cloud = getCloudTable();
@@ -794,7 +874,10 @@ function PurseCard({ purse }: { purse: Purse }) {
               variant="secondary"
               onClick={() => {
                 setCoins(intoSilver);
-                void setPurseCoins(purse.id, intoSilver);
+                // Saved coins: the logged coin-exchange command. Unsaved edits: set as before.
+                void (sameCoins(coins, purse.coins)
+                  ? makeChange(purse.id, purse.coins, intoSilver)
+                  : setPurseCoins(purse.id, intoSilver));
               }}
             >
               Convert to silver
@@ -805,7 +888,10 @@ function PurseCard({ purse }: { purse: Purse }) {
               variant="secondary"
               onClick={() => {
                 setCoins(intoGold);
-                void setPurseCoins(purse.id, intoGold);
+                // Saved coins: the logged coin-exchange command. Unsaved edits: set as before.
+                void (sameCoins(coins, purse.coins)
+                  ? makeChange(purse.id, purse.coins, intoGold)
+                  : setPurseCoins(purse.id, intoGold));
               }}
             >
               Convert to gold
@@ -816,7 +902,10 @@ function PurseCard({ purse }: { purse: Purse }) {
               variant="secondary"
               onClick={() => {
                 setCoins(intoPlatinum);
-                void setPurseCoins(purse.id, intoPlatinum);
+                // Saved coins: the logged coin-exchange command. Unsaved edits: set as before.
+                void (sameCoins(coins, purse.coins)
+                  ? makeChange(purse.id, purse.coins, intoPlatinum)
+                  : setPurseCoins(purse.id, intoPlatinum));
               }}
             >
               Convert to platinum
@@ -832,6 +921,7 @@ function PurseCard({ purse }: { purse: Purse }) {
           ) : null}
         </div>
       </fieldset>
+      {seat.role === "dm" || seat.purseIds.includes(purse.id) ? <MakeChange purse={purse} /> : null}
       {readOnly ? (
         <p className="mt-2 text-sm text-muted">
           Direct fund edits are managed by the DM in shared modes.
