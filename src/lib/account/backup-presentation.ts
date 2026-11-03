@@ -91,6 +91,10 @@ export function pendingCommandDescription(value: unknown): string {
       return `Resolve ${c.lots.length} treasure-pool item${c.lots.length === 1 ? "" : "s"} (${c.method})`;
     case "coin-exchange":
       return `Make change (same worth) · character ${c.purseId}`;
+    case "post":
+      return `DM ledger posting ${formatCopper(c.copper)} · account ${c.purseId}`;
+    case "set-coins":
+      return `DM coin edit · account ${c.purseId}`;
     case "bank-repay":
     case "finance-repay":
       return `Repay ${formatCopper(c.copper)} · debt ${c.loanId}`;

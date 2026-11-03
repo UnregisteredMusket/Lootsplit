@@ -117,6 +117,28 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
   /** Make change (loot phase 4): coins exchanged inside one purse at book rates; the worth never changes. */
   z.object({ ...base, kind: z.literal("coin-exchange"), purseId: id, before: coinsSchema, after: coinsSchema }).strict(),
+  // DM coin postings and direct coin edits (audit 2026-10-21, finding 3): shared rooms record them
+  // as commands, so a retried command ID applies once. The device runs the same commands.
+  z
+    .object({
+      ...base,
+      kind: z.literal("post"),
+      purseId: id,
+      copper: z.number().int().min(-1e12).max(1e12).refine((n) => n !== 0, "Enter a valid amount in whole copper."),
+      summary: z.string().trim().min(1, "Write what the money was for.").max(500),
+    })
+    .strict(),
+  z
+    .object({
+      ...base,
+      kind: z.literal("set-coins"),
+      purseId: id,
+      // The coins the DM edited from; a purse that changed meanwhile is refused.
+      before: coinsSchema,
+      coins: coinsSchema,
+      summary: z.string().max(500).optional(),
+    })
+    .strict(),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
   z.object({ ...base, kind: z.literal("property-plan"), holdingId: id, income: amount, upkeep: amount, periodDays: z.number().int().min(1).max(3650), active: z.boolean() }),
@@ -833,6 +855,37 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       active.endLedgerIds = t.ledger.map((l) => l.id);
       archiveSession(t, active.id, active.name, at);
     }
+  } else if (cmd.kind === "post") {
+    // The DM's ledger posting (Party → Record a payment, Activity adjustments): one payment line.
+    dm();
+    const p = t.purses.find((x) => x.id === cmd.purseId);
+    if (!p) throw new Error("This account no longer exists.");
+    const next = toCopper(p.coins) + cmd.copper;
+    if (!Number.isSafeInteger(next) || next < 0 || next > 1e12) throw new Error("Insufficient funds.");
+    const add = fromCopper(Math.max(0, cmd.copper));
+    p.coins =
+      cmd.copper < 0
+        ? spendCoins(p.coins, -cmd.copper)!
+        : { cp: p.coins.cp + add.cp, sp: p.coins.sp + add.sp, ep: p.coins.ep + add.ep, gp: p.coins.gp + add.gp, pp: p.coins.pp + add.pp };
+    t.ledger.push({ id: cmd.id, at, purseId: p.id, shopId: null, summary: cmd.summary, copper: cmd.copper, transactionType: "payment" });
+  } else if (cmd.kind === "set-coins") {
+    // The DM's direct coin edit: the new coins, and one adjustment line for any change of worth.
+    dm();
+    const p = t.purses.find((x) => x.id === cmd.purseId);
+    if (!p) throw new Error("This account no longer exists.");
+    if (!sameCoins(p.coins, cmd.before)) throw new Error("These coins changed. Review the purse and try again.");
+    const delta = toCopper(cmd.coins) - toCopper(p.coins);
+    p.coins = { cp: cmd.coins.cp, sp: cmd.coins.sp, ep: cmd.coins.ep, gp: cmd.coins.gp, pp: cmd.coins.pp };
+    if (delta !== 0)
+      t.ledger.push({
+        id: cmd.id,
+        at,
+        purseId: p.id,
+        shopId: null,
+        summary: cmd.summary?.trim() || `Adjusted coin in ${p.name}`,
+        copper: delta,
+        transactionType: "adjustment",
+      });
   } else if (cmd.kind === "coin-exchange") {
     // Owner or DM; the same rule as spending from the purse. Recorded as the purse's own activity,
     // which players see only for purses they hold (projectRecord).
