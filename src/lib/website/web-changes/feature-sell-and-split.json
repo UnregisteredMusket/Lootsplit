@@ -1,0 +1,9 @@
+{
+  "title": "Sell & split",
+  "summary": "Sell items from a party fund or the treasure pool at one open shop and split the proceeds evenly among the party, in one step.",
+  "items": [
+    "Party → Funds & inventory and the Treasure pool tab have Sell & split: choose a shop, tick the items, choose who shares and where leftover copper goes, then review before anything moves.",
+    "Prices follow the shop's usual buy rate, exactly as Sell to shop; items the shop doesn't buy stay unticked with the reason.",
+    "Everything happens or nothing does, and pressing again after an error never sells or pays twice. Activity shows one row that opens to the sale and each share."
+  ]
+}
