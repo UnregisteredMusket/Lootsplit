@@ -736,6 +736,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / economy / worker-trade-economy | open | 2 | 78s → 109s | +31s | +39.74% |
 | Development / world / dev-npc-barter | open | 4 | 9s → 96s | +87s | +966.67% |
 | Packaged Worker / pull request / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 1s → 8s | +7s | +700% |
+| backup / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / world / Start disposable development server | open | 2 | 7s → 11s | +4s | +57.14% |
 | Dependency vulnerabilities (OSV-Scanner) / osv-scan / Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 | open | 3 | 2s → 24s | +22s | +1100% |
 | Packaged Worker / world / worker-downtime | open | 2 | 42s → 59s | +17s | +40.48% |
@@ -861,6 +862,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Packaged Worker / economy / worker-game-analytics | open | 2 | 4s → 9s | +5s | +125% |
 | verify / Packaged Worker / features / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 2 | 2s → 6s | +4s | +200% |
 | verify / Packaged Worker / features / worker-website | open | 2 | 38s → 80s | +42s | +110.53% |
+| backup / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 6s | +4s | +200% |
 | Website changelog note / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 14s | +13s | +1300% |
 | Website changelog note / initial queue | open | 8 | 92s → 1301s | +1209s | +1314.13% |
 | verify / Packaged standby / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 4s | +2s | +100% |
@@ -937,6 +939,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-03T17:03:30Z | step: backup / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39757935431/job/119754586449) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41680219124/job/126071584101) |
+| 2026-11-03T17:02:25Z | step: backup / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39933985463/job/120348892643) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41680219124/job/126071584101) |
 | 2026-11-03T13:36:54.000Z | workflow: Verify preserved functionality | 2649s → 6506s | +3857s | +145.6% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39914748016) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41630478939) |
 | 2026-11-03T13:31:11Z | step: Packaged Worker / accounts / Set up job | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267485071/job/111627511946) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41630478939/job/125947933319) |
 | 2026-11-03T11:43:58Z | step: Development / world / dev-map-group-place | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40855200398/job/123384378435) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41627913636/job/125889919631) |
