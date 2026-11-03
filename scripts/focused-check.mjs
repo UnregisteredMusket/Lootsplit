@@ -12,6 +12,7 @@ const scenario = process.argv[2];
 const featureAudits = {
   "npc-barter": "scripts/npc-barter-browser-audit.mjs",
   "coin-split": "scripts/coin-split-browser-audit.mjs",
+  "make-change": "scripts/make-change-browser-audit.mjs",
   "loot-claims": "scripts/loot-claims-browser-audit.mjs",
   "loot-review": "scripts/loot-review-browser-audit.mjs",
   "loot-fairness": "scripts/loot-fairness-browser-audit.mjs",

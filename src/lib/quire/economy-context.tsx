@@ -229,6 +229,11 @@ type EconomyApi = {
   // was refused (the error is already shown as a toast), so a form can keep
   // its input for a retry instead of clearing it on failure.
   setPurseCoins: (purseId: string, coins: Coins, options?: CommandOptions) => Promise<boolean>;
+  /**
+   * Make change (loot phase 4): exchange coins inside one purse at book rates through the
+   * authoritative `coin-exchange` command (owner or DM; logged as the purse's activity).
+   */
+  makeChange: (purseId: string, before: Coins, after: Coins, options?: CommandOptions) => Promise<boolean>;
   post: (
     purseId: string,
     copper: number,
@@ -930,6 +935,17 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await setCoins(purseId, coins, undefined, getCloudWatch().joined ? {} : options);
         }, "Coin updated."),
+      makeChange: async (purseId, before, after, options = {}) => {
+        try {
+          await acceptCommand({ kind: "coin-exchange", purseId, before, after, ...idOf(options) });
+          toast.success("Change made.");
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The coins could not be exchanged.");
+          return false;
+        }
+      },
       post: (purseId, copper, summary, options = {}) =>
         attempt(async () => {
           dmOnly();

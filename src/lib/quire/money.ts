@@ -254,3 +254,42 @@ export function spendCoins(coins: Coins, cost: number): Coins | null {
   }
   return fromCopper(toCopper(coins) - cost);
 }
+
+/** Whether two purses hold exactly the same coins of each kind. */
+export function sameCoins(a: Coins, b: Coins): boolean {
+  return (["cp", "sp", "ep", "gp", "pp"] as const).every((unit) => a[unit] === b[unit]);
+}
+
+const UNITS_DESCENDING = ["pp", "gp", "ep", "sp", "cp"] as const;
+/** "3 gp → 30 sp": the coins that left the purse and those that arrived, largest first. */
+export function exchangeSummary(before: Coins, after: Coins): string {
+  const gave: string[] = [],
+    got: string[] = [];
+  for (const unit of UNITS_DESCENDING) {
+    const delta = after[unit] - before[unit];
+    if (delta < 0) gave.push(`${-delta} ${unit}`);
+    else if (delta > 0) got.push(`${delta} ${unit}`);
+  }
+  return `${gave.join(" + ") || "nothing"} → ${got.join(" + ") || "nothing"}`;
+}
+
+export type CoinUnit = keyof typeof COPPER;
+/**
+ * Make change: exchange up to `count` coins of `from` for coins of `to` at book rates. Only whole
+ * coins move: if `count` doesn't divide evenly into `to` (7 sp into electrum), the leftover `from`
+ * coins stay in the purse. Null when nothing can be exchanged.
+ */
+export function exchangeCoins(
+  coins: Coins,
+  from: CoinUnit,
+  count: number,
+  to: CoinUnit,
+): { after: Coins; used: number; got: number } | null {
+  if (from === to || !Number.isSafeInteger(count) || count < 1 || count > coins[from]) return null;
+  const got = Math.floor((count * COPPER[from]) / COPPER[to]);
+  if (got < 1) return null;
+  // Every book rate divides evenly (1, 10, 50, 100, 1000 cp), so the coins used are whole.
+  const used = (got * COPPER[to]) / COPPER[from];
+  const after = { ...coins, [from]: coins[from] - used, [to]: coins[to] + got };
+  return toCopper(after) === toCopper(coins) && Number.isSafeInteger(toCopper(after)) ? { after, used, got } : null;
+}

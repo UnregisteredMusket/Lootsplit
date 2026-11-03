@@ -246,6 +246,9 @@ jobs:
       - name: dev-coin-split
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-coin-split 240 node scripts/coin-split-browser-audit.mjs
+      - name: dev-make-change
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-make-change 180 node scripts/make-change-browser-audit.mjs
       - name: dev-loot-review
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-loot-review 300 node scripts/loot-review-browser-audit.mjs

@@ -64,9 +64,9 @@ import {
   editLegacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
-import { formatCopper, fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
+import { formatCopper, fromCopper, toCopper, spendCoins, priceAfterCharisma, sameCoins, exchangeSummary } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
-import { validateEconomyRows } from "./validation.ts";
+import { coinsSchema, validateEconomyRows } from "./validation.ts";
 import { listingSchema, propertyProfileSchema, propertyAvailableToGroups, validatePropertyLocations } from "./property.ts";
 import { actingGroups, activeGroups, groupInfo, MAIN_GROUP, partySplit, purseGroup } from "./party-groups.ts";
 import { partyGroupCommands, partyGroupKinds, type PartyGroupCommand } from "./party-groups-schema.ts";
@@ -115,6 +115,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
     /** Split the party: move this group (absent or "main" = the main group, as before). */
     groupId: id.optional() }),
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
+  /** Make change (loot phase 4): coins exchanged inside one purse at book rates; the worth never changes. */
+  z.object({ ...base, kind: z.literal("coin-exchange"), purseId: id, before: coinsSchema, after: coinsSchema }).strict(),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
   z.object({ ...base, kind: z.literal("property-plan"), holdingId: id, income: amount, upkeep: amount, periodDays: z.number().int().min(1).max(3650), active: z.boolean() }),
@@ -831,6 +833,15 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       active.endLedgerIds = t.ledger.map((l) => l.id);
       archiveSession(t, active.id, active.name, at);
     }
+  } else if (cmd.kind === "coin-exchange") {
+    // Owner or DM; the same rule as spending from the purse. Recorded as the purse's own activity,
+    // which players see only for purses they hold (projectRecord).
+    const p = own(cmd.purseId);
+    if (!sameCoins(p.coins, cmd.before)) throw Error("These coins changed. Review the purse and try again.");
+    if (toCopper(cmd.after) !== toCopper(cmd.before)) throw Error("Making change can't change what the coins are worth.");
+    if (sameCoins(cmd.before, cmd.after)) throw Error("Choose coins to exchange.");
+    p.coins = { cp: cmd.after.cp, sp: cmd.after.sp, ep: cmd.after.ep, gp: cmd.after.gp, pp: cmd.after.pp };
+    event(`${p.name} made change: ${exchangeSummary(cmd.before, cmd.after)}`, "management", p.id);
   } else if (cmd.kind === "journal-note") {
     if (cmd.provenance || cmd.visibility === "dm") dm();
     if (seat.role !== "dm" || cmd.visibility === "player") {
