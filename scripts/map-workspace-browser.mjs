@@ -12,7 +12,7 @@ export async function closeMapSettings(page) {
   if (await button.isVisible()) await button.click();
 }
 export async function openMapNavigation(page) {
-  const button = page.getByRole("button", { name: "Map navigation menu", exact: true });
+  const button = page.getByRole("button", { name: /map navigation menu$/i });
   if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
 }
 export async function mapBack(page) {
@@ -34,7 +34,7 @@ export async function selectWorkspaceMap(page, id) {
   await closeMapSettings(page);
   await openMapNavigation(page);
   await chooseOption(page.getByLabel("Map", { exact: true }), id);
-  const menu = page.getByRole("button", { name: "Map navigation menu", exact: true });
+  const menu = page.getByRole("button", { name: /map navigation menu$/i });
   if ((await menu.getAttribute("aria-expanded")) === "true") await menu.click();
 }
 export async function selectMapType(page, id) {
