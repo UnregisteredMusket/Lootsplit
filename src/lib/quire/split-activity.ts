@@ -24,6 +24,25 @@ export type SplitActivity = {
 
 const ROLE_ORDER = { source: 0, share: 1, remainder: 2 } as const;
 
+/**
+ * Sell and split writes plain sale lines `<command id>-sale-<n>` beside its split lines (no new
+ * stored field); Activity shows them inside the split's row. Null for any other line.
+ */
+function saleBelongs(
+  line: Pick<LedgerLine, "purseId" | "at">,
+  group: { lines: LedgerLine[]; event?: Journal["events"][number] },
+): boolean {
+  const source = group.lines.find((l) => l.split?.role === "source");
+  const fundId = group.event?.split?.sourceId ?? source?.purseId;
+  const at = source?.at ?? group.event?.at;
+  return line.purseId === fundId && line.at === at;
+}
+
+export function saleSplitId(line: Pick<LedgerLine, "id" | "split" | "transactionType">): string | null {
+  if (line.split || line.transactionType !== "sale") return null;
+  return /^(.+)-sale-\d+$/.exec(line.id)?.[1] ?? null;
+}
+
 export function splitActivity(
   ledger: LedgerLine[],
   events: Journal["events"],
@@ -44,12 +63,18 @@ export function splitActivity(
     group.event = event;
     groups.set(event.split.id, group);
   }
+  // A sale line joins its split's row only when the split is in this view and the line is the
+  // same fund's, written at the same moment (command IDs come from clients).
+  for (const line of ledger) {
+    const id = saleSplitId(line);
+    const group = id ? groups.get(id) : undefined;
+    if (group && saleBelongs(line, group)) group.lines.push(line);
+  }
   const rows: SplitActivity[] = [];
   for (const [id, { lines, event }] of groups) {
-    lines.sort(
-      (a, b) =>
-        ROLE_ORDER[a.split!.role] - ROLE_ORDER[b.split!.role] || a.id.localeCompare(b.id, "en", { numeric: true }),
-    );
+    const order = (l: LedgerLine) => (l.split ? ROLE_ORDER[l.split.role] + 1 : 0);
+    lines.sort((a, b) => order(a) - order(b) || a.id.localeCompare(b.id, "en", { numeric: true }));
+    const sales = lines.filter((l) => !l.split);
     const sourceLine = lines.find((l) => l.split?.role === "source");
     const encounter = !sourceLine && !event && lines.some((l) => l.summary.startsWith("Encounter loot"));
     const at = event?.at ?? lines[0]?.at ?? 0;
@@ -67,7 +92,10 @@ export function splitActivity(
     } else {
       const sourceId = event?.split?.sourceId ?? sourceLine?.purseId ?? "";
       const shares = options.dm && event?.split ? ` · ${event.split.n} shares` : "";
-      title = `Coin split from ${name(sourceId)}${shares}`;
+      const shop = sales[0]?.summary.match(/^.* to (.+)$/)?.[1];
+      title = sales.length
+        ? `Sold ${sales.length === 1 ? sales[0]!.summary.replace(/^Sold /, "").replace(/ to (?:(?! to ).)+$/, "") : `${sales.length} items`} to ${shop ?? "a shop"} and split from ${name(sourceId)}${shares}`
+        : `Coin split from ${name(sourceId)}${shares}`;
       copper = event?.split?.copper ?? Math.abs(sourceLine?.copper ?? 0) + (sourceLine?.split?.keptShare ?? 0);
       detail = event?.split && options.dm ? `leftover rule: ${event.split.rule.replace("-", " ")}` : "";
     }

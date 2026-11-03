@@ -28,6 +28,8 @@ import { estateImportCommand, estateImportFingerprint, previewEstateImport } fro
 import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEstatePurchase, removeEstateSite, validateEstate } from "./estate.ts";
 import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { planSaleSplit, MAX_SALE_LOTS, lotLabel } from "./sale-split.ts";
+import { creditCoins } from "./coin-split.ts";
 import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
 import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
 import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
@@ -257,6 +259,21 @@ export const commandSchema = z.discriminatedUnion("kind", [
       // What the reviewed preview showed; a split that would now differ is refused.
       expect: z.object({ share: amount.min(1), remainderTo: id.nullable() }).strict(),
       makeDefault: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...base,
+      kind: z.literal("sale-split"),
+      fundId: id,
+      shopId: id,
+      lots: z.array(z.object({ holdingId: id, quantity: qty }).strict()).min(1).max(MAX_SALE_LOTS),
+      recipientIds: z.array(id).min(1).max(MAX_SPLIT_RECIPIENTS),
+      remainder: z
+        .object({ rule: z.enum(SPLIT_RULES), purseId: id.optional() })
+        .strict(),
+      // What the reviewed preview showed; a sale or split that would now differ is refused.
+      expect: z.object({ proceeds: amount.min(1), share: amount.min(1), remainderTo: id.nullable() }).strict(),
     })
     .strict(),
   z.object({
@@ -1300,6 +1317,109 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       from: seat.role,
       to: plan.npc ? "dm" : "party",
       purseId: plan.npc && npcId ? npcId : source.id,
+      text,
+    });
+  } else if (cmd.kind === "sale-split") {
+    // One atomic action: the fund sells the items, then pays the proceeds out evenly. Whoever may
+    // spend from the fund may sell its items; pooled items stay the DM's (saleProblem).
+    const fund = own(cmd.fundId);
+    const shop = t.shops.find((x) => x.id === cmd.shopId);
+    if (!shop) throw new Error("Item or shop no longer exists.");
+    if (seat.role === "player") {
+      if (!shopVisible(shop, t, actingGroups(t, fund.id, seat.purseIds))) throw Error(notHere(fund.id, "This shop"));
+      assertShipTradingHere(t, fund.id);
+    }
+    if (shop.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
+    const projected = execution.preview === true && seat.role !== "dm";
+    const plan = planSaleSplit(
+      t,
+      {
+        fundId: fund.id,
+        shopId: shop.id,
+        lots: cmd.lots,
+        recipientIds: cmd.recipientIds,
+        rule: cmd.remainder.rule,
+        ...(cmd.remainder.purseId ? { purseId: cmd.remainder.purseId } : {}),
+      },
+      { actor: seat.role === "dm" ? "dm" : "player", projected },
+    );
+    if (
+      plan.proceeds !== cmd.expect.proceeds ||
+      plan.split.share !== cmd.expect.share ||
+      plan.split.remainderTo !== cmd.expect.remainderTo
+    )
+      throw Error("The sale or split changed (prices, items, the party fund or recipients moved). Review it again.");
+    // The sale: the fund receives each lot's price (keeping its own coins), one sale line per lot.
+    fund.coins = creditCoins(fund.coins, plan.proceeds);
+    for (const [i, lot] of plan.lots.entries()) {
+      const h = t.holdings.find((x) => x.id === lot.holdingId)!;
+      h.quantity -= lot.quantity;
+      const lineId = `${cmd.id}-sale-${i}`;
+      t.ledger.push({
+        id: lineId,
+        at,
+        purseId: fund.id,
+        shopId: shop.id,
+        summary: `Sold ${lot.quantity} ${h.name} to ${shop.name}`,
+        copper: lot.paid,
+        transactionType: "sale",
+      });
+      const linked = t.stock.find((line) => line.shopId === shop.id && line.commodityId === h.commodityId && h.commodityId);
+      if (linked) {
+        const receipt = recordShopTrade(t, { id: lineId, at, stockId: linked.id, purseId: fund.id, direction: "sell", quantity: lot.quantity, copper: lot.paid });
+        if (receipt) t.ledger[t.ledger.length - 1].trade = { receiptId: receipt.id, leg: "owner" };
+      }
+    }
+    const sold = new Set(t.holdings.filter((h) => h.quantity <= 0).map((h) => h.id));
+    t.holdings = t.holdings.filter((h) => !sold.has(h.id));
+    const loot = (journal as { lootClaims?: { claims: Array<{ holdingId: string }> } }).lootClaims;
+    if (loot?.claims.some((c) => sold.has(c.holdingId))) loot.claims = loot.claims.filter((c) => !sold.has(c.holdingId));
+    // The split, exactly as Split coins pays from a party fund.
+    applyFundSplit(t, plan.split, cmd.id, at, projected);
+    const settings = (journal.coinSplit ??= {});
+    if (plan.split.rotation) settings.rotation = { lastPurseId: plan.split.rotation };
+    if (!Object.keys(settings).length) delete journal.coinSplit;
+    const name = (purseId: string) => t.purses.find((p) => p.id === purseId)?.name ?? "an account";
+    const items = plan.lots.length === 1 ? lotLabel(plan.lots[0]!) : `${plan.lots.length} items`;
+    event(
+      `Sold ${items} to ${shop.name} and split ${formatCopper(plan.proceeds)} from ${fund.name} among ${plan.split.n}`,
+      "management",
+      fund.id,
+    );
+    const receipt = journal.events[journal.events.length - 1]!;
+    receipt.split = {
+      id: cmd.id,
+      sourceId: fund.id,
+      copper: plan.split.copper,
+      share: plan.split.share,
+      n: plan.split.n,
+      remainder: plan.split.remainder,
+      remainderTo: plan.split.remainderTo,
+      rule: plan.split.rule,
+      recipientIds: plan.split.recipientIds,
+    };
+    if (plan.split.npc) receipt.dmOnly = true;
+    const leftover = remainderText(plan.split, name);
+    const names = plan.split.recipientIds.map(name);
+    const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+    // Party chat reaches players who can't read the fund (or are away): no item or shop names.
+    const count = plan.lots.reduce((sum, l) => sum + l.quantity, 0);
+    const head = `${fund.name} sold ${count} item${count === 1 ? "" : "s"} for ${formatCopper(plan.proceeds)} and split it:`;
+    const full = [`${head} ${formatCopper(plan.split.share)} each to ${list}.`, leftover].filter(Boolean).join(" ");
+    const text =
+      full.length <= 500
+        ? full
+        : [`${head} ${formatCopper(plan.split.share)} each to ${plan.split.n} characters.`, leftover].filter(Boolean).join(" ").slice(0, 500);
+    const npcId = plan.split.recipientIds.find((purseId) => {
+      const p = t.purses.find((p) => p.id === purseId);
+      return p?.kind === "character" && (p.control === "npc" || !!journal.world?.npcs.some((n) => n.id === p.id));
+    });
+    t.notes.push({
+      id: cmd.id + "-note",
+      at,
+      from: seat.role,
+      to: plan.split.npc ? "dm" : "party",
+      purseId: plan.split.npc && npcId ? npcId : fund.id,
       text,
     });
   } else if (cmd.kind === "loan") {

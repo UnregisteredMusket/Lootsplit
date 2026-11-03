@@ -85,7 +85,16 @@ export function usePoolCount(): number {
 }
 
 /** Party → Treasure pool. */
-export function TreasurePool({ onAddLoot, onAddFund }: { onAddLoot?: () => void; onAddFund?: () => void }) {
+export function TreasurePool({
+  onAddLoot,
+  onAddFund,
+  onSellSplit,
+}: {
+  onAddLoot?: () => void;
+  onAddFund?: () => void;
+  /** Sell and split (loot phase 4): sell pool or fund items at one open shop and split the proceeds. */
+  onSellSplit?: () => void;
+}) {
   const t = useLootTable();
   const seat = useSeat();
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
@@ -190,6 +199,11 @@ export function TreasurePool({ onAddLoot, onAddFund }: { onAddLoot?: () => void;
                   {onAddLoot && (
                     <Button variant="secondary" onClick={onAddLoot}>
                       Add loot
+                    </Button>
+                  )}
+                  {onSellSplit && lots.length > 0 && (
+                    <Button variant="secondary" onClick={onSellSplit}>
+                      Sell &amp; split…
                     </Button>
                   )}
                 </div>

@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { selectSessionLedgerRows, type Journal } from "@/lib/quire/journal";
-import { splitActivity, type SplitActivity } from "@/lib/quire/split-activity";
+import { saleSplitId, splitActivity, type SplitActivity } from "@/lib/quire/split-activity";
 import { lootActivity, type LootActivity } from "@/lib/quire/loot-activity";
 import {
   readArchiveResult,
@@ -293,7 +293,10 @@ export function CampaignJournal({
     ...ledger
       .filter(
         (x) =>
-          !x.split && x.loot?.role !== "award" && (dm || seat.purseIds.includes(x.purseId)),
+          !x.split &&
+          x.loot?.role !== "award" &&
+          !(saleSplitId(x) && splits.some((row) => row.lines.includes(x))) &&
+          (dm || seat.purseIds.includes(x.purseId)),
       )
       .map((x) => ({ ...x, kind: "transaction" })),
     ...journal.events.filter(

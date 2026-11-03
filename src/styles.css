@@ -4335,6 +4335,7 @@ input,select,textarea { max-width: 100%; }
 .coin-split-check { display: flex; align-items: center; gap: .6rem; min-height: 44px; font-size: .9rem; border-bottom: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent); }
 .coin-split-check:last-child { border-bottom: 0; }
 .coin-split-check input { width: 1.15rem; height: 1.15rem; accent-color: var(--color-lead); flex-shrink: 0; }
+.coin-split-check input.sale-split-qty { width: 4.5rem; height: auto; min-height: 44px; }
 .coin-split-who { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .coin-split-who small { display: block; color: var(--color-muted); font-size: .75rem; line-height: 1.25; }
 .coin-split-subgroup { display: flex; align-items: center; gap: .5rem; margin: .6rem 0 0; font-size: .78rem; font-weight: 600; color: var(--color-muted); letter-spacing: .06em; text-transform: uppercase; }
