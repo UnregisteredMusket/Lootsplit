@@ -258,6 +258,14 @@ type EconomyApi = {
     input: Omit<Extract<CommandRequest, { kind: "coin-split" }>, "kind" | "id">,
     options?: CommandOptions,
   ) => Promise<string | null>;
+  /**
+   * Sell and split (one atomic `sale-split` command): sell party-fund items at one open shop and
+   * split the proceeds evenly. Resolves to null once accepted, or to the refusal text.
+   */
+  sellAndSplit: (
+    input: Omit<Extract<CommandRequest, { kind: "sale-split" }>, "kind" | "id">,
+    options?: CommandOptions,
+  ) => Promise<string | null>;
   listings: Listing[];
   loans: LoanAsk[];
   addListing: (input: {
@@ -999,6 +1007,32 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
                 }
                 return ok;
               });
+      },
+      sellAndSplit: async (input, options = {}) => {
+        const command = { kind: "sale-split" as const, ...input, ...idOf(options) };
+        try {
+          const joined = getCloudWatch().joined;
+          if (joined) {
+            await queueCommand(command);
+            await reload();
+            announceWorkspaceChange();
+          } else {
+            if (getSeat().role === "player")
+              throw Error("Sell and split isn't available on a player link. Ask the DM, or sell one item at a shop.");
+            await acceptCommand(command);
+          }
+          const pending = joined && hasPendingChanges();
+          if (!pending) void playSound("coins");
+          toast.success(
+            pending
+              ? "Sale and split saved as pending. Check sync status."
+              : "Sold and split. It appears once in Activity and the party chat.",
+          );
+          return null;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          return error instanceof Error && error.message ? error.message : "Nothing was sold or split.";
+        }
       },
       split: async (input, options = {}) => {
         const command = { kind: "coin-split" as const, ...input, ...idOf(options) };

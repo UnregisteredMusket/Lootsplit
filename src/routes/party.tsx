@@ -35,6 +35,7 @@ import { Button, Checkbox, Field, Modal, Segmented, TextInput } from "@/componen
 import { Disclosure } from "@/components/disclosure";
 import { FeatureHeader } from "@/components/feature-header";
 import { RemoveButton } from "@/components/quire-ui";
+import { SellAndSplit } from "@/components/sell-and-split";
 import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
 import { FairnessLedger } from "@/components/fairness-ledger";
@@ -242,6 +243,14 @@ function PartyPage() {
                   }
             }
             onAddFund={() => void economy.createPurse("party")}
+            onSellSplit={
+              canSplit
+                ? () => {
+                    setSection("funds");
+                    setAction("sell-split");
+                  }
+                : undefined
+            }
           />
         )}
       </div>
@@ -421,6 +430,9 @@ function PartyPage() {
                   setSplitSource("");
                   setAction("split");
                 }}
+                onSellSplit={
+                  canSplit && visible.some((p) => p.kind === "party") ? () => setAction("sell-split") : undefined
+                }
               />
             ) : null}
             <PartyInventory
@@ -568,6 +580,15 @@ function PartyPage() {
                     Split coins
                   </Button>
                 ) : null}
+                {canSplit ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setAction("sell-split")}
+                    disabled={!visible.some((p) => p.kind === "party")}
+                  >
+                    Sell &amp; split
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   onClick={() => setAction("pay")}
@@ -593,10 +614,17 @@ function PartyPage() {
                     ? "Give to a player"
                     : action === "split"
                       ? "Split coins"
-                      : "Record a payment"
+                      : action === "sell-split"
+                        ? "Sell & split"
+                        : "Record a payment"
               }
             >
-              {action === "split" ? (
+              {action === "sell-split" ? (
+                <SellAndSplit
+                  funds={visible.filter((p) => p.kind === "party")}
+                  onDone={() => setAction("")}
+                />
+              ) : action === "split" ? (
                 <SplitCoins
                   sources={visible}
                   initialSourceId={splitSource}
@@ -633,11 +661,13 @@ function PurseStrip({
   canSplit,
   onGive,
   onSplit,
+  onSellSplit,
 }: {
   purses: Purse[];
   canSplit: boolean;
   onGive: () => void;
   onSplit: () => void;
+  onSellSplit?: () => void;
 }) {
   const units: Array<[keyof Coins, string]> = [
     ["pp", "platinum"],
@@ -667,6 +697,11 @@ function PurseStrip({
         {canSplit ? (
           <Button variant="secondary" onClick={onSplit} disabled={!purses.some((p) => toCopper(p.coins))}>
             Split
+          </Button>
+        ) : null}
+        {onSellSplit ? (
+          <Button variant="secondary" onClick={onSellSplit}>
+            Sell &amp; split
           </Button>
         ) : null}
       </span>
