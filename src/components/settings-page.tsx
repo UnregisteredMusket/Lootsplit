@@ -18,6 +18,7 @@ import { useLibrary } from "@/lib/quire/library";
 import { CATEGORIES, RARITIES, WEALTHS } from "@/lib/quire/labels";
 import { usePrefs, useShowDollars, type AppPrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
+import { MarkupDisplaySetting } from "@/components/black-market";
 import { APP_VERSION } from "@/lib/quire/version";
 import { basketNote, DEFAULT_REALM, realmNote, scalePrice, SEASON_NAMES } from "@/lib/quire/scale";
 import { DEFAULT_ACCENT, DEFAULT_GROUND, FANTASY_LOOKS, LOOKS, luminance } from "@/lib/quire/theme";
@@ -253,6 +254,10 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
             <Button className="mt-2" variant="secondary" onClick={() => void setRealm(draftRef.current, { reprice: true })}>
               Reprice open shops now
             </Button>
+          </Fold>
+
+          <Fold anchorId="black-market-markup" title="Black-market markup" hint="Descriptions or percentages for players.">
+            <MarkupDisplaySetting />
           </Fold>
 
           <Fold title="Defaults for the next shop" hint="Wealth, stock, and prices used when you create a shop.">

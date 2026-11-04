@@ -160,7 +160,7 @@ test("the negotiator is the paying character, with the same Charisma rule the co
   assert.deepEqual(breakdownLines(b), ["List price: 100 cp", "Aria negotiates: Charisma 16, 6% off: −6 cp", "Total: 94 cp (9 sp, 4 cp)"]);
 });
 
-test("players see DM-only factors folded into Other adjustments, never their detail", () => {
+test("players see DM-only factors folded into Other adjustments, never their detail; the black-market markup as a description", () => {
   const shop = { sellRate: 1.1, blackMarket: true, blackMarketPremium: 2 };
   const derivation = listPriceDerivation(
     { wealth: "rich", priceScale: 1, category: "smith" },
@@ -170,13 +170,14 @@ test("players see DM-only factors folded into Other adjustments, never their det
   assert.ok(derivation);
   const b = shopBuyBreakdown(shop, 1000, 14, 2, { listDerivation: derivation });
   const dmText = JSON.stringify(viewerBreakdown(b, true));
-  assert.match(dmText, /Black-market premium/);
+  assert.match(dmText, /Black-market markup \+100% \(players see \\"Steep\\"\)/);
   assert.match(dmText, /War/);
   const player = viewerBreakdown(b, false);
   const text = JSON.stringify(player) + breakdownLines(player).join("\n");
-  assert.doesNotMatch(text, /Black-market|premium|War|wealth|Rarity|\+100%|200/);
+  // Owner, 2026-11-04: players see the black-market markup, by default as a description only.
+  assert.doesNotMatch(text, /premium|War|wealth|Rarity|\+100%|200/);
   assert.equal(player.listDerivation, undefined);
-  assert.deepEqual(player.factors.map((f) => f.label), ["Shop sells at 110%", "Other adjustments", "Charisma 14, 4% off"]);
+  assert.deepEqual(player.factors.map((f) => f.label), ["Shop sells at 110%", "Black-market markup: Steep", "Charisma 14, 4% off"]);
   assert.equal(player.total, b.total);
   // Barter: a player's quote has no valuation, so the whole amount is "private valuation", and
   // a player's view of it names no figure but the amount itself.

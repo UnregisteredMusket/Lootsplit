@@ -161,8 +161,16 @@ export const XP_PROTOCOL = 21;
  * website.
  */
 export const ITEM_IDENTITY_PROTOCOL = 24;
+/**
+ * Protocol 25 (2026-11-04, black-market markup labels): the DM may send `black-market-markup`,
+ * and the journal may carry `blackMarketMarkup` ("percentages"; missing means descriptions). The
+ * top-level journal schema is not strict, so every protocol receives the table unchanged (older
+ * clients drop the key); their whole-journal writes keep the stored value (journal.ts). Drafts
+ * with the new command ask them to finish on the updated website.
+ */
+export const MARKET_MARKUP_PROTOCOL = 25;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = ITEM_IDENTITY_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = MARKET_MARKUP_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1295,12 +1303,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= ITEM_IDENTITY_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= MARKET_MARKUP_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 25: the black-market markup display setting.
+      if (c.kind === "black-market-markup") return true;
+      if (protocol && protocol >= ITEM_IDENTITY_PROTOCOL) return false;
       // Protocol 24: item identification commands.
       if (c.kind === "item-identify" || c.kind === "item-unidentify") return true;
       if (protocol && protocol >= XP_PROTOCOL) return false;

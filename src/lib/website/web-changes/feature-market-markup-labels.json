@@ -1,0 +1,9 @@
+{
+  "title": "Black-market markup players can read",
+  "summary": "Players now see how steep a black-market vendor's prices are: a description from Fair Deal through Slightly Above Average, Pricey and Steep to Highway Robbery, on the shop card and in Why this price?.",
+  "items": [
+    "The DM can show players the exact percent instead, beside the Black market toggle or in Economic rules.",
+    "The DM always sees the percent and which description players get, and the vendor rules preview it while the premium is edited.",
+    "Prices themselves are unchanged."
+  ]
+}

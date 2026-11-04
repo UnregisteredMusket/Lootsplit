@@ -383,7 +383,7 @@ test("the sage's Identify reveals an unidentified item in the approval, logged o
 
 test("protocol 24: older apps finish identification drafts on the website; every protocol gets the presented item", () => {
   assert.equal(ITEM_IDENTITY_PROTOCOL, 24);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, ITEM_IDENTITY_PROTOCOL);
+  assert.ok(CURRENT_TABLETOP_PROTOCOL >= ITEM_IDENTITY_PROTOCOL);
   const table = projectRecord(campaign(), ariaSeat);
   const draft = JSON.stringify([{ id: "d", kind: "item-identify", holdingId: "wand", before: { name: "Carved stick" } }]);
   assert.throws(() => tabletopResponse({ table, draft }, 19), /updated Lootsplitter client/);

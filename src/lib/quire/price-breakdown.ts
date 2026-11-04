@@ -13,6 +13,7 @@ import { scaleFactors } from "./scale.ts";
 import { charismaScore } from "./sheet.ts";
 import { offListPercent, onBuyList, stockCategory } from "./merchant.ts";
 import { forSale } from "./item-identity.ts";
+import { blackMarketPremium, markupTier, type MarkupDisplay } from "./market-markup.ts";
 import type { CharacterSheet } from "./sheet.ts";
 import type { ItemCategory, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
 
@@ -26,6 +27,11 @@ export type PriceFactor = {
   percent?: number;
   /** DM-only detail: players see it folded into "Other adjustments". */
   dmOnly?: boolean;
+  /**
+   * What players see in place of `label` and `percent` (black-market markup, market-markup.ts):
+   * a description without a percent, or the percent alone. The copper is unchanged.
+   */
+  player?: { label: string; percent?: number };
 };
 
 export type Negotiator = { name: string; cha: number | null; percent: number; party: boolean };
@@ -133,7 +139,12 @@ export function shopBuyBreakdown(
   copper: number,
   cha: number | null,
   quantity = 1,
-  options: { negotiator?: Negotiator; listDerivation?: PriceFactor[] } = {},
+  options: {
+    negotiator?: Negotiator;
+    listDerivation?: PriceFactor[];
+    /** How players see the black-market markup (the campaign setting; missing = descriptions). */
+    markup?: MarkupDisplay;
+  } = {},
 ): PriceBreakdown {
   const asking = shopAsking(shop, copper);
   const unit = priceAfterCharisma(asking, cha);
@@ -142,8 +153,21 @@ export function shopBuyBreakdown(
   if (shop.sellRate !== 1)
     factors.push({ key: "markup", label: `Shop sells at ${Math.round(shop.sellRate * 1000) / 10}%`, percent: pct(shop.sellRate), copper: marked - copper });
   if (shop.blackMarket) {
-    const premium = shop.blackMarketPremium ?? 1.5;
-    factors.push({ key: "black-market", label: "Black-market premium", percent: pct(premium), copper: asking - marked, dmOnly: true });
+    // Players see the markup (owner, 2026-11-04): as a description or as the percent, by the
+    // DM's setting. The DM's label always carries the percent and what players are shown.
+    const premium = blackMarketPremium(shop);
+    const percent = pct(premium),
+      tier = markupTier(premium),
+      percents = options.markup === "percentages";
+    factors.push({
+      key: "black-market",
+      label: `Black-market markup +${percent}% (players see ${percents ? "the percent" : `"${tier}"`})`,
+      percent,
+      copper: asking - marked,
+      player: percents
+        ? { label: `Black-market markup +${percent}%`, percent }
+        : { label: `Black-market markup: ${tier}` },
+    });
   } else if (asking !== marked) factors.push({ key: "rounding", label: "Rounded to whole copper", copper: asking - marked });
   const c = charismaFactor(asking, cha, options.negotiator?.name);
   if (c) factors.push(c);
@@ -280,12 +304,22 @@ export function barterSweetenBreakdown(
 }
 
 /**
- * What a player may see: DM-only factors (black-market premium, list-price rates, an NPC's
- * valuation) fold into one "Other adjustments" line without their detail. Totals are unchanged.
+ * What a player may see: DM-only factors (list-price rates, an NPC's valuation) fold into one
+ * "Other adjustments" line without their detail; a factor with a player form (black-market
+ * markup) shows that form. Totals are unchanged.
  */
 export function viewerBreakdown(b: PriceBreakdown, dm: boolean): PriceBreakdown {
   if (dm) return b;
-  const { listDerivation: _derivation, playerBase, ...rest } = b;
+  const { listDerivation: _derivation, playerBase, ...shown } = b;
+  // Factors with a player form (black-market markup) show it, without the DM's wording.
+  const rest = {
+    ...shown,
+    factors: shown.factors.map((f) => {
+      if (!f.player) return f;
+      const { player, percent: _percent, ...plain } = f;
+      return { ...plain, label: player.label, ...(player.percent !== undefined ? { percent: player.percent } : {}) };
+    }),
+  };
   const base = playerBase ? { label: playerBase, copper: 0 } : b.base;
   const hiddenBase = playerBase ? b.base.copper : 0;
   const hidden = b.factors.filter((f) => f.dmOnly);
@@ -299,7 +333,7 @@ export function viewerBreakdown(b: PriceBreakdown, dm: boolean): PriceBreakdown 
     if (other) factors.push({ key: "other", label: "Other adjustments", copper: other });
   };
   if (hiddenBase) fold();
-  for (const f of b.factors) {
+  for (const f of rest.factors) {
     if (!f.dmOnly) factors.push(f);
     else fold();
   }

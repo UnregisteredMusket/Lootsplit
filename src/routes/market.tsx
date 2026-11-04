@@ -13,6 +13,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Search, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
+import { blackMarketPremium, markupDisplay, shopMarkupNote } from "@/lib/quire/market-markup";
 import { CATEGORIES } from "@/lib/quire/labels";
 import { usePrefs } from "@/lib/quire/prefs";
 import { pressureFor } from "@/lib/quire/scale";
@@ -276,7 +277,9 @@ function MarketPage() {
                     {shop.name}
                   </span>
                   <span className="text-sm text-muted">
-                    {shop.blackMarket ? "Black market · " : ""}
+                    {shop.blackMarket
+                      ? `Black market (${shopMarkupNote(blackMarketPremium(shop), markupDisplay(journal), seat.role === "dm")}) · `
+                      : ""}
                     {shop.closed ? "Closed" : "Open"} · {labelKind(shop.category)} · {lines.length}{" "}
                     stock lines · {tier}
                   </span>
