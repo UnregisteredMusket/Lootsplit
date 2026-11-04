@@ -33,4 +33,4 @@
 .price-why-note, .price-why-dm { display: block; margin-top: 0.3rem; color: var(--color-muted); overflow-wrap: anywhere; }
 .price-why-dm { font-size: 0.75rem; }
 .npc-talk-why { padding: 0 1rem; min-width: 0; }
-@media (max-width: 480px) { .npc-talk-why { padding: 0 .45rem; } }
+@media (max-width: 430px) { .npc-talk-why { padding: 0 .45rem; } }
