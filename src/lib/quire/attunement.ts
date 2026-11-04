@@ -239,7 +239,8 @@ export function settleAttunement(
                 : null;
     if (!why) continue;
     delete h.attuned;
-    ended(was.purseId, h.id, was.name, why);
+    // Named as it is now: unidentifying an attuned item must not print its true name here.
+    ended(was.purseId, h.id, presentedHolding(h).name, why);
   }
   for (const [holdingId, was] of before)
     if (!present.has(holdingId)) ended(was.purseId, holdingId, was.name, "left the character");

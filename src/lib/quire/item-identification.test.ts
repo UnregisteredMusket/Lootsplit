@@ -730,3 +730,15 @@ test("session recap: the player's recap and the DM's shareable draft name items 
   assert.match(draft, /Carved stick/);
   assert.match(mine, /Carved stick/);
 });
+
+test("unidentifying an attuned item ends the attunement under the presented name only", () => {
+  let t = campaign();
+  t.holdings.push({ id: "amulet", purseId: "aria", name: "Amulet of Proof", kind: "item", quantity: 1, unitCopper: 50_000, notes: "", requiresAttunement: "Requires attunement", attuned: true } as (typeof t.holdings)[number]);
+  t = applyCommand(t, dmSeat, { id: "mark-amulet", kind: "item-unidentify", holdingId: "amulet", before: null, unidentified: { name: "Dull pendant" } });
+  const amulet = t.holdings.find((h) => h.id === "amulet")!;
+  assert.equal(amulet.attuned, undefined, "no presented requirement, so the attunement ends");
+  const ended = t.journal!.events.filter((e) => e.summary.startsWith("Attunement ended"));
+  assert.equal(ended.length, 1);
+  assert.match(ended[0]!.summary, /Dull pendant/);
+  assert.ok(!JSON.stringify(projectRecord(t, ariaSeat)).includes("Amulet of Proof"), "the holder's view never names the true item");
+});
