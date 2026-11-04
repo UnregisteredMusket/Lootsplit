@@ -42,6 +42,7 @@ import {
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { attunementFromNotes, attunementKinds, attunementProblem } from "./attunement.ts";
+import { usesProblem } from "./item-uses.ts";
 import { assertPoolable } from "./loot-claims.ts";
 import {
   coinsSchema,
@@ -876,6 +877,8 @@ export async function saveHolding(input: Holding): Promise<void> {
     holding.unitCopper < 0
   )
     throw new Error("Enter a valid quantity and value.");
+  const usesError = usesProblem(holding);
+  if (usesError) throw new Error(usesError);
   const db = await quireDb();
   await atomic(["holdings", "meta", "purses"], async (tx) => {
     const old = await request<Holding | undefined>(tx.objectStore("holdings").get(holding.id));
@@ -2916,6 +2919,10 @@ export async function executeLocalCommand(
     // reach the DM's campaign. The DM marks it on their device (or the party plays shared).
     if (seat.role !== "dm" && attunementKinds.has(command.kind))
       throw Error("Attunement is tracked on the DM's device or in a shared room. Ask the DM to mark it.");
+    // Charges: the player link holds a copy of part of the party, so a use there would never
+    // reach the DM's campaign. The DM marks uses on their device (or the party plays shared).
+    if (seat.role !== "dm" && (command.kind === "item-use" || command.kind === "item-recharge"))
+      throw Error("Item uses are tracked on the DM's device or in a shared room. Ask the DM to mark the use.");
     const next = applyCommand(source, seat, command, {
       source: "local",
       random: randomTradeRoll,

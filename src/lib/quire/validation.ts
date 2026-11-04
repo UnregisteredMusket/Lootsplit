@@ -19,6 +19,7 @@ import {
   purseAttunementProblem,
   requiresAttunementSchema,
 } from "./attunement.ts";
+import { holdingUsesSchema, usesProblem } from "./item-uses.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z
@@ -61,6 +62,7 @@ export const holdingSchema = z.object({
   pool: lootPoolMarkerSchema.optional(),
   requiresAttunement: requiresAttunementSchema.optional(),
   attuned: z.literal(true).optional(),
+  uses: holdingUsesSchema.optional(),
 });
 
 const shop = z.object({
@@ -145,7 +147,7 @@ export function validateEconomyRows(value: {
       throw Error("A deed must belong to its property owner. The current campaign was not changed.");
     if (key === "holdings")
       for (const holding of rows as import("./types.ts").Holding[]) {
-        const problem = attunementProblem(holding);
+        const problem = usesProblem(holding) ?? attunementProblem(holding);
         if (problem) throw Error(`${holding.name}: ${problem} The current campaign was not changed.`);
       }
     if (key === "purses")

@@ -11,13 +11,14 @@ import { readFilters, writeFilters } from "@/lib/quire/campaign-filters";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getCloudTable } from "@/lib/quire/cloud-client";
+import { MAX_USES, usesLabel, type HoldingUses } from "@/lib/quire/item-uses";
 import { useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppLink } from "./app-link";
 import { LedgerArt } from "./ledger-art";
 import { RecordRow, type RecordMenuItem } from "./record-row";
 import { Button, Field, Modal, Segmented, Switch, TextInput } from "./ui";
-import { getCloudTable } from "@/lib/quire/cloud-client";
 import { attunedCount, attunementLimit } from "@/lib/quire/attunement";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { holdingRecordId } from "@/lib/quire/finance-record-links";
@@ -123,10 +124,15 @@ export function PartyInventory({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Holding | null>(null);
   const [selling, setSelling] = useState<Holding | null>(null);
+  const [recharging, setRecharging] = useState<Holding | null>(null);
   const [giving, setGiving] = useState<string[] | null>(null);
-  // Attunement: a player-only device link holds a copy of part of the party, so attunement is
-  // marked on the DM's device or in a shared room. One command ID per action, reused on retry.
-  const attuneHere = dm || getCloudTable().joined;
+  // Charges: a player-only device link holds a copy of part of the party, so uses are marked on
+  // the DM's device or in a shared room. One command ID per Use, reused if the same Use is retried.
+  const usesHere = dm || getCloudTable().joined;
+  const useIds = useRef(new Map<string, string>());
+  // Attunement: likewise marked on the DM's device or in a shared room (a player link's copy
+  // never reaches the DM). One command ID per action, reused on retry.
+  const attuneHere = usesHere;
   const attuneIds = useRef(new Map<string, string>());
   const [busy, setBusy] = useState(false);
   const [interrupted, setInterrupted] = useState<BulkRun | null>(null);
@@ -317,6 +323,31 @@ export function PartyInventory({
     if (yes) await execute(newRun("remove", ok));
   }
 
+  async function spendUse(h: Holding) {
+    const uses = h.uses;
+    if (!uses || busy) return;
+    if (uses.current === 1 && uses.whenEmpty === "remove") {
+      const yes = await requestConfirm({
+        title: `Use the last of ${h.name}?`,
+        body:
+          h.quantity > 1
+            ? `One ${h.name} is used up and removed; ${h.quantity - 1} left, the next with ${uses.max} of ${uses.max} uses.`
+            : `${h.name} is used up and removed from the inventory.`,
+        confirmLabel: "Use",
+      });
+      if (!yes) return;
+    }
+    const key = JSON.stringify([h.id, uses.current, h.quantity]);
+    const commandId = useIds.current.get(key) ?? newCommandId();
+    useIds.current.set(key, commandId);
+    setBusy(true);
+    try {
+      if (await economy.spendItemUse(h, { commandId })) useIds.current.delete(key);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function changeAttunement(h: Holding, attuned: boolean) {
     if (busy) return;
     const holder = economy.purses.find((p) => p.id === h.purseId);
@@ -370,6 +401,16 @@ export function PartyInventory({
     if (manage) items.push({ label: "Edit", onSelect: () => setEditing(h) });
     const attune = attunementItem(h);
     if (attune) items.push(attune);
+    if (h.uses && usesHere && (dm || (canGive(h) && !h.pool)))
+      items.push({
+        label: "Use",
+        onSelect: () => void spendUse(h),
+        disabledReason:
+          ((h.custody || h.reservedFor) && "Stored at a property") ||
+          (h.uses.current === 0 && "No uses left") ||
+          undefined,
+      });
+    if (h.uses && dm) items.push({ label: "Recharge", onSelect: () => setRecharging(h) });
     if (canGive(h))
       items.push({
         label: "Give",
@@ -411,6 +452,7 @@ export function PartyInventory({
             Requires attunement
           </span>
         ) : null}
+        {h.uses ? <span className="record-chip">{usesLabel(h.uses)}</span> : null}
         {h.pool ? <span className="record-chip">In the pool</span> : null}
         {h.custody ? (
           <span className="record-chip">{h.custody.kind === "transit" ? "In transit" : "Stored"}</span>
@@ -698,6 +740,10 @@ export function PartyInventory({
         </p>
       ) : null}
       <EditHolding holding={editing} onClose={() => setEditing(null)} />
+      <RechargeHolding
+        holding={recharging ? (holdings.find((h) => h.id === recharging.id) ?? null) : null}
+        onClose={() => setRecharging(null)}
+      />
       <SellPicker holding={selling} onClose={() => setSelling(null)} />
       <BulkGive
         ids={giving}
@@ -810,6 +856,10 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
+  const [tracked, setTracked] = useState(false);
+  const [maxUses, setMaxUses] = useState("");
+  const [startUses, setStartUses] = useState("");
+  const [whenEmpty, setWhenEmpty] = useState<HoldingUses["whenEmpty"]>("remove");
   // Attunement (loot phase 5): whether the item requires it, and the requirement's text.
   const [requires, setRequires] = useState(false);
   const [requirement, setRequirement] = useState("");
@@ -820,10 +870,29 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
     setName(holding.name);
     setCategory(holding.category || inventoryCategory(holding, catalog));
     setNotes(holding.notes);
+    setTracked(!!holding.uses);
+    setMaxUses(holding.uses ? String(holding.uses.max) : "1");
+    setStartUses("");
+    setWhenEmpty(holding.uses?.whenEmpty ?? "remove");
     setRequires(!!holding.requiresAttunement);
     setRequirement(holding.requiresAttunement ?? "Requires attunement");
     setError("");
   }, [holding, catalog]);
+  const wholeUses = (text: string, min: number) => {
+    const n = Number(text);
+    return text.trim() !== "" && Number.isInteger(n) && n >= min && n <= MAX_USES ? n : null;
+  };
+  // Charges (loot phase 5): uses left change only through Use and Recharge, which leave a receipt.
+  // Turning tracking on starts the current item at "Uses left" (full unless set); lowering the
+  // maximum lowers uses left with it.
+  function nextUses(h: Holding): HoldingUses | undefined | string {
+    if (!tracked || h.kind !== "item") return undefined;
+    const max = wholeUses(maxUses, 1);
+    if (max === null) return `Enter maximum uses from 1 to ${MAX_USES}.`;
+    const start = startUses.trim() === "" ? max : wholeUses(startUses, 0);
+    if (!h.uses && (start === null || start > max)) return `Enter uses left from 0 to ${max}.`;
+    return { current: h.uses ? Math.min(h.uses.current, max) : start!, max, whenEmpty };
+  }
   return (
     <Modal
       open={holding !== null}
@@ -840,6 +909,11 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
               setError("Enter a name.");
               return;
             }
+            const uses = nextUses(holding);
+            if (typeof uses === "string") {
+              setError(uses);
+              return;
+            }
             setSaving(true);
             setError("");
             try {
@@ -847,6 +921,8 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
               const trimmed = category.trim();
               if (trimmed && trimmed !== holding.kind) next.category = trimmed;
               else if (!trimmed) delete next.category;
+              if (uses) next.uses = uses;
+              else delete next.uses;
               if (requires && holding.kind === "item")
                 next.requiresAttunement = requirement.trim().slice(0, 200) || "Requires attunement";
               else delete next.requiresAttunement;
@@ -911,6 +987,58 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
               </>
             )
           ) : null}
+          {holding.kind === "item" ? (
+            <fieldset className="flex flex-col gap-3 rounded-sm border border-border p-3">
+              <legend className="px-1 text-sm font-medium">Charges or uses</legend>
+              <Switch
+                checked={tracked}
+                onChange={setTracked}
+                label="Track uses"
+                hint="For wands, potions, scrolls and kits: Use spends one, Recharge refills."
+              />
+              {tracked ? (
+                <>
+                  <Field label="Maximum uses" hint={`Whole number, 1 to ${MAX_USES}, for each item.`}>
+                    <TextInput
+                      aria-label={`Maximum uses for ${holding.name}`}
+                      inputMode="numeric"
+                      value={maxUses}
+                      onChange={(e) => setMaxUses(e.target.value)}
+                    />
+                  </Field>
+                  {holding.uses ? (
+                    <p className="text-sm text-muted">
+                      Uses left: {holding.uses.current} of {holding.uses.max}. Change them with
+                      Recharge, so the change has a receipt.
+                    </p>
+                  ) : (
+                    <Field label="Uses left now" hint="Leave empty to start full.">
+                      <TextInput
+                        aria-label={`Uses left for ${holding.name}`}
+                        inputMode="numeric"
+                        value={startUses}
+                        onChange={(e) => setStartUses(e.target.value)}
+                      />
+                    </Field>
+                  )}
+                  <Segmented
+                    label="When the last use is spent"
+                    value={whenEmpty}
+                    onChange={setWhenEmpty}
+                    options={[
+                      { value: "remove", label: "Remove the item" },
+                      { value: "keep", label: "Keep it at 0" },
+                    ]}
+                  />
+                  <p className="text-sm text-muted">
+                    {whenEmpty === "remove"
+                      ? "A consumable: the last use removes it (one of a stack; the next starts full)."
+                      : "Rechargeable: it stays at 0 uses until you recharge it."}
+                  </p>
+                </>
+              ) : null}
+            </fieldset>
+          ) : null}
           <p className="text-sm text-muted">
             Quantity and value change through Give, Sell, the treasure pool or the character sheet,
             so every change has a receipt.
@@ -923,6 +1051,88 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
           <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={saving}>
               {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : null}
+    </Modal>
+  );
+}
+
+/** DM: set an item's uses left (0 to max) through `item-recharge`, one command ID per dialog. */
+function RechargeHolding({ holding, onClose }: { holding: Holding | null; onClose: () => void }) {
+  const { rechargeItem } = useEconomy();
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const commandId = useRef("");
+  const openId = holding?.id;
+  const max = holding?.uses?.max;
+  useEffect(() => {
+    if (!openId || max === undefined) return;
+    setValue(String(max));
+    setError("");
+    commandId.current = newCommandId();
+  }, [openId, max]);
+  const uses = holding?.uses;
+  return (
+    <Modal
+      open={!!holding && !!uses}
+      onOpenChange={(open) => !open && onClose()}
+      title={holding ? `Recharge ${holding.name}` : "Recharge"}
+    >
+      {holding && uses ? (
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (saving) return;
+            const n = Number(value);
+            if (value.trim() === "" || !Number.isInteger(n) || n < 0 || n > uses.max) {
+              setError(`Enter uses left from 0 to ${uses.max}.`);
+              return;
+            }
+            if (n === uses.current) {
+              setError(`${holding.name} already has ${n} of ${uses.max} uses.`);
+              return;
+            }
+            setSaving(true);
+            setError("");
+            try {
+              if (await rechargeItem(holding, n, { commandId: commandId.current })) onClose();
+              else {
+                // The item may have changed: the next attempt is a new action.
+                commandId.current = newCommandId();
+                setError("Not recharged. Check the item and try again.");
+              }
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          <p className="text-sm">
+            Now {uses.current} of {uses.max} uses
+            {holding.quantity > 1 ? ` on the current item (the other ${holding.quantity - 1} are full)` : ""}.
+          </p>
+          <Field label="Uses left" hint={`0 to ${uses.max}. Activity records the change.`}>
+            <TextInput
+              aria-label={`Uses left for ${holding.name}`}
+              inputMode="numeric"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </Field>
+          {error ? (
+            <p role="alert" className="text-sm">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Recharge"}
             </Button>
             <Button variant="secondary" onClick={onClose}>
               Cancel

@@ -395,6 +395,34 @@ test("offline: the same commands give the same inventory and activity, and a ret
   setSeat(DM_SEAT);
 });
 
+test("an attuned item used up through item-use ends its attunement in the same command, with one event", () => {
+  const t = campaign();
+  Object.assign(find(t, "ring")!, { uses: { current: 1, max: 3, whenEmpty: "remove" } });
+  Object.assign(find(t, "cloak")!, { uses: { current: 1, max: 3, whenEmpty: "keep" } });
+  const attunedT = attuneAll(ariaSeat, ["ring", "cloak"], t);
+  const used = applyCommand(attunedT, ariaSeat, {
+    id: "u1",
+    kind: "item-use",
+    holdingId: "ring",
+    expect: { current: 1, quantity: 1 },
+  });
+  assert.equal(find(used, "ring"), undefined, "used up and removed");
+  const ended = used.journal!.events.filter((e) => e.id.startsWith("u1-"));
+  assert.deepEqual(
+    ended.map((e) => e.summary),
+    [
+      "Used up Ring of protection (Aria Thorne): removed from the inventory",
+      "Attunement ended: Ring of protection (Aria Thorne) left the character; attuned 1/3",
+    ],
+  );
+  assert.equal(ended.filter((e) => e.summary.startsWith("Attunement ended")).length, 1);
+  assert.equal(ended[1]!.purseId, "aria");
+  // Kept at 0 uses: still held, so still attuned.
+  const kept = applyCommand(used, ariaSeat, { id: "u2", kind: "item-use", holdingId: "cloak", expect: { current: 1, quantity: 1 } });
+  assert.equal(find(kept, "cloak")!.attuned, true);
+  assert.equal(kept.journal!.events.some((e) => e.id.startsWith("u2-") && e.summary.startsWith("Attunement ended")), false);
+});
+
 test("a DM patch that also changes the journal still records the attunement it ends", () => {
   const t = attuneAll(ariaSeat, ["ring"]);
   const ring = find(t, "ring")!;

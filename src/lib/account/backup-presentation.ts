@@ -95,6 +95,10 @@ export function pendingCommandDescription(value: unknown): string {
       return `${c.attuned ? `Attune${c.override ? " past the limit" : ""}` : "End attunement"} · item ${c.holdingId}`;
     case "attunement-limit":
       return `Attunement limit ${c.limit ?? "default"} · character ${c.purseId}`;
+    case "item-use":
+      return `Use one charge · item ${c.holdingId}`;
+    case "item-recharge":
+      return `Recharge to ${c.current} uses · item ${c.holdingId}`;
     case "sale-split":
       return `Sell ${c.lots.length} item${c.lots.length === 1 ? "" : "s"} and split ${formatCopper(c.expect.proceeds)} among ${c.recipientIds.length} · from ${c.fundId}`;
     case "post":
