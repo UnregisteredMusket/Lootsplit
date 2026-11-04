@@ -37,6 +37,10 @@ import { estatePreset } from "./estate-catalogue.ts";
 import { readFinance } from "./finance.ts";
 import { blankShop } from "./economy.ts";
 import { fairnessStandings } from "./loot-fairness.ts";
+import { shopSellBreakdown } from "./price-breakdown.ts";
+import { seatView } from "./player-view.ts";
+import { buildSessionRecap, recapText } from "./session-recap.ts";
+import { formatCopper } from "./money.ts";
 import type { Holding, Purse, Shop } from "./types.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
@@ -652,4 +656,77 @@ test("earlier IDs are never told, and only the holding a command took from is li
     assert.equal(seen.holdings.find((h) => h.id === "gv-item")!.unidentified!.ids, undefined);
     assert.ok(!JSON.stringify(seen).includes("vizier-hoard-ring") && !JSON.stringify(seen).includes('"ids"'));
   }
+});
+
+test("price breakdown and merchant purse: an unidentified sale shows and pays only presented factors", () => {
+  const t = campaign();
+  // A jeweller that buys other categories at 50% and has a purse: the true category (jewels) would
+  // be on its list; the presented one (general) is not.
+  t.shops = [{ ...shop, id: "jeweller", name: "Jeweller", category: "jewels", acceptedCategories: ["jewels"], offListPercent: 50, merchantPurse: 100000 }];
+  const ring = t.holdings[0]!;
+  const breakdown = shopSellBreakdown(t.shops[0]!, ring.unitCopper, 1, ring);
+  assert.deepEqual(leaks(breakdown), []);
+  assert.equal(breakdown.base.copper, 2500);
+  assert.ok(breakdown.factors.some((f) => f.key === "off-list"), "judged by the presented category");
+  assert.equal(breakdown.unit, 625);
+  const sold = applyCommand(t, ariaSeat, { id: "sj", kind: "sell", holdingId: "ring", shopId: "jeweller", quantity: 1 });
+  assert.equal(sold.ledger.find((l) => l.id === "sj")!.copper, 625);
+  assert.equal(sold.shops[0]!.merchantPurse, 100000 - 625);
+  // The player's projected shop (affordability per lot) is worked out from presented values too.
+  assert.deepEqual(leaks(projectRecord(t, ariaSeat).shops), []);
+});
+
+test("attunement: events and messages name an unidentified item as presented; the presented requirement applies", () => {
+  let t = campaign();
+  t.holdings[0]!.requiresAttunement = "Requires attunement by a djinni-binder";
+  // No presented requirement: players aren't told it needs attunement, and can't attune it.
+  assert.equal(projectRecord(t, ariaSeat).holdings.find((h) => h.id === "ring")!.requiresAttunement, undefined);
+  assert.throws(() => applyCommand(t, ariaSeat, { id: "at0", kind: "item-attune", holdingId: "ring", attuned: true, expect: { purseId: "aria", attuned: false } }), /doesn't require attunement/);
+  t = applyCommand(t, dmSeat, { id: "mk", kind: "item-unidentify", holdingId: "ring", before: t.holdings[0]!.unidentified!, unidentified: { ...t.holdings[0]!.unidentified!, requiresAttunement: "Requires attunement" } });
+  t = applyCommand(t, ariaSeat, { id: "at1", kind: "item-attune", holdingId: "ring", attuned: true, expect: { purseId: "aria", attuned: false } });
+  assert.equal(t.holdings[0]!.attuned, true);
+  // Giving it away ends the attunement (settleAttunement), named as presented.
+  t = applyCommand(t, ariaSeat, { id: "gv", kind: "give", fromId: "aria", toId: "bram", copper: 0, holdingId: "ring", quantity: 1 });
+  const events = t.journal!.events.filter((e) => /ttune/.test(e.summary));
+  assert.ok(events.length >= 2);
+  assert.deepEqual(leaks(events), []);
+  for (const seat of [ariaSeat, bramSeat]) assert.deepEqual(leaks(projectRecord(t, seat)), []);
+  assert.equal(projectRecord(t, bramSeat).holdings.find((h) => h.id === "gv-item")!.requiresAttunement, "Requires attunement");
+});
+
+test("preview as player (seatView) shows the presented items, exactly as the server sends", async () => {
+  const { dm, aria } = await room();
+  const host = (await roomState(dm)).table;
+  const preview = seatView(host, { purseIds: ["aria"] });
+  assert.deepEqual(leaks(preview), []);
+  assert.equal(preview.holdings.find((h) => h.id === "ring")!.name, "Plain brass ring");
+  const sent = (await roomState(aria)).table;
+  assert.deepEqual(preview.holdings.find((h) => h.id === "ring"), sent.holdings.find((h) => h.id === "ring"));
+});
+
+test("session recap: the player's recap and the DM's shareable draft name items as presented", () => {
+  let t = applyCommand(campaign(), dmSeat, { id: "s1", kind: "session", name: "The Vault", end: false });
+  const session = readJournal(t.journal).sessions[0]!;
+  const at = session.startedAt + 1;
+  // Aria sells her ring; a pool resolution recorded with the true name before the DM marked it.
+  t = applyCommand(t, ariaSeat, { id: "sell-r", kind: "sell", holdingId: "ring", shopId: "marlow", quantity: 1 });
+  const j = readJournal(t.journal);
+  j.events.push({
+    id: "pool-1", at, kind: "management", summary: "Treasure pool resolved",
+    lootResolution: {
+      id: "pool-1", method: "manual",
+      lots: [{ holdingId: "wand", fundId: "hoard", name: WAND.name, poolQuantity: 1, quantity: 1, unitCopper: WAND.copper, tier: "need", claims: [], unmarked: [], rolls: [], kept: 0, awards: [{ purseId: "aria", quantity: 1, choice: "need", holdingId: "wand-a" }] }],
+    },
+  } as never);
+  t.journal = j;
+  const dmText = recapText(buildSessionRecap(t, session, { kind: "dm" }));
+  assert.match(dmText, /Wand of Wonder Prime/, "the DM's own recap names the true item");
+  const draft = recapText(buildSessionRecap(t, session, { kind: "party" }));
+  const mine = recapText(buildSessionRecap(projectRecord(t, ariaSeat), session, { kind: "player", purseIds: ["aria"] }));
+  for (const text of [draft, mine]) {
+    assert.deepEqual(leaks(text), [], text);
+    assert.ok(!text.includes(formatCopper(RING.copper)) && !text.includes(formatCopper(WAND.copper)));
+  }
+  assert.match(draft, /Carved stick/);
+  assert.match(mine, /Carved stick/);
 });

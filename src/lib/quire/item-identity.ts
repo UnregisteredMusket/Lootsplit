@@ -33,6 +33,11 @@ export const unidentifiedSchema = z
     value: z.number().int().nonnegative().max(1e12).optional(),
     /** The inventory category players see (shops buy by it); absent: `NEUTRAL_CATEGORY`. */
     category: z.string().trim().min(1).max(80).optional(),
+    /**
+     * The attunement requirement players see ("Requires attunement"); absent: none shown, and the
+     * item can't be attuned while unidentified (attunement.ts `attunementRequirement`).
+     */
+    requiresAttunement: z.string().trim().min(1).max(200).optional(),
     /** The weight players see; absent: the true weight (a holder can feel it). */
     weight: z.number().min(0).max(9999).optional(),
     /**
@@ -79,7 +84,7 @@ export function isUnidentified<H extends Marked>(h: H | null | undefined): h is 
 export function presentedHolding<H extends Holding>(h: H): H {
   if (!isUnidentified(h)) return h;
   const u = h.unidentified;
-  const { image: _image, commodityId: _commodity, materialKey: _material, valueSource: _source, ...rest } = h;
+  const { image: _image, commodityId: _commodity, materialKey: _material, valueSource: _source, requiresAttunement: _requires, ...rest } = h;
   const shown = {
     ...rest,
     name: u.name,
@@ -90,6 +95,8 @@ export function presentedHolding<H extends Holding>(h: H): H {
     unidentified: presentedRecord(u),
   } as H;
   if (u.weight !== undefined) shown.weight = u.weight;
+  // Attunement: the presented requirement only; whether the holder is attuned (`attuned`) stays.
+  if (u.requiresAttunement !== undefined) shown.requiresAttunement = u.requiresAttunement;
   return shown;
 }
 

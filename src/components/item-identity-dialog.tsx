@@ -20,9 +20,10 @@ export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | nu
   const [value, setValue] = useState("");
   const [category, setCategory] = useState("");
   const [weight, setWeight] = useState("");
+  const [attunement, setAttunement] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const save = useCommandId(`${holding?.id}|${name}|${description}|${value}|${category}|${weight}`);
+  const save = useCommandId(`${holding?.id}|${name}|${description}|${value}|${category}|${weight}|${attunement}`);
   const reveal = useCommandId(`${holding?.id}|reveal`);
   useEffect(() => {
     if (!holding) return;
@@ -31,6 +32,7 @@ export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | nu
     setValue(current?.value === undefined ? "" : formatCopper(current.value));
     setCategory(current?.category ?? "");
     setWeight(current?.weight === undefined ? "" : String(current.weight));
+    setAttunement(current?.requiresAttunement ?? "");
     setError("");
     // Reset the form when another item opens; `current` follows the holding.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,6 +59,8 @@ export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | nu
       ...(copper === undefined ? {} : { value: copper }),
       ...(category.trim() ? { category: category.trim() } : {}),
       ...(pounds === undefined ? {} : { weight: pounds }),
+      ...(attunement.trim() ? { requiresAttunement: attunement.trim() } : {}),
+      // The server's lineage IDs stay with the item (commands.ts keeps them).
     };
   };
   return (
@@ -115,6 +119,9 @@ export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | nu
         </Field>
         <Field label="Category players see (optional)" hint={`Shops buy it by this category. Empty: “${NEUTRAL_CATEGORY}”.`}>
           <TextInput aria-label="Category players see" value={category} maxLength={80} onChange={(e) => setCategory(e.target.value)} placeholder={NEUTRAL_CATEGORY} />
+        </Field>
+        <Field label="Attunement players see (optional)" hint="Such as Requires attunement. Empty: players can't attune it until it is identified.">
+          <TextInput aria-label="Attunement players see" value={attunement} maxLength={200} onChange={(e) => setAttunement(e.target.value)} />
         </Field>
         <Field label="Weight players see (optional)" hint="Empty: the item's own weight, which the holder can feel.">
           <TextInput aria-label="Weight players see" inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} />

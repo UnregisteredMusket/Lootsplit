@@ -19,7 +19,7 @@ import { AppLink } from "./app-link";
 import { LedgerArt } from "./ledger-art";
 import { RecordRow, type RecordMenuItem } from "./record-row";
 import { Button, Field, Modal, Segmented, Switch, TextInput } from "./ui";
-import { attunedCount, attunementLimit } from "@/lib/quire/attunement";
+import { attunedCount, attunementLimit, attunementRequirement } from "@/lib/quire/attunement";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { holdingRecordId } from "@/lib/quire/finance-record-links";
 import { newCommandId } from "@/lib/quire/command-id";
@@ -383,7 +383,7 @@ export function PartyInventory({
   function attunementItem(h: Holding): RecordMenuItem | null {
     if (!attuneHere || !canGive(h)) return null;
     if (h.attuned) return { label: "End attunement", onSelect: () => void changeAttunement(h, false) };
-    if (!h.requiresAttunement || h.kind !== "item") return null;
+    if (!attunementRequirement(h) || h.kind !== "item") return null;
     const holder = economy.purses.find((p) => p.id === h.purseId);
     const count = holder ? attunedCount(economy.holdings, holder.id) : 0,
       limit = attunementLimit(holder);
