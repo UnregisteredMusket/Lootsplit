@@ -41,6 +41,8 @@ import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
 import { FairnessLedger } from "@/components/fairness-ledger";
 import { partyFunds } from "@/lib/quire/coin-split";
 import { PartyGroupsPanel, PlayerGroupCard, SplitPartyButton } from "@/components/party-groups";
+import { XpAward } from "@/components/xp-award";
+import { XpLine } from "@/components/xp-level-up";
 
 export const Route = createFileRoute("/party")({
   validateSearch: (
@@ -106,6 +108,7 @@ function PartyPage() {
   // of the party, so it is not offered there (owner decision, phase 1).
   const canSplit = seat.role === "dm" || cloud.joined;
   const [splitSource, setSplitSource] = useState("");
+  const [xpOpen, setXpOpen] = useState(false);
   const poolCount = usePoolCount();
   // Party sections: the DM's Characters / Funds & inventory, and the treasure pool for everyone.
   // Short, non-wrapping labels (design plan P10) so the pool's count sits inside its own tab.
@@ -273,6 +276,16 @@ function PartyPage() {
           hidden={shownSection !== "characters"}
           tabIndex={0}
         >
+          {economy.ready && visible.some((p) => p.kind === "character") && (
+            <div className="party-xp-bar">
+              <Button variant="secondary" disabled={readOnly} onClick={() => setXpOpen(true)}>
+                Award XP or milestones
+              </Button>
+              <Modal open={xpOpen} onOpenChange={setXpOpen} title="Award XP or milestones">
+                <XpAward onDone={() => setXpOpen(false)} />
+              </Modal>
+            </div>
+          )}
           {visible
             .filter((p) => p.kind === "character")
             .map((p) => {
@@ -315,6 +328,7 @@ function PartyPage() {
                         ? `Level ${live.body.level}${live.body.classes ? ` · ${live.body.classes}` : ""}`
                         : old?.classLevel || "Character"}
                     </p>
+                    <XpLine purse={p} sheets={economy.sheets} />
                     <div className="party-hp">
                       {live?.body.maxHp
                         ? `${live.body.hp} / ${live.body.maxHp} HP`

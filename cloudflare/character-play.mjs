@@ -410,11 +410,16 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       assignmentMutable(target, approval);
       // Approval authorizes the reviewed stats, never account wealth or equipment.
       const existing = campaignBody(room, purse);
+      // XP and milestones are the DM's campaign awards: they stay with the campaign character and
+      // are never imported from a profile.
+      const { xp: _xp, milestoneLevel: _milestone, ...stats } = source;
       p.sheet = statsOnly({
-        ...source,
+        ...stats,
         ...(seat.role === "player" && !approval
           ? { scores: { ...source.scores, cha: existing.scores.cha } }
           : {}),
+        ...(existing.xp !== undefined ? { xp: existing.xp } : {}),
+        ...(existing.milestoneLevel !== undefined ? { milestoneLevel: existing.milestoneLevel } : {}),
       });
       p.name = source.name;
       p.portrait = source.portrait || undefined;

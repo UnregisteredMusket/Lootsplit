@@ -144,8 +144,16 @@ export const ZONES_PROTOCOL = 18;
  * updated website.
  */
 export const MOVE_APPROVAL_PROTOCOL = 19;
+/**
+ * Protocol 21 (2026-11-04, XP and milestones): a character's play sheet (and its edit baseline
+ * and change reports) may carry `xp` and `milestoneLevel`, and the DM may send `xp-award`.
+ * Protocols 0-20 receive sheets without them. Their sheet edits and whole-purse writes come back
+ * without them and the server keeps the stored values (`keepAdvancement`, `keepPurseAdvancement`).
+ * Pending drafts with the new command or fields ask them to finish on the updated website.
+ */
+export const XP_PROTOCOL = 21;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = MOVE_APPROVAL_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = XP_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1052,6 +1060,63 @@ function upgradeSessionCommands<C extends { kind: string }>(table: CloudTable, c
     return { ...c, before, session };
   });
 }
+// Protocol 21 (XP and milestones).
+const advancementText = (text: string) => /"(xp|milestoneLevel)":\d/.test(text);
+type SheetLike = { xp?: number; milestoneLevel?: number } | undefined;
+const sheetHasAdvancement = (s: SheetLike) => !!s && (s.xp !== undefined || s.milestoneLevel !== undefined);
+function withoutAdvancement<T extends SheetLike>(s: T): T {
+  if (!sheetHasAdvancement(s)) return s;
+  const { xp: _xp, milestoneLevel: _milestone, ...rest } = s!;
+  return rest as T;
+}
+/** Whether a table (or a stored backup body) holds XP or milestones on a character sheet. */
+export function hasAdvancement(table: CloudTable): boolean {
+  const reportHas = (snapshot: string) => {
+    // "xp" also names creature XP in resource packs: parse only when the text could match.
+    if (!advancementText(snapshot)) return false;
+    try {
+      return hasAdvancement(JSON.parse(snapshot));
+    } catch {
+      return false;
+    }
+  };
+  return (
+    (table.purses ?? []).some((p) => sheetHasAdvancement(p.sheet) || sheetHasAdvancement(p.editBaseline)) ||
+    !!table.journal?.editReports?.some((r) => sheetHasAdvancement(r.before) || sheetHasAdvancement(r.after)) ||
+    !!table.journal?.reports?.some((r) => reportHas(r.snapshot ?? ""))
+  );
+}
+function advancementFreeTable(table: CloudTable): CloudTable {
+  if (!hasAdvancement(table)) return table;
+  const purses = table.purses.map((p) =>
+    sheetHasAdvancement(p.sheet) || sheetHasAdvancement(p.editBaseline)
+      ? {
+          ...p,
+          ...(p.sheet ? { sheet: withoutAdvancement(p.sheet) } : {}),
+          ...(p.editBaseline ? { editBaseline: withoutAdvancement(p.editBaseline) } : {}),
+        }
+      : p,
+  );
+  if (!table.journal) return { ...table, purses };
+  const editReports = table.journal.editReports?.map((r) => ({
+    ...r,
+    before: withoutAdvancement(r.before),
+    after: withoutAdvancement(r.after),
+  }));
+  const reports = table.journal.reports?.map((report) => {
+    if (!advancementText(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(advancementFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    purses,
+    journal: { ...table.journal, ...(editReports ? { editReports } : {}), ...(reports ? { reports } : {}) },
+  };
+}
 // Protocol 19 ("Ask the DM" movement).
 const moveRequestText = (text: string) => text.includes('"moveRequests":[');
 export function hasMoveRequests(table: CloudTable): boolean {
@@ -1126,6 +1191,8 @@ export function upgradeOldClientCommands<C extends { kind: string }>(
   return result;
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= XP_PROTOCOL) return table;
+  table = advancementFreeTable(table);
   if (protocol >= MOVE_APPROVAL_PROTOCOL) return table;
   table = moveRequestFreeTable(table);
   if (protocol >= ZONES_PROTOCOL) return table;
@@ -1219,12 +1286,24 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= MOVE_APPROVAL_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= XP_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 21: XP awards, and sheet edits or purse writes that carry XP or milestones.
+      if (
+        c.kind === "xp-award" ||
+        (c.kind === "character" && advancementText(JSON.stringify([c.before, c.sheet]))) ||
+        (c.kind === "patch" &&
+          Array.isArray(c.changes) &&
+          c.changes.some(
+            (change: { store?: string }) => change?.store === "purses" && advancementText(JSON.stringify(change)),
+          ))
+      )
+        return true;
+      if (protocol && protocol >= MOVE_APPROVAL_PROTOCOL) return false;
       // Protocol 19: "Ask the DM" move requests.
       if (String(c.kind).startsWith("map-move-request") || moveRequestText(JSON.stringify(c))) return true;
       if (protocol && protocol >= ZONES_PROTOCOL) return false;
