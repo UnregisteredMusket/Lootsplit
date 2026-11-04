@@ -21,7 +21,7 @@
  *   threshold, never a refusal** (owner rule: no feature is reduced; a session can always be
  *   archived): the largest total at which each of those still fits comfortably in a 128 MB Worker
  *   isolate, two at once (measured with scripts/room-memory-measure.mjs, documented and checked by
- *   scripts/room-memory-warning.test.mjs). Past it, the archive goes ahead, the owner monitor gets
+ *   scripts/room-memory-warning-case.mjs). Past it, the archive goes ahead, the owner monitor gets
  *   a `room-storage` warning and the DM a notice recommending Download a copy; a whole-campaign
  *   operation that cannot fit fails loudly with nothing changed. 5 MB until 2026-10-29; 12 MB
  *   since (owner decision) once those paths became bounded: the rest need about 2.8 bytes of heap
