@@ -36,6 +36,7 @@ import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
 import { questCommands, questKinds, type QuestCommand } from "./quests-schema.ts";
 import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
+import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -331,6 +332,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   }),
   ...lootCommands,
   ...questCommands,
+  // Charges and consumables (loot phase 5, item-uses.ts): Use and the DM's Recharge.
+  ...itemUseCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export type CommandInput = Command extends infer C
@@ -912,6 +915,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (sameCoins(cmd.before, cmd.after)) throw Error("Choose coins to exchange.");
     p.coins = { cp: cmd.after.cp, sp: cmd.after.sp, ep: cmd.after.ep, gp: cmd.after.gp, pp: cmd.after.pp };
     event(`${p.name} made change: ${exchangeSummary(cmd.before, cmd.after)}`, "management", p.id);
+  } else if (cmd.kind === "item-use" || cmd.kind === "item-recharge") {
+    // The controlling player or the DM (pooled items and Recharge: the DM); one journal event
+    // keyed by the command ID, which players see only for purses they hold (projectRecord).
+    applyItemUseCommand(t, cmd, { dm, own, assertCarried }, event);
   } else if (cmd.kind === "journal-note") {
     if (cmd.provenance || cmd.visibility === "dm") dm();
     if (seat.role !== "dm" || cmd.visibility === "player") {
@@ -1207,6 +1214,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         id: cmd.id + "-item",
         purseId: cmd.toId,
         quantity: cmd.quantity,
+        // Charges: a partly used current item stays with the giver while any of the stack stays.
+        ...movedUses(h, h.quantity),
         ...(h.deed
           ? {
               deed: transferPropertyDeed(
