@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { applyCommand } from "./commands.ts";
-import { emptyCloudTable, type CloudSeat } from "./cloud.ts";
+import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { readJournal } from "./journal.ts";
 
 const dm: CloudSeat = { id: "dm", token: "dm", name: "DM", role: "dm", purseIds: [] };
@@ -10,7 +10,7 @@ const dm: CloudSeat = { id: "dm", token: "dm", name: "DM", role: "dm", purseIds:
 // archiveSession replaces t.journal, so the command used to keep writing to the old journal object:
 // the new session, the "Started session" event and the ended session's last event were lost.
 test("one session command ends the active session and starts the next", () => {
-  let t = { ...emptyCloudTable(), journal: readJournal({}) };
+  let t: CloudTable = { ...emptyCloudTable(), journal: readJournal({}) };
   t = applyCommand(t, dm, { id: "s1", kind: "session", name: "The Crypt", end: false });
   assert.equal(t.journal!.sessions.find((s) => !s.endedAt)?.name, "The Crypt");
   t = applyCommand(t, dm, { id: "s2", kind: "session", name: "The Market", end: false });
