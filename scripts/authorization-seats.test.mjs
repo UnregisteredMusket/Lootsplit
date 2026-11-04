@@ -205,6 +205,16 @@ test("new direct API controls: unrelated account/character/campaign access, forg
       ).status,
       409,
     );
+    // Audit U06: a permitted campaign save returns the campaign's new sheet revision, and the
+    // next save made from it succeeds without reloading.
+    const unchanged = { id, revision: detail.revision, before: detail.body, sheet: detail.body };
+    const kept = await f.call("sheets/save", unchanged, f.player.cookie);
+    assert.equal(kept.status, 200, JSON.stringify(kept.data));
+    const reread = (await f.call("sheets/detail", { id }, f.player.cookie)).data;
+    assert.equal(kept.data.revision, reread.revision);
+    assert.ok(kept.data.revision > detail.revision);
+    const again = { ...unchanged, revision: kept.data.revision };
+    assert.equal((await f.call("sheets/save", again, f.player.cookie)).status, 200);
     await closeRoom({ code: f.room.code, token: f.room.seats[0].token, keepOnline: true });
     const after = (await f.call("sheets/detail", { id }, f.player.cookie)).data;
     assert.equal(after.body.name, "Synthetic hero");

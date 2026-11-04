@@ -39,6 +39,8 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  /** Charges or uses of the current item (loot phase 5, item-uses.ts). Absent: not tracked. */
+  uses?: import("./item-uses.ts").HoldingUses;
   /** In the party treasure pool (a party-fund holding the party can claim). Absent otherwise. */
   pool?: import("./loot-claims-schema.ts").LootPoolMarker;
   /** "player": a player set this value through a sheet edit, so NPC barter treats it as unreferenced. */

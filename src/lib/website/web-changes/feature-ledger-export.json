@@ -1,0 +1,9 @@
+{
+  "title": "Download your ledger as a spreadsheet",
+  "summary": "Download CSV saves every ledger line and activity record of the whole campaign, archived sessions included, as a file any spreadsheet app opens.",
+  "items": [
+    "The DM finds it in Review Reports → Full activity and gets the whole campaign; players find it in My Finances → Recorded transactions and get only their own characters' history.",
+    "Each row has the date, session, purse, shop, summary, type, amount in copper and in gp/sp/cp, and its receipt ID.",
+    "In a shared campaign all earlier history is loaded first; if any part cannot be loaded, nothing is downloaded and you can try again. The file is made on your device."
+  ]
+}

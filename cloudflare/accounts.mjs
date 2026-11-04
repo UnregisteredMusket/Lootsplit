@@ -30,7 +30,9 @@ import { CURRENT_TABLETOP_PROTOCOL, MOVE_APPROVAL_PROTOCOL, hasMoveRequests, ZON
  * wave 2, 10 split-the-party groups). */
 const tabletopHeader = (request) => {
   const value = Number(request.headers.get("x-lootsplit-tabletop"));
-  return Number.isInteger(value) && value >= 0 ? Math.min(value, 10) : 0;
+  // Capped at the protocol this server knows; never below it (it was 10, so current clients
+  // were treated as protocol 10 and refused their own backups with newer map data).
+  return Number.isInteger(value) && value >= 0 ? Math.min(value, CURRENT_TABLETOP_PROTOCOL) : 0;
 };
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";

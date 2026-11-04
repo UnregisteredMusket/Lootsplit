@@ -1,0 +1,8 @@
+{
+  "title": "Character sheets save twice in a row without a refresh",
+  "summary": "Saving a character sheet now always remembers the new version, so you can save again straight away, even if the page couldn't reload the sheet after the first save.",
+  "items": [
+    "If a save goes through but the reply is lost and you press Save again, the second press reports the first save instead of a conflict.",
+    "A real edit from another device is still refused, so nothing is overwritten."
+  ]
+}

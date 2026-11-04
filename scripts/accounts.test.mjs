@@ -962,6 +962,25 @@ test("interactive sheets require active accounts and reject cross-origin changes
     const saved = await call("sheets/save", body, a.cookie);
     assert.equal(saved.response.status, 200, JSON.stringify(saved.data));
     assert.equal((await call("sheets", undefined, a.cookie)).data.characters.length, 1);
+    // Audit U06: each save returns the new revision, so a second save needs no refresh; a
+    // retry of a save whose response was lost reports that save; a real conflict still fails.
+    assert.equal(saved.data.revision, 0);
+    const first = { id: saved.data.id, revision: 0, sheet: { ...blankSheet(), name: "Ada" } };
+    const once = await call("sheets/save", first, a.cookie);
+    assert.equal(once.response.status, 200, JSON.stringify(once.data));
+    assert.equal(once.data.revision, 1);
+    const retried = await call("sheets/save", first, a.cookie);
+    assert.equal(retried.response.status, 200, JSON.stringify(retried.data));
+    assert.equal(retried.data.revision, 1);
+    const other = { ...first, sheet: { ...blankSheet(), name: "Someone else" } };
+    assert.equal((await call("sheets/save", other, a.cookie)).response.status, 409);
+    const second = { id: saved.data.id, revision: 1, sheet: { ...blankSheet(), name: "Ada II" } };
+    const next = await call("sheets/save", second, a.cookie);
+    assert.equal(next.response.status, 200, JSON.stringify(next.data));
+    assert.equal(next.data.revision, 2);
+    const stored = (await call("sheets/detail", { id: saved.data.id }, a.cookie)).data;
+    assert.equal(stored.revision, 2);
+    assert.equal(stored.body.name, "Ada II");
     await DB.prepare("UPDATE member_access SET status='revoked' WHERE user_id=?")
       .bind(a.data.user.id)
       .run();
