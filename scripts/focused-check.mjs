@@ -16,6 +16,7 @@ const featureAudits = {
   "sell-and-split": "scripts/sell-and-split-browser-audit.mjs",
   "ledger-export": "scripts/ledger-export-browser-audit.mjs",
   "item-charges": "scripts/item-charges-browser-audit.mjs",
+  "xp-milestones": "scripts/xp-milestones-browser-audit.mjs",
   "loot-claims": "scripts/loot-claims-browser-audit.mjs",
   "loot-review": "scripts/loot-review-browser-audit.mjs",
   "loot-fairness": "scripts/loot-fairness-browser-audit.mjs",
