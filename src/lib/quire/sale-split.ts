@@ -8,7 +8,7 @@
  */
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
 import { assertCarried } from "./custody.ts";
-import { assertMerchantSale } from "./merchant.ts";
+import { assertMerchantSale, merchantShortfall, merchantUnitOffer, revealPurse } from "./merchant.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -44,9 +44,12 @@ export type SaleSplitPlan = {
   split: CoinSplitPlan;
 };
 
-/** What one unit of `h` fetches at `shop`: the Sell to shop rule. */
-export function unitSalePrice(h: Pick<Holding, "unitCopper">, shop: Pick<Shop, "buyRate">): number {
-  return Math.round(h.unitCopper * shop.buyRate);
+/**
+ * What one unit of `h` fetches at `shop`: the Sell to shop rule, including the off-list rate and
+ * purchase limit (merchant.ts). The shop's purse is checked by the command for the whole sale.
+ */
+export function unitSalePrice(h: Pick<Holding, "unitCopper" | "notes" | "category">, shop: Shop): number {
+  return merchantUnitOffer(h, shop);
 }
 
 /**
@@ -110,6 +113,9 @@ export function planSaleSplit(
   }
   const proceeds = lots.reduce((sum, l) => sum + l.paid, 0);
   if (!Number.isSafeInteger(proceeds)) throw Error("The sale exceeds the supported coin balance.");
+  // Merchant purse: the whole sale fits it or nothing is sold.
+  const short = merchantShortfall(shop, proceeds, revealPurse(shop, options.actor));
+  if (short) throw Error(short);
   const split = planCoinSplit(
     t,
     {

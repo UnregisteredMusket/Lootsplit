@@ -13,7 +13,17 @@ import { readMarketLocations, locationLabel } from "@/lib/quire/shop-locations";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { FinanceReadiness } from "@/components/finance-input";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
-import { assertMerchantSale } from "@/lib/quire/merchant";
+import {
+  assertMerchantSale,
+  hasMerchantPurse,
+  merchantName,
+  merchantSaleNotice,
+  merchantUnitOffer,
+  offListPercent,
+  onBuyList,
+  purchaseLimited,
+  revealPurse,
+} from "@/lib/quire/merchant";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
@@ -211,6 +221,7 @@ export function ShopContent({
               Sells at {Math.round(shop.sellRate * 100)}%, buys at {Math.round(shop.buyRate * 100)}%
               {shop.blackMarket ? " · black market" : ""}
             </p>
+            <MerchantTerms shop={shop} dm={dm} />
           </div>
           {dm ? (
             <OpenSwitch shop={shop} />
@@ -706,6 +717,18 @@ function AddGood({ shopId }: { shopId: string }) {
   );
 }
 
+/** The shop's buying terms: purse (where this seat may read it), per-item limit, off-list rate. */
+function MerchantTerms({ shop, dm }: { shop: Shop; dm: boolean }) {
+  const parts: string[] = [];
+  if (hasMerchantPurse(shop) && revealPurse(shop, dm ? "dm" : "player"))
+    parts.push(`Purse ${formatCopper(shop.merchantPurse)}${dm && !shop.showPurse ? " (DM only)" : ""}`);
+  else if (hasMerchantPurse(shop) || shop.purseLimited) parts.push("Limited purse");
+  if (shop.purchaseLimit !== undefined) parts.push(`pays at most ${formatCopper(shop.purchaseLimit)} per item`);
+  if (offListPercent(shop) && !shop.acceptAnyCategory && shop.category !== "mixed")
+    parts.push(`buys anything else at ${offListPercent(shop)}% of its rate`);
+  return parts.length ? <p className="text-sm text-muted">{parts.join(" · ")}</p> : null;
+}
+
 function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingId?: string }) {
   const { holdings, sell, shops } = useEconomy();
   const closed = shops.find((s) => s.id === shopId)?.closed;
@@ -746,8 +769,17 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
     }
   }
   const asked = Number(qty),
-    payout =
-      holding && shop ? Math.max(0, Math.round(holding.unitCopper * shop.buyRate)) * asked : 0;
+    unitOffer = holding && shop ? merchantUnitOffer(holding, shop) : 0,
+    payout = unitOffer * asked;
+  // Merchant purse: the refusal shows before confirming (the amount only where this seat may read it).
+  const purseNotice =
+    holding && shop && !eligibility && Number.isSafeInteger(asked) && asked > 0
+      ? merchantSaleNotice(shop, holding, payout, asked, seat.role)
+      : null;
+  const purseRefuses =
+    !!purseNotice && !!shop && (hasMerchantPurse(shop) || shop.merchantAffords?.[holding?.id ?? ""] === "none");
+  const affordable =
+    shop && hasMerchantPurse(shop) && unitOffer > 0 ? Math.floor(shop.merchantPurse / unitOffer) : null;
 
   useEffect(() => {
     if (!mine.some((item) => item.id === holdingId) && mine[0]) setHoldingId(mine[0].id);
@@ -763,7 +795,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
       style={{ scrollMarginTop: "6rem" }}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!holding || closed || turnLocked || locked || busy || eligibility) return;
+        if (!holding || closed || turnLocked || locked || busy || eligibility || purseRefuses) return;
         setBusy(true);
         setError("");
         setNotice("");
@@ -789,13 +821,28 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
       {holding && shop && (
         <p>
           Lot value each {formatCopper(holding.unitCopper)} · merchant rate{" "}
-          {Math.round(shop.buyRate * 100)}%.{" "}
+          {Math.round(shop.buyRate * 100)}%
+          {!eligibility && !onBuyList(holding, shop) && offListPercent(shop)
+            ? ` × ${offListPercent(shop)}% (not on its buy list)`
+            : ""}
+          {!eligibility && purchaseLimited(holding, shop)
+            ? ` · pays at most ${formatCopper(unitOffer)} for one item`
+            : ""}
+          .{" "}
           {Number.isSafeInteger(asked) && asked > 0
             ? `Preview payout ${formatCopper(payout)}; quantity remaining ${holding.quantity - asked}.`
             : "Choose a whole quantity of at least one."}
         </p>
       )}
       {eligibility && <p role="status">{eligibility}</p>}
+      {purseNotice && (
+        <p role="status">
+          {purseNotice}
+          {purseRefuses && affordable !== null && affordable > 0 && revealPurse(shop!, seat.role)
+            ? ` ${merchantName(shop!)} can buy up to ${affordable}.`
+            : ""}
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {notice && (
         <p role="status">
@@ -830,6 +877,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
             locked ||
             busy ||
             !!eligibility ||
+            purseRefuses ||
             !Number.isSafeInteger(asked) ||
             asked < 1 ||
             asked > (holding?.quantity || 0)

@@ -9,7 +9,7 @@ import { shopVisible, shopAsking, validateWorld } from "./world.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
-import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
+import { assertMerchantSale, creditMerchant, isService, merchantUnitOffer, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
 import { applyCommand, applyCommandBatch, commandSchema, type CommandRequest } from "./commands.ts";
 import { actionDigest, commandIdentity } from "./command-identity.ts";
 import { ensureCityExchanges } from "./city-exchanges.ts";
@@ -1358,7 +1358,11 @@ export async function buyFromShop(
               }
             : {}),
         };
+    // Merchant purse: the purchase price goes to the shop, as in the shared command.
+    const merchant = structuredClone(shop);
+    creditMerchant(merchant, cost);
     tx.objectStore("purses").put({ ...purse, coins });
+    if (merchant.merchantPurse !== shop.merchantPurse) tx.objectStore("shops").put(merchant);
     if (holding) tx.objectStore("holdings").put(holding);
     if (stock.quantity !== null)
       tx.objectStore("stock").put({
@@ -1461,9 +1465,13 @@ export async function sellToShop(
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
-    const paid = Math.max(0, Math.round(holding.unitCopper * shop.buyRate)) * quantity;
+    const paid = merchantUnitOffer(holding, shop) * quantity;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");
+    // Merchant purse: paid from it or the sale is refused, as in the shared command.
+    const merchant = structuredClone(shop);
+    payFromMerchant(merchant, paid, revealPurse(shop, getSeat().role));
     tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, paid) });
+    if (merchant.merchantPurse !== shop.merchantPurse) tx.objectStore("shops").put(merchant);
     if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
     else tx.objectStore("holdings").put({ ...holding, quantity: holding.quantity - quantity });
     const entry = {
@@ -2424,7 +2432,7 @@ export async function applyBill(file: BillFile): Promise<number> {
       sales: get("localSeen")?.sales ?? [],
     });
     validateEconomyRows(next.table);
-    for (const store of ["purses", "holdings", "stock", "ledger"] as const) {
+    for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) {
       tx.objectStore(store).clear();
       for (const row of next.table[store]) tx.objectStore(store).put(row);
     }

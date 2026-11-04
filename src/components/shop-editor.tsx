@@ -10,6 +10,8 @@ import { readMarketLocations } from "@/lib/quire/shop-locations";
 import { SHOP_KINDS, WEALTHS } from "@/lib/quire/labels";
 import { realmNote, scarcityNote } from "@/lib/quire/scale";
 import type { Shop, Wealth } from "@/lib/quire/types";
+import { formatCopper, parsePrice } from "@/lib/quire/money";
+import { MAX_MERCHANT_PURSE, MERCHANT_PURSE_PRESETS } from "@/lib/quire/merchant";
 import { Button, Checkbox, Field, Fold, Slider, TextInput } from "@/components/ui";
 
 type PartResult = { part: string; ok: boolean; message: string };
@@ -356,12 +358,166 @@ function ShelfTuning({ shop }: { shop: Shop }) {
         onCommit={(value) => void updateShop({ ...shop, buyRate: value })}
         display={`${Math.round(buy * 100)}%`}
       />
+      <MerchantPurseSettings shop={shop} />
       <p className="text-sm text-muted">
         {realmNote(realm, { dollars: showDollars })} {scarcityNote(realm.scarcity)} Updating
         prices uses the modifiers above. Dollars are a comparison for one gold piece, not a second
         price.
       </p>
     </section>
+  );
+}
+
+const priceText = (copper: number | undefined) => (copper === undefined ? "" : formatCopper(copper));
+
+/**
+ * Merchant purse, purchase limit and the off-list rate (merchant.ts). Typed amounts apply with
+ * Apply; unset fields keep today's behaviour (unlimited purse, no limit, off-list refused).
+ */
+function MerchantPurseSettings({ shop }: { shop: Shop }) {
+  const { updateShop } = useEconomy();
+  const base = {
+    purse: priceText(shop.merchantPurse),
+    refill: priceText(shop.merchantPurseRefill),
+    limit: priceText(shop.purchaseLimit),
+    offList: shop.offListPercent ? String(shop.offListPercent) : "",
+  };
+  const key = JSON.stringify(base);
+  const [draft, setDraft] = useState(base);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  useEffect(() => setDraft(JSON.parse(key) as typeof base), [shop.id, key]);
+  const dirty = JSON.stringify(draft) !== key;
+  useDraftGuard(dirty, "merchant purse settings");
+  const limited = shop.merchantPurse !== undefined;
+  const preset = MERCHANT_PURSE_PRESETS.find((p) => p.wealth === shop.wealth);
+  const set = (field: keyof typeof base) => (event: { target: { value: string } }) =>
+    setDraft({ ...draft, [field]: event.target.value });
+  const save = async (next: Shop, done: string) => {
+    setError("");
+    setNotice("");
+    try {
+      await updateShop(next);
+      setNotice(done);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Merchant purse settings were not saved.");
+    }
+  };
+  const apply = () => {
+    const amount = (text: string, label: string) => {
+      if (!text.trim()) return undefined;
+      const copper = parsePrice(text);
+      if (copper === null || copper < 0 || copper > MAX_MERCHANT_PURSE)
+        throw Error(`${label}: enter an amount such as 100 gp or 12 gp, 3 sp.`);
+      return copper;
+    };
+    let next: Shop;
+    try {
+      const percent = draft.offList.trim() ? Number(draft.offList) : 0;
+      if (!Number.isInteger(percent) || percent < 0 || percent > 100)
+        throw Error("Buys anything else at: enter a whole percentage from 0 to 100.");
+      const fields = {
+        merchantPurse: limited ? (amount(draft.purse, "Purse now") ?? 0) : undefined,
+        merchantPurseRefill: limited ? amount(draft.refill, "Refill on restock") : undefined,
+        purchaseLimit: amount(draft.limit, "Most paid for one item"),
+        offListPercent: percent || undefined,
+      };
+      next = { ...shop };
+      for (const [field, value] of Object.entries(fields) as [keyof typeof fields, number | undefined][]) {
+        if (value === undefined) delete next[field];
+        else next[field] = value;
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Check the purse settings.");
+      return;
+    }
+    void save(next, "Merchant purse settings saved.");
+  };
+  const toggle = (on: boolean) => {
+    const next: Shop = { ...shop };
+    if (on) {
+      next.merchantPurse = preset?.copper ?? 10_000;
+      next.merchantPurseRefill = preset?.copper ?? 10_000;
+    } else {
+      delete next.merchantPurse;
+      delete next.merchantPurseRefill;
+      delete next.showPurse;
+    }
+    void save(next, on ? "Limited purse on." : "Unlimited purse.");
+  };
+  return (
+    <fieldset className="flex min-w-0 flex-col gap-3">
+      <legend className="text-sm font-medium">Merchant purse and buy list</legend>
+      <Checkbox
+        label="Limited purse: sales to this shop are paid from it"
+        checked={limited}
+        onChange={toggle}
+      />
+      {limited ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Purse now" hint="Purchases from the shop add to it.">
+              <TextInput value={draft.purse} onChange={set("purse")} />
+            </Field>
+            <Field label="Refill on restock" hint="Restock tops it up to this; blank never refills.">
+              <TextInput value={draft.refill} onChange={set("refill")} />
+            </Field>
+          </div>
+          <div role="group" aria-label="Purse presets" className="flex flex-wrap gap-2">
+            {MERCHANT_PURSE_PRESETS.map((p) => (
+              <Button
+                key={p.wealth}
+                variant="secondary"
+                onClick={() =>
+                  setDraft({ ...draft, purse: formatCopper(p.copper), refill: formatCopper(p.copper) })
+                }
+              >
+                {p.label}
+              </Button>
+            ))}
+          </div>
+          <p className="text-sm text-muted">
+            Presets are Lootsplitter homebrew defaults, not official rules. The purse refills only
+            when the shop restocks (its schedule or Restock), never by itself.
+          </p>
+          <Checkbox
+            label="Show the shop's purse to players"
+            checked={shop.showPurse === true}
+            onChange={(checked) => {
+              const next: Shop = { ...shop };
+              if (checked) next.showPurse = true;
+              else delete next.showPurse;
+              void save(next, checked ? "Players can see the purse." : "The purse is DM-only.");
+            }}
+          />
+          {!shop.showPurse ? (
+            <p className="text-sm text-muted">
+              Players see only that the merchant can&apos;t afford an item, not the amount.
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-sm text-muted">Unlimited: the shop can always pay.</p>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Most paid for one item" hint="Blank: no limit.">
+          <TextInput value={draft.limit} onChange={set("limit")} />
+        </Field>
+        <Field
+          label="Buys anything else at (% of its buy rate)"
+          hint="Blank or 0: refuses categories it doesn't buy."
+        >
+          <TextInput value={draft.offList} onChange={set("offList")} inputMode="numeric" />
+        </Field>
+      </div>
+      {error && <p role="alert">{error}</p>}
+      {notice && <p role="status">{notice}</p>}
+      <div>
+        <Button variant="secondary" disabled={!dirty} onClick={apply}>
+          Apply purse settings
+        </Button>
+      </div>
+    </fieldset>
   );
 }
 

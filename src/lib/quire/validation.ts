@@ -1,5 +1,6 @@
 import { historyWindow } from "./history-window.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
+import { MAX_MERCHANT_PURSE } from "./merchant.ts";
 import { characterPermissionsSchema } from "../characters/permissions.mjs";
 import { z } from "zod";
 import { artworkSchema } from "./artwork.ts";
@@ -61,6 +62,11 @@ const shop = z.object({
   schedule: shopScheduleSchema.optional(),
   acceptedCategories: z.array(z.string().max(80)).max(20).optional(),
   acceptAnyCategory: z.boolean().optional(),
+  merchantPurse: z.number().int().min(0).max(MAX_MERCHANT_PURSE).optional(),
+  merchantPurseRefill: z.number().int().min(0).max(MAX_MERCHANT_PURSE).optional(),
+  showPurse: z.boolean().optional(),
+  purchaseLimit: amount.optional(),
+  offListPercent: z.number().int().min(0).max(100).optional(),
   id,
   closed: z.boolean().optional(),
   image: artworkSchema.optional(),

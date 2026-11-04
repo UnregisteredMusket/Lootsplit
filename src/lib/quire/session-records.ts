@@ -23,6 +23,7 @@ import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
+import { projectMerchantPurse } from "./merchant.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
 import { propertyAvailableToGroups } from "./property.ts";
@@ -395,6 +396,9 @@ export function projectRecord(
         visibleSites.has(h.id) ||
         (h.custody && visibleSites.has(h.custody.propertyId)),
     );
+    // Merchant purses stay DM-only unless the DM shows them; players learn only whether the
+    // merchant can afford each lot they can read (merchant.ts).
+    t.shops = t.shops.map((shop) => projectMerchantPurse(shop, t.holdings));
     if (t.journal.propertyOperations) {
       const keys = new Set([
         ...estate.sites.flatMap((site) => [site.templateKey, ...site.completedTemplates]),

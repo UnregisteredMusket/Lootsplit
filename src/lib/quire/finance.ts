@@ -15,7 +15,7 @@ import { previewSmith } from "./blacksmith-time.ts";
 import { previewServices, serviceQuoteSchema } from "./services-time.ts";
 import { deliverLetters } from "./services-courier.ts";
 import type { CloudTable } from "./cloud.ts";
-import { toCopper, fromCopper, spendCoins } from "./money.ts";
+import { toCopper, fromCopper, spendCoins, formatCopper } from "./money.ts";
 import {
   applyJourney,
   assertJourneyPayable,
@@ -90,6 +90,8 @@ export const quoteSchema = z.object({
         closed: z.boolean(),
         lastRestockDay: z.number().int().nonnegative(),
         stock: z.array(z.object({ id, before: money, after: money })),
+        /** Merchant purse refill (merchant.ts); absent before merchant purses. */
+        purse: z.object({ before: money, after: money }).optional(),
       }),
     )
     .optional(),
@@ -512,6 +514,18 @@ export function applyFinanceQuote(
     shop.schedule!.lastRestockDay = market.lastRestockDay;
     for (const line of market.stock)
       table.stock.find((s) => s.id === line.id)!.quantity = line.after;
+    if (market.purse) {
+      if (shop.merchantPurse !== market.purse.before)
+        throw Error("A merchant's purse changed after this preview. Recalculate before approving.");
+      shop.merchantPurse = market.purse.after;
+      table.journal!.events.push({
+        id: `${receipt.id}-purse-${shop.id}`,
+        at,
+        kind: "management",
+        dmOnly: true,
+        summary: `${shop.name}: merchant purse refilled ${formatCopper(market.purse.before)} → ${formatCopper(market.purse.after)} (scheduled restock)`.slice(0, 500),
+      });
+    }
   }
   f.loans = quote.loans;
   f.rules = quote.rules;

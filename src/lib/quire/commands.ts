@@ -53,7 +53,7 @@ import {
   applyDowntime,
   financeMove,
 } from "./finance.ts";
-import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
+import { assertMerchantSale, creditMerchant, isService, merchantRefill, merchantUnitOffer, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
 import { archiveSession } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
@@ -1063,6 +1063,18 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       line.quantity! += cmd.quantity;
     }
     event(`Restocked ${shop.name}: +${cmd.quantity} per finite stock line`);
+    // The DM's Restock also refills a merchant purse to its refill amount (DM-only event).
+    const refill = merchantRefill(shop);
+    if (refill) {
+      shop.merchantPurse = refill.after;
+      journal.events.push({
+        id: `${cmd.id}-purse`,
+        at,
+        kind: "management",
+        dmOnly: true,
+        summary: `${shop.name}: merchant purse refilled ${formatCopper(refill.before)} → ${formatCopper(refill.after)}`,
+      });
+    }
   } else if (cmd.kind === "buy") {
     own(cmd.purseId);
     const s = t.stock.find((x) => x.id === cmd.stockId),
@@ -1076,6 +1088,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const cost =
       priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
+    creditMerchant(shop, cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
     const purchasedHolding: import("./types.ts").Holding | null = isService(s)
       ? null
@@ -1175,7 +1188,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.kind === "property") assertEstateDisposable(t, h.id);
     assertMerchantSale(h, s);
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
-    const paid = Math.round(h.unitCopper * s.buyRate) * cmd.quantity;
+    const paid = merchantUnitOffer(h, s) * cmd.quantity;
+    // Merchant purse: the shop pays from it, or the whole sale is refused.
+    payFromMerchant(s, paid, revealPurse(s, seat.role));
     coins(h.purseId, paid);
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
@@ -1349,6 +1364,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       plan.split.remainderTo !== cmd.expect.remainderTo
     )
       throw Error("The sale or split changed (prices, items, the party fund or recipients moved). Review it again.");
+    // Merchant purse: the whole sale is paid from it or nothing is sold (never half a sale).
+    payFromMerchant(shop, plan.proceeds, revealPurse(shop, seat.role));
     // The sale: the fund receives each lot's price (keeping its own coins), one sale line per lot.
     fund.coins = creditCoins(fund.coins, plan.proceeds);
     for (const [i, lot] of plan.lots.entries()) {
