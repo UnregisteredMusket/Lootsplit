@@ -251,8 +251,11 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
       (e) => e.status === 404,
     );
     await call("player", "/save", { id, sheet, revision: 0 });
+    // Resending the same save (a lost response) reports it; a different sheet from the stale
+    // revision is still a conflict (audit U06).
+    assert.equal((await call("player", "/save", { id, sheet, revision: 0 })).revision, 1);
     await assert.rejects(
-      call("player", "/save", { id, sheet, revision: 0 }),
+      call("player", "/save", { id, sheet: { ...sheet, name: "Changed elsewhere" }, revision: 0 }),
       (e) => e.status === 409,
     );
     const solo = {
