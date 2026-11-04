@@ -236,7 +236,9 @@ export function redactWritten(
   if (!j) return;
   if (j.events) j.events = fresh(j.events, before.eventIds, (e) => !e.dmOnly);
   if (j.entries) j.entries = fresh(j.entries, before.entryIds, (e) => e.visibility !== "dm");
-  if (j.services) j.services = redactIdentity(j.services, secrets);
+  // Service orders snapshot the item they are about (terms.item); providers stay as written.
+  const services = j.services as { orders?: unknown[] } | undefined;
+  if (services?.orders) services.orders = redactIdentity(services.orders, secrets);
   if (j.lootClaims) j.lootClaims = redactIdentity(j.lootClaims, secrets);
 }
 
