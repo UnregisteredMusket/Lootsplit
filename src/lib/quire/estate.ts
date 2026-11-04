@@ -1,4 +1,5 @@
 import { assertCarried } from "./custody.ts";
+import { presentedHolding, snapshotText } from "./item-identity.ts";
 import {
   shipHere,
   initializeShipPurchase,
@@ -18,7 +19,7 @@ import type { Holding, StockLine } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
-import { isService } from "./merchant.ts";
+import { creditMerchant, isService } from "./merchant.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
 import {
   readEstate,
@@ -625,6 +626,8 @@ function delivery(
     at,
     shop.id,
   );
+  // A sale from the shop's stock: the payment goes into its merchant purse (merchant.ts).
+  creditMerchant(shop, cost);
   if (line.quantity !== null) line.quantity -= args.quantity;
   const item: Holding = {
     id: `${receipt}-goods`,
@@ -745,7 +748,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
       const item = t.holdings.find((i) => i.id === request.holdingId);
       if (
         !item ||
-        canonicalJson(item) !== request.itemBefore ||
+        !sameSnapshot(item, request.itemBefore) ||
         item.reservedFor ||
         item.custody?.kind !== "property" ||
         item.custody.propertyId !== request.propertyId
@@ -819,7 +822,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
           purseId: cmd.purseId,
           requestedBy: seat.id,
           quantity: cmd.quantity,
-          itemBefore: canonicalJson(item),
+          itemBefore: snapshotText(item),
           status: "pending",
           reason: "",
         });
@@ -829,7 +832,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
           kind: "request",
           propertyId: h.id,
           summary:
-            `Requested withdrawal of ${cmd.quantity} ${item.name} for ${t.purses.find((p) => p.id === cmd.purseId)!.name}.`.slice(
+            `Requested withdrawal of ${cmd.quantity} ${presentedHolding(item).name} for ${t.purses.find((p) => p.id === cmd.purseId)!.name}.`.slice(
               0,
               500,
             ),
@@ -847,7 +850,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
         request.holdingId !== item.id ||
         request.purseId !== cmd.purseId ||
         request.quantity !== cmd.quantity ||
-        request.itemBefore !== canonicalJson(item)
+        !sameSnapshot(item, request.itemBefore)
       )
         throw Error(
           "An unchanged DM-approved withdrawal is required. Submit a fresh request if the goods changed.",
@@ -875,7 +878,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
       purseId: h.purseId,
       propertyId: h.id,
       summary:
-        `${t.purses.find((p) => p.id === cmd.purseId)!.name} ${cmd.direction === "deposit" ? "stored" : "retrieved"} ${cmd.quantity} ${item.name} at ${h.name}${cmd.donate && cmd.direction === "deposit" ? "; donated to the property owner for shared use" : ""}${cmd.override ? " (DM location override)" : ""}.`.slice(
+        `${t.purses.find((p) => p.id === cmd.purseId)!.name} ${cmd.direction === "deposit" ? "stored" : "retrieved"} ${cmd.quantity} ${presentedHolding(item).name} at ${h.name}${cmd.donate && cmd.direction === "deposit" ? "; donated to the property owner for shared use" : ""}${cmd.override ? " (DM location override)" : ""}.`.slice(
           0,
           500,
         ),
@@ -1809,4 +1812,9 @@ export function previewEstate(
     notices,
     rules: working.journal!.finance!.rules,
   };
+}
+
+/** A withdrawal's item snapshot: the presented form (newer requests) or the true one (older). */
+function sameSnapshot(item: import("./types.ts").Holding, text: string) {
+  return text === snapshotText(item) || text === canonicalJson(item);
 }

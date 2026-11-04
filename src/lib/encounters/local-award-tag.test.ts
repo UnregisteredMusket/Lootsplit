@@ -81,7 +81,7 @@ async function shared(remainderRule: unknown) {
 const tagged = (t: CloudTable, receiptId: string) =>
   t.ledger
     .filter((l) => l.award)
-    .map((l) => ({ ...l, at: 0, id: l.id.replace(receiptId, "R"), award: { ...l.award!, receiptId: l.award!.receiptId.replace(receiptId, "R") } }))
+    .map((l) => ({ ...l, at: 0, id: l.id.replace(receiptId, "R"), award: { ...l.award!, receiptId: l.award!.receiptId.replace(receiptId, "R"), ...(l.award!.holdingId ? { holdingId: l.award!.holdingId.replace(receiptId, "R") } : {}) } }))
     .sort((a, b) => a.id.localeCompare(b.id));
 
 test("device and shared encounter awards write the same award-tagged lines, once", async () => {
@@ -94,8 +94,9 @@ test("device and shared encounter awards write the same award-tagged lines, once
     lines.map((l) => [l.id, l.purseId, l.copper, l.award]),
     [
       ["R-coins", "aria", 3449, { receiptId: "R", role: "coins" }],
-      ["R-item-0", "party", 0, { receiptId: "R", role: "item", quantity: 1, unitCopper: 5000 }],
-      ["R-item-1", "bram", 0, { receiptId: "R", role: "item", quantity: 2, unitCopper: 1000 }],
+      // Item lines name the holding they created (item identification), the same on both paths.
+      ["R-item-0", "party", 0, { receiptId: "R", role: "item", quantity: 1, unitCopper: 5000, holdingId: "R-item-0" }],
+      ["R-item-1", "bram", 0, { receiptId: "R", role: "item", quantity: 2, unitCopper: 1000, holdingId: "R-item-1" }],
     ],
   );
   // The summaries older readers already understand stay the same.

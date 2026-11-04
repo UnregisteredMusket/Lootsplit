@@ -15,6 +15,7 @@ import {
 } from "./character-position.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import { projectRecord } from "./session-records.ts";
+import { projectIdentities } from "./item-identity.ts";
 import { characterControl, type Purse } from "./types.ts";
 import { npcController } from "./world.ts";
 
@@ -123,5 +124,6 @@ export function seatView(
 ): CloudTable {
   const full: CloudSeat = { id: "", token: "", name: "", ...seat, role: "player" };
   const record = projectRecord({ ...table, journal: table.journal }, full, { directory: true });
-  return playerTable(table, record, full);
+  // Item identification: as `view()` does, unidentified items as presented (item-identity.ts).
+  return projectIdentities(table, playerTable(table, record, full));
 }

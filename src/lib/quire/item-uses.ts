@@ -13,6 +13,7 @@
  */
 import { z } from "zod";
 import type { Holding } from "./types.ts";
+import { presentedHolding } from "./item-identity.ts";
 
 export const MAX_USES = 1000;
 const count = z.number().int().min(0).max(MAX_USES);
@@ -90,13 +91,15 @@ export function applyItemUseCommand(
   if (h.uses.current !== cmd.expect.current || h.quantity !== cmd.expect.quantity)
     throw Error("This item changed. Review it and try again.");
   const holder = t.purses.find((p) => p.id === h.purseId)?.name ?? "Unassigned";
+  // Item identification: receipts and messages name an unidentified item as presented.
+  const name = presentedHolding(h).name;
   const { max } = h.uses;
   const before = { current: h.uses.current, max, quantity: h.quantity };
   if (cmd.kind === "item-recharge") {
     if (cmd.current > max) throw Error(`Choose 0 to ${max} uses.`);
-    if (cmd.current === h.uses.current) throw Error(`${h.name} already has ${cmd.current} of ${max} uses.`);
+    if (cmd.current === h.uses.current) throw Error(`${name} already has ${cmd.current} of ${max} uses.`);
     h.uses = { ...h.uses, current: cmd.current };
-    event(`Recharged ${h.name} (${holder}): ${before.current} → ${cmd.current} of ${max} uses`, "management", h.purseId, {
+    event(`Recharged ${name} (${holder}): ${before.current} → ${cmd.current} of ${max} uses`, "management", h.purseId, {
       entity: "holding",
       entityId: h.id,
       before,
@@ -106,7 +109,7 @@ export function applyItemUseCommand(
   }
   // Stored, delivered or reserved goods are not in hand (custody.ts); the pool was checked above.
   authorize.assertCarried({ ...h, pool: undefined });
-  if (h.uses.current === 0) throw Error(`${h.name} has no uses left. The DM can recharge it.`);
+  if (h.uses.current === 0) throw Error(`${name} has no uses left. The DM can recharge it.`);
   const left = h.uses.current - 1;
   let summary: string;
   let after: Record<string, number | string> | null;
@@ -115,17 +118,17 @@ export function applyItemUseCommand(
     after = { current: left, max, quantity: h.quantity };
     summary =
       left > 0
-        ? `Used ${h.name} (${holder}): ${left} of ${max} uses left`
-        : `Used the last use of ${h.name} (${holder}): 0 of ${max} left, kept until recharged`;
+        ? `Used ${name} (${holder}): ${left} of ${max} uses left`
+        : `Used the last use of ${name} (${holder}): 0 of ${max} left, kept until recharged`;
   } else if (h.quantity > 1) {
     h.quantity -= 1;
     h.uses = { ...h.uses, current: max };
     after = { current: max, max, quantity: h.quantity, removed: 1 };
-    summary = `Used up one ${h.name} (${holder}): removed; ${h.quantity} left, the next at ${max} of ${max} uses`;
+    summary = `Used up one ${name} (${holder}): removed; ${h.quantity} left, the next at ${max} of ${max} uses`;
   } else {
     t.holdings.splice(t.holdings.indexOf(h), 1);
     after = null;
-    summary = `Used up ${h.name} (${holder}): removed from the inventory`;
+    summary = `Used up ${name} (${holder}): removed from the inventory`;
   }
   event(summary, "management", h.purseId, { entity: "holding", entityId: h.id, before, after });
 }

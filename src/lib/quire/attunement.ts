@@ -19,6 +19,7 @@
  * Holdings and purses are not strictly parsed (validation.ts), so older clients keep the fields.
  */
 import { z } from "zod";
+import { isUnidentified, presentedHolding } from "./item-identity.ts";
 import type { Holding, Purse } from "./types.ts";
 
 export const DEFAULT_ATTUNEMENT_LIMIT = 3;
@@ -74,14 +75,22 @@ export function attunementFromNotes(notes: string | undefined): { requiresAttune
   return text ? { requiresAttunement: text } : {};
 }
 
+/**
+ * The requirement that applies: for an unidentified item the presented one (item-identity.ts), so
+ * a player's options and the server's checks never depend on the true item.
+ */
+export function attunementRequirement(h: Pick<Holding, "requiresAttunement" | "unidentified">): string | undefined {
+  return isUnidentified(h) ? h.unidentified.requiresAttunement : h.requiresAttunement;
+}
+
 /** A problem with a holding's attunement fields, or null (validation and the device's item edit). */
-export function attunementProblem(holding: Pick<Holding, "kind" | "requiresAttunement" | "attuned">): string | null {
+export function attunementProblem(holding: Pick<Holding, "kind" | "requiresAttunement" | "attuned" | "unidentified">): string | null {
   if (holding.requiresAttunement !== undefined) {
     if (holding.kind !== "item") return "Only items can require attunement.";
     if (!requiresAttunementSchema.safeParse(holding.requiresAttunement).success)
       return "Attunement text must be 1 to 200 characters.";
   }
-  if (holding.attuned !== undefined && (holding.attuned !== true || holding.requiresAttunement === undefined))
+  if (holding.attuned !== undefined && (holding.attuned !== true || attunementRequirement(holding) === undefined))
     return "Only an item that requires attunement can be attuned.";
   return null;
 }
@@ -139,11 +148,13 @@ export function applyAttunementCommand(
   const p = t.purses.find((x) => x.id === h.purseId);
   if (!p) throw Error("Account no longer exists.");
   const limit = attunementLimit(p);
+  // Item identification: messages and events name an unidentified item as presented.
+  const name = presentedHolding(h).name;
   if (!cmd.attuned) {
-    if (!h.attuned) throw Error(`${p.name} isn't attuned to ${h.name}.`);
+    if (!h.attuned) throw Error(`${p.name} isn't attuned to ${name}.`);
     delete h.attuned;
     const count = attunedCount(t.holdings, p.id);
-    event(`Ended attunement to ${h.name} (${p.name}): attuned ${count}/${limit}`, "management", p.id, {
+    event(`Ended attunement to ${name} (${p.name}): attuned ${count}/${limit}`, "management", p.id, {
       entity: "holding",
       entityId: h.id,
       before: { attuned: true },
@@ -151,10 +162,10 @@ export function applyAttunementCommand(
     });
     return;
   }
-  if (h.attuned) throw Error(`${p.name} is already attuned to ${h.name}.`);
+  if (h.attuned) throw Error(`${p.name} is already attuned to ${name}.`);
   if (p.kind !== "character") throw Error("Only a character can attune to an item. Give it to a character first.");
   if (h.pool) throw Error("An item in the treasure pool can't be attuned. Resolve the pool first.");
-  if (h.kind !== "item" || !h.requiresAttunement)
+  if (h.kind !== "item" || !attunementRequirement(h))
     throw Error("This item doesn't require attunement. The DM can mark it in Edit item.");
   authorize.assertCarried(h);
   const count = attunedCount(t.holdings, p.id);
@@ -165,7 +176,7 @@ export function applyAttunementCommand(
   h.attuned = true;
   const over = count + 1 > limit;
   event(
-    `Attuned ${p.name} to ${h.name}: attuned ${count + 1}/${limit}${over ? ` (DM override past the limit of ${limit})` : ""}`,
+    `Attuned ${p.name} to ${name}: attuned ${count + 1}/${limit}${over ? ` (DM override past the limit of ${limit})` : ""}`,
     "management",
     p.id,
     {
@@ -179,7 +190,7 @@ export function applyAttunementCommand(
 
 /** The attuned holdings before a command: id → holder and name. */
 export function attunedBefore(holdings: readonly Holding[]): Map<string, { purseId: string; name: string }> {
-  return new Map(holdings.filter((h) => h.attuned).map((h) => [h.id, { purseId: h.purseId, name: h.name }]));
+  return new Map(holdings.filter((h) => h.attuned).map((h) => [h.id, { purseId: h.purseId, name: presentedHolding(h).name }]));
 }
 
 /**
@@ -223,12 +234,13 @@ export function settleAttunement(
             ? "is no longer carried"
             : holder?.kind !== "character"
               ? "is no longer held by a character"
-              : h.kind !== "item" || !h.requiresAttunement
+              : h.kind !== "item" || !attunementRequirement(h)
                 ? "no longer requires attunement"
                 : null;
     if (!why) continue;
     delete h.attuned;
-    ended(was.purseId, h.id, was.name, why);
+    // Named as it is now: unidentifying an attuned item must not print its true name here.
+    ended(was.purseId, h.id, presentedHolding(h).name, why);
   }
   for (const [holdingId, was] of before)
     if (!present.has(holdingId)) ended(was.purseId, holdingId, was.name, "left the character");

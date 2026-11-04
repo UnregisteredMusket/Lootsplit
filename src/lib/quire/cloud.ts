@@ -15,9 +15,11 @@ import { mergeNoteLists, readNotes } from "./chat.ts";
 import { readGifts } from "./gift.ts";
 import { mergeLoanLists, readListings, readLoans, readSales, type Listing, type LoanAsk } from "./market.ts";
 import { fromCopper } from "./money.ts";
+import { hasMerchantPurse, MAX_MERCHANT_PURSE } from "./merchant.ts";
 import { mergeSheets, readSheets, type CharacterSheet } from "./sheet.ts";
 import { lesserQuantity, type BillFile } from "./table.ts";
 import { readHandouts, type Handout } from "./handouts.ts";
+import { isUnidentified, keepIdentity } from "./item-identity.ts";
 import { characterControl, type Coins, type Holding, type LedgerLine, type Purse, type Shop, type StockLine } from "./types.ts";
 
 export type CloudTable = {
@@ -176,7 +178,23 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
     const next = bill.purses.find((item) => item.id === purse.id);
     return next && purseIds.has(purse.id) ? next : { ...purse, coins: { ...purse.coins } };
   });
-  const holdings = [...table.holdings.filter((holding) => !purseIds.has(holding.purseId)), ...bill.holdings.filter((holding) => purseIds.has(holding.purseId))];
+  // Item identification: a player's bill lists unidentified items as presented; the true item is
+  // kept, with only its quantity, equipped state and weight taken from the bill (item-identity.ts).
+  const holdings = [
+    ...table.holdings.filter((holding) => !purseIds.has(holding.purseId)),
+    ...bill.holdings
+      .filter((holding) => purseIds.has(holding.purseId))
+      .map((holding) => {
+        // By item ID only: a bill can't set, drop or change a presented record.
+        const old = table.holdings.find((h) => h.id === holding.id);
+        // Another purse's item can't be taken over by naming its ID.
+        if (old && !purseIds.has(old.purseId)) throw Error("This report changes an item another character holds. Nothing was changed.");
+        if (old && isUnidentified(old)) return { ...keepIdentity(old, holding), purseId: holding.purseId };
+        if (holding.unidentified === undefined) return holding;
+        const { unidentified: _dropped, ...plain } = holding;
+        return plain;
+      }),
+  ];
   const stock = table.stock.map((line) => {
     const update = bill.stock.find((item) => item.id === line.id);
     if (!update) return line;
@@ -184,7 +202,19 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
     return quantity === line.quantity ? line : { ...line, quantity };
   });
   const have = new Set(table.ledger.map((line) => line.id));
-  const ledger = [...table.ledger, ...bill.ledger.filter((line) => !have.has(line.id) && purseIds.has(line.purseId))];
+  const added = bill.ledger.filter((line) => !have.has(line.id) && purseIds.has(line.purseId));
+  const ledger = [...table.ledger, ...added];
+  // Merchant purses (merchant.ts): a reported sale is paid from the shop's purse and a reported
+  // purchase is paid into it; a report the purse can't cover is refused whole.
+  const shops = table.shops.map((shop) => {
+    if (!hasMerchantPurse(shop)) return shop;
+    const delta = added.filter((line) => line.shopId === shop.id).reduce((sum, line) => sum + line.copper, 0);
+    if (!delta) return shop;
+    const after = shop.merchantPurse - delta;
+    if (!Number.isSafeInteger(after) || after < 0 || after > MAX_MERCHANT_PURSE)
+      throw Error("Conflict: a merchant can't afford the sales in this report. No report changes were imported.");
+    return { ...shop, merchantPurse: after };
+  });
   const giftSeen = new Set(seen.gifts);
   for (const gift of readGifts(bill.gifts)) {
     if (giftSeen.has(gift.id) || !purseIds.has(gift.fromId)) continue;
@@ -214,7 +244,7 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
       realm: table.realm,
       purses,
       holdings,
-      shops: table.shops,
+      shops,
       stock,
       ledger,
       listings,

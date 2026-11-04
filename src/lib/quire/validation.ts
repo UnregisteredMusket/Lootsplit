@@ -1,5 +1,6 @@
 import { historyWindow } from "./history-window.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
+import { MAX_MERCHANT_PURSE } from "./merchant.ts";
 import { characterPermissionsSchema } from "../characters/permissions.mjs";
 import { z } from "zod";
 import { artworkSchema } from "./artwork.ts";
@@ -13,6 +14,7 @@ import { custodySchema, estateKey } from "./estate-schema.ts";
 import { tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
 import { lootLedgerSchema, lootPoolMarkerSchema } from "./loot-claims-schema.ts";
 import { awardTagSchema } from "./award-tag.ts";
+import { presentedHolding, unidentifiedSchema } from "./item-identity.ts";
 import {
   attunementLimitSchema,
   attunementProblem,
@@ -60,6 +62,7 @@ export const holdingSchema = z.object({
   weight: z.number().min(0).max(9999).optional(),
   equipped: z.boolean().optional(),
   pool: lootPoolMarkerSchema.optional(),
+  unidentified: unidentifiedSchema.optional(),
   requiresAttunement: requiresAttunementSchema.optional(),
   attuned: z.literal(true).optional(),
   uses: holdingUsesSchema.optional(),
@@ -72,6 +75,11 @@ const shop = z.object({
   schedule: shopScheduleSchema.optional(),
   acceptedCategories: z.array(z.string().max(80)).max(20).optional(),
   acceptAnyCategory: z.boolean().optional(),
+  merchantPurse: z.number().int().min(0).max(MAX_MERCHANT_PURSE).optional(),
+  merchantPurseRefill: z.number().int().min(0).max(MAX_MERCHANT_PURSE).optional(),
+  showPurse: z.boolean().optional(),
+  purchaseLimit: amount.optional(),
+  offListPercent: z.number().int().min(0).max(100).optional(),
   id,
   closed: z.boolean().optional(),
   image: artworkSchema.optional(),
@@ -145,10 +153,12 @@ export function validateEconomyRows(value: {
     if (window) for (const id of ids) if (!window.initialIds.has(id)) window.pendingIds.add(id);
     if (key === "holdings" && (rows as import("./types.ts").Holding[]).some(holding => holding.deed && (holding.kind !== "property" || holding.deed.ownerId !== holding.purseId)))
       throw Error("A deed must belong to its property owner. The current campaign was not changed.");
+    if (key === "holdings" && (rows as import("./types.ts").Holding[]).some((h) => h.unidentified && (h.kind !== "item" || h.deed || h.property || h.service)))
+      throw Error("Only an item can be unidentified. The current campaign was not changed.");
     if (key === "holdings")
       for (const holding of rows as import("./types.ts").Holding[]) {
         const problem = usesProblem(holding) ?? attunementProblem(holding);
-        if (problem) throw Error(`${holding.name}: ${problem} The current campaign was not changed.`);
+        if (problem) throw Error(`${presentedHolding(holding).name}: ${problem} The current campaign was not changed.`);
       }
     if (key === "purses")
       for (const purse of rows as import("./types.ts").Purse[]) {

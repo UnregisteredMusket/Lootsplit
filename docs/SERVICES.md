@@ -188,8 +188,10 @@ price as cloth the party may bring or the tailor supplies.
   NPC, appends `Day N · identified by {NPC}: {text}` to the item's notes when ticked (old notes
   stay) and renames it when asked, all in one command; `order.reveal` records it. Deny or withdraw
   moves nothing.
-- **Phase 5 hook**: `revealIdentify` in `services-command.ts` is where the item-identification
-  reveal will be called, so payment and reveal stay atomic.
+- **Phase 5 hook**: `revealIdentify` in `services-command.ts` identifies an unidentified item
+  (`identifyHolding`, item-identity.ts) before the answer is appended, in the same command as the
+  payment, with one logged "Identified by {NPC}" event. The order's `terms.item` records the item
+  as the payer knows it (presented name and description).
 - **Privacy**: other players never receive the order or the thread; the answer exists only after
   approval. Protocol 8 clients never receive Identify offers or orders (key whitelist).
 

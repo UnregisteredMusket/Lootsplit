@@ -41,6 +41,11 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  /**
+   * Item identification (phase 5): while present, everyone but the DM is told this presented
+   * record in place of the true name, notes and value (item-identity.ts). Absent: identified.
+   */
+  unidentified?: import("./item-identity.ts").Unidentified;
   /** Items only: the attunement requirement's text, e.g. "Requires attunement: by a wizard" (attunement.ts). */
   requiresAttunement?: string;
   /** The holding character is attuned to this item (one of a stack). Changed only by item-attune. */
@@ -97,6 +102,20 @@ export type Shop = {
   schedule?: import("./shop-schedule.ts").ShopSchedule;
   acceptedCategories?: string[];
   acceptAnyCategory?: boolean;
+  /** Merchant purse (merchant.ts): whole copper the shop can pay out. Unset = unlimited. DM-only unless `showPurse`. */
+  merchantPurse?: number;
+  /** Restock tops the purse up to this amount (never reduces it). DM-only unless `showPurse`. */
+  merchantPurseRefill?: number;
+  /** "Show the shop's purse to players" (off by default). */
+  showPurse?: boolean;
+  /** The most the shop pays for one item, in whole copper (PF1-style purchase limit). */
+  purchaseLimit?: number;
+  /** Buys categories outside its buy list at this % (1–100) of its normal buy rate; 0/unset refuses them. */
+  offListPercent?: number;
+  /** Player projection only: the shop has a purse the DM keeps hidden. */
+  purseLimited?: boolean;
+  /** Player projection only: whether the hidden purse covers each readable lot. */
+  merchantAffords?: Record<string, "all" | "some" | "none">;
   closed?: boolean;
   image?: string;
   id: string;

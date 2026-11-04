@@ -740,7 +740,13 @@ export function LootClaimsReview() {
   useEffect(() => {
     if (historyMissing) void loadAllHistory().catch(() => undefined);
   }, [historyMissing]);
+  // The plan and its receipt use what players read (unidentified items at their presented
+  // value, as the server does); the comparison shown to the DM uses the true totals.
   const totals = useMemo(
+    () => (favouring ? fairnessStandings(fair.table, favourBasis, { presented: true }) : null),
+    [favouring, fair.table, favourBasis],
+  );
+  const dmTotals = useMemo(
     () => (favouring ? fairnessStandings(fair.table, favourBasis) : null),
     [favouring, fair.table, favourBasis],
   );
@@ -928,7 +934,7 @@ export function LootClaimsReview() {
                 entered={entered}
                 setEntered={setEntered}
                 keyOf={key}
-                favour={totals && plain ? { totals, plain } : null}
+                favour={totals && plain ? { totals: dmTotals ?? totals, plain } : null}
               />
             ) : (
               <p className="coin-split-hint" role="status">

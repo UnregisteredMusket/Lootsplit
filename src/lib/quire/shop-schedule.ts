@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Shop, StockLine } from "./types.ts";
+import { merchantRefill } from "./merchant.ts";
 export const shopScheduleSchema = z.object({
   cycleDays: z.number().int().min(1).max(30),
   openDays: z.array(z.number().int().min(0).max(29)).max(30),
@@ -13,12 +14,16 @@ export function scheduledMarket(shops: Shop[], stock: StockLine[], day: number) 
     const schedule = shopScheduleSchema.parse(shop.schedule);
     if (schedule.lastRestockDay > day) throw Error("Shop schedule starts after the campaign day.");
     const periods = schedule.restockEveryDays ? Math.floor((day - schedule.lastRestockDay) / schedule.restockEveryDays) : 0;
+    const refill = merchantRefill(shop);
     return {
       shopId: shop.id,
       before: JSON.stringify({ closed: shop.closed, schedule }),
       closed: !schedule.openDays.includes(day % schedule.cycleDays),
       lastRestockDay: schedule.lastRestockDay + periods * schedule.restockEveryDays,
       stock: periods ? stock.filter((s) => s.shopId === shop.id && s.quantity !== null).map((s) => ({ id: s.id, before: s.quantity!, after: Math.max(s.quantity!, schedule.restockQuantity) })) : [],
+      // Merchant purse: a scheduled restock tops it up to the refill amount. Present only when it
+      // changes, so a quote saved before merchant purses still matches.
+      ...(periods && refill ? { purse: refill } : {}),
     };
   }).sort((a,b) => a.shopId.localeCompare(b.shopId));
 }

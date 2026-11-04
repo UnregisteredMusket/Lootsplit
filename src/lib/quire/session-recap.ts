@@ -27,6 +27,7 @@ import { isNpc, partyFunds } from "./coin-split.ts";
 import { readJournal, selectSessionLedgerRows, type Journal } from "./journal.ts";
 import { formatCopper } from "./money.ts";
 import { splitActivity } from "./split-activity.ts";
+import { projectIdentities } from "./item-identity.ts";
 import { characterControl, type LedgerLine, type Purse } from "./types.ts";
 
 export type RecapAudience =
@@ -86,6 +87,9 @@ export function buildSessionRecap(
   audience: RecapAudience,
 ): SessionRecap {
   const recap: SessionRecap = { sessionId: session.id, name: session.name, sections: [] };
+  // Item identification: the party draft is what players will read, so unidentified items are
+  // named and valued as presented (a player's own source is already projected).
+  if (audience.kind !== "dm" && source.holdings) source = projectIdentities({ holdings: source.holdings, journal: source.journal }, source);
   let journal: Journal;
   try {
     journal = readJournal(source.journal);

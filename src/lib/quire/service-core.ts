@@ -5,6 +5,7 @@ import { partyPlaces } from "./party-groups.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { assertCarried } from "./custody.ts";
 import type { Holding } from "./types.ts";
+import { presentedHolding } from "./item-identity.ts";
 
 // Shared pieces of the NPC service engines (docs/SERVICES.md). The blacksmith was the first
 // engine; these were lifted out of it unchanged so later providers (temple, workshop, inn)
@@ -84,13 +85,16 @@ export function assertContribution(
   rule: { materialKey?: string; minCopper?: number; mismatch: string; equipped: string },
 ): Holding {
   const h = t.holdings.find((h) => h.id === holdingId);
+  // Item identification: an unidentified item counts as what the payer knows it to be.
+  const shown = h && presentedHolding(h);
   if (
     !h ||
+    !shown ||
     h.kind !== "item" ||
     h.service ||
     h.purseId !== purseId ||
-    (rule.materialKey !== undefined && h.materialKey !== rule.materialKey) ||
-    (rule.minCopper !== undefined && h.unitCopper < rule.minCopper)
+    (rule.materialKey !== undefined && shown.materialKey !== rule.materialKey) ||
+    (rule.minCopper !== undefined && shown.unitCopper < rule.minCopper)
   )
     throw Error(rule.mismatch);
   assertCarried(h);

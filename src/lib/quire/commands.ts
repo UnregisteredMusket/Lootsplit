@@ -9,6 +9,16 @@ import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange
 import { worldCommands, readWorld, type WorldCommand } from "./world-schema.ts";
 import { journeyCommands, journeyKinds, type JourneyCommand } from "./journey-schema.ts";
 import {
+  identifyHolding,
+  isUnidentified,
+  knownUnitCopper,
+  presentedHolding,
+  identityLineage,
+  redactWritten,
+  unidentifiedSchema,
+  writtenBaseline,
+} from "./item-identity.ts";
+import {
   applyJourneyCommand,
   prepareJourneyPlan,
   quoteHash,
@@ -56,7 +66,7 @@ import {
   applyDowntime,
   financeMove,
 } from "./finance.ts";
-import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
+import { assertMerchantSale, creditMerchant, isService, merchantRefill, merchantShortfall, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
 import { archiveSession } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
@@ -150,6 +160,13 @@ export const commandSchema = z.discriminatedUnion("kind", [
     .strict(),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
+  /**
+   * Item identification (phase 5, DM only): set or edit what players are told about an item
+   * (`before` is the presented record the DM edited from, null for an identified item)...
+   */
+  z.object({ ...base, kind: z.literal("item-unidentify"), holdingId: id, before: unidentifiedSchema.nullable(), unidentified: unidentifiedSchema }).strict(),
+  /** ...and reveal it: one logged event, after which everyone sees the true item. */
+  z.object({ ...base, kind: z.literal("item-identify"), holdingId: id, before: unidentifiedSchema }).strict(),
   z.object({ ...base, kind: z.literal("property-plan"), holdingId: id, income: amount, upkeep: amount, periodDays: z.number().int().min(1).max(3650), active: z.boolean() }),
   z.object({
     ...base,
@@ -362,7 +379,11 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
 /** One private working copy per atomic batch. Every command retains its full validation. */
 export function applyCommandBatch(input: CloudTable, seat: CloudSeat, commands: Command[], executionFor: (command: Command) => TradeExecution = () => ({})): CloudTable {
   let table = structuredClone(input);
-  for (const command of commands) table = applyOwnedCommand(table, seat, command, executionFor(command));
+  // Hidden merchant purses: refused last, after every other command in the batch validated.
+  const merchantShortfalls: string[] = [];
+  for (const command of commands)
+    table = applyOwnedCommand(table, seat, command, { ...executionFor(command), merchantShortfalls });
+  if (merchantShortfalls.length) throw Error(merchantShortfalls[0]);
   return table;
 }
 function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution): CloudTable {
@@ -371,6 +392,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   const at = Date.now();
   // `let`: archiveSession replaces t.journal, and everything after it must write to the new one.
   let journal = (t.journal = readJournal(t.journal));
+  // Item identification: what this command writes names unidentified items as presented.
+  const written = t.holdings.some(isUnidentified) ? writtenBaseline(t) : null;
   // Attunement ends when an attuned item leaves its character in this command (settleAttunement).
   const attuned = attunedBefore(t.holdings);
   // Exchange editors can address a legacy city's default before its first save.
@@ -411,6 +434,20 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const p = t.purses.find((p) => p.id === purseId);
     if (!p) throw new Error("Account no longer exists.");
     return p;
+  };
+  // Merchant purse (merchant.ts). A seat that can't read the purse never learns from the order of
+  // errors whether a sale fit: in a batch the shortfall is refused only after every other command
+  // validated (applyCommandBatch), and a staged batch is checked again at final submit.
+  const merchantPays = (shop: import("./types.ts").Shop, copper: number) => {
+    const reveal = revealPurse(shop, seat.role);
+    if (!reveal && (execution.staged || execution.merchantShortfalls)) {
+      const short = merchantShortfall(shop, copper, false);
+      if (short) {
+        if (!execution.staged) execution.merchantShortfalls!.push(short);
+        return;
+      }
+    }
+    payFromMerchant(shop, copper, reveal);
   };
   const dm = () => {
     if (seat.role !== "dm") throw new Error("Only the DM can perform this action.");
@@ -664,6 +701,24 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         ? `Party location: ${market.locations.find((location) => location.id === cmd.locationId)?.name}${cmd.journeyId ? " (journey arrived)" : ""}`
         : "Party location cleared; all shops available",
     );
+  } else if (cmd.kind === "item-unidentify") {
+    dm();
+    const h = t.holdings.find((x) => x.id === cmd.holdingId);
+    if (!h) throw Error("This item no longer exists.");
+    if (h.kind !== "item" || h.deed || h.property || h.service) throw Error("Only an item can be unidentified.");
+    if (!same(h.unidentified ?? null, cmd.before)) throw Error("What players are told about this item changed. Review it again.");
+    if (same(h.unidentified ?? null, cmd.unidentified)) return t;
+    // The server's lineage IDs stay with the item (identityLineage).
+    h.unidentified = { ...cmd.unidentified, ...(h.unidentified?.ids ? { ids: h.unidentified.ids } : {}) };
+    event(`${cmd.before ? "Unidentified item updated" : "Marked unidentified"}: ${h.name} (players see ${cmd.unidentified.name})`, "management", h.purseId);
+    journal.events[journal.events.length - 1]!.dmOnly = true;
+  } else if (cmd.kind === "item-identify") {
+    dm();
+    const h = t.holdings.find((x) => x.id === cmd.holdingId);
+    if (!h) throw Error("This item no longer exists.");
+    if (!isUnidentified(h)) throw Error("This item is already identified.");
+    if (!same(h.unidentified, cmd.before)) throw Error("What players are told about this item changed. Review it again.");
+    identifyHolding(t, h, cmd.id, at);
   } else if (cmd.kind === "property-details") {
     const h = t.holdings.find(
       (h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0,
@@ -1100,6 +1155,18 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       line.quantity! += cmd.quantity;
     }
     event(`Restocked ${shop.name}: +${cmd.quantity} per finite stock line`);
+    // The DM's Restock also refills a merchant purse to its refill amount (DM-only event).
+    const refill = merchantRefill(shop);
+    if (refill) {
+      shop.merchantPurse = refill.after;
+      journal.events.push({
+        id: `${cmd.id}-purse`,
+        at,
+        kind: "management",
+        dmOnly: true,
+        summary: `${shop.name}: merchant purse refilled ${formatCopper(refill.before)} → ${formatCopper(refill.after)}`,
+      });
+    }
   } else if (cmd.kind === "buy") {
     own(cmd.purseId);
     const s = t.stock.find((x) => x.id === cmd.stockId),
@@ -1112,6 +1179,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
     const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity).total;
     coins(cmd.purseId, -cost);
+    creditMerchant(shop, cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
     const purchasedHolding: import("./types.ts").Holding | null = isService(s)
       ? null
@@ -1213,13 +1281,17 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.kind === "property") assertEstateDisposable(t, h.id);
     assertMerchantSale(h, s);
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
-    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity).total;
+    // An unidentified item sells at its presented value and category (shopSellBreakdown).
+    const shown = presentedHolding(h);
+    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h).total;
+    // Merchant purse: the shop pays from it, or the whole sale is refused.
+    merchantPays(s, paid);
     coins(h.purseId, paid);
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
-    log(h.purseId, `Sold ${cmd.quantity} ${h.name} to ${s.name}`, paid, s.id);
+    log(h.purseId, `Sold ${cmd.quantity} ${shown.name} to ${s.name}`, paid, s.id);
     const linked = t.stock.find(
-      (line) => line.shopId === s.id && line.commodityId === h.commodityId && h.commodityId,
+      (line) => line.shopId === s.id && line.commodityId === shown.commodityId && shown.commodityId,
     );
     if (linked) {
       const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: linked.id, purseId: h.purseId, direction: "sell", quantity: cmd.quantity, copper: paid });
@@ -1381,7 +1453,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         rule: cmd.remainder.rule,
         ...(cmd.remainder.purseId ? { purseId: cmd.remainder.purseId } : {}),
       },
-      { actor: seat.role === "dm" ? "dm" : "player", projected },
+      // The purse is checked below (merchantPays), in the batch order that keeps a hidden purse hidden.
+      { actor: seat.role === "dm" ? "dm" : "player", projected, skipPurse: true },
     );
     if (
       plan.proceeds !== cmd.expect.proceeds ||
@@ -1389,6 +1462,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       plan.split.remainderTo !== cmd.expect.remainderTo
     )
       throw Error("The sale or split changed (prices, items, the party fund or recipients moved). Review it again.");
+    // Merchant purse: the whole sale is paid from it or nothing is sold (never half a sale).
+    merchantPays(shop, plan.proceeds);
     // The sale: the fund receives each lot's price (keeping its own coins), one sale line per lot.
     fund.coins = creditCoins(fund.coins, plan.proceeds);
     for (const [i, lot] of plan.lots.entries()) {
@@ -1400,11 +1475,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         at,
         purseId: fund.id,
         shopId: shop.id,
-        summary: `Sold ${lot.quantity} ${h.name} to ${shop.name}`,
+        summary: `Sold ${lot.quantity} ${lot.name} to ${shop.name}`,
         copper: lot.paid,
         transactionType: "sale",
       });
-      const linked = t.stock.find((line) => line.shopId === shop.id && line.commodityId === h.commodityId && h.commodityId);
+      const shown = presentedHolding(h);
+      const linked = t.stock.find((line) => line.shopId === shop.id && line.commodityId === shown.commodityId && shown.commodityId);
       if (linked) {
         const receipt = recordShopTrade(t, { id: lineId, at, stockId: linked.id, purseId: fund.id, direction: "sell", quantity: lot.quantity, copper: lot.paid });
         if (receipt) t.ledger[t.ledger.length - 1].trade = { receiptId: receipt.id, leg: "owner" };
@@ -1598,6 +1674,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         if (after.purseId !== current.purseId) throw Error(POOL_GUARD);
         if (!after.pool) change.after = { ...after, pool: current.pool };
       }
+      // Item identification: revealing is logged, so only `item-identify` clears the presented
+      // record; a holding saved without it (an older client) stays unidentified.
+      if (change.store === "holdings" && isUnidentified(current) && change.after !== null) {
+        const after = change.after as import("./types.ts").Holding;
+        if (!after.unidentified) change.after = { ...after, unidentified: current.unidentified };
+      }
       // Attunement changes through item-attune. An edit that keeps an attuned item with its
       // character keeps the attunement and its requirement (an older client may drop them).
       if (change.store === "holdings" && current?.attuned && change.after !== null) {
@@ -1631,6 +1713,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     events.push({ id: cmd.id + "-event-" + events.length, at, summary, kind, purseId, change });
   });
   if (journal.finance) journal.finance = readFinance(journal.finance);
+  if (written) {
+    identityLineage(written.holdings, t as { holdings: typeof t.holdings; journal: { events: object[] } }, cmd.id, at);
+    redactWritten(written, t);
+  }
   if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
     !same(originalLocations, t.journal?.market?.locations))
     ensureCityExchanges(t);

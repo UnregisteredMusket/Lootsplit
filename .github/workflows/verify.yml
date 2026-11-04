@@ -255,6 +255,12 @@ jobs:
       - name: dev-sell-and-split
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-sell-and-split 240 node scripts/sell-and-split-browser-audit.mjs
+      - name: dev-item-identification
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-item-identification 240 node scripts/item-identification-browser-audit.mjs
+      - name: dev-merchant-purse
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-merchant-purse 240 node scripts/merchant-purse-browser-audit.mjs
       - name: dev-price-breakdown
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-price-breakdown 240 node scripts/price-breakdown-browser-audit.mjs

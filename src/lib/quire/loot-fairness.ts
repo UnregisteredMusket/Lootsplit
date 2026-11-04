@@ -25,9 +25,10 @@ import { DEFERRED_REPORT_PREFIX, isDeferredSnapshot } from "./history-pages.ts";
 import { characterVisible, inParty } from "./character-position.ts";
 import { isNpc } from "./coin-split.ts";
 import type { CloudTable } from "./cloud.ts";
+import { redactIdentity, tableSecrets } from "./item-identity.ts";
 import type { LedgerLine, Purse } from "./types.ts";
 
-export type FairTable = Pick<CloudTable, "purses" | "ledger" | "journal">;
+export type FairTable = Pick<CloudTable, "purses" | "ledger" | "journal"> & { holdings?: CloudTable["holdings"] };
 export type FairViewer = { dm: boolean; purseIds: string[] };
 type Journal = NonNullable<CloudTable["journal"]>;
 type Session = Journal["sessions"][number];
@@ -670,14 +671,21 @@ export function fairnessReceipts(
  * Computed from the table the command runs against (never from the client). DM view: every
  * character's received total, whether or not it is compared.
  */
-export function fairnessStandings(t: FairTable, basis: "campaign" | "session"): Map<string, number> {
+export function fairnessStandings(
+  t: FairTable,
+  basis: "campaign" | "session",
+  /** Item identification: count unidentified items at their presented value (what players read). */
+  options: { presented?: boolean } = {},
+): Map<string, number> {
   let period = "campaign";
   if (basis === "session") {
     const active = (t.journal?.sessions ?? []).find((s) => !s.endedAt);
     if (!active) throw Error("No session is running. Favour whoever is behind using campaign-to-date totals instead.");
     period = active.id;
   }
-  const index = indexOf(t);
+  // Item identification: totals that land in a receipt players read (treasure-pool favour) count
+  // unidentified items at their presented value; the DM's own view counts true values.
+  const index = indexOf(options.presented && t.holdings ? { ...t, ledger: redactIdentity(t.ledger, tableSecrets({ holdings: t.holdings, journal: t.journal })) } : t);
   const out = new Map<string, number>();
   for (const r of index.receipts) if (period === "campaign" || r.period === period) out.set(r.purseId, (out.get(r.purseId) ?? 0) + r.coins + r.items);
   return out;

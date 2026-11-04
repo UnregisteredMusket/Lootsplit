@@ -31,6 +31,7 @@ import {
   type CloudTable,
 } from "./cloud.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
+import { projectIdentities, redactIdentity, tableSecrets } from "./item-identity.ts";
 import { playerLedgerLine, playerTable } from "./player-view.ts";
 import { HistoryNeeded, runOnWorkingSet } from "./history-window.server.ts";
 import { receiptForLine } from "./ledger-reversal.ts";
@@ -722,7 +723,8 @@ async function seatTable(room: CloudRoom, seat: CloudSeat) {
           journal,
           notes: room.table.notes.filter((note) => canReadNote(note, seat)),
         }
-      : playerTable(room.table, record, seat);
+      : // Item identification: `playerTable` reads ledger lines and own purses from the room.
+        projectIdentities(room.table, playerTable(room.table, record, seat));
   return { record, table, posters };
 }
 
@@ -866,14 +868,18 @@ async function historyProjector(table: CloudTable, seat: CloudSeat, code: string
   const party = compares
     ? table.purses.filter((p) => fairnessEligible(table, p)).map((p) => [p.id, p.name]).sort()
     : [];
+  // Item identification: older pages name unidentified items as presented, as the view does; a
+  // reveal changes what they say, so the unidentified items are part of the fingerprint.
+  const secrets = dm ? new Map() : tableSecrets(table);
+  const hidden = [...secrets.keys()].sort();
   const fingerprint = (
     await sha256Hex(
-      JSON.stringify(["lootsplit-history-projection-v1", code, seat.id, seat.role, [...visible.purseIds].sort(), ledgerPurses, compares, party]),
+      JSON.stringify(["lootsplit-history-projection-v1", code, seat.id, seat.role, [...visible.purseIds].sort(), ledgerPurses, compares, party, ...(hidden.length ? [hidden] : [])]),
     )
   ).slice(0, 32);
   return {
-    ledger: (lines) => lines.filter(line),
-    notes: (notes) => notes.filter((note) => readNote(note)),
+    ledger: (lines) => redactIdentity(lines.filter(line), secrets),
+    notes: (notes) => redactIdentity(notes.filter((note) => readNote(note)), secrets),
     visible: (list, keys) => {
       if (!keys) return true;
       if (list === "ledger") return dm || keys.some((key) => line({ purseId: JSON.parse(key)[0] } as CloudTable["ledger"][number]));
@@ -1097,6 +1103,8 @@ export async function submitCommands(input: {
       const applied = upgradeOldClientCommands(base, unapplied, input.tabletopProtocol ?? 0);
       return applyCommandBatch(base, seat, applied, (command) => ({
         source: "server",
+        // Hidden merchant purses are checked when the turn is submitted, not while staging.
+        ...(input.stage ? { staged: true } : {}),
         manualRolls,
         mapCombat,
         playerSeats: room.seats.filter((s) => s.role === "player").map((s) => ({ id: s.id, purseIds: s.purseIds })),

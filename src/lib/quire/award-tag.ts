@@ -10,6 +10,7 @@
  */
 import { z } from "zod";
 import type { LedgerLine } from "./types.ts";
+import type { Unidentified } from "./item-identity.ts";
 
 const id = z.string().min(1).max(150);
 const whole = z.number().int().nonnegative().max(1e12);
@@ -21,6 +22,8 @@ export const awardTagSchema = z
     role: z.enum(["coins", "item"]),
     quantity: z.number().int().min(1).max(100000).optional(),
     unitCopper: whole.optional(),
+    /** Item lines from 2026-11-04: the holding the award created, so a later mark is matched. */
+    holdingId: id.optional(),
   })
   .strict();
 export type AwardTag = z.infer<typeof awardTagSchema>;
@@ -52,9 +55,14 @@ export function encounterItemLine(
   index: number,
   at: number,
   purseId: string,
-  item: { name: string; quantity: number; unitCopper: number },
+  item: { name: string; quantity: number; unitCopper: number; unidentified?: Unidentified },
   encounterName: string,
+  holdingId?: string,
 ): LedgerLine {
+  // Item identification: an item awarded unidentified is recorded as the party is told it, with
+  // its presented value (or no value: "No value was recorded" in the Fairness ledger).
+  const name = item.unidentified ? item.unidentified.name : item.name;
+  const unitCopper = item.unidentified ? item.unidentified.value : item.unitCopper;
   if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 100000)
     throw Error("Each awarded item needs a whole quantity of at least 1.");
   if (!Number.isSafeInteger(item.unitCopper) || item.unitCopper < 0 || item.unitCopper > 1e12)
@@ -64,9 +72,15 @@ export function encounterItemLine(
     at,
     purseId,
     shopId: null,
-    summary: `Encounter loot: ${item.quantity} × ${item.name} (${encounterName})`,
+    summary: `Encounter loot: ${item.quantity} × ${name} (${encounterName})`,
     copper: 0,
     transactionType: "adjustment",
-    award: { receiptId, role: "item", quantity: item.quantity, unitCopper: item.unitCopper },
+    award: {
+      receiptId,
+      role: "item",
+      quantity: item.quantity,
+      ...(unitCopper === undefined ? {} : { unitCopper }),
+      ...(holdingId ? { holdingId } : {}),
+    },
   };
 }

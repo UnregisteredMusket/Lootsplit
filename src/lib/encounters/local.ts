@@ -291,16 +291,18 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
           for (const [index, item] of e.loot.entries()) {
             if (item.pool) continue;
             const p = recipient(item.purseId);
+            const holdingId = `${receiptId}-item-${index}`; // One ID on both award paths.
             tx.objectStore("holdings").put({
-              id: crypto.randomUUID(),
+              id: holdingId,
               purseId: p.id,
               name: item.name,
               kind: "item",
               quantity: item.quantity,
               unitCopper: item.unitCopper,
               notes: item.notes,
+              ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
             });
-            tx.objectStore("ledger").put(encounterItemLine(receiptId, index, at, p.id, item, e.name));
+            tx.objectStore("ledger").put(encounterItemLine(receiptId, index, at, p.id, item, e.name, holdingId));
           }
           r.award = { receiptId, at, ...(splitReceipt ?? {}), ...(pool ? { poolFundId: pool.fundId } : {}) };
           r.status = "awarded";

@@ -19,7 +19,7 @@ import { AppLink } from "./app-link";
 import { LedgerArt } from "./ledger-art";
 import { RecordRow, type RecordMenuItem } from "./record-row";
 import { Button, Field, Modal, Segmented, Switch, TextInput } from "./ui";
-import { attunedCount, attunementLimit } from "@/lib/quire/attunement";
+import { attunedCount, attunementLimit, attunementRequirement } from "@/lib/quire/attunement";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { holdingRecordId } from "@/lib/quire/finance-record-links";
 import { newCommandId } from "@/lib/quire/command-id";
@@ -45,6 +45,8 @@ import {
   type InventoryStack,
   stackKey,
 } from "@/lib/quire/inventory-stacks";
+import { ItemIdentityDialog } from "./item-identity-dialog";
+import { holdingValueKnown, unidentifiedLabel, UNKNOWN_VALUE } from "@/lib/quire/item-identity";
 import "./party-inventory.css";
 
 const GROUP_STORAGE = "lootsplit.inventory-group.v1";
@@ -123,6 +125,7 @@ export function PartyInventory({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Holding | null>(null);
+  const [presenting, setPresenting] = useState<Holding | null>(null);
   const [selling, setSelling] = useState<Holding | null>(null);
   const [recharging, setRecharging] = useState<Holding | null>(null);
   const [giving, setGiving] = useState<string[] | null>(null);
@@ -380,7 +383,7 @@ export function PartyInventory({
   function attunementItem(h: Holding): RecordMenuItem | null {
     if (!attuneHere || !canGive(h)) return null;
     if (h.attuned) return { label: "End attunement", onSelect: () => void changeAttunement(h, false) };
-    if (!h.requiresAttunement || h.kind !== "item") return null;
+    if (!attunementRequirement(h) || h.kind !== "item") return null;
     const holder = economy.purses.find((p) => p.id === h.purseId);
     const count = holder ? attunedCount(economy.holdings, holder.id) : 0,
       limit = attunementLimit(holder);
@@ -399,6 +402,9 @@ export function PartyInventory({
   function menuFor(h: Holding): RecordMenuItem[] {
     const items: RecordMenuItem[] = [];
     if (manage) items.push({ label: "Edit", onSelect: () => setEditing(h) });
+    // Item identification: what players are told about an unidentified item, and Identify.
+    if (manage && h.kind === "item" && !h.service)
+      items.push({ label: h.unidentified ? "What players see / Identify" : "Mark unidentified", onSelect: () => setPresenting(h) });
     const attune = attunementItem(h);
     if (attune) items.push(attune);
     if (h.uses && usesHere && (dm || (canGive(h) && !h.pool)))
@@ -458,6 +464,7 @@ export function PartyInventory({
           <span className="record-chip">{h.custody.kind === "transit" ? "In transit" : "Stored"}</span>
         ) : null}
         {h.reservedFor ? <span className="record-chip">Reserved</span> : null}
+        {h.unidentified ? <span className="record-chip">{unidentifiedLabel(h, dm)}</span> : null}
       </>
     );
   }
@@ -506,7 +513,7 @@ export function PartyInventory({
           ) : undefined
         }
         quantity={`×${h.quantity}`}
-        value={value(h.quantity * h.unitCopper)}
+        value={holdingValueKnown(h, dm) ? value(h.quantity * h.unitCopper) : UNKNOWN_VALUE}
         menu={menuFor(h)}
         menuLabel={`Actions for ${h.name}`}
         select={
@@ -545,7 +552,7 @@ export function PartyInventory({
           </>
         }
         quantity={`×${s.quantity}`}
-        value={value(s.copper)}
+        value={s.holdings.every((h) => holdingValueKnown(h, dm)) ? value(s.copper) : UNKNOWN_VALUE}
         expand={{
           open,
           label: `${open ? "Hide" : "Show"} the ${s.holdings.length} entries of ${first.name}`,
@@ -740,6 +747,7 @@ export function PartyInventory({
         </p>
       ) : null}
       <EditHolding holding={editing} onClose={() => setEditing(null)} />
+      <ItemIdentityDialog holding={presenting} onClose={() => setPresenting(null)} />
       <RechargeHolding
         holding={recharging ? (holdings.find((h) => h.id === recharging.id) ?? null) : null}
         onClose={() => setRecharging(null)}

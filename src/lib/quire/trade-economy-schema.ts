@@ -199,6 +199,14 @@ export type TradeExecution = {
   playerSeats?: { id: string; purseIds: string[] }[];
   /** Zones: the client predates zone requests (protocol < 18), so it can't ask the party. */
   zoneRequestsUnsupported?: boolean;
+  /**
+   * Merchant purses hidden from the seat (merchant.ts): shortfalls are collected here and the
+   * batch refuses them only after every other command validated, so another failure in the same
+   * batch can never reveal whether a sale fit the purse. Set by `applyCommandBatch`.
+   */
+  merchantShortfalls?: string[];
+  /** A staged (not committed) batch: hidden merchant purses are checked at final submit instead. */
+  staged?: boolean;
 };
 export const readTradeEconomy = (raw?: unknown): TradeEconomy =>
   tradeEconomySchema.parse(raw ?? {});

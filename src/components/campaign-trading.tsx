@@ -5,7 +5,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { readWorld, type Trade } from "@/lib/quire/world-schema";
 import { npcAvailableHere, npcController } from "@/lib/quire/world";
 import { companionFundsReadable } from "@/lib/quire/character-position";
-import { canonicalJson } from "@/lib/quire/canonical-json";
+import { snapshotText } from "@/lib/quire/item-identity";
 import { formatCopper } from "@/lib/quire/money";
 import type { Holding, Purse } from "@/lib/quire/types";
 import type { CloudTable } from "@/lib/quire/cloud";
@@ -248,7 +248,7 @@ function TradeEditor({
       .map(([id, quantity]) => {
         const h = available.find((h) => h.id === id);
         if (!h) throw Error("An offered item is no longer available. Review the inventory.");
-        return { holdingId: id, quantity, before: canonicalJson(h) };
+        return { holdingId: id, quantity, before: snapshotText(h) };
       }),
   });
   return (

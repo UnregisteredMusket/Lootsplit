@@ -1,6 +1,7 @@
 import { assertNotPooled } from "./custody.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
+import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
 import { readWorld, type Npc } from "./world-schema.ts";
 import { readFinance } from "./finance.ts";
 import { toCopper, formatCopper } from "./money.ts";
@@ -269,8 +270,11 @@ export function quoteNpcBarter(
     unreferenced: string[] = [];
   let given = input.ask.copper;
   for (const item of input.ask.items) {
-    const h = t.holdings.find((h) => h.id === item.holdingId && h.purseId === npc.id);
-    if (!h) throw Error("An item you asked for is no longer available. Review the offer.");
+    const found = t.holdings.find((h) => h.id === item.holdingId && h.purseId === npc.id);
+    if (!found) throw Error("An item you asked for is no longer available. Review the offer.");
+    // Item identification: an unidentified item counts at its presented value; none is unknown.
+    const h = presentedHolding(found);
+    if (knownUnitCopper(h) === null) unreferenced.push(h.name);
     given += h.unitCopper * item.quantity;
   }
   // Units of each good already received from the party in the window count toward the cap.
@@ -288,15 +292,16 @@ export function quoteNpcBarter(
   let received = input.give.copper;
   const wants = npc.barter?.wants;
   for (const item of input.give.items) {
-    const h = t.holdings.find((h) => h.id === item.holdingId && h.purseId === input.purseId);
-    if (!h) throw Error("An item you offered is no longer in your inventory. Review the offer.");
+    const found = t.holdings.find((h) => h.id === item.holdingId && h.purseId === input.purseId);
+    if (!found) throw Error("An item you offered is no longer in your inventory. Review the offer.");
+    const h = presentedHolding(found);
     assertNotPooled(h);
     if (wants && !wants.includes(h.category ?? "")) {
       unwanted.push(h.name);
       continue;
     }
     const override = options.values?.find((v) => v.holdingId === h.id);
-    if (h.valueSource === "player" && !override) {
+    if ((h.valueSource === "player" || knownUnitCopper(h) === null) && !override) {
       unreferenced.push(h.name);
       continue;
     }
