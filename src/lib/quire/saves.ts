@@ -1,6 +1,7 @@
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import type { QuireFile } from "./economy.ts";
 import type { LockedFile } from "./lock.ts";
+import { assertNotPreviewing } from "./player-preview.ts";
 
 const DB_NAME = "lootsplit-saves";
 const DB_VERSION = 1;
@@ -81,6 +82,8 @@ export async function rememberSave(input: {
   campaignId: string;
   file: SavePayload;
 }): Promise<LocalSave> {
+  // Read-only "Preview as player" (player-preview.ts): nothing is saved while it runs.
+  assertNotPreviewing();
   const save: LocalSave = {
     id: crypto.randomUUID(),
     name: cleanSaveName(input.name),

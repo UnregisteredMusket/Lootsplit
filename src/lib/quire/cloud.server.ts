@@ -1,10 +1,4 @@
-import {
-  characterVisible,
-  canReadCharacter,
-  companionFundsReadable,
-  inParty,
-  seatInParty,
-} from "./character-position.ts";
+import { characterVisible, canReadCharacter, seatInParty } from "./character-position.ts";
 import { fairnessDigestOfSnapshot, fairnessEligible, withArchivedFairness, type ArchivedFairnessDigest } from "./loot-fairness.ts";
 import {
   readRoom,
@@ -37,6 +31,7 @@ import {
   type CloudTable,
 } from "./cloud.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
+import { playerLedgerLine, playerTable } from "./player-view.ts";
 import { HistoryNeeded, runOnWorkingSet } from "./history-window.server.ts";
 import { receiptForLine } from "./ledger-reversal.ts";
 import { DEFERRED_REPORT_PREFIX, isDeferredSnapshot } from "./history-pages.ts";
@@ -49,10 +44,9 @@ import {
   roomPages,
   type HistoryProjector,
 } from "./history.server.ts";
-import { npcController } from "./world.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { roomCampaignName } from "./campaign-name.ts";
-import { characterControl, type Purse } from "./types.ts";
+import { characterControl } from "./types.ts";
 import type { BillFile } from "./table.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
@@ -838,41 +832,6 @@ export async function authorizedRoomImage(input: {
 }
 
 /**
- * Player projection on top of `projectRecord`. Owner decision (2026-10-22): other visible
- * party players' balances and ledger lines stay readable to party players, as before; a player
- * whose character is not with the party does not receive them. NPC, hidden-NPC,
- * exchange-treasury and non-party balances and ledger lines are never projected, and
- * purses the seat does not control never carry editing permissions. Owner decision (2026-10-22):
- * the DM may share party companion NPC funds with party players (off by default).
- */
-/**
- * Which ledger lines a player's view holds (owner decision 2026-10-22, see `playerTable`): lines
- * of purses the seat controls (and delegated NPCs), and of party balances or shared companion
- * funds this seat may read. Also used for older ledger pages (`readCloudHistory`).
- */
-function playerLedgerLine(table: CloudTable, seat: CloudSeat) {
-  const npcs = table.journal?.world?.npcs ?? [];
-  const npcIds = new Set(npcs.map((n) => n.id));
-  const controlled = new Set([
-    ...seat.purseIds,
-    ...npcs.filter((n) => npcController(n, seat)).map((n) => n.id),
-  ]);
-  const treasuries = new Set((table.journal?.tradeEconomy?.exchanges ?? []).map((e) => e.purseId));
-  const partyPlayer = (p: Purse) =>
-    characterVisible(table, p) &&
-    !p.nonParty &&
-    !npcIds.has(p.id) &&
-    !treasuries.has(p.id) &&
-    (p.kind === "party" || characterControl(p) === "player");
-  const viewerInParty = seatInParty(table, seat);
-  const byId = new Map(table.purses.map((p) => [p.id, p]));
-  return (l: CloudTable["ledger"][number]) => {
-    if (controlled.has(l.purseId)) return true;
-    const p = byId.get(l.purseId);
-    return !!p && ((viewerInParty && partyPlayer(p) && inParty(table, p)) || companionFundsReadable(table, p, seat));
-  };
-}
-/**
  * The view's rules for older history lines of one seat (`readCloudHistory`): the DM reads every
  * ledger line and the messages `canReadNote` allows; a player the ledger lines `playerLedgerLine`
  * allows and the messages `projectRecord` keeps (for the seat's visible characters).
@@ -930,64 +889,6 @@ async function sha256Hex(text: string) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
 }
-function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): CloudTable {
-  const npcs = table.journal?.world?.npcs ?? [];
-  const npcIds = new Set(npcs.map((n) => n.id));
-  // A delegated NPC controller acts for that NPC (barter offers), so it keeps that NPC's funds readout.
-  const controlled = new Set([
-    ...seat.purseIds,
-    ...npcs.filter((n) => npcController(n, seat)).map((n) => n.id),
-  ]);
-  const readableNpcs = new Set((record.journal?.world?.npcs ?? []).map((n) => n.id));
-  const treasuries = new Set(
-    (table.journal?.tradeEconomy?.exchanges ?? []).map((e) => e.purseId),
-  );
-  const partyPlayer = (p: Purse) =>
-    characterVisible(table, p) &&
-    !p.nonParty &&
-    !npcIds.has(p.id) &&
-    !treasuries.has(p.id) &&
-    (p.kind === "party" || characterControl(p) === "player");
-  // Party balances and ledger lines are shared only among the party: the viewer needs a visible
-  // character travelling with the party (as for companion funds), and the account must be in the
-  // party too. A player outside the party receives only their own (and delegated) data.
-  const viewerInParty = seatInParty(table, seat);
-  const sharedBalance = (p: Purse) => viewerInParty && partyPlayer(p) && inParty(table, p);
-  // DM setting "Party can see companion NPC funds": a visible NPC travelling with the party is
-  // readable (coins and ledger lines, never permissions) by seats with a visible party character.
-  const companion = (p: Purse) => companionFundsReadable(table, p, seat);
-  const byId = new Map(table.purses.map((p) => [p.id, p]));
-  return {
-    ...record,
-    ledger: table.ledger.filter(playerLedgerLine(table, seat)),
-    purses: record.purses.map((projected) => {
-      const p = byId.get(projected.id)!;
-      if (!characterVisible(table, p)) return projected;
-      if (seat.purseIds.includes(p.id)) {
-        if (canReadCharacter(table, p, seat)) return p;
-        const {
-          sheet: _sheet,
-          sheetRevision: _revision,
-          profileId: _profile,
-          editBaseline: _baseline,
-          rolls: _rolls,
-          ...ownPurse
-        } = p;
-        return ownPurse;
-      }
-      // Not controlled by this seat: the projected public fields only.
-      const portrait =
-        projected.portrait ??
-        (p.portrait && (partyPlayer(p) || readableNpcs.has(p.id)) ? p.portrait : undefined);
-      return {
-        ...projected,
-        ...(portrait ? { portrait } : {}),
-        ...(sharedBalance(p) || companion(p) || controlled.has(p.id) ? { coins: p.coins } : {}),
-      };
-    }),
-  };
-}
-
 async function freshCode(): Promise<string> {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   for (let attempt = 0; attempt < 20; attempt += 1) {

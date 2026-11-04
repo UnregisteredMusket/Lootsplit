@@ -12,7 +12,7 @@ const source = stripTypeScriptTypes(
     .replace('await import("../quire/cloud-client")', "({ requestCampaignRoll })"),
 );
 
-function fixture(replies) {
+function fixture(replies, preview = null) {
   const table = {
     purses: [
       {
@@ -54,6 +54,11 @@ function fixture(replies) {
     captureMutationScope: forbidden,
     assertMutationScope: forbidden,
     announceSheetChange: forbidden,
+    // "Preview as player" (player-preview.ts): off unless a test passes the previewed seat.
+    previewSeat: () => preview,
+    assertNotPreviewing: () => {
+      if (preview) throw Error("Previewing as Guest hero — read-only.");
+    },
     requestCampaignRoll: async (input) => {
       calls.push(input);
       return replies.shift();
@@ -99,4 +104,17 @@ test("a valid policy retains the DM's manual-roll decision for a controlled camp
     const detail = await h.read("sheets/detail", { id: "party:hero" });
     assert.equal(detail.campaign.manualAllowed, manualAllowed);
   }
+});
+
+test("Preview as player: the character list is the previewed character, never the DM's account", async () => {
+  // accountRequest is forbidden in this fixture: any account call fails the test.
+  const h = fixture([{ manualAllowed: true }], { role: "player", purseIds: ["hero"] });
+  const list = await h.read("sheets");
+  assert.deepEqual(list.campaigns, []);
+  assert.deepEqual(list.characters.map((c) => [c.id, c.purse_id, c.body.name]), [["party:hero", "hero", "Guest hero"]]);
+  // An account sheet (the DM's own library) is refused; the campaign character still opens.
+  await assert.rejects(h.read("sheets/detail", { id: "account-sheet-1" }), /read-only/);
+  await assert.rejects(h.read("sheets/save", { id: "party:hero" }), /read-only/);
+  const detail = await h.read("sheets/detail", { id: "party:hero" });
+  assert.equal(detail.body.name, "Guest hero");
 });

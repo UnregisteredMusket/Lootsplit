@@ -19,6 +19,7 @@ import { AppLink } from "./app-link";
 import { LedgerArt } from "./ledger-art";
 import { RecordRow, type RecordMenuItem } from "./record-row";
 import { Button, Field, Modal, Segmented, Switch, TextInput } from "./ui";
+import { attunedCount, attunementLimit } from "@/lib/quire/attunement";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { holdingRecordId } from "@/lib/quire/finance-record-links";
 import { newCommandId } from "@/lib/quire/command-id";
@@ -129,6 +130,10 @@ export function PartyInventory({
   // the DM's device or in a shared room. One command ID per Use, reused if the same Use is retried.
   const usesHere = dm || getCloudTable().joined;
   const useIds = useRef(new Map<string, string>());
+  // Attunement: likewise marked on the DM's device or in a shared room (a player link's copy
+  // never reaches the DM). One command ID per action, reused on retry.
+  const attuneHere = usesHere;
+  const attuneIds = useRef(new Map<string, string>());
   const [busy, setBusy] = useState(false);
   const [interrupted, setInterrupted] = useState<BulkRun | null>(null);
 
@@ -343,9 +348,59 @@ export function PartyInventory({
     }
   }
 
+  async function changeAttunement(h: Holding, attuned: boolean) {
+    if (busy) return;
+    const holder = economy.purses.find((p) => p.id === h.purseId);
+    let override = false;
+    if (attuned && holder) {
+      const count = attunedCount(economy.holdings, holder.id),
+        limit = attunementLimit(holder);
+      if (count >= limit) {
+        if (!dm) return;
+        const yes = await requestConfirm({
+          title: `Attune past the limit?`,
+          body: `${holder.name} is attuned to ${count} of ${limit} items. Attuning to ${h.name} makes it ${count + 1}/${limit}; Activity records the override.`,
+          confirmLabel: "Attune past the limit",
+        });
+        if (!yes) return;
+        override = true;
+      }
+    }
+    const key = JSON.stringify([h.id, h.purseId, !!h.attuned, attuned, override]);
+    const commandId = attuneIds.current.get(key) ?? newCommandId();
+    attuneIds.current.set(key, commandId);
+    setBusy(true);
+    try {
+      if (await economy.attuneItem(h, attuned, { commandId, override })) attuneIds.current.delete(key);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function attunementItem(h: Holding): RecordMenuItem | null {
+    if (!attuneHere || !canGive(h)) return null;
+    if (h.attuned) return { label: "End attunement", onSelect: () => void changeAttunement(h, false) };
+    if (!h.requiresAttunement || h.kind !== "item") return null;
+    const holder = economy.purses.find((p) => p.id === h.purseId);
+    const count = holder ? attunedCount(economy.holdings, holder.id) : 0,
+      limit = attunementLimit(holder);
+    return {
+      label: "Attune",
+      onSelect: () => void changeAttunement(h, true),
+      disabledReason:
+        (holder?.kind !== "character" && "Give it to a character first") ||
+        (h.pool && "In the treasure pool") ||
+        ((h.custody || h.reservedFor) && "Stored at a property") ||
+        (!dm && count >= limit && `Attuned ${count}/${limit}: end one first or ask the DM`) ||
+        undefined,
+    };
+  }
+
   function menuFor(h: Holding): RecordMenuItem[] {
     const items: RecordMenuItem[] = [];
     if (manage) items.push({ label: "Edit", onSelect: () => setEditing(h) });
+    const attune = attunementItem(h);
+    if (attune) items.push(attune);
     if (h.uses && usesHere && (dm || (canGive(h) && !h.pool)))
       items.push({
         label: "Use",
@@ -390,6 +445,13 @@ export function PartyInventory({
     return (
       <>
         {h.equipped ? <span className="record-chip is-lead">Equipped</span> : null}
+        {h.attuned ? (
+          <span className="record-chip is-lead">Attuned</span>
+        ) : h.requiresAttunement ? (
+          <span className="record-chip" title={h.requiresAttunement}>
+            Requires attunement
+          </span>
+        ) : null}
         {h.uses ? <span className="record-chip">{usesLabel(h.uses)}</span> : null}
         {h.pool ? <span className="record-chip">In the pool</span> : null}
         {h.custody ? (
@@ -798,6 +860,9 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
   const [maxUses, setMaxUses] = useState("");
   const [startUses, setStartUses] = useState("");
   const [whenEmpty, setWhenEmpty] = useState<HoldingUses["whenEmpty"]>("remove");
+  // Attunement (loot phase 5): whether the item requires it, and the requirement's text.
+  const [requires, setRequires] = useState(false);
+  const [requirement, setRequirement] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -809,6 +874,8 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
     setMaxUses(holding.uses ? String(holding.uses.max) : "1");
     setStartUses("");
     setWhenEmpty(holding.uses?.whenEmpty ?? "remove");
+    setRequires(!!holding.requiresAttunement);
+    setRequirement(holding.requiresAttunement ?? "Requires attunement");
     setError("");
   }, [holding, catalog]);
   const wholeUses = (text: string, min: number) => {
@@ -856,6 +923,9 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
               else if (!trimmed) delete next.category;
               if (uses) next.uses = uses;
               else delete next.uses;
+              if (requires && holding.kind === "item")
+                next.requiresAttunement = requirement.trim().slice(0, 200) || "Requires attunement";
+              else delete next.requiresAttunement;
               if (await updateHolding(next)) {
                 toast.success(`Saved ${next.name}.`);
                 onClose();
@@ -890,6 +960,33 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
               onChange={(e) => setNotes(e.target.value)}
             />
           </label>
+          {holding.kind === "item" ? (
+            holding.attuned ? (
+              <p className="text-sm text-muted">
+                {holding.requiresAttunement}. Its character is attuned to it; end the attunement
+                (⋯ menu) before changing this.
+              </p>
+            ) : (
+              <>
+                <Switch
+                  checked={requires}
+                  onChange={setRequires}
+                  label="Requires attunement"
+                  hint="Its character can then attune to it (3 items each unless you change the limit)."
+                />
+                {requires ? (
+                  <Field label="Attunement requirement" hint="For example: Requires attunement: by a wizard.">
+                    <TextInput
+                      aria-label={`Attunement requirement for ${holding.name}`}
+                      value={requirement}
+                      maxLength={200}
+                      onChange={(e) => setRequirement(e.target.value)}
+                    />
+                  </Field>
+                ) : null}
+              </>
+            )
+          ) : null}
           {holding.kind === "item" ? (
             <fieldset className="flex flex-col gap-3 rounded-sm border border-border p-3">
               <legend className="px-1 text-sm font-medium">Charges or uses</legend>

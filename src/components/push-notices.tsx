@@ -4,6 +4,7 @@ import { Bell } from "lucide-react";
 import { Button } from "./ui";
 import { getCloudTable, subscribeCloudTable, roomCredentials } from "@/lib/quire/cloud-client";
 import { getRoomPushSettings, updateRoomPushSubscription } from "@/lib/quire/cloud-api";
+import { assertNotPreviewing } from "@/lib/quire/player-preview";
 
 export function PushNotices() {
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
@@ -38,6 +39,8 @@ export function PushNotices() {
   async function toggle() {
     setBusy(true);
     try {
+      // Preview as player: this device's room alerts are the DM's and stay unchanged.
+      assertNotPreviewing();
       if (
         !("serviceWorker" in navigator) ||
         !("PushManager" in window) ||

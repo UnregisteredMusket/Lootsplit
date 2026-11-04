@@ -11,6 +11,7 @@ import { canReadNote, conversationFor, isOwnNote } from "@/lib/quire/chat-visibi
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
+import { PreviewReadOnlyError, previewActive } from "@/lib/quire/player-preview";
 import { accountRequest, type AccountLibrary } from "@/lib/account/client";
 import {
   adoptProvisionalChatComposer,
@@ -258,7 +259,7 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
     setOutbox(updateChatOutbox(scopeRef.current, next, storage.current));
   }
   async function deliver(item: OutgoingMessage) {
-    if (viewOnly || sendingRef.current.has(item.command.id)) return;
+    if (viewOnly || previewActive() || sendingRef.current.has(item.command.id)) return;
     sendingRef.current.add(item.command.id);
     setSending([...sendingRef.current]);
     try {
@@ -281,6 +282,12 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
   }
   function send() {
     if (!text.trim() || isSending || viewOnly) return;
+    // Preview as player: refused before the message enters the outbox, so it is never sent
+    // later as the previewed character.
+    if (previewActive()) {
+      toast.error(new PreviewReadOnlyError().message);
+      return;
+    }
     // Right after a page load the seat is restored before the room's purses arrive. Send
     // as the assigned character that is still loading; the server checks it is this seat's.
     const senderId = sender?.id || chatSenderPurseId(seat.purseIds, purses);

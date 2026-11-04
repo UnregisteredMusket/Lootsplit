@@ -83,6 +83,7 @@ function harness() {
       const {session:sessionValue,counts,remote,recovery,readRoomResponse,readUnchangedRoom,applyCommand,sameCommand,faults}=deps;
       let acceptedPoll;
       const noteRoomView=()=>{},mergeHistory=(t)=>t; // no older history loaded
+      const playerPreviewActive=()=>false; // no "Preview as player" (player-preview.ts) here
       const listeners=new Set();
       let view={joined:false,mine:true,live:false,who:"",code:"",sessionId:"",role:"dm",seats:[],departed:[],
         testMode:false,viewOnly:false,encounterActive:undefined,revision:0,seatId:"",pending:0,staged:0,

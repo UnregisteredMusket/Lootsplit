@@ -2,6 +2,7 @@ import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutatio
 import { quireDb } from "./db.ts";
 import { getCloudWatch, pushCloudChange } from "./cloud-turn.ts";
 import { alertNotes } from "./notify.ts";
+import { previewActive, subscribePreview } from "./player-preview.ts";
 
 export type ChatNote = {
   id: string;
@@ -86,8 +87,26 @@ export async function rememberIncoming(incoming: ChatNote[]): Promise<void> {
   await writeNotes(next, guard);
 }
 
+/** The previewed seat's messages (player-preview.ts), set by `economyView` from its projection. */
+let previewNotes: ChatNote[] = EMPTY;
+let previewWatched = false;
+
+export function showPreviewNotes(next: ChatNote[]): void {
+  if (!previewWatched) {
+    previewWatched = true;
+    // Starting or stopping a preview switches the chat between the seat's and the DM's messages.
+    subscribePreview(() => {
+      if (!previewActive()) previewNotes = EMPTY;
+      publish();
+    });
+  }
+  previewNotes = next;
+  publish();
+}
+
 export function getChatSnapshot(): ChatNote[] {
-  return notes;
+  // During "Preview as player", only the previewed seat's messages (never the DM's whole chat).
+  return previewActive() ? previewNotes : notes;
 }
 
 export function serverChat(): ChatNote[] {

@@ -42,6 +42,7 @@ import { roomCampaignName, sharedCampaignFallback } from "@/lib/quire/campaign-n
 import { useCampaignDisplayName } from "@/lib/quire/use-campaign-name";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 import { requestConfirm, requestPrompt } from "@/lib/quire/confirm-store";
+import { PreviewAsPlayerButton } from "./player-preview";
 
 type Mode = "local" | "turns" | "live";
 
@@ -733,6 +734,11 @@ export function CloudTable() {
             <p className="mb-3 text-sm text-muted">
               Joined participants may be offline. Your connection status appears above.
             </p>
+            {host && (
+              <div className="mb-3">
+                <PreviewAsPlayerButton />
+              </div>
+            )}
             <ul className="player-roster">
               {cloud.seats.map((item) => (
                 <li key={item.id}>
