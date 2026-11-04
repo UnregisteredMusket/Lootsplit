@@ -20,7 +20,7 @@ import { applyNpcBarterCommand, validateNpcBarter } from "./npc-barter.ts";
 import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
 import { applyTradeCommand, prepareTradeSeason, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
-import { applyWorldCommand, validateWorld, shopVisible, shopAsking } from "./world.ts";
+import { applyWorldCommand, validateWorld, shopVisible } from "./world.ts";
 import { cancelStaleZoneRequests } from "./zone-commands.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { estateCommands } from "./estate-schema.ts";
@@ -66,8 +66,9 @@ import {
   editLegacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
-import { formatCopper, fromCopper, toCopper, spendCoins, priceAfterCharisma, sameCoins, exchangeSummary } from "./money.ts";
-import { charismaScore, readSheets } from "./sheet.ts";
+import { formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
+import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
+import { readSheets } from "./sheet.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
 import { listingSchema, propertyProfileSchema, propertyAvailableToGroups, validatePropertyLocations } from "./property.ts";
 import { actingGroups, activeGroups, groupInfo, MAIN_GROUP, partySplit, purseGroup } from "./party-groups.ts";
@@ -442,10 +443,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
                 : "payment",
     });
   const score = (purseId: string) =>
-    t.purses.find((p) => p.id === purseId)?.kind === "party"
-      ? null
-      : (t.purses.find((p) => p.id === purseId)?.sheet?.scores.cha ??
-        charismaScore(t.sheets.find((s) => s.purseId === purseId)));
+    charismaFor(t.purses.find((p) => p.id === purseId) ?? { id: purseId, kind: "character" }, t.sheets);
   const finance = () => (journal.finance ??= readFinance());
   const editableFinance = () => {
     dm();
@@ -1073,8 +1071,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (shop.closed) throw new Error("This shop is closed.");
     if (s.quantity !== null && s.quantity < cmd.quantity)
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
-    const cost =
-      priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
+    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity).total;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
     const purchasedHolding: import("./types.ts").Holding | null = isService(s)
@@ -1120,7 +1117,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw Error(notHere(cmd.purseId, "This property"));
     if (l.quantity !== null && l.quantity < cmd.quantity)
       throw new Error("Not enough listing stock.");
-    const cost = priceAfterCharisma(l.copper, score(cmd.purseId)) * cmd.quantity;
+    const cost = listingBreakdown(l.copper, score(cmd.purseId), cmd.quantity).total;
     coins(cmd.purseId, -cost);
     if (l.quantity !== null) l.quantity -= cmd.quantity;
     const holding: import("./types.ts").Holding = {
@@ -1175,7 +1172,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.kind === "property") assertEstateDisposable(t, h.id);
     assertMerchantSale(h, s);
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
-    const paid = Math.round(h.unitCopper * s.buyRate) * cmd.quantity;
+    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity).total;
     coins(h.purseId, paid);
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);

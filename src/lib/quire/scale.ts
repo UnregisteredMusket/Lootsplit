@@ -150,6 +150,40 @@ export function scalePrice(
   return Math.max(1, Math.round(raw));
 }
 
+/**
+ * The rates `scalePrice` multiplies, for the DM's price breakdown. `copper` is `scalePrice`'s own
+ * result, so the explanation can only accompany the real number.
+ */
+export function scaleFactors(
+  baseCopper: number,
+  input: Parameters<typeof scalePrice>[1],
+) {
+  const realm = clampRealm(input.realm);
+  const category = input.category;
+  if (!(category in SEASON_RATE)) return undefined;
+  const season = SEASON_RATE[category][realm.season] ?? 1;
+  const shortage = 1 + realm.shortage * SHORTAGE_WEIGHT[category];
+  const war = 1 + realm.war * WAR_WEIGHT[category];
+  const plague = 1 + realm.plague * PLAGUE_WEIGHT[category];
+  const roads = 1 + (1 - realm.roads) * ROAD_WEIGHT[category];
+  const product = season * shortage * war * plague * roads;
+  return {
+    wealth: WEALTH_RATE[input.wealth],
+    rarity: 1 + RARITY_BEND[input.rarity] * realm.scarcity,
+    priceScale: clampScale(input.priceScale),
+    inflation: realm.inflation,
+    season,
+    seasonName: SEASON_NAMES[realm.season] ?? "Season",
+    shortage,
+    war,
+    plague,
+    roads,
+    /** Market pressure is kept within 0.35–4; this is the correction when it was limited. */
+    pressureLimit: pressureFor(category, realm) / product,
+    copper: scalePrice(baseCopper, input),
+  };
+}
+
 export function scarcityNote(scarcity: number): string {
   const rare = Math.round((1 + RARITY_BEND.rare * scarcity) * 100);
   const magic = Math.round((1 + RARITY_BEND.magic * scarcity) * 100);

@@ -9,15 +9,15 @@ import {
   finishShipWork,
 } from "./ships.ts";
 import { characterLocation, inParty } from "./character-position.ts";
-import { shopVisible, shopAsking } from "./vendors.ts";
+import { shopVisible } from "./vendors.ts";
+import { charismaFor, shopBuyBreakdown } from "./price-breakdown.ts";
 import { actingGroups, partyPlaces } from "./party-groups.ts";
 import { exchangeQuoteKey, executeExchange, recordShopTrade } from "./trade-economy.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import type { Holding, StockLine } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
-import { toCopper, fromCopper, spendCoins, priceAfterCharisma } from "./money.ts";
-import { charismaScore } from "./sheet.ts";
+import { toCopper, fromCopper, spendCoins } from "./money.ts";
 import { isService } from "./merchant.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
 import {
@@ -603,11 +603,8 @@ function delivery(
     throw Error("Choose a supplier serving the property's location.");
   const payer = t.purses.find((p) => p.id === args.purseId);
   if (!payer) throw Error("The paying account no longer exists.");
-  const cha =
-    payer.kind === "party"
-      ? null
-      : (payer.sheet?.scores.cha ?? charismaScore(t.sheets.find((x) => x.purseId === payer.id)));
-  const unitCopper = priceAfterCharisma(shopAsking(shop, line.copper), cha),
+  const cha = charismaFor(payer, t.sheets);
+  const unitCopper = shopBuyBreakdown(shop, line.copper, cha).unit,
     cost = unitCopper * args.quantity + args.deliveryCopper;
   const approvedSupplier = s.suppliers.find(
     (x) =>
@@ -1422,15 +1419,11 @@ export function previewEstate(
       const line = working.stock.find((x) => x.id === order.stockId),
         payer = working.purses.find((p) => p.id === h.purseId)!;
       if (!line) throw Error("The selected supply stock is missing.");
-      const cha =
-        payer.kind === "party"
-          ? null
-          : (payer.sheet?.scores.cha ??
-            charismaScore(working.sheets.find((x) => x.purseId === payer.id)));
+      const cha = charismaFor(payer, working.sheets);
       const vendor = working.shops.find((shop) => shop.id === line.shopId);
       if (!vendor) throw Error("The selected supply vendor is missing.");
       const cost =
-        priceAfterCharisma(shopAsking(vendor, line.copper), cha) * order.quantity +
+        shopBuyBreakdown(vendor, line.copper, cha, order.quantity).total +
         order.deliveryCopper;
       if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
         throw Error("The order exceeds its authorized spending budget.");

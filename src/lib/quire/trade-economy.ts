@@ -4,6 +4,7 @@ import { actingGroups, groupMarket, groupRefs } from "./party-groups.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { exchangeBreakdown } from "./price-breakdown.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { clampRealm, pressureFor, scalePrice, SEASON_NAMES } from "./scale.ts";
 import { globalMarketCity, locationPath, readMarketLocations } from "./shop-locations.ts";
@@ -473,9 +474,7 @@ export function executeExchange(
   if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 100000)
     throw Error("Choose a valid whole-unit quantity.");
   const treasury = table.purses.find((p) => p.id === exchange.purseId)!;
-  const total = money(
-    input.quantity * (input.direction === "buy" ? offer.askCopper : offer.bidCopper),
-  );
+  const total = money(exchangeBreakdown(offer, input.direction, input.quantity).total);
   let holding: Holding | undefined;
   if (input.direction === "buy") {
     if (offer.stock < input.quantity) throw Error("The exchange has insufficient stock.");

@@ -5,7 +5,8 @@ import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { validateServices } from "./services-validation.ts";
 import { serviceOrderOpen } from "./services-schema.ts";
 import { projectRecord } from "./session-records.ts";
-import { shopVisible, shopAsking, validateWorld } from "./world.ts";
+import { shopVisible, validateWorld } from "./world.ts";
+import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
@@ -56,7 +57,6 @@ import {
   emptyCoins,
   formatCopper,
   fromCopper,
-  priceAfterCharisma,
   spendCoins,
   toCopper,
 } from "./money.ts";
@@ -95,7 +95,6 @@ import {
   type LoanStatus,
 } from "./market.ts";
 import {
-  charismaScore,
   loadSheets,
   mergeSheets,
   readSheets,
@@ -1174,10 +1173,9 @@ function logLine(
 }
 
 async function charismaOf(purse: Purse, tx: IDBTransaction): Promise<number | null> {
-  if (purse.kind === "party") return null;
-  if (purse.sheet) return purse.sheet.scores.cha;
-  const sheets = readSheets(await request(tx.objectStore("meta").get("sheets")));
-  return charismaScore(sheets.find((sheet) => sheet.purseId === purse.id));
+  // The same rule as the shared command engine (`charismaFor`); sheets load only when needed.
+  if (purse.kind === "party" || purse.sheet) return charismaFor(purse, []);
+  return charismaFor(purse, readSheets(await request(tx.objectStore("meta").get("sheets"))));
 }
 
 async function atomic<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
@@ -1325,8 +1323,7 @@ export async function buyFromShop(
     if (stock.quantity !== null && stock.quantity < quantity)
       throw new Error("The shop does not have that many.");
     const score = await charismaOf(purse, tx);
-    const unit = priceAfterCharisma(shopAsking(shop, stock.copper), score);
-    const cost = unit * quantity;
+    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity).total;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
     // Each purchase is a separate lot. A matching name does not identify the
@@ -1461,7 +1458,7 @@ export async function sellToShop(
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
-    const paid = Math.max(0, Math.round(holding.unitCopper * shop.buyRate)) * quantity;
+    const paid = shopSellBreakdown(shop, holding.unitCopper, quantity).total;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");
     tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, paid) });
     if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
@@ -1780,7 +1777,7 @@ export async function buyListing(
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!purse) throw new Error("This account no longer exists.");
     const score = await charismaOf(purse, tx);
-    const cost = priceAfterCharisma(listing.copper, score) * quantity;
+    const cost = listingBreakdown(listing.copper, score, quantity).total;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
     const sales = readSales(await request(tx.objectStore("meta").get("sales")));

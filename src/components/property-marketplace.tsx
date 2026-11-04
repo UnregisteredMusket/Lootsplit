@@ -15,6 +15,8 @@ import {
   charismaOffPercent,
 } from "@/lib/quire/money";
 import { charismaScore } from "@/lib/quire/sheet";
+import { listingBreakdown, negotiatorFor } from "@/lib/quire/price-breakdown";
+import { PriceWhy } from "@/components/price-why";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import {
   PROPERTY_TYPES,
@@ -534,6 +536,7 @@ function PropertyViewing({
   available: boolean;
 }) {
   const { journal, sheets, commandOutcome } = useEconomy(),
+    seat = useSeat(),
     market = readMarketLocations(journal.market);
   const [image, setImage] = useState(0),
     [buyer, setBuyer] = useState(initialBuyer || purses[0]?.id || ""),
@@ -551,12 +554,11 @@ function PropertyViewing({
   const purse = purses.find((p) => p.id === buyer),
     units = Number(quantity),
     balance = purse ? toCopper(purse.coins) : 0;
-  const score =
-    purse?.kind === "party"
-      ? null
-      : (purse?.sheet?.scores.cha ??
-        charismaScore(sheets.find((sheet) => sheet.purseId === buyer)));
-  const unit = priceAfterCharisma(listing.copper, score),
+  // The buyer negotiates, with the Charisma the `listing` command uses.
+  const negotiator = negotiatorFor(purse, sheets);
+  const score = negotiator?.cha ?? null;
+  const breakdown = listingBreakdown(listing.copper, score, Number.isSafeInteger(units) && units > 0 ? units : 1, { negotiator });
+  const unit = breakdown.unit,
     cost = unit * units;
   const valid =
     available &&
@@ -725,6 +727,7 @@ function PropertyViewing({
             pricing.
           </p>
         )}
+        <PriceWhy breakdown={breakdown} dm={seat.role === "dm"} />
         {reason && <p role="status">{reason}</p>}
         {!available && <p role="status">This listing is no longer available for a new purchase.</p>}
         {changed && (

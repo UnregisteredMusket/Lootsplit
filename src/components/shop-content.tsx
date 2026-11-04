@@ -26,10 +26,18 @@ import {
   charismaOffPercent,
   formatCopper,
   parsePrice,
-  priceAfterCharisma,
   toCopper,
 } from "@/lib/quire/money";
-import { charismaScore } from "@/lib/quire/sheet";
+import {
+  charismaFor,
+  listPriceDerivation,
+  negotiatorFor,
+  shopBuyBreakdown,
+  shopSellBreakdown,
+  type Negotiator,
+} from "@/lib/quire/price-breakdown";
+import { shopAsking } from "@/lib/quire/vendors";
+import { PriceWhy } from "@/components/price-why";
 import { useDollarText, useShowDollars } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { getSeat } from "@/lib/quire/table";
@@ -319,8 +327,9 @@ export function ShopContent({
             sellToName={dm && sellTo ? (payer?.name ?? "") : ""}
             active={activeRow === line.id}
             onActivate={() => setActiveRow(line.id)}
-            sellRate={shop.sellRate * (shop.blackMarket ? (shop.blackMarketPremium ?? 1.5) : 1)}
-            charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))}
+            shop={shop}
+            negotiator={negotiatorFor(economy.purses.find((p) => p.id === purseId), economy.sheets)}
+            dm={dm}
             locked={!!shop.closed || (viewing === "counter" && turnIsLocked())}
           />
         )}
@@ -429,7 +438,7 @@ function CharismaNote({ purseId, dm }: { purseId: string; dm: boolean }) {
   if (!purse) return null;
   if (purse.kind !== "character")
     return <>The party fund pays the listed price from the shared account.</>;
-  const score = charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
+  const score = charismaFor(purse, sheets);
   // Importing a sheet is the DM's setup step; players are not shown it.
   if (score === null)
     return dm ? <>Import this character's 2014 sheet to take the Charisma discount.</> : null;
@@ -449,8 +458,9 @@ function StockRow({
   sellToName = "",
   active = false,
   onActivate,
-  sellRate,
-  charisma,
+  shop,
+  negotiator,
+  dm,
   locked = false,
 }: {
   line: StockLine;
@@ -461,11 +471,13 @@ function StockRow({
   /** This row is being edited, so it shows the cost and afterward balance. */
   active?: boolean;
   onActivate?: () => void;
-  sellRate: number;
-  charisma: number | null;
+  shop: Shop;
+  /** The paying account; its Charisma is the one the `buy` command uses. */
+  negotiator: Negotiator | undefined;
+  dm: boolean;
   locked?: boolean;
 }) {
-  const { buy, updateStock, deleteStock, purses, undoPurchase } = useEconomy();
+  const { buy, updateStock, deleteStock, purses, undoPurchase, realm } = useEconomy();
   const stockSaved = useSavedTick();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
@@ -481,9 +493,15 @@ function StockRow({
   const available = toCopper(
     purses.find((p) => p.id === purseId)?.coins || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
   );
-  const asking = Math.round(line.copper * sellRate);
+  // The `buy` command's own price: list × markup (× black-market premium), then Charisma.
+  const charisma = negotiator?.cha ?? null;
+  const breakdown = shopBuyBreakdown(shop, line.copper, charisma, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, {
+    negotiator,
+    ...(dm ? { listDerivation: listPriceDerivation(shop, line, realm) } : {}),
+  });
+  const asking = shopAsking(shop, line.copper);
   const percent = charisma === null ? 0 : charismaOffPercent(charisma);
-  const unit = priceAfterCharisma(asking, charisma);
+  const unit = breakdown.unit;
   const price = unit * asked;
   const reduced = unit !== asking;
   const modern = dollars(unit);
@@ -544,6 +562,7 @@ function StockRow({
             {line.quantity === null ? "" : ` · ${line.quantity} left`}
             {modern ? <span className="shop-row-modern"> · {modern}</span> : null}
           </span>
+          <PriceWhy breakdown={breakdown} dm={dm} />
         </span>
         {oneTap ? (
           <Button disabled={disabled} onClick={() => void purchase()}>
@@ -746,8 +765,8 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
     }
   }
   const asked = Number(qty),
-    payout =
-      holding && shop ? Math.max(0, Math.round(holding.unitCopper * shop.buyRate)) * asked : 0;
+    sale = holding && shop ? shopSellBreakdown(shop, holding.unitCopper, Number.isSafeInteger(asked) && asked > 0 ? asked : 1) : null,
+    payout = sale ? sale.unit * asked : 0;
 
   useEffect(() => {
     if (!mine.some((item) => item.id === holdingId) && mine[0]) setHoldingId(mine[0].id);
@@ -793,6 +812,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
           {Number.isSafeInteger(asked) && asked > 0
             ? `Preview payout ${formatCopper(payout)}; quantity remaining ${holding.quantity - asked}.`
             : "Choose a whole quantity of at least one."}
+          <PriceWhy breakdown={sale} dm={seat.role === "dm"} label="Why this payout?" />
         </p>
       )}
       {eligibility && <p role="status">{eligibility}</p>}
