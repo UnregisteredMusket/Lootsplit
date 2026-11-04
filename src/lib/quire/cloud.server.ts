@@ -37,7 +37,7 @@ import {
   type CloudTable,
 } from "./cloud.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
-import { identitySecrets, presentLedgerLines, projectIdentities, redactIdentity } from "./item-identity.ts";
+import { projectIdentities, redactIdentity, tableSecrets } from "./item-identity.ts";
 import { HistoryNeeded, runOnWorkingSet } from "./history-window.server.ts";
 import { receiptForLine } from "./ledger-reversal.ts";
 import { DEFERRED_REPORT_PREFIX, isDeferredSnapshot } from "./history-pages.ts";
@@ -911,7 +911,7 @@ async function historyProjector(table: CloudTable, seat: CloudSeat, code: string
     : [];
   // Item identification: older pages name unidentified items as presented, as the view does; a
   // reveal changes what they say, so the unidentified items are part of the fingerprint.
-  const secrets = dm ? new Map() : identitySecrets(table.holdings);
+  const secrets = dm ? new Map() : tableSecrets(table);
   const hidden = [...secrets.keys()].sort();
   const fingerprint = (
     await sha256Hex(
@@ -919,7 +919,7 @@ async function historyProjector(table: CloudTable, seat: CloudSeat, code: string
     )
   ).slice(0, 32);
   return {
-    ledger: (lines) => (dm ? lines.filter(line) : presentLedgerLines(redactIdentity(lines.filter(line), secrets))),
+    ledger: (lines) => redactIdentity(lines.filter(line), secrets),
     notes: (notes) => redactIdentity(notes.filter((note) => readNote(note)), secrets),
     visible: (list, keys) => {
       if (!keys) return true;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { downtimeActivitiesSchema } from "./downtime-activities-schema.ts";
+import { identityEndedSchema } from "./item-identity.ts";
 import { validateDowntimeActivities } from "./downtime-activities.ts";
 import { blacksmithSchema } from "./blacksmith-schema.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
@@ -164,6 +165,8 @@ const journalFields = z.object({
         lootPool: lootPoolEventSchema.optional(),
         lootResolution: lootResolutionSchema.optional(),
         lootFavour: lootFavourSchema.optional(),
+        /** Item identification: an unidentified item that left the inventory (DM-only event). */
+        identityEnded: identityEndedSchema.optional(),
         change: z
           .object({
             entity: z.enum(["stock", "realm", "shop", "holding", "account"]),

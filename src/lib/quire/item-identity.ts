@@ -86,10 +86,17 @@ export function presentedHolding<H extends Holding>(h: H): H {
     notes: u.description ?? "",
     unitCopper: u.value ?? 0,
     category: u.category ?? NEUTRAL_CATEGORY,
-    unidentified: { ...u },
+    // The server's lineage IDs are never told: they could name other holdings.
+    unidentified: presentedRecord(u),
   } as H;
   if (u.weight !== undefined) shown.weight = u.weight;
   return shown;
+}
+
+/** The presented record as players receive it: without the server's lineage IDs. */
+export function presentedRecord(u: Unidentified): Unidentified {
+  const { ids: _ids, ...told } = u;
+  return told;
 }
 
 /** The value a sale or a receipt may use: the presented value, or null when it is unknown. */
@@ -113,6 +120,49 @@ export function identitySecrets(holdings: readonly Holding[]): IdentitySecrets {
   return secrets;
 }
 
+/**
+ * The secrets a command's records must keep: holdings still in the table as they are now, and
+ * holdings the command removed (sold, given away, used up) as they were before it.
+ */
+export function commandSecrets(before: readonly Holding[], after: readonly Holding[]): IdentitySecrets {
+  const now = identitySecrets(after);
+  const kept = new Set(after.map((h) => h.id));
+  for (const [id, secret] of identitySecrets(before)) if (!kept.has(id)) now.set(id, secret);
+  return now;
+}
+
+/** An unidentified item that left the inventory (sold, used up): a DM-only event keeps it. */
+export const identityEndedSchema = z
+  .object({
+    holdingIds: z.array(z.string().min(1).max(150)).min(1).max(51),
+    unitCopper: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    value: z.number().int().nonnegative().max(1e12).optional(),
+  })
+  .strict();
+export type IdentityEnded = z.infer<typeof identityEndedSchema>;
+
+/**
+ * Every secret of a table: its unidentified holdings, and the items that left it unidentified
+ * this session (`identityEnded` on DM-only events, which go to the session archive with the lines
+ * they cover). Reads the holdings and the live journal only, never ledger pages.
+ */
+export function tableSecrets(t: { holdings: readonly Holding[]; journal?: { events?: readonly { identityEnded?: IdentityEnded }[] } }): IdentitySecrets {
+  const secrets = identitySecrets(t.holdings);
+  for (const e of t.journal?.events ?? []) {
+    const ended = e.identityEnded;
+    if (!ended) continue;
+    // Never a name or notes match ("\u0000"): only linked values are presented.
+    const secret = {
+      trueName: "\u0000",
+      trueNotes: "\u0000",
+      trueCopper: ended.unitCopper,
+      shown: { id: ended.holdingIds[0]!, purseId: "", name: "", kind: "item", quantity: 0, notes: "", unitCopper: ended.value ?? 0 } as Holding,
+    };
+    for (const id of ended.holdingIds) if (!secrets.has(id)) secrets.set(id, secret);
+  }
+  return secrets;
+}
+
 /** The presented record without the server's bookkeeping, for comparing two copies of an item. */
 function sameItem(a: Holding & { unidentified: Unidentified }, b: Holding & { unidentified: Unidentified }) {
   const { ids: _a, ...ua } = a.unidentified;
@@ -123,61 +173,46 @@ function sameItem(a: Holding & { unidentified: Unidentified }, b: Holding & { un
 /**
  * After a command: an unidentified holding with a new ID (a give, a pool resolution, a storage
  * move or a trade copied it) records the IDs of the holding it came from, so records linked to
- * those IDs stay presented. An unidentified item the command removed without a successor (sold,
- * used up) leaves `presentedCopper` on the live ledger lines linked to it: it can no longer be
- * revealed, so those lines show players the presented value from now on. `t` changes in place.
+ * those IDs stay presented. Only holdings this command reduced or removed can be its source. An
+ * unidentified item the command removed without a successor (sold, used up) leaves a DM-only
+ * event with `identityEnded`, so its linked records stay presented for the rest of the session.
+ * Reads holdings only, never the ledger. `t` changes in place.
  */
 export function identityLineage(
   before: readonly Holding[],
-  t: { holdings: Holding[]; ledger: Array<{ award?: { holdingId?: string; presentedCopper?: number }; loot?: { holdingId: string; presentedCopper?: number } }> },
+  t: { holdings: Holding[]; journal?: { events: object[] } },
+  receiptId: string,
+  at: number,
 ) {
-  const earlier = before.filter(isUnidentified);
-  if (!earlier.length) return;
+  const after = new Map(t.holdings.map((h) => [h.id, h]));
+  const touched = before.filter(isUnidentified).filter((b) => (after.get(b.id)?.quantity ?? 0) < b.quantity);
+  if (!touched.length) return;
   const known = new Set(before.map((h) => h.id));
   const successors = new Set<string>();
   for (const h of t.holdings) {
-    if (!isUnidentified(h)) continue;
-    if (known.has(h.id)) {
-      successors.add(h.id);
-      continue;
-    }
-    const from = earlier.filter((b) => b.id !== h.id && sameItem(b, h));
+    if (known.has(h.id) || !isUnidentified(h)) continue;
+    const from = touched.filter((b) => sameItem(b, h));
     if (!from.length) continue;
     const ids = [...new Set([...(h.unidentified.ids ?? []), ...from.flatMap((b) => [b.id, ...(b.unidentified.ids ?? [])])])].slice(-50);
     h.unidentified = { ...h.unidentified, ids };
     for (const b of from) successors.add(b.id);
   }
-  const ended = earlier.filter((b) => !successors.has(b.id) && !t.holdings.some((h) => h.id === b.id));
-  if (!ended.length) return;
-  const value = new Map<string, number>();
-  for (const b of ended) for (const id of [b.id, ...(b.unidentified.ids ?? [])]) value.set(id, b.unidentified.value ?? 0);
-  for (const line of t.ledger) {
-    for (const link of [line.award, line.loot])
-      if (link?.holdingId && value.has(link.holdingId) && link.presentedCopper === undefined)
-        link.presentedCopper = value.get(link.holdingId)!;
+  for (const b of touched) {
+    if (after.has(b.id) || successors.has(b.id)) continue;
+    t.journal?.events.push({
+      id: `${receiptId}-identity-${b.id}`.slice(0, 150),
+      at,
+      kind: "management",
+      dmOnly: true,
+      purseId: b.purseId,
+      summary: `An unidentified item left the inventory: ${b.name} (players saw ${b.unidentified.name})`.slice(0, 500),
+      identityEnded: {
+        holdingIds: [b.id, ...(b.unidentified.ids ?? [])].slice(0, 51),
+        unitCopper: b.unitCopper,
+        ...(b.unidentified.value === undefined ? {} : { value: b.unidentified.value }),
+      },
+    });
   }
-}
-
-/** Players' copies of ledger lines: a recorded `presentedCopper` replaces the value they see. */
-export function presentLedgerLines<T extends { award?: object; loot?: object }>(lines: T[]): T[] {
-  if (!lines.some((l) => (l.award && "presentedCopper" in l.award) || (l.loot && "presentedCopper" in l.loot))) return lines;
-  const present = <L extends object>(link: L | undefined) => {
-    if (!link || !("presentedCopper" in link)) return link;
-    const { presentedCopper, ...rest } = link as L & { presentedCopper: number };
-    return "unitCopper" in rest ? { ...rest, unitCopper: presentedCopper } : rest;
-  };
-  return lines.map((l) => ({ ...l, ...(l.award ? { award: present(l.award) } : {}), ...(l.loot ? { loot: present(l.loot) } : {}) }));
-}
-
-/**
- * The secrets a command's records must keep: holdings still in the table as they are now, and
- * holdings the command removed (sold, given away, used up) as they were before it.
- */
-export function commandSecrets(before: readonly Holding[], after: readonly Holding[]): IdentitySecrets {
-  const now = identitySecrets(after);
-  const kept = new Set(after.map((h) => h.id));
-  for (const [id, secret] of identitySecrets(before)) if (!kept.has(id)) now.set(id, secret);
-  return now;
 }
 
 /**
@@ -242,12 +277,8 @@ export function redactIdentity<T>(value: T, secrets: IdentitySecrets): T {
  * (the unprojected table it was made from) presented. A table without unidentified items is
  * returned as it is.
  */
-export function projectIdentities<T>(source: { holdings: readonly Holding[] }, projected: T): T {
-  const out = redactIdentity(projected, identitySecrets(source.holdings));
-  const ledger = (out as { ledger?: Array<{ award?: object; loot?: object }> }).ledger;
-  if (!Array.isArray(ledger)) return out;
-  const shown = presentLedgerLines(ledger);
-  return shown === ledger ? out : ({ ...out, ledger: shown } as T);
+export function projectIdentities<T>(source: Parameters<typeof tableSecrets>[0], projected: T): T {
+  return redactIdentity(projected, tableSecrets(source));
 }
 
 /** Item snapshot text for a stored record (trades, barter, withdrawals): the presented form. */
@@ -263,7 +294,7 @@ export function snapshotText(h: Holding): string {
  * command; `t` is changed in place.
  */
 export function redactWritten(
-  before: { holdings: readonly Holding[]; ledgerIds: Set<string>; eventIds: Set<string>; orderIds: Set<string> },
+  before: { holdings: readonly Holding[]; ledgerLength: number; eventIds: Set<string>; orderIds: Set<string> },
   t: {
     holdings: Holding[];
     ledger: Array<{ id: string }>;
@@ -274,7 +305,8 @@ export function redactWritten(
   if (!secrets.size) return;
   const fresh = <R extends { id: string }>(rows: R[], seen: Set<string>, keep: (r: R) => boolean = () => true) =>
     rows.map((r) => (!seen.has(r.id) && keep(r) ? redactIdentity(r, secrets) : r));
-  t.ledger = fresh(t.ledger, before.ledgerIds);
+  // Only the lines appended by this command: older ledger pages are never read (history on demand).
+  for (let i = before.ledgerLength; i < t.ledger.length; i++) t.ledger[i] = redactIdentity(t.ledger[i]!, secrets);
   const j = t.journal;
   if (!j) return;
   if (j.events) j.events = fresh(j.events, before.eventIds, (e) => !e.dmOnly);
@@ -292,7 +324,8 @@ export function writtenBaseline(t: {
   const orders = (t.journal?.services as { orders?: Array<{ id: string }> } | undefined)?.orders ?? [];
   return {
     holdings: t.holdings.map((h) => ({ ...h })),
-    ledgerIds: new Set(t.ledger.map((l) => l.id)),
+    // The length only: reading line IDs would load every ledger page (history on demand).
+    ledgerLength: t.ledger.length,
     eventIds: new Set((t.journal?.events ?? []).map((e) => e.id)),
     orderIds: new Set(orders.map((o) => o.id)),
   };

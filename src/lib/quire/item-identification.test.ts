@@ -549,15 +549,21 @@ test("an item's records stay presented after it moves to a new holding ID or is 
   assert.deepEqual(t.holdings.find((h) => h.id === "gv2-item")!.unidentified!.ids, ["rope", "gv-item"]);
   assert.equal(seen(t), 5);
   assert.equal(t.ledger.find((l) => l.id === "award-r-item-0")!.award!.unitCopper, 100, "the DM's record keeps its value");
-  // Fully sold: the live line records what players see from now on.
+  // Fully sold: a DM-only event keeps the ended item for the session; the line is unchanged.
   t = applyCommand(t, dmSeat, { id: "sl2", kind: "sell", holdingId: "gv2-item", shopId: "marlow", quantity: 1 });
-  assert.equal(t.ledger.find((l) => l.id === "award-r-item-0")!.award!.presentedCopper, 5);
+  const ended = t.journal!.events.find((e) => e.identityEnded?.holdingIds.includes("gv2-item"))!;
+  assert.equal(ended.dmOnly, true);
+  assert.deepEqual(ended.identityEnded!.holdingIds, ["gv2-item", "rope", "gv-item"]);
+  assert.equal(t.ledger.find((l) => l.id === "award-r-item-0")!.award!.unitCopper, 100);
   assert.equal(seen(t), 5);
+  assert.ok(!JSON.stringify(projectRecord(t, ariaSeat).journal!.events).includes("identityEnded"));
   // Favour totals (stored in a receipt players read) count the presented value.
   const fresh = campaign();
   fresh.ledger.push(encounterItemLine("award-f", 0, 1, "aria", { name: "Hempen rope", quantity: 1, unitCopper: 100 }, "Crypt", "rope"));
   const marked = applyCommand(fresh, dmSeat, { id: "mk", kind: "item-unidentify", holdingId: "rope", before: null, unidentified: { name: "Coil of cord", value: 5 } });
-  assert.equal(fairnessStandings(marked, "campaign").get("aria"), 5);
+  assert.equal(fairnessStandings(marked, "campaign", { presented: true }).get("aria"), 5);
+  // The DM's own totals count the true value.
+  assert.equal(fairnessStandings(marked, "campaign").get("aria"), 100);
 });
 
 function estateFixture(): CloudTable {
@@ -630,4 +636,20 @@ test("a turn bill can't take another character's item by naming its ID", () => {
   const wand = projectRecord(t, bramSeat).holdings.find((h) => h.id === "wand")!;
   const bill = { purseIds: ["aria"], purses: [t.purses[1]!], holdings: [...t.holdings.filter((h) => h.purseId === "aria").map(presentedHolding), { ...wand, purseId: "aria" }], stock: [], ledger: [], loans: [], notes: [] };
   assert.throws(() => applyBillToTable(t, bill as never, {} as never), /another character holds/);
+});
+
+test("earlier IDs are never told, and only the holding a command took from is linked", () => {
+  for (const same of [true, false]) {
+    const t = campaign();
+    // A look-alike: the same presented ring, truly the same item or not.
+    t.holdings.push({ id: "ring2", purseId: "aria", name: same ? RING.name : "Brass ring", kind: "item", quantity: 1, unitCopper: same ? RING.copper : 10, notes: same ? RING.notes : "", category: "jewels", unidentified: { name: "Plain brass ring", description: "A dull ring, warm to the touch.", value: 2500 } } as Holding);
+    // A matching item in a purse Bram can't see.
+    t.purses.push({ id: "vizier", name: "The Vizier", kind: "character", control: "npc", coins: coins({}) });
+    t.holdings.push({ ...t.holdings[0]!, id: "vizier-hoard-ring", purseId: "vizier" });
+    const g = applyCommand(t, ariaSeat, { id: "gv", kind: "give", fromId: "aria", toId: "bram", copper: 0, holdingId: "ring", quantity: 1 });
+    assert.deepEqual(g.holdings.find((h) => h.id === "gv-item")!.unidentified!.ids, ["ring"], "only the holding the give reduced");
+    const seen = projectRecord(g, bramSeat);
+    assert.equal(seen.holdings.find((h) => h.id === "gv-item")!.unidentified!.ids, undefined);
+    assert.ok(!JSON.stringify(seen).includes("vizier-hoard-ring") && !JSON.stringify(seen).includes('"ids"'));
+  }
 });

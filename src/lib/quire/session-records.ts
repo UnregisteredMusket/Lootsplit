@@ -35,7 +35,7 @@ import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
 import { projectJourneys } from "./journey-engine.ts";
 import { projectQuestMapLinks, projectQuests, questNamedPurses, type QuestProjectionContext } from "./quests.ts";
 import { isDeferredSnapshot } from "./history-pages.ts";
-import { identitySecrets, isUnidentified, projectIdentities, redactIdentity } from "./item-identity.ts";
+import { isUnidentified, projectIdentities, redactIdentity, tableSecrets } from "./item-identity.ts";
 import type { Holding } from "./types.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
@@ -601,7 +601,7 @@ export function projectArchivedReport(
                 ...projected,
                 fairness: fairnessProjection(r.snapshot, raw, table, seat, comparesParty, projected.ledger),
               },
-              new Map([...identitySecrets(table.holdings), ...identitySecrets(raw.holdings)]),
+              new Map([...tableSecrets(table), ...tableSecrets(raw)]),
             ),
       ),
     };

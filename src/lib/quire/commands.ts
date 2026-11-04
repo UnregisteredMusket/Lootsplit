@@ -1631,7 +1631,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
   if (written) {
-    identityLineage(written.holdings, t);
+    identityLineage(written.holdings, t as { holdings: typeof t.holdings; journal: { events: object[] } }, cmd.id, at);
     redactWritten(written, t);
   }
   if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||

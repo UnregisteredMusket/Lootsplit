@@ -495,7 +495,7 @@ export function applyLootCommand(
   if (cmd.favour && cmd.method === "manual")
     throw Error("Favour whoever is behind applies to random and round-robin resolutions only.");
   // Fairness totals come from the campaign this command runs against, never from the client.
-  const favour = cmd.favour ? { basis: cmd.favour.basis, totals: fairnessStandings(t, cmd.favour.basis) } : undefined;
+  const favour = cmd.favour ? { basis: cmd.favour.basis, totals: fairnessStandings(t, cmd.favour.basis, { presented: true }) } : undefined;
   if (lootFingerprint(t, cmd.lots, cmd.method, favour) !== cmd.expect)
     throw Error("Claims changed. Nothing moved. Review the new preview and confirm again.");
   if (cmd.method !== "random" && (cmd.rolls || cmd.manualRolls))
