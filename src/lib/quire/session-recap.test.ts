@@ -19,7 +19,9 @@ import { applyCloudTable, economySnapshot, executeLocalCommand } from "./economy
 import { DM_SEAT, setSeat } from "./table.ts";
 import {
   buildSessionRecap,
+  liveRecapSource,
   NOTHING_RECORDED,
+  RECAP_UNAVAILABLE,
   recapEntryId,
   recapText,
   type RecapAudience,
@@ -191,6 +193,59 @@ test("the DM's party draft never names NPCs, hidden characters or DM-only record
   assert.ok(!out.includes("Ironhall Forge") && !out.includes("sold"), out);
   assert.ok(!out.includes("Old Tam") && !out.includes("Downtime finances"), out);
   assert.match(out, /The party moved in at Saltwind Harbour\./);
+});
+
+test("the party draft leaves out characters away from the party or on downtime", () => {
+  const { t, session } = playedSession();
+  const at = session.startedAt + 1;
+  t.purses.push(
+    { id: "wren", name: "Wren on downtime", kind: "character", coins: coins({}) },
+    { id: "ossia", name: "Ossia far away", kind: "character", coins: coins({}) },
+  );
+  const j = readJournal(t.journal);
+  j.world!.characterPositions.push(
+    {
+      purseId: "wren", inParty: true, locationId: null, visible: true, sheetVisible: true,
+      downtime: { id: "dt", name: "Studying", startedMinute: 0, finishMinute: 600, returnInParty: true, returnLocationId: null },
+    },
+    { purseId: "ossia", inParty: false, locationId: null, visible: true, sheetVisible: true },
+  );
+  for (const id of ["wren", "ossia"]) {
+    t.ledger.push(
+      encounterCoinLine(`award-${id}`, at, id, "Lonely errand", 500),
+      { id: `${id}-share`, at, purseId: id, shopId: null, summary: "Split share from The Hoard", copper: 100, transactionType: "transfer", split: { id: `split-${id}`, role: "share" } },
+    );
+    j.events.push({
+      id: `pool-${id}`, at, kind: "management", summary: "Treasure pool resolved",
+      lootResolution: {
+        id: `pool-${id}`, method: "manual",
+        lots: [{ holdingId: `lot-${id}`, fundId: "hoard", name: `Charm for ${id}`, poolQuantity: 1, quantity: 1, unitCopper: 100, tier: null, claims: [], unmarked: [], rolls: [], kept: 0,
+          awards: [{ purseId: id, quantity: 1, choice: "dm", holdingId: `got-${id}` }] }],
+      },
+    });
+  }
+  t.journal = j;
+  const out = text(t, session, { kind: "party" });
+  for (const secret of ["Wren", "Ossia", "Lonely errand", "Charm for"]) assert.ok(!out.includes(secret), `party draft names ${secret}:\n${out}`);
+  // The DM's own view still has them.
+  const dmView = text(t, session, { kind: "dm" });
+  assert.match(dmView, /Lonely errand: 5 gp to Wren on downtime\./);
+  assert.match(dmView, /Charm for ossia × 1 to Ossia far away/);
+});
+
+test("a player's live recap never falls back to unprojected records", () => {
+  const { t } = playedSession();
+  const failed = liveRecapSource(t, false, () => {
+    throw Error("projection failed");
+  });
+  assert.deepEqual(failed, { error: RECAP_UNAVAILABLE });
+  const projected = liveRecapSource(t, false, (x) => projectRecord(x as CloudTable, ariaSeat));
+  assert.ok("source" in projected && projected.source !== t);
+  assert.ok("source" in projected && !projected.source.ledger.some((l) => l.purseId === "bram"));
+  const dm = liveRecapSource(t, true, () => {
+    throw Error("never called for the DM");
+  });
+  assert.ok("source" in dm && dm.source === t);
 });
 
 test("a player's recap comes from their projection only", () => {

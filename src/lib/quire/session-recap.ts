@@ -22,12 +22,12 @@
  * with nothing to report gives no sections ("Nothing recorded"), never an error.
  */
 import type { CloudTable } from "./cloud.ts";
-import { characterVisible } from "./character-position.ts";
+import { characterPosition, characterVisible, inParty } from "./character-position.ts";
 import { isNpc, partyFunds } from "./coin-split.ts";
 import { readJournal, selectSessionLedgerRows, type Journal } from "./journal.ts";
 import { formatCopper } from "./money.ts";
 import { splitActivity } from "./split-activity.ts";
-import type { LedgerLine, Purse } from "./types.ts";
+import { characterControl, type LedgerLine, type Purse } from "./types.ts";
 
 export type RecapAudience =
   | { kind: "dm" }
@@ -54,6 +54,25 @@ const TITLES: Record<RecapSectionKey, string> = {
 export const recapEntryId = (sessionId: string) => `recap:${sessionId}`.slice(0, 150);
 export const isRecapEntryId = (id: string) => id.startsWith("recap:");
 export const recapTitle = (name: string) => `Recap: ${name}`.slice(0, 100);
+export const RECAP_UNAVAILABLE = "The recap could not be built.";
+
+/**
+ * The live session's records for a recap reader: the DM's own table, or a player's projection
+ * (`project`, projectRecord for the seat). If projecting fails the reader gets an error, never
+ * the unprojected records.
+ */
+export function liveRecapSource<T extends RecapSource>(
+  live: T,
+  dm: boolean,
+  project: (table: T) => RecapSource,
+): { source: RecapSource } | { error: string } {
+  if (dm) return { source: live };
+  try {
+    return { source: project(live) };
+  } catch {
+    return { error: RECAP_UNAVAILABLE };
+  }
+}
 
 const encounterName = (summary: string) =>
   summary
@@ -83,7 +102,17 @@ export function buildSessionRecap(
     const p = purse(purseId);
     if (!p) return false;
     if (funds.has(p.id)) return true;
-    return p.kind === "character" && !p.nonParty && !isNpc(table, p) && characterVisible(table, p);
+    // The characters whose lines party players read (cloud.server.ts playerLedgerLine): visible
+    // player characters travelling with the party, not away or on downtime.
+    return (
+      p.kind === "character" &&
+      characterControl(p) === "player" &&
+      !p.nonParty &&
+      !isNpc(table, p) &&
+      characterVisible(table, p) &&
+      inParty(table, p) &&
+      !characterPosition(table, p).downtime
+    );
   };
   const name = (id: string) => {
     const p = purse(id);

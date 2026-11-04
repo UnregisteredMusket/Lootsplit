@@ -18,6 +18,7 @@ import { journalEntryHref } from "@/lib/quire/journal-navigation";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import {
   buildSessionRecap,
+  liveRecapSource,
   NOTHING_RECORDED,
   recapEntryId,
   recapText,
@@ -85,13 +86,8 @@ function SessionRecapDialog({
       return "deferred" in result && result.deferred ? { deferred: true } : { error: result.error };
     }
     const live = { ...emptyCloudTable(), purses, holdings, shops, stock, ledger, journal };
-    if (dm) return { source: live };
-    try {
-      // A shared room already sends a player's projection; project again for device player links.
-      return { source: projectRecord(live, archiveSeat) };
-    } catch {
-      return { source: live };
-    }
+    // A shared room already sends a player's projection; project again for device player links.
+    return liveRecapSource(live, dm, (table) => projectRecord(table, archiveSeat));
   }, [archived, archiveSeat, purses, holdings, shops, stock, ledger, journal, dm]);
   const audience: RecapAudience = dm ? { kind: "dm" } : { kind: "player", purseIds: seat.purseIds };
   const recap = "source" in source ? buildSessionRecap(source.source, session, audience) : null;
