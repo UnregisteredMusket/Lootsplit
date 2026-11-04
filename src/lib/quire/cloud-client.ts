@@ -890,6 +890,14 @@ async function assertWholeDeviceCampaign(failure: string) {
 export function keepWholeCampaignOnDevice() {
   return serial(() => loadWholeCampaign("nothing was changed"));
 }
+/**
+ * Ledger CSV export: the same whole-campaign load as Download a copy (every older page and
+ * archived session this seat may read), refusing when any part could not be loaded. Pending
+ * actions do not block it: the file holds recorded history only.
+ */
+export function loadWholeCampaignForExport() {
+  return serial(() => loadWholeCampaign("the export would be incomplete. Nothing was downloaded"));
+}
 export const DEVICE_HISTORY_NOTICE_ID = "lootsplit-history-device-notice";
 /**
  * When the room ended before its whole history reached this device (closed elsewhere, access
