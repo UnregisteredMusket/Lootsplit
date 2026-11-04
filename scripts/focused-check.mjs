@@ -14,6 +14,7 @@ const featureAudits = {
   "coin-split": "scripts/coin-split-browser-audit.mjs",
   "make-change": "scripts/make-change-browser-audit.mjs",
   "sell-and-split": "scripts/sell-and-split-browser-audit.mjs",
+  "preview-as-player": "scripts/preview-as-player-browser-audit.mjs",
   "ledger-export": "scripts/ledger-export-browser-audit.mjs",
   "item-charges": "scripts/item-charges-browser-audit.mjs",
   "xp-milestones": "scripts/xp-milestones-browser-audit.mjs",

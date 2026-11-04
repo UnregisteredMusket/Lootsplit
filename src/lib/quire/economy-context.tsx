@@ -35,6 +35,7 @@ import {
   useMemo,
   useState,
   useRef,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
@@ -87,6 +88,7 @@ import {
   type QuireFile,
 } from "./economy.ts";
 import { subscribeCampaigns } from "./campaigns.ts";
+import { getPreview, subscribePreview, type PlayerPreview } from "./player-preview.ts";
 import { getCloudWatch, subscribeCloudWatch } from "./cloud-turn.ts";
 import {
   captureDeviceBackup,
@@ -360,6 +362,7 @@ function fault(error: unknown, fallback: string) {
   toast.error(error instanceof Error ? error.message : fallback);
 }
 
+const noPreview = () => null;
 export function EconomyProvider({ children }: { children: ReactNode }) {
   const [journal, setJournal] = useState<Journal>({ sessions: [], requests: [], events: [] });
   const [ready, setReady] = useState(false);
@@ -378,9 +381,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
   const ledgerRef = useRef(ledger);
   ledgerRef.current = ledger;
   const reloadSequence = useRef(0);
+  // "Preview as player": the preview the economy below was read for. Until a reload for the
+  // current preview (or for none) finishes, screens get no data, so the player layout never
+  // renders the DM's data (nor the DM layout the player's) for a frame.
+  const preview = useSyncExternalStore(subscribePreview, getPreview, noPreview);
+  const [loadedFor, setLoadedFor] = useState<PlayerPreview | null>(null);
   const reload = useCallback(async () => {
     const sequence = ++reloadSequence.current;
     const campaignKey = activeCampaignId();
+    // The preview (or none) this read is for: a preview started or stopped meanwhile drops it.
+    const viewing = getPreview();
     await ensureEconomy();
     // A once-per-campaign safety copy. Never bypass an existing password-protected-save policy.
     if (
@@ -412,6 +422,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       journal: nextJournal,
     } = await economyView();
     if (sequence !== reloadSequence.current || campaignKey !== activeCampaignId()) return;
+    if (viewing !== getPreview()) return;
+    setLoadedFor(viewing);
     setPurses(nextPurses.sort((a, b) => a.name.localeCompare(b.name)));
     setHoldings(nextHoldings.sort((a, b) => a.name.localeCompare(b.name)));
     setShops(nextShops.sort((a, b) => a.name.localeCompare(b.name)));
@@ -468,6 +480,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     () =>
       subscribeSheetChanges(() => {
         void reload();
+      }),
+    [reload],
+  );
+  // Starting or stopping "Preview as player" switches every screen between the DM's data and the
+  // previewed seat's view, read again from this device (no campaign reload, nothing written).
+  useEffect(
+    () =>
+      subscribePreview(() => {
+        void reload().catch((error) => fault(error, "This view could not refresh."));
       }),
     [reload],
   );
@@ -1421,7 +1442,30 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     attempt,
   ]);
 
-  return <EconomyContext.Provider value={api}>{children}</EconomyContext.Provider>;
+  const stale = preview !== loadedFor;
+  const shown = useMemo<EconomyApi>(
+    () =>
+      stale
+        ? {
+            ...api,
+            ready: false,
+            journal: { sessions: [], requests: [], events: [] },
+            purses: [],
+            holdings: [],
+            shops: [],
+            stock: [],
+            ledger: [],
+            catalog: [],
+            lexicon: [],
+            listings: [],
+            loans: [],
+            sheets: [],
+          }
+        : api,
+    [api, stale],
+  );
+
+  return <EconomyContext.Provider value={shown}>{children}</EconomyContext.Provider>;
 }
 
 export function useEconomy() {

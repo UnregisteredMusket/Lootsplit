@@ -2,6 +2,7 @@ import { activeCampaignId } from "./campaign-context.ts";
 import type { Article, Book, DraftArticle } from "./types.ts";
 
 import { isEphemeralCampaign } from "./guest-storage.ts";
+import { PreviewReadOnlyError, previewActive } from "./player-preview.ts";
 const DB_VERSION = 3;
 let memoryFactory: IDBFactory | undefined;
 
@@ -84,7 +85,7 @@ async function database(): Promise<IDBDatabase> {
       reject(new Error("Close other Lootsplitter tabs, then reload."));
     };
     open.onsuccess = () => {
-      const db = open.result;
+      const db = readOnlyDuringPreview(open.result);
       db.onversionchange = () => {
         db.close();
         opening = null;
@@ -97,6 +98,20 @@ async function database(): Promise<IDBDatabase> {
     };
   });
   return opening;
+}
+
+/**
+ * The DM's read-only "Preview as player" (player-preview.ts): while it runs, this campaign's
+ * database refuses every read-write transaction, so no command, sheet, message, setting or
+ * journal line can be saved on this device, whichever screen or code path tries.
+ */
+function readOnlyDuringPreview(db: IDBDatabase): IDBDatabase {
+  const transaction = db.transaction.bind(db);
+  db.transaction = ((stores: string | string[], mode?: IDBTransactionMode, options?: IDBTransactionOptions) => {
+    if (mode && mode !== "readonly" && previewActive()) throw new PreviewReadOnlyError();
+    return transaction(stores, mode, options);
+  }) as IDBDatabase["transaction"];
+  return db;
 }
 
 export function quireDb(): Promise<IDBDatabase> {

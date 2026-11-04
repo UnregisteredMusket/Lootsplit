@@ -65,6 +65,20 @@ export const HELP_GROUPS: HelpGroup[] = [
           ["Campaign encounters", "/encounters"],
         ],
       },
+      {
+        id: "preview-as-player",
+        title: "Preview as player: check what a player sees",
+        audience: "DM",
+        paragraphs: [
+          "Party → Preview as player (also Joined participants on the Campaign screen of a shared campaign, or Preview as player in the command palette, Ctrl/⌘ K) shows the app exactly as one player character's player sees it. Choose the character; a banner reads “Previewing as <name> — read-only” until you choose Stop preview, which returns to your DM view at once without reloading the campaign.",
+          "Use it to check that hidden NPCs, hidden quest objectives, DM-only ledger lines and markers, other players' purses and whispers, fog and unrevealed map places really stay hidden. The preview is built on this device with the same player projection the server uses for that seat, so in a shared campaign it matches what that player's device receives. Messages between two players, which you never receive, are not in the preview either.",
+          "Home, Party & inventory, the character sheet, Journal, Quests, Maps and Campaign chat can be previewed; other screens say “Not available in preview”, and the combat tracker and map pings on a shared map are left out. Nothing can change while you preview: buying, giving, posting, editing, sending a message, rolling or saving is refused with the read-only notice, nothing is stored or synced, and no history, receipt or event is written. A shared campaign pauses its updates on this device while you preview and catches up when you stop. Changing campaign or reloading ends the preview.",
+        ],
+        links: [
+          ["Party", "/party"],
+          ["Campaign", "/share?tab=room"],
+        ],
+      },
     ],
   },
   {

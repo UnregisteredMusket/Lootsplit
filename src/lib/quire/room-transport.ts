@@ -16,11 +16,11 @@
  * to the sections of the latest view, so it never holds more than one view's sections.
  */
 import {
-  closeCloudTable,
-  joinCloudTable,
+  closeCloudTable as closeServer,
+  joinCloudTable as joinServer,
   manageCloudRoom as manageServer,
   nameCloudRoom as nameServer,
-  openCloudTable,
+  openCloudTable as openServer,
   pollCloudTable as pollServer,
   previewCloudTable,
   pullCloudTable as pullServer,
@@ -31,8 +31,27 @@ import {
   submitCloudCommands as submitServer,
 } from "./cloud-api.ts";
 import { createRoomSync } from "./room-sync.ts";
+import { assertNotPreviewing } from "./player-preview.ts";
 
-export { closeCloudTable, joinCloudTable, openCloudTable, previewCloudTable, readCloudHistory };
+export { previewCloudTable, readCloudHistory };
+
+/**
+ * The DM's read-only "Preview as player" (player-preview.ts): every room write is refused before
+ * any request is sent, whichever screen asks.
+ */
+function refusedInPreview<A extends unknown[], R>(write: (...args: A) => Promise<R>) {
+  return (...args: A): Promise<R> => {
+    try {
+      assertNotPreviewing();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    return write(...args);
+  };
+}
+export const closeCloudTable = refusedInPreview(closeServer);
+export const joinCloudTable = refusedInPreview(joinServer);
+export const openCloudTable = refusedInPreview(openServer);
 
 const sync = createRoomSync({ readSections: readCloudSections, fullRead: pullServer });
 export const { clearViewSectionCache } = sync;
@@ -41,8 +60,8 @@ if (typeof window !== "undefined")
 
 export const pullCloudTable = sync.roomRead(pullServer);
 export const pollCloudTable = sync.roomRead(pollServer);
-export const setCloudPace = sync.roomWrite(paceServer);
-export const skipCloudTurn = sync.roomWrite(skipServer);
-export const submitCloudCommands = sync.roomWrite(submitServer);
-export const nameCloudRoom = sync.roomWrite(nameServer);
-export const manageCloudRoom = sync.roomWrite(manageServer);
+export const setCloudPace = refusedInPreview(sync.roomWrite(paceServer));
+export const skipCloudTurn = refusedInPreview(sync.roomWrite(skipServer));
+export const submitCloudCommands = refusedInPreview(sync.roomWrite(submitServer));
+export const nameCloudRoom = refusedInPreview(sync.roomWrite(nameServer));
+export const manageCloudRoom = refusedInPreview(sync.roomWrite(manageServer));

@@ -28,6 +28,7 @@
   "node scripts/recovery-step.mjs dev-coin-split 240 node scripts/coin-split-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-make-change 180 node scripts/make-change-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-sell-and-split 240 node scripts/sell-and-split-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-ledger-export 240 node scripts/ledger-export-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-item-charges 180 node scripts/item-charges-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-xp-milestones 240 node scripts/xp-milestones-browser-audit.mjs",
