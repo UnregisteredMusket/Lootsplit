@@ -562,7 +562,6 @@ function StockRow({
             {line.quantity === null ? "" : ` · ${line.quantity} left`}
             {modern ? <span className="shop-row-modern"> · {modern}</span> : null}
           </span>
-          <PriceWhy breakdown={breakdown} dm={dm} />
         </span>
         {oneTap ? (
           <Button disabled={disabled} onClick={() => void purchase()}>
@@ -586,6 +585,10 @@ function StockRow({
             </Button>
           </>
         )}
+        {/* Its own full-width line, so the breakdown never shares the narrow name column. */}
+        <div className="w-full min-w-0">
+          <PriceWhy breakdown={breakdown} dm={dm} />
+        </div>
         {active && !oneTap ? (
           <p className="w-full text-sm" aria-live="polite">
             {Number.isSafeInteger(asked) && asked > 0

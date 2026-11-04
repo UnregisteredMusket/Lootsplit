@@ -6,7 +6,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const browser = await chromium.launch({
@@ -47,7 +47,7 @@ try {
         journal: readJournal({ world: { blackMarketActive: true } }),
       });
     });
-    await reloadApplication(page, origin + "/shop/backroom");
+    await openApplication(page, origin + "/shop/backroom");
     await chooseOption(page.getByLabel("Paying from", { exact: true }), "aria");
     // 1337 × 1.15 = 1538 (markup); × 1.37 → 2106 (premium); Charisma 16 takes 6% → 1980.
     const toggle = page.getByRole("button", { name: "Why this price?" }).first();
