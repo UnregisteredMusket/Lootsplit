@@ -358,7 +358,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   const originalLocations = structuredClone(t.journal?.market?.locations);
   const cmd = commandSchema.parse(raw);
   const at = Date.now();
-  const journal = (t.journal = readJournal(t.journal));
+  // `let`: archiveSession replaces t.journal, and everything after it must write to the new one.
+  let journal = (t.journal = readJournal(t.journal));
   // Exchange editors can address a legacy city's default before its first save.
   // Other commands retain their original financial/patch preview baselines.
   if (cmd.kind.startsWith("trade-")) ensureCityExchanges(t);
@@ -871,6 +872,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       active.endedAt = at;
       active.endLedgerIds = t.ledger.map((l) => l.id);
       archiveSession(t, active.id, active.name, at);
+      journal = t.journal!;
     }
   } else if (cmd.kind === "post") {
     // The DM's ledger posting (Party → Record a payment, Activity adjustments): one payment line.
@@ -1007,6 +1009,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       active.endedAt = at;
       active.endLedgerIds = t.ledger.map((x) => x.id);
       archiveSession(t, active.id, active.name, at);
+      journal = t.journal!;
     }
     if (
       !cmd.end &&
