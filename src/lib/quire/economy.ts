@@ -69,7 +69,10 @@ import {
   refreshChat,
   rememberIncoming,
   replaceNotes,
+  showPreviewNotes,
 } from "./chat.ts";
+import { assertNotPreviewing, previewSeat } from "./player-preview.ts";
+import { seatView } from "./player-view.ts";
 import { readCloudTable, applyBillToTable, emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { readHandouts, type Handout } from "./handouts.ts";
 import { APP_VERSION } from "./version.ts";
@@ -182,7 +185,9 @@ let ensuring: Promise<void> | null = null;
 let ensuringName = "";
 
 export function ensureEconomy(): Promise<void> {
-  const name = isEphemeralCampaign() ? "guest-memory" : activeDatabaseName();
+  // A preview starts on an opened campaign, and its database refuses writes (player-preview.ts).
+  if (previewSeat()) return Promise.resolve();
+  const name =isEphemeralCampaign() ? "guest-memory" : activeDatabaseName();
   if (ensuring && ensuringName === name) return ensuring;
   ensuringName = name;
   ensuring = (async () => {
@@ -2183,6 +2188,8 @@ export type QuireFile = {
 };
 
 export async function snapshot(): Promise<QuireFile> {
+  // A whole-campaign file (backups, exports, activity links) is never made during a preview.
+  assertNotPreviewing();
   const db = await quireDb();
   const tx = db.transaction(
     [
@@ -2733,6 +2740,13 @@ export async function economySnapshot(): Promise<CloudTable> {
     readEconomyTransaction(tx).then((table) => (dm ? initializeCityExchanges(tx, table) : table)),
     finish(tx),
   ]);
+  // "Preview as player": every reader of the campaign (sheets, exports, …) gets the previewed
+  // seat's view, never the DM's whole table (player-preview.ts).
+  const previewing = previewSeat();
+  if (previewing) {
+    const view = seatView(table, { purseIds: previewing.purseIds });
+    return { ...view, realm: table.realm, journal: readJournal(view.journal) };
+  }
   return table;
 }
 
@@ -2755,22 +2769,28 @@ export async function economyView() {
   const dm = getSeat().role === "dm";
   const tx = db.transaction([...ECONOMY, "catalog", "lexicon"], dm ? "readwrite" : "readonly");
   const [table, catalog, lexicon] = await Promise.all([
-    readEconomyTransaction(tx, false).then((table) =>
+    // A preview also reads the chat, to show the previewed seat's messages from its projection.
+    readEconomyTransaction(tx, previewSeat() !== null).then((table) =>
       dm ? initializeCityExchanges(tx, table) : table,
     ),
     request<CatalogItem[]>(tx.objectStore("catalog").getAll()),
     request<Lexeme[]>(tx.objectStore("lexicon").getAll()),
     finish(tx),
   ]);
+  // The DM's read-only "Preview as player" (player-preview.ts): the previewed seat's view, as the
+  // server's `view()` projects it for that seat (player-view.ts), from the DM's whole copy.
+  const previewing = previewSeat();
   // A player-only device link: one projection, with the party directory as in shared rooms
   // (cloud.server.ts seatTable), so the journal keeps the listed characters' party positions.
-  const projected =
-    getSeat().role === "player"
+  const projected = previewing
+    ? seatView(table, { purseIds: previewing.purseIds })
+    : getSeat().role === "player"
       ? projectRecord(table, getSeat(), {
           directory: true,
           tabletopProjected: getCloudWatch().joined,
         })
       : null;
+  if (previewing) showPreviewNotes(projected!.notes);
   return {
     ...(projected ?? table),
     realm: table.realm,
@@ -2871,6 +2891,8 @@ export async function executeLocalCommand(
   input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
+  // Read-only "Preview as player": refused before anything is read or written.
+  assertNotPreviewing();
   const invoked = captureDeviceMutationScope();
   const guard = () => {
     assertDeviceMutationScope(invoked);
@@ -2940,6 +2962,8 @@ export async function executeFinanceCommand(
   input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
+  // Read-only "Preview as player": refused before anything is read or written.
+  assertNotPreviewing();
   const invoked = captureDeviceMutationScope();
   assertDeviceMutationScope(invoked);
   assertScope?.();
@@ -2958,6 +2982,8 @@ export async function executeFinanceBatch(
   inputs: CommandRequest[],
   assertScope?: () => void,
 ): Promise<void> {
+  // Read-only "Preview as player": refused before anything is read or written.
+  assertNotPreviewing();
   const invoked = captureDeviceMutationScope();
   assertDeviceMutationScope(invoked);
   assertScope?.();

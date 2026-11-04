@@ -84,6 +84,7 @@ export function paletteActions(dm: boolean, sessionActive: boolean): PaletteEntr
         action("Review Inbox", "Approve or deny requests", "/features/review", "approve pending requests"),
         action("Split the party", "Party → Split the party", "/party?action=split", "groups"),
         action("Invite players", "Multiplayer → Room", "/share?tab=room", "invite link host"),
+        action("Preview as player", "Party → Preview as player (read-only)", "/party?preview=1", "view as player check hidden seat"),
       ]
     : [
         action("Request a payment", "Bank", "/features/bank", "pay spend coins"),

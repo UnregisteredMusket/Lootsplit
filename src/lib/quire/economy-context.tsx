@@ -87,6 +87,7 @@ import {
   type QuireFile,
 } from "./economy.ts";
 import { subscribeCampaigns } from "./campaigns.ts";
+import { subscribePreview } from "./player-preview.ts";
 import { getCloudWatch, subscribeCloudWatch } from "./cloud-turn.ts";
 import {
   captureDeviceBackup,
@@ -457,6 +458,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     () =>
       subscribeSheetChanges(() => {
         void reload();
+      }),
+    [reload],
+  );
+  // Starting or stopping "Preview as player" switches every screen between the DM's data and the
+  // previewed seat's view, read again from this device (no campaign reload, nothing written).
+  useEffect(
+    () =>
+      subscribePreview(() => {
+        void reload().catch((error) => fault(error, "This view could not refresh."));
       }),
     [reload],
   );

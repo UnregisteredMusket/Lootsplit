@@ -19,6 +19,7 @@ test("actual conditional refresh retains pending work and attention, updates enc
   const body = source.slice(source.indexOf("async function refresh("), source.indexOf("export async function refreshShared()"));
   const refresh = new Function("context", "readUnchangedRoom", stripTypeScriptTypes(`
     const {sessionValue,view,pollCloudTable,pullCloudTable,accept,signal}=context;
+    const playerPreviewActive=()=>false; // no "Preview as player" (player-preview.ts) here
     const session=()=>sessionValue,key=()=>"campaign";
     const acceptedPoll={campaignKey:key(),token:sessionValue.token,seatId:sessionValue.seatId,revision:sessionValue.revision};
     const publish=(patch,dataChanged)=>{signal(dataChanged);Object.assign(view,patch);};
@@ -116,7 +117,9 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     "fail",
     "sameCommand",
     "compactPatch",
-    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + HISTORY_STUBS + body) + "; return accept;",
+    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' +
+      // No "Preview as player" (player-preview.ts) runs here.
+      "const playerPreviewActive=()=>false,PreviewReadOnlyError=Error;\n" + HISTORY_STUBS + body) + "; return accept;",
   )(
     () => session,
     readRoomResponse,
@@ -333,6 +336,7 @@ async function recoveryHarness(ephemeral = true, owner?: string) {
     "downloadJson",
     stripTypeScriptTypes(`function harness() {
     let playerSession=original,acceptedPoll;
+    const playerPreviewActive=()=>false; // no "Preview as player" (player-preview.ts) here
     const session=()=>playerSession,key=()=>"quire.cloud.v2.main",isEphemeralCampaign=()=>ephemeral;
     const stopPolling=()=>{},forgetRoomImages=()=>{},polling=false,publish=()=>{},initialView={},PLAYER_TICKET="lootsplit.player.reconnect.v1";
     const warnUnsentPlayerActions=()=>{},applyCloudTable=async()=>{},setSeat=()=>{},notify=()=>{};
@@ -772,7 +776,9 @@ function outcomeHarness({
     "sameCommand",
     "readRoomResponse",
     "compactPatch",
-    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + HISTORY_STUBS + body) +
+    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' +
+      // No "Preview as player" (player-preview.ts) runs here.
+      "const playerPreviewActive=()=>false,PreviewReadOnlyError=Error;\n" + HISTORY_STUBS + body) +
       "; return {queueCommand, runSharedMutation, captureMutationScope, retryPending};",
   )(
     () => Object.freeze({ ...deviceScope }),

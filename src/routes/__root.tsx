@@ -29,6 +29,7 @@ import { SplitViewProvider, usePane } from "@/components/split-view";
 import { retainBeside } from "@/lib/quire/split-view";
 import { NotFoundPage } from "@/components/website/not-found";
 import { CommandPaletteHost } from "@/components/command-palette";
+import { PlayerPreviewBanner, PreviewRouteGate } from "@/components/player-preview";
 import { SessionSheetHost } from "@/components/session-chip";
 import { NOT_FOUND_TITLE, isUnmatchedRoute, useUnmatchedRoute } from "@/lib/website/not-found-route";
 import appCss from "../styles.css?url";
@@ -61,7 +62,13 @@ export const Route = createRootRoute({
   notFoundComponent: NotFoundPage,
   component: function RootComponent() {
     // The right split-view pane renders this route tree inside the existing document.
-    return usePane() ? <Outlet /> : <RootDocument />;
+    return usePane() ? (
+      <PreviewRouteGate>
+        <Outlet />
+      </PreviewRouteGate>
+    ) : (
+      <RootDocument />
+    );
   },
 });
 
@@ -128,8 +135,12 @@ function RootDocument() {
                         {/* Progress for a large shared campaign's first load or catch-up. */}
                         <CampaignLoadingHost />
                         <QuestUpdateToasts />
+                        {/* DM's read-only "Preview as player": banner and screen gate. */}
+                        <PlayerPreviewBanner />
                         <SplitViewProvider>
-                          <Outlet />
+                          <PreviewRouteGate>
+                            <Outlet />
+                          </PreviewRouteGate>
                           {/* Ctrl/⌘ K palette and keyboard shortcuts for every app screen. */}
                           <CommandPaletteHost />
                           <SessionSheetHost />

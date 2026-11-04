@@ -10,6 +10,7 @@ import {
   assertMutationScope,
 } from "../quire/cloud-client";
 import { announceSheetChange } from "../quire/party-sheet-links";
+import { assertNotPreviewing } from "../quire/player-preview";
 import type { PlaySheet } from "./model.mjs";
 
 export async function characterRequest<T>(
@@ -17,6 +18,9 @@ export async function characterRequest<T>(
   payload?: any,
   signal?: AbortSignal,
 ): Promise<T> {
+  // Preview as player: sheets can be read, never saved, assigned or rolled.
+  // (The DM's campaign roll-policy list, "sheets/campaign", is the DM's and refused too.)
+  if (!["sheets", "sheets/detail", "sheets/log"].includes(path)) assertNotPreviewing();
   const scope = path === "sheets/save" ? captureMutationScope() : undefined;
   const joinedAtStart = getCloudTable().joined;
   if (

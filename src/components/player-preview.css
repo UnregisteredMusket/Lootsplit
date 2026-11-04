@@ -1,0 +1,42 @@
+/* "Preview as player": the persistent read-only banner and the unavailable-screen notice. */
+.player-preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 55;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--color-lead, #c9a35a);
+  color: var(--color-bg, #14110d);
+  min-width: 0;
+}
+.player-preview-banner p {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.player-preview-stop {
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+}
+.player-preview-unavailable {
+  max-width: 40rem;
+  margin: 3rem auto;
+  padding: 0 1rem;
+  overflow-wrap: anywhere;
+}
+.player-preview-unavailable h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+.player-preview-unavailable p {
+  margin-top: 0.5rem;
+}
+.player-preview-choices {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
