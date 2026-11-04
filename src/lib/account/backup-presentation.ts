@@ -89,6 +89,8 @@ export function pendingCommandDescription(value: unknown): string {
       return `${c.pooled ? "Put in" : "Take out of"} the treasure pool · item ${c.holdingId}`;
     case "loot-resolve":
       return `Resolve ${c.lots.length} treasure-pool item${c.lots.length === 1 ? "" : "s"} (${c.method})`;
+    case "xp-award":
+      return `Award ${c.amount} ${c.unit === "xp" ? "XP" : c.amount === 1 ? "milestone" : "milestones"} · ${c.purseIds.length} character${c.purseIds.length === 1 ? "" : "s"}`;
     case "coin-exchange":
       return `Make change (same worth) · character ${c.purseId}`;
     case "item-use":

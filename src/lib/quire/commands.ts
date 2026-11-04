@@ -34,6 +34,7 @@ import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RE
 import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
 import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
 import { questCommands, questKinds, type QuestCommand } from "./quests-schema.ts";
+import { applyXpAward, keepPurseAdvancement, xpAwardCommand, xpAwardSummary } from "./xp.ts";
 import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
@@ -120,6 +121,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
   /** Make change (loot phase 4): coins exchanged inside one purse at book rates; the worth never changes. */
   z.object({ ...base, kind: z.literal("coin-exchange"), purseId: id, before: coinsSchema, after: coinsSchema }).strict(),
+  /** XP and milestones (loot phase 6): the DM awards experience to chosen party characters (xp.ts). */
+  xpAwardCommand,
   // DM coin postings and direct coin edits (audit 2026-10-21, finding 3): shared rooms record them
   // as commands, so a retried command ID applies once. The device runs the same commands.
   z
@@ -926,6 +929,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         copper: delta,
         transactionType: "adjustment",
       });
+  } else if (cmd.kind === "xp-award") {
+    // DM only (checked in applyXpAward). One journal entry lists who got what; like a coin split,
+    // it is DM-only text when an NPC is among the recipients.
+    const plan = applyXpAward(t, seat, cmd);
+    event(xpAwardSummary(plan, cmd.reason), "management");
+    if (plan.npc) journal.events[journal.events.length - 1]!.dmOnly = true;
   } else if (cmd.kind === "coin-exchange") {
     // Owner or DM; the same rule as spending from the purse. Recorded as the purse's own activity,
     // which players see only for purses they hold (projectRecord).
@@ -1593,6 +1602,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       const rows = (t[change.store] ?? []) as any[];
       const rowId = (x: any) => (change.store === "sheets" ? x.purseId : x.id);
       const current = rows.find((x) => rowId(x) === change.id) ?? null;
+      // XP and milestones (protocol 21): an older client's purse rows lack them; keep the stored values.
+      if (change.store === "purses" && current) Object.assign(change, keepPurseAdvancement(current, change.before, change.after));
       if (!same(current, change.before))
         throw new Error(
           `Conflict in ${change.store}. Export your pending changes, then refresh and retry.`,
