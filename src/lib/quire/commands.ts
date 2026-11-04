@@ -54,7 +54,7 @@ import {
   applyDowntime,
   financeMove,
 } from "./finance.ts";
-import { assertMerchantSale, creditMerchant, isService, merchantRefill, merchantUnitOffer, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
+import { assertMerchantSale, creditMerchant, isService, merchantRefill, merchantUnitOffer, merchantShortfall, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
 import { archiveSession } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
@@ -354,7 +354,11 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
 /** One private working copy per atomic batch. Every command retains its full validation. */
 export function applyCommandBatch(input: CloudTable, seat: CloudSeat, commands: Command[], executionFor: (command: Command) => TradeExecution = () => ({})): CloudTable {
   let table = structuredClone(input);
-  for (const command of commands) table = applyOwnedCommand(table, seat, command, executionFor(command));
+  // Hidden merchant purses: refused last, after every other command in the batch validated.
+  const merchantShortfalls: string[] = [];
+  for (const command of commands)
+    table = applyOwnedCommand(table, seat, command, { ...executionFor(command), merchantShortfalls });
+  if (merchantShortfalls.length) throw Error(merchantShortfalls[0]);
   return table;
 }
 function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution): CloudTable {
@@ -401,6 +405,20 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const p = t.purses.find((p) => p.id === purseId);
     if (!p) throw new Error("Account no longer exists.");
     return p;
+  };
+  // Merchant purse (merchant.ts). A seat that can't read the purse never learns from the order of
+  // errors whether a sale fit: in a batch the shortfall is refused only after every other command
+  // validated (applyCommandBatch), and a staged batch is checked again at final submit.
+  const merchantPays = (shop: import("./types.ts").Shop, copper: number) => {
+    const reveal = revealPurse(shop, seat.role);
+    if (!reveal && (execution.staged || execution.merchantShortfalls)) {
+      const short = merchantShortfall(shop, copper, false);
+      if (short) {
+        if (!execution.staged) execution.merchantShortfalls!.push(short);
+        return;
+      }
+    }
+    payFromMerchant(shop, copper, reveal);
   };
   const dm = () => {
     if (seat.role !== "dm") throw new Error("Only the DM can perform this action.");
@@ -1200,7 +1218,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
     const paid = merchantUnitOffer(h, s) * cmd.quantity;
     // Merchant purse: the shop pays from it, or the whole sale is refused.
-    payFromMerchant(s, paid, revealPurse(s, seat.role));
+    merchantPays(s, paid);
     coins(h.purseId, paid);
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
@@ -1368,7 +1386,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         rule: cmd.remainder.rule,
         ...(cmd.remainder.purseId ? { purseId: cmd.remainder.purseId } : {}),
       },
-      { actor: seat.role === "dm" ? "dm" : "player", projected },
+      // The purse is checked below (merchantPays), in the batch order that keeps a hidden purse hidden.
+      { actor: seat.role === "dm" ? "dm" : "player", projected, skipPurse: true },
     );
     if (
       plan.proceeds !== cmd.expect.proceeds ||
@@ -1377,7 +1396,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     )
       throw Error("The sale or split changed (prices, items, the party fund or recipients moved). Review it again.");
     // Merchant purse: the whole sale is paid from it or nothing is sold (never half a sale).
-    payFromMerchant(shop, plan.proceeds, revealPurse(shop, seat.role));
+    merchantPays(shop, plan.proceeds);
     // The sale: the fund receives each lot's price (keeping its own coins), one sale line per lot.
     fund.coins = creditCoins(fund.coins, plan.proceeds);
     for (const [i, lot] of plan.lots.entries()) {

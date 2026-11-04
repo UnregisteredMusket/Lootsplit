@@ -79,7 +79,7 @@ export function saleProblem(h: Holding, shop: Shop, actor: "dm" | "player"): str
 export function planSaleSplit(
   t: SaleSplitTable,
   input: SaleSplitInput,
-  options: { actor: "dm" | "player"; projected?: boolean },
+  options: { actor: "dm" | "player"; projected?: boolean; skipPurse?: boolean },
 ): SaleSplitPlan {
   const fund = t.purses.find((p) => p.id === input.fundId);
   if (!fund) throw Error("Account no longer exists.");
@@ -114,7 +114,7 @@ export function planSaleSplit(
   const proceeds = lots.reduce((sum, l) => sum + l.paid, 0);
   if (!Number.isSafeInteger(proceeds)) throw Error("The sale exceeds the supported coin balance.");
   // Merchant purse: the whole sale fits it or nothing is sold.
-  const short = merchantShortfall(shop, proceeds, revealPurse(shop, options.actor));
+  const short = options.skipPurse ? null : merchantShortfall(shop, proceeds, revealPurse(shop, options.actor));
   if (short) throw Error(short);
   const split = planCoinSplit(
     t,

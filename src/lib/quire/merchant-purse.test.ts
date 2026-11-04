@@ -356,3 +356,54 @@ test("purse fields are whole copper; invalid values are refused", () => {
   for (const bad of [{ merchantPurse: -1 }, { merchantPurse: 1.5 }, { purchaseLimit: -5 }, { offListPercent: 101 }, { offListPercent: 2.5 }])
     assert.throws(() => validateEconomyRows(campaign(marlow(bad as Partial<Shop>))), /invalid or missing data/);
 });
+
+test("a hidden purse can't be probed: another failure in the batch is always reported first", async () => {
+  const t = campaign(marlow({ merchantPurse: 12_345 }));
+  t.holdings.push(item("nail", "a", "Nail", 2, 100_000, "smith"));
+  const host = await openRoom({ name: "Probe DM", table: t });
+  const joined = await joinRoom({ code: host.code, purseId: "a", name: "Ash" });
+  const ash = { code: host.code, token: joined.token };
+  await choosePace({ ...host, live: true });
+  // Selling k nails (1 cp each) fits for k ≤ 12,345; paired with a failing command, the answer is
+  // the same either way and nothing commits.
+  for (const k of [1, 12_345, 12_346, 100_000]) {
+    await assert.rejects(
+      submitCommands({ ...ash, batchId: `probe-${k}`, commands: [
+        { id: `probe-sell-${k}`, kind: "sell", holdingId: "nail", shopId: "marlow", quantity: k },
+        { id: `probe-miss-${k}`, kind: "sell", holdingId: "missing", shopId: "marlow", quantity: 1 },
+      ] }),
+      { message: "Item or shop no longer exists." },
+    );
+  }
+  // Staging (nothing stored) doesn't check a hidden purse either: it is checked at submit.
+  await submitCommands({ ...ash, batchId: "stage-over", stage: true, commands: [
+    { id: "stage-over", kind: "sell", holdingId: "nail", shopId: "marlow", quantity: 20_000 },
+  ] });
+  const host1 = (await roomState(host)).table;
+  assert.equal(host1.shops[0].merchantPurse, 12_345);
+  // A real over-purse sale is still refused, after the batch's other commands validated.
+  await assert.rejects(
+    submitCommands({ ...ash, batchId: "real-over", commands: [
+      { id: "real-over", kind: "sell", holdingId: "nail", shopId: "marlow", quantity: 12_346 },
+      { id: "real-ok", kind: "sell", holdingId: "sword", shopId: "marlow", quantity: 1 },
+    ] }),
+    { message: "Marlow can't afford that." },
+  );
+  assert.deepEqual((await roomState(host)).table.shops, host1.shops);
+  await submitCommands({ ...ash, batchId: "real-fit", commands: [
+    { id: "real-fit", kind: "sell", holdingId: "nail", shopId: "marlow", quantity: 12_345 },
+  ] });
+  assert.equal((await roomState(host)).table.shops[0].merchantPurse, 0);
+});
+
+test("the DM still gets the purse amount at once, and a downtime approval names the changed purse", () => {
+  assert.throws(() => act(campaign(), sell(2), "dm-short"), { message: "Marlow has only 12 gp, 3 sp to spend." });
+  let t = act(campaign(), { kind: "shop-schedule", shopId: "marlow", schedule: { cycleDays: 7, openDays: [0, 1, 2, 3, 4, 5, 6], restockEveryDays: 3, restockQuantity: 5, lastRestockDay: 0 } }, "sched-2");
+  t = act(t, { kind: "downtime-plan", days: 4, name: "Week" }, "plan-w");
+  const downtimeId = t.journal!.finance!.downtime.at(-1)!.id;
+  const moved = act(t, sell(1), "between-2");
+  assert.throws(
+    () => act(moved, { kind: "session", name: "Back", end: false, downtimeId }, "s-w"),
+    { message: "Marlow's Forge's merchant purse changed after this preview (a sale or purchase there). Recalculate downtime before approving." },
+  );
+});

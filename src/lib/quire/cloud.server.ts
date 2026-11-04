@@ -1196,6 +1196,8 @@ export async function submitCommands(input: {
       const applied = upgradeOldClientCommands(base, unapplied, input.tabletopProtocol ?? 0);
       return applyCommandBatch(base, seat, applied, (command) => ({
         source: "server",
+        // Hidden merchant purses are checked when the turn is submitted, not while staging.
+        ...(input.stage ? { staged: true } : {}),
         manualRolls,
         mapCombat,
         playerSeats: room.seats.filter((s) => s.role === "player").map((s) => ({ id: s.id, purseIds: s.purseIds })),
