@@ -17,7 +17,7 @@ import type { PlaySheet } from "./model.mjs";
  * The character list during "Preview as player" (player-preview.ts): the previewed characters as
  * the projected campaign holds them, and no account campaigns.
  */
-export async function previewedCharacterList(purseIds: readonly string[]) {
+async function previewedCharacterList(purseIds: readonly string[]) {
   const table = await economySnapshot();
   const room = getCloudTable();
   return {
