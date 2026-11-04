@@ -3,6 +3,7 @@ import { SearchSelect } from "@/components/search-select";
 import { LocationOptions } from "@/components/market-locations";
 import { MarketImageUpload } from "@/components/market-image-upload";
 import { useEconomy } from "@/lib/quire/economy-context";
+import { markupDisplay, markupPercentText, markupTier } from "@/lib/quire/market-markup";
 import { useShowDollars } from "@/lib/quire/prefs";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
@@ -210,6 +211,7 @@ export function ShopEditor({
               onChange={(e) => setPremium(e.target.value)}
             />
           </label>
+          <MarkupPreview premium={premium} />
           <p>
             The multiplier applies to the existing shop asking price before the usual Charisma
             adjustment. The DM's live toggle controls visibility; closed vendors and location rules
@@ -529,5 +531,20 @@ function WealthGroup({ children }: { children: ReactNode }) {
       </p>
       <div className="grid grid-cols-2 gap-2">{children}</div>
     </div>
+  );
+}
+
+/** What players will see for the premium being edited (market-markup.ts). */
+function MarkupPreview({ premium }: { premium: string }) {
+  const { journal } = useEconomy();
+  const rate = Number(premium);
+  if (!Number.isFinite(rate) || rate < 1.01 || rate > 100) return null;
+  const percents = markupDisplay(journal) === "percentages";
+  return (
+    <p data-testid="markup-preview">
+      Markup {markupPercentText(rate)}. Players see{" "}
+      <strong>{percents ? markupPercentText(rate) : markupTier(rate)}</strong>
+      {percents ? " (percentages are on)" : ` (the description for ${markupPercentText(rate)})`}.
+    </p>
   );
 }

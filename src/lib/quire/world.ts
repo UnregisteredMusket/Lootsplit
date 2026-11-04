@@ -25,6 +25,7 @@ import { tokenInsideGrid } from "./tabletop-geometry.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
 import { snapshotText } from "./item-identity.ts";
+import { markupDisplay } from "./market-markup.ts";
 import { actingGroups, groupPlace, groupRefs, MAIN_GROUP, resolveGroup } from "./party-groups.ts";
 import { applyGroupMapPosition } from "./party-groups-command.ts";
 import { validatePartyGroups } from "./party-groups-validation.ts";
@@ -829,6 +830,13 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     if (cmd.visible) w.companionFundsVisible = true;
     else delete w.companionFundsVisible;
     event(`Party companion NPC funds ${cmd.visible ? "shown to the party" : "kept private"}`);
+  } else if (cmd.kind === "black-market-markup") {
+    dm();
+    if (markupDisplay(journal) !== cmd.before)
+      throw Error("Black-market markup display changed. Refresh before changing it.");
+    if (cmd.display === "percentages") journal.blackMarketMarkup = "percentages";
+    else delete journal.blackMarketMarkup;
+    event(`Players see black-market markup as ${cmd.display === "percentages" ? "percentages" : "descriptions"}`);
   } else if (cmd.kind === "shop-black-market") {
     dm();
     const shop = t.shops.find((s) => s.id === cmd.shopId);

@@ -809,6 +809,13 @@ export const worldCommands = [
     before: z.boolean(),
     visible: z.boolean(),
   }),
+  // How players see black-market markup (market-markup.ts; tabletop protocol 25).
+  z.object({
+    id,
+    kind: z.literal("black-market-markup"),
+    before: z.enum(["descriptions", "percentages"]),
+    display: z.enum(["descriptions", "percentages"]),
+  }),
   z.object({
     id,
     kind: z.literal("shop-black-market"),

@@ -47,6 +47,7 @@ import {
   type Negotiator,
 } from "@/lib/quire/price-breakdown";
 import { shopAsking } from "@/lib/quire/vendors";
+import { blackMarketPremium, markupDisplay, shopMarkupNote } from "@/lib/quire/market-markup";
 import { PriceWhy } from "@/components/price-why";
 import { useDollarText, useShowDollars } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
@@ -227,7 +228,14 @@ export function ShopContent({
             </p>
             <p className="text-sm text-muted">
               Sells at {Math.round(shop.sellRate * 100)}%, buys at {Math.round(shop.buyRate * 100)}%
-              {shop.blackMarket ? " · black market" : ""}
+              {shop.blackMarket ? (
+                <span data-testid="shop-markup">
+                  {" · black market: "}
+                  {shopMarkupNote(blackMarketPremium(shop), markupDisplay(economy.journal), dm)}
+                </span>
+              ) : (
+                ""
+              )}
             </p>
             <MerchantTerms shop={shop} dm={dm} />
           </div>
@@ -488,7 +496,7 @@ function StockRow({
   dm: boolean;
   locked?: boolean;
 }) {
-  const { buy, updateStock, deleteStock, purses, undoPurchase, realm } = useEconomy();
+  const { buy, updateStock, deleteStock, purses, undoPurchase, realm, journal } = useEconomy();
   const stockSaved = useSavedTick();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
@@ -508,6 +516,7 @@ function StockRow({
   const charisma = negotiator?.cha ?? null;
   const breakdown = shopBuyBreakdown(shop, line.copper, charisma, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, {
     negotiator,
+    markup: markupDisplay(journal),
     ...(dm ? { listDerivation: listPriceDerivation(shop, line, realm) } : {}),
   });
   const asking = shopAsking(shop, line.copper);

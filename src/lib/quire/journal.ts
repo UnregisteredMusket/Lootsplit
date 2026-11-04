@@ -86,6 +86,11 @@ const journalFields = z.object({
   downtimePrompt: z
     .object({ enabled: z.boolean(), days: z.number().int().min(0).max(3650) })
     .optional(),
+  /**
+   * How players see black-market markup (market-markup.ts); missing means descriptions. Changes
+   * only through the DM's `black-market-markup` command (tabletop protocol 25).
+   */
+  blackMarketMarkup: z.enum(["descriptions", "percentages"]).optional(),
   finance: financeSchema.optional(),
   reports: z
     .array(
@@ -320,6 +325,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   delete next.lootClaims;
   delete next.services;
   delete next.quests;
+  delete next.blackMarketMarkup;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -476,6 +482,9 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     ...(current.lootClaims ? { lootClaims: current.lootClaims } : {}),
     // Quests change only through quest commands; a journal patch never rewrites them.
     ...(current.quests ? { quests: current.quests } : {}),
+    // Black-market markup display changes only through its command; older clients (protocol 24
+    // and earlier) drop the unknown key, so their whole-journal writes keep the stored value.
+    ...(current.blackMarketMarkup ? { blackMarketMarkup: current.blackMarketMarkup } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);
