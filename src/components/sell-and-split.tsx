@@ -13,6 +13,7 @@ import { shopVisible } from "@/lib/quire/vendors";
 import { formatCopper } from "@/lib/quire/money";
 import { creditCoins, defaultSplitRule, isNpc, remainderText, splitRecipients, type SplitRule } from "@/lib/quire/coin-split";
 import { lotLabel, planSaleSplit, saleProblem, unitSalePrice, type SaleSplitPlan } from "@/lib/quire/sale-split";
+import { merchantName, revealPurse } from "@/lib/quire/merchant";
 import type { Purse } from "@/lib/quire/types";
 import { SplitPreview, SplitRecipientPicker, SplitRules } from "./coin-split";
 import { Button } from "./ui";
@@ -240,7 +241,7 @@ export function SellAndSplit({
                 {h.pool ? " · in the pool" : ""}
                 <small>
                   {why ??
-                    `${h.quantity > 1 ? `${h.quantity} × ` : ""}${formatCopper(h.unitCopper)} value · ${shop?.name} pays ${formatCopper(pays * Math.max(1, qty || h.quantity))}`}
+                    `${h.quantity > 1 ? `${h.quantity} × ` : ""}${formatCopper(h.unitCopper)} value · ${shop?.name} pays ${formatCopper(pays * Math.max(1, qty || h.quantity))}${shop?.merchantAffords?.[h.id] === "none" ? ` · ${merchantName(shop)} can't afford this` : ""}`}
                 </small>
               </span>
               {!why && qty > 0 && h.quantity > 1 ? (
@@ -263,6 +264,9 @@ export function SellAndSplit({
         <small className="text-sm text-muted">
           Each price is the item's value × the shop's buy rate, rounded to whole copper per unit, exactly as Sell to shop
           does.
+          {shop && (shop.merchantPurse !== undefined || shop.purseLimited)
+            ? ` ${merchantName(shop)} pays from a limited purse${shop.merchantPurse !== undefined && revealPurse(shop, actor) ? ` (${formatCopper(shop.merchantPurse)} left)` : ""}: if it can't cover the whole sale, nothing is sold.`
+            : ""}
         </small>
       </fieldset>
       <div className="coin-split-preview-head sale-split-proceeds" aria-live="polite">

@@ -16,6 +16,7 @@ const featureAudits = {
   "attunement": "scripts/attunement-browser-audit.mjs",
   "sell-and-split": "scripts/sell-and-split-browser-audit.mjs",
   "item-identification": "scripts/item-identification-browser-audit.mjs",
+  "merchant-purse": "scripts/merchant-purse-browser-audit.mjs",
   "price-breakdown": "scripts/price-breakdown-browser-audit.mjs",
   "preview-as-player": "scripts/preview-as-player-browser-audit.mjs",
   "ledger-export": "scripts/ledger-export-browser-audit.mjs",

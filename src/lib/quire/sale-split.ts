@@ -8,7 +8,7 @@
  */
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
 import { assertCarried } from "./custody.ts";
-import { assertMerchantSale } from "./merchant.ts";
+import { assertMerchantSale, merchantShortfall, revealPurse } from "./merchant.ts";
 import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
 import { shopSellBreakdown } from "./price-breakdown.ts";
 import type { Holding, Shop } from "./types.ts";
@@ -47,11 +47,12 @@ export type SaleSplitPlan = {
 };
 
 /**
- * What one unit of `h` fetches at `shop`: the Sell to shop rule. An unidentified item is priced at
- * its presented value (0 when unknown, which `saleProblem` refuses), never its true one.
+ * What one unit of `h` fetches at `shop`: the Sell to shop rule (price-breakdown.ts), including
+ * the off-list rate and purchase limit. The shop's purse is checked for the whole sale. An
+ * unidentified item is priced at its presented value and category, never its true ones.
  */
-export function unitSalePrice(h: Pick<Holding, "unitCopper" | "unidentified">, shop: Pick<Shop, "buyRate">): number {
-  return shopSellBreakdown(shop, knownUnitCopper(h) ?? 0).unit;
+export function unitSalePrice(h: Pick<Holding, "unitCopper" | "category" | "unidentified">, shop: Shop): number {
+  return shopSellBreakdown(shop, h.unitCopper, 1, h).unit;
 }
 
 /**
@@ -81,7 +82,7 @@ export function saleProblem(h: Holding, shop: Shop, actor: "dm" | "player"): str
 export function planSaleSplit(
   t: SaleSplitTable,
   input: SaleSplitInput,
-  options: { actor: "dm" | "player"; projected?: boolean },
+  options: { actor: "dm" | "player"; projected?: boolean; skipPurse?: boolean },
 ): SaleSplitPlan {
   const fund = t.purses.find((p) => p.id === input.fundId);
   if (!fund) throw Error("Account no longer exists.");
@@ -117,6 +118,9 @@ export function planSaleSplit(
   }
   const proceeds = lots.reduce((sum, l) => sum + l.paid, 0);
   if (!Number.isSafeInteger(proceeds)) throw Error("The sale exceeds the supported coin balance.");
+  // Merchant purse: the whole sale fits it or nothing is sold.
+  const short = options.skipPurse ? null : merchantShortfall(shop, proceeds, revealPurse(shop, options.actor));
+  if (short) throw Error(short);
   const split = planCoinSplit(
     t,
     {

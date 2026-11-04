@@ -19,7 +19,7 @@ import type { Holding, StockLine } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
-import { isService } from "./merchant.ts";
+import { creditMerchant, isService } from "./merchant.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
 import {
   readEstate,
@@ -626,6 +626,8 @@ function delivery(
     at,
     shop.id,
   );
+  // A sale from the shop's stock: the payment goes into its merchant purse (merchant.ts).
+  creditMerchant(shop, cost);
   if (line.quantity !== null) line.quantity -= args.quantity;
   const item: Holding = {
     id: `${receipt}-goods`,

@@ -15,7 +15,8 @@ import { previewSmith } from "./blacksmith-time.ts";
 import { previewServices, serviceQuoteSchema } from "./services-time.ts";
 import { deliverLetters } from "./services-courier.ts";
 import type { CloudTable } from "./cloud.ts";
-import { toCopper, fromCopper, spendCoins } from "./money.ts";
+import { toCopper, fromCopper, spendCoins, formatCopper } from "./money.ts";
+import { creditMerchant } from "./merchant.ts";
 import {
   applyJourney,
   assertJourneyPayable,
@@ -90,6 +91,8 @@ export const quoteSchema = z.object({
         closed: z.boolean(),
         lastRestockDay: z.number().int().nonnegative(),
         stock: z.array(z.object({ id, before: money, after: money })),
+        /** Merchant purse refill (merchant.ts); absent before merchant purses. */
+        purse: z.object({ before: money, after: money }).optional(),
       }),
     )
     .optional(),
@@ -444,6 +447,14 @@ export function applyDowntime(
   }
   if (comparable.propertyOperations && !d.quote.propertyOperations?.characterWorkDays)
     delete comparable.propertyOperations.characterWorkDays;
+  // Merchant purses: a sale or purchase at a restocking shop since the preview changes its refill.
+  for (const m of d.quote.market ?? []) {
+    const shop = table.shops.find((s) => s.id === m.shopId);
+    if (m.purse && shop && shop.merchantPurse !== m.purse.before)
+      throw Error(
+        `${shop.name}'s merchant purse changed after this preview (a sale or purchase there). Recalculate downtime before approving.`,
+      );
+  }
   if (JSON.stringify(comparable) !== JSON.stringify(d.quote))
     throw Error(
       "Campaign finances changed after this preview. Recalculate downtime before approving.",
@@ -512,6 +523,18 @@ export function applyFinanceQuote(
     shop.schedule!.lastRestockDay = market.lastRestockDay;
     for (const line of market.stock)
       table.stock.find((s) => s.id === line.id)!.quantity = line.after;
+    if (market.purse) {
+      if (shop.merchantPurse !== market.purse.before)
+        throw Error("A merchant's purse changed after this preview. Recalculate before approving.");
+      shop.merchantPurse = market.purse.after;
+      table.journal!.events.push({
+        id: `${receipt.id}-purse-${shop.id}`,
+        at,
+        kind: "management",
+        dmOnly: true,
+        summary: `${shop.name}: merchant purse refilled ${formatCopper(market.purse.before)} → ${formatCopper(market.purse.after)} (scheduled restock)`.slice(0, 500),
+      });
+    }
   }
   f.loans = quote.loans;
   f.rules = quote.rules;
@@ -549,6 +572,9 @@ export function applyFinanceQuote(
         if (move.transactionType) line.transactionType = move.transactionType;
         else if (move.shopId) line.transactionType = "purchase";
         if (move.trade) line.trade = move.trade;
+        // A manager's supply purchase from a shop pays into its merchant purse (merchant.ts).
+        const shop = move.shopId && move.copper > 0 ? table.shops.find((s) => s.id === move.shopId) : undefined;
+        if (shop) creditMerchant(shop, move.copper);
       }
     }
     table.holdings = operations.holdings as CloudTable["holdings"];

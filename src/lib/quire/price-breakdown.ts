@@ -11,7 +11,8 @@ import { charismaOffPercent, formatCopper, groupThousands, priceAfterCharisma } 
 import { shopAsking } from "./vendors.ts";
 import { scaleFactors } from "./scale.ts";
 import { charismaScore } from "./sheet.ts";
-import { stockCategory } from "./merchant.ts";
+import { offListPercent, onBuyList, stockCategory } from "./merchant.ts";
+import { forSale } from "./item-identity.ts";
 import type { CharacterSheet } from "./sheet.ts";
 import type { ItemCategory, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
 
@@ -157,19 +158,43 @@ export function shopBuyBreakdown(
   };
 }
 
-/** Selling to a shop: the `sell` command's payout. */
+/**
+ * Selling to a shop: the `sell` and `sale-split` payout. With the item's category it also applies
+ * the merchant-purse rules (merchant.ts): the off-list rate for categories outside the shop's buy
+ * list (rounded down) and the per-item purchase limit. The purse itself only refuses a sale; it
+ * never changes the price, so it is not a factor.
+ */
 export function shopSellBreakdown(
-  shop: Pick<Shop, "buyRate">,
+  shop: Pick<Shop, "buyRate"> & Partial<Pick<Shop, "acceptAnyCategory" | "acceptedCategories" | "category" | "offListPercent" | "purchaseLimit">>,
   unitCopper: number,
   quantity = 1,
+  item?: { category?: string; unidentified?: import("./item-identity.ts").Unidentified },
 ): PriceBreakdown {
-  const unit = Math.max(0, Math.round(unitCopper * shop.buyRate));
+  // Item identification: an unidentified item is priced at its presented value and category, so
+  // no factor (lot value, off-list rate, limit) shows the true ones.
+  if (item?.unidentified) {
+    unitCopper = item.unidentified.value ?? 0;
+    item = forSale(item);
+  }
+  const rated = Math.max(0, Math.round(unitCopper * shop.buyRate));
+  const factors: PriceFactor[] =
+    rated === unitCopper
+      ? []
+      : [{ key: "buy-rate", label: `Shop buys at ${Math.round(shop.buyRate * 1000) / 10}%`, percent: pct(shop.buyRate), copper: rated - unitCopper }];
+  let unit = rated;
+  const full = shop as Shop;
+  if (item && shop.category !== undefined && !onBuyList(item, full) && offListPercent(full)) {
+    const percent = offListPercent(full);
+    unit = Math.floor((rated * percent) / 100);
+    factors.push({ key: "off-list", label: `Not on its buy list: ${percent}% of its rate (rounded down)`, percent: percent - 100, copper: unit - rated });
+  }
+  if (shop.purchaseLimit !== undefined && unit > shop.purchaseLimit) {
+    factors.push({ key: "purchase-limit", label: `Pays at most ${cp(shop.purchaseLimit)} for one item`, copper: shop.purchaseLimit - unit });
+    unit = shop.purchaseLimit;
+  }
   return {
     base: { label: "Lot value", copper: unitCopper },
-    factors:
-      unit === unitCopper
-        ? []
-        : [{ key: "buy-rate", label: `Shop buys at ${Math.round(shop.buyRate * 1000) / 10}%`, percent: pct(shop.buyRate), copper: unit - unitCopper }],
+    factors,
     unit,
     quantity,
     total: unit * quantity,

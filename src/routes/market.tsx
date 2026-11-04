@@ -16,6 +16,7 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { CATEGORIES } from "@/lib/quire/labels";
 import { usePrefs } from "@/lib/quire/prefs";
 import { pressureFor } from "@/lib/quire/scale";
+import { formatCopper } from "@/lib/quire/money";
 import { useSeat } from "@/lib/quire/seat";
 import { Shell } from "@/components/shell";
 import { PriceHarvest } from "@/components/price-harvest";
@@ -434,6 +435,14 @@ function MarketPage() {
               </p>
             ))}
         </Disclosure>
+        {restockShop && restockShop.merchantPurse !== undefined ? (
+          <p>
+            Merchant purse:{" "}
+            {restockShop.merchantPurseRefill === undefined
+              ? `${formatCopper(restockShop.merchantPurse)}; no refill amount set`
+              : `${formatCopper(restockShop.merchantPurse)} → ${formatCopper(Math.max(restockShop.merchantPurse, restockShop.merchantPurseRefill))} (tops up to ${formatCopper(restockShop.merchantPurseRefill)}, never reduces)`}
+          </p>
+        ) : null}
         {restockError && <p role="alert">{restockError}</p>}
         <Button
           disabled={

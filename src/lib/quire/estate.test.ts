@@ -590,6 +590,33 @@ test("manager supply orders use reviewed stock, budgets and non-carried shipment
   assert.equal(t.holdings.filter((h) => h.custody?.kind === "property").length, 1);
 });
 
+test("a material delivery from a shop with a merchant purse pays into that purse", () => {
+  const base = fixture();
+  base.shops[0].merchantPurse = 0;
+  let t = manager(base);
+  t = command(t, {
+    kind: "estate-supplier",
+    before: null,
+    supplier: { id: "supplier", propertyId: "warehouse", stockId: "stock", materialKey: "timber", deliveryDays: 1, deliveryCopper: 10, weight: 2 },
+  });
+  t = command(
+    t,
+    {
+      kind: "estate-letter",
+      propertyId: "warehouse",
+      senderId: "hero",
+      managerId: "manager",
+      budgetCopper: 250,
+      order: { kind: "supply", stockId: "stock", materialKey: "timber", quantity: 2, deliveryDays: 1, deliveryCopper: 10 },
+    },
+    hero,
+  );
+  t = command(t, { kind: "party-location", before: "area", locationId: "far" });
+  t = advance(t, 2);
+  assert.equal(t.journal!.propertyOperations!.staff[0].budgetSpentCopper, 210);
+  assert.equal(t.shops[0].merchantPurse, 210);
+});
+
 function supplierMarket() {
   const t = fixture(), market = tradeFixture();
   t.realm = market.realm;

@@ -99,6 +99,21 @@ export function presentedRecord(u: Unidentified): Unidentified {
   return told;
 }
 
+/**
+ * An item as shops judge it: an unidentified item's presented value, category and description in
+ * place of the true ones (merchant.ts, price-breakdown.ts). Anything else is returned as it is.
+ */
+export function forSale<T extends { unitCopper?: number; category?: string; notes?: string; unidentified?: unknown }>(item: T): T {
+  if (!isUnidentified(item)) return item;
+  const u = item.unidentified;
+  return {
+    ...item,
+    ...("unitCopper" in item ? { unitCopper: u.value ?? 0 } : {}),
+    ...("notes" in item ? { notes: u.description ?? "" } : {}),
+    category: u.category ?? NEUTRAL_CATEGORY,
+  };
+}
+
 /** The value a sale or a receipt may use: the presented value, or null when it is unknown. */
 export function knownUnitCopper(h: Pick<Holding, "unitCopper"> & Marked): number | null {
   if (!isUnidentified(h)) return h.unitCopper;

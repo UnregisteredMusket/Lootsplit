@@ -7,7 +7,7 @@ import { holdingSchema } from "./validation.ts";
 import { readArchivedSnapshot } from "./journal.ts";
 import { readEstate } from "./estate-schema.ts";
 import { estateCapabilities, storageWeight } from "./estate.ts";
-import { isService, stockCategory } from "./merchant.ts";
+import { hasMerchantPurse, isService, stockCategory } from "./merchant.ts";
 import { fromCopper, spendCoins, toCopper } from "./money.ts";
 
 export const ledgerVoidCommandSchema = z.object({
@@ -276,6 +276,13 @@ function reverseOrdinary(
     receipt.purseId !== line.purseId || receipt.quantity !== quantity || receipt.copper !== -line.copper ||
     shelf?.commodityId !== receipt.commodityId || shelf.tradeExchangeId !== receipt.exchangeId))
     unsafe("This shop receipt no longer matches the original linked purchase.");
+  // A refund comes back out of a merchant purse the purchase paid into (merchant.ts).
+  const merchant = (line.purchase || bought) && line.shopId ? table.shops.find(shop => shop.id === line.shopId) : undefined;
+  if (merchant && hasMerchantPurse(merchant)) {
+    if (merchant.merchantPurse < -line.copper)
+      unsafe(`${merchant.keeper.trim() || merchant.name} has already spent this payment from the shop's purse.`);
+    merchant.merchantPurse += line.copper;
+  }
   changeCoins(table, line.purseId, -line.copper);
   if (holding) {
     if (holding.quantity === quantity) table.holdings = table.holdings.filter(h => h.id !== holding!.id);
