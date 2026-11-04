@@ -40,6 +40,7 @@ import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
 import { FairnessLedger } from "@/components/fairness-ledger";
 import { partyFunds } from "@/lib/quire/coin-split";
+import { attunementFromNotes } from "@/lib/quire/attunement";
 import { PartyGroupsPanel, PlayerGroupCard, SplitPartyButton } from "@/components/party-groups";
 
 export const Route = createFileRoute("/party")({
@@ -1052,6 +1053,8 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               await addHolding(purseId, name.trim(), kind, quantity, copper, {
                 notes,
                 category,
+                // Open5e loot carries "Requires attunement" in its notes (attunement.ts).
+                ...attunementFromNotes(notes),
                 ...(poolable && pool ? { pool: true } : {}),
               });
               setName("");

@@ -91,6 +91,10 @@ export function pendingCommandDescription(value: unknown): string {
       return `Resolve ${c.lots.length} treasure-pool item${c.lots.length === 1 ? "" : "s"} (${c.method})`;
     case "coin-exchange":
       return `Make change (same worth) · character ${c.purseId}`;
+    case "item-attune":
+      return `${c.attuned ? `Attune${c.override ? " past the limit" : ""}` : "End attunement"} · item ${c.holdingId}`;
+    case "attunement-limit":
+      return `Attunement limit ${c.limit ?? "default"} · character ${c.purseId}`;
     case "sale-split":
       return `Sell ${c.lots.length} item${c.lots.length === 1 ? "" : "s"} and split ${formatCopper(c.expect.proceeds)} among ${c.recipientIds.length} · from ${c.fundId}`;
     case "post":

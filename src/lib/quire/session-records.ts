@@ -485,7 +485,13 @@ export function projectRecord(
               ...(p.nonParty ? { nonParty: true } : {}),
               ...(p.control ? { control: p.control } : {}),
               ...(canReadCharacter(t, p, seat)
-                ? { sheet: p.sheet, portrait: p.portrait, sheetRevision: p.sheetRevision }
+                ? {
+                    sheet: p.sheet,
+                    portrait: p.portrait,
+                    sheetRevision: p.sheetRevision,
+                    // Attunement (loot phase 5): "Attuned 2/3" for characters the seat can read.
+                    ...(p.attunementLimit !== undefined ? { attunementLimit: p.attunementLimit } : {}),
+                  }
                 : {}),
               coins: companions.has(p.id) ? p.coins : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
             },

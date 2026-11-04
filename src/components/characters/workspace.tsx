@@ -9,6 +9,7 @@ import { usePrefs } from "@/lib/quire/prefs";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { LedgerArt } from "@/components/ledger-art";
 import { Modal } from "@/components/ui";
+import { AttunementLine } from "./attunement-line";
 
 function CampaignInventoryArt({
   item,
@@ -104,6 +105,8 @@ type Detail = Row & {
     manualAllowed: boolean;
     coins: Sheet["coins"];
     holdings: Holding[];
+    /** Attunement (loot phase 5): the character's limit when the DM changed it. */
+    attunementLimit?: number;
   };
 };
 type Roll = {
@@ -822,6 +825,7 @@ function CharacterEditor({
       ? {
           coins: devicePurse.coins,
           holdings: deviceCampaign!.holdings.filter((h) => h.purseId === devicePurse.id),
+          attunementLimit: devicePurse.attunementLimit,
         }
       : null);
   const canManageInventory = canEdit("equipment");
@@ -1895,9 +1899,15 @@ function CharacterEditor({
                             <FantasyIcon entry={h} size={28} className="fantasy-inline" />
                           )}
                           {h.name} × {h.quantity}
+                          {h.attuned ? " · Attuned" : ""}
                         </li>
                       ))}
                     </ul>
+                    <AttunementLine
+                      holdings={campaignLedger.holdings}
+                      limit={campaignLedger.attunementLimit}
+                      purse={livePurse}
+                    />
                     <Link to="/party" search={{ action: "", section: "funds" }}>
                       Open party inventory
                     </Link>

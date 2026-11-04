@@ -31,6 +31,8 @@ export type Purse = {
   /** Character only. Missing means a player character, so older saves stay usable. */
   control?: "player" | "npc";
   coins: Coins;
+  /** Character only: the DM's attunement limit, 0 to 10 (attunement.ts). Absent: 3. */
+  attunementLimit?: number;
 };
 
 export function characterControl(purse: Purse): "player" | "npc" | null {
@@ -39,6 +41,10 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  /** Items only: the attunement requirement's text, e.g. "Requires attunement: by a wizard" (attunement.ts). */
+  requiresAttunement?: string;
+  /** The holding character is attuned to this item (one of a stack). Changed only by item-attune. */
+  attuned?: true;
   /** In the party treasure pool (a party-fund holding the party can claim). Absent otherwise. */
   pool?: import("./loot-claims-schema.ts").LootPoolMarker;
   /** "player": a player set this value through a sheet edit, so NPC barter treats it as unreferenced. */

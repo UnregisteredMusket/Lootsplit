@@ -194,7 +194,7 @@ type EconomyApi = {
     kind: Holding["kind"],
     quantity: number,
     unitCopper: number,
-    metadata?: Pick<Holding, "notes" | "category"> & { pool?: boolean },
+    metadata?: Pick<Holding, "notes" | "category" | "requiresAttunement"> & { pool?: boolean },
   ) => Promise<void>;
   /** Resolves `true` when removed; `false` after a shown error. */
   deleteHolding: (id: string) => Promise<boolean>;
@@ -234,6 +234,13 @@ type EconomyApi = {
    * authoritative `coin-exchange` command (owner or DM; logged as the purse's activity).
    */
   makeChange: (purseId: string, before: Coins, after: Coins, options?: CommandOptions) => Promise<boolean>;
+  /**
+   * Attunement (loot phase 5): attune the holder's character to an item or end it (`item-attune`;
+   * the controlling player or the DM, past the limit the DM with `override`), and the DM's
+   * per-character limit (`attunement-limit`; `null` is the default of 3).
+   */
+  attuneItem: (holding: Holding, attuned: boolean, options?: CommandOptions & { override?: boolean }) => Promise<boolean>;
+  setAttunementLimit: (purse: Purse, limit: number | null, options?: CommandOptions) => Promise<boolean>;
   post: (
     purseId: string,
     copper: number,
@@ -898,6 +905,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               unitCopper,
               notes: metadata?.notes ?? "",
               ...(metadata?.category ? { category: metadata.category } : {}),
+              ...(metadata?.requiresAttunement && kind === "item"
+                ? { requiresAttunement: metadata.requiresAttunement }
+                : {}),
               ...(metadata?.pool ? { pool: { at: Date.now(), source: "add-loot" as const } } : {}),
             });
           },
@@ -982,6 +992,42 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           await reload().catch(() => undefined);
           toast.error(error instanceof Error && error.message ? error.message : "The coins could not be exchanged.");
+          return false;
+        }
+      },
+      attuneItem: async (holding, attuned, options = {}) => {
+        const expect = { purseId: holding.purseId, attuned: !!holding.attuned };
+        try {
+          await acceptCommand({
+            kind: "item-attune",
+            holdingId: holding.id,
+            attuned,
+            ...(options.override ? { override: true as const } : {}),
+            expect,
+            ...idOf(options),
+          });
+          toast.success(attuned ? `Attuned to ${holding.name}.` : `Attunement to ${holding.name} ended.`);
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The attunement was not changed.");
+          return false;
+        }
+      },
+      setAttunementLimit: async (purse, limit, options = {}) => {
+        try {
+          await acceptCommand({
+            kind: "attunement-limit",
+            purseId: purse.id,
+            limit,
+            expect: purse.attunementLimit ?? null,
+            ...idOf(options),
+          });
+          toast.success(`${purse.name} can attune to ${limit ?? 3} item${(limit ?? 3) === 1 ? "" : "s"}.`);
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The limit was not changed.");
           return false;
         }
       },

@@ -40,6 +40,8 @@ export function stackKey(holding: Holding, category: string): string {
     holding.custody?.kind ?? "",
     holding.reservedFor ?? "",
     !!(holding.deed || holding.property || holding.service),
+    // Attunement: an attuned item is listed apart from the rest of its kind.
+    holding.attuned === true,
   ]);
 }
 

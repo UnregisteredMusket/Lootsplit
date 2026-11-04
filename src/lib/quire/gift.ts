@@ -128,7 +128,10 @@ function normalizeGift(value: unknown): PlayerGift | null {
   };
 }
 
-const giftHoldingSchema = holdingSchema.omit({ id: true, purseId: true }).partial({ notes: true });
+// Attunement stays with the giver's character: a received item is never attuned (attunement.ts).
+const giftHoldingSchema = holdingSchema
+  .omit({ id: true, purseId: true, attuned: true })
+  .partial({ notes: true });
 
 // Carry all supported item metadata, matching shared transfers, without copying ownership IDs.
 export function itemForGift(holding: Holding, quantity: number): GiftHolding {

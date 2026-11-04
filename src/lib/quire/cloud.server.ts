@@ -971,6 +971,7 @@ function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): Cl
           profileId: _profile,
           editBaseline: _baseline,
           rolls: _rolls,
+          attunementLimit: _attunementLimit,
           ...ownPurse
         } = p;
         return ownPurse;

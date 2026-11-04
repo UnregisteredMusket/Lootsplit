@@ -1,0 +1,10 @@
+{
+  "title": "Attunement",
+  "summary": "Magic items that require attunement are marked, and characters can attune to them from the item's ⋯ menu, up to 3 items each unless the DM sets another limit.",
+  "items": [
+    "Open5e magic items carry their attunement requirement when added as loot or bought; the DM can mark any other item in Edit item.",
+    "Players attune their own characters; at the limit the DM can still attune past it, and the activity says so.",
+    "Giving, selling or using up an attuned item ends the attunement, and whoever receives it isn't attuned.",
+    "The character sheet shows Attuned 2/3, and the DM sets each character's limit (0 to 10) there."
+  ]
+}
