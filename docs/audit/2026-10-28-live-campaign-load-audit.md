@@ -3,7 +3,7 @@
 - **Requested by:** owner, 2026-10-28 08:13 ET. "Gradually ensure a smooth experience with up to 6 active users in a live campaign… Report your findings before administering any fixes… Ensure this audit does not repeat without my authorization."
 - **Run:** 2026-10-28, 08:35–09:05 ET (12:35–13:05 UTC), authorization label `owner-2026-10-28`.
 - **Code audited:** `main` at `8652d1a` (#325). Live site at the time: `802b331`.
-- **Status:** findings only. **No fixes have been applied.** Each fix below waits for the owner's go-ahead.
+- **Status (updated 2026-11-04):** the owner approved the fixes after this report. 13 of the 15 findings are fixed, F3 is mostly fixed, and F9 and F15 are open; see [Closure status](#closure-status-2026-11-04). The audit has not been re-run, because that needs the owner's dated authorization, so no figure below has been re-measured.
 
 ## Bottom line
 
@@ -189,7 +189,29 @@ Ranked by impact on a real table. **Bug** means wrong behaviour. **Cost** means 
 - **No leaks:** timers, listeners and server-side caches are all cleaned up or bounded, and heap stayed flat across stages.
 - **The browser stages showed no page errors, console errors, failed actions or lost changes.**
 
-## Suggested order of fixes (not started)
+## Closure status (2026-11-04)
+
+How closure was checked: by reading each PR's description and confirming its code, migration and tests are on `main`. Nothing here was re-measured, because re-running the load audit needs the owner's dated authorization.
+
+| Finding | Status | Fixed by | Evidence on `main` |
+| --- | --- | --- | --- |
+| F1 receipts fill the room | **Fixed** | #347; sectioned storage #356, #358–#361 | Receipts live in `campaign_room_receipts` (migration 0024), written in the room's batch and never pruned; a room over the limit moves its receipts on its next write. Rooms over 1.5 MB are stored in sections; the live cap is 4 MB. |
+| F2 simultaneous actions fail | **Fixed** | #351 | Jittered server retries (20–150 ms, growing to 540 ms) and one automatic client retry with the same batch ID. Test: six simultaneous actions all succeed, with coins moved once. |
+| F3 full re-download on every change | **Mostly fixed** | #360, #369/#375, #382–#389 | Protocol 11+ clients fetch only the sections whose hashes changed. Protocol 12+ clients read a working set, and archived sessions load on request. **Not built:** a cached projected view per (revision, seat). |
+| F4 shared Wi-Fi account lockout | **Fixed** | #352, #391 | Signed-in requests count per account (240/min) with a 1500/min per-IP ceiling. One shared, visibility-gated encounter poller. |
+| F5 encounter table scan | **Fixed** | #349 | Migration 0025 `dm_encounters_code_status`. |
+| F6 map pings re-read the room | **Fixed** | #353 | One `json_extract` read authorizes; cleanup runs on insert and in the minute cron; 1 s polling only while pings are active, 3 s otherwise. |
+| F7 full refresh before each action | **Fixed** | #353 | `queueCommand` and `runSharedMutation` use the conditional poll. |
+| F8 heavy combat polling | **Fixed** | #352 | One light room-plus-encounter read without map rasters; loops pause in hidden tabs; the player panel polls only while the DM presents combat. |
+| F9 client main-thread work | **Open** | (#360 and #369 reduce how much each change carries) | Device re-projection and the full IndexedDB rewrite per revision were not changed directly. Needs a production-build check on a phone. |
+| F10 rolls fail during chat | **Fixed** | #349 | Rolls guard on the revision and retry up to three times, never saved twice. |
+| F11 other writes have no retry | **Fixed** | #351 | Join, seat management, pace, naming, pass turn and close share the bounded retry and re-check permissions on each attempt. |
+| F12 pushes inside the submit | **Fixed** | #353 | Pushes run after the response through `waitUntil`. |
+| F13 failed poll becomes a full read | **Fixed** | #353 | Falls back to a full read only on a protocol mismatch. |
+| F14 room re-sent per account seat | **Fixed** | #349 | Account-seat statements guard on the `write_id` from migration 0024. |
+| F15 occasional slow live requests | **Open** | — | Still needs the Cloudflare request-duration percentiles before anything changes. |
+
+## Suggested order of fixes (as proposed on 2026-10-28; see Closure status)
 
 1. **F1:** receipt pruning, and let a campaign over the limit end its session. Prevents campaigns getting stuck.
 2. **F5:** one additive index. Smallest change, removes a site-wide scan from every poll.
