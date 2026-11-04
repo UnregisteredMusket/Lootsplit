@@ -82,6 +82,7 @@ import { applyServiceCommand } from "./services-command.ts";
 // After services-command: finance must load after journal here (see services-lessons.ts).
 import { chargeLesson } from "./services-lessons.ts";
 import { validateServices } from "./services-validation.ts";
+import { isRecapEntryId, recapEntryId } from "./session-recap.ts";
 import { diffJournal, journalChangeId, journalChangePath, LEGACY_JOURNAL_CHANGE_ID, writeJournalPath } from "./journal-patch.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
@@ -914,6 +915,16 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     event(`${p.name} made change: ${exchangeSummary(cmd.before, cmd.after)}`, "management", p.id);
   } else if (cmd.kind === "journal-note") {
     if (cmd.provenance || cmd.visibility === "dm") dm();
+    // A shared session recap (session-recap.ts): the DM's own words, posted once per session.
+    if (isRecapEntryId(cmd.id)) {
+      dm();
+      if (cmd.visibility !== "party" || cmd.purseId || cmd.reportIds.length || cmd.questId || cmd.provenance)
+        throw Error("A session recap is shared as a party journal entry.");
+      if (!journal.sessions.some((session) => recapEntryId(session.id) === cmd.id))
+        throw Error("Choose an existing campaign session for this recap.");
+      if (journal.entries?.some((entry) => entry.id === cmd.id))
+        throw Error("This session's recap is already shared.");
+    }
     if (seat.role !== "dm" || cmd.visibility === "player") {
       const p = own(cmd.purseId);
       if (p.kind !== "character") throw Error("Choose your character.");

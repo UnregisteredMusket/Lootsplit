@@ -4392,6 +4392,11 @@ input,select,textarea { max-width: 100%; }
 .coin-split-lines li small { grid-column: 1 / -1; margin: 0; }
 .coin-split-lines li.is-remainder { font-style: italic; }
 .coin-split-session { margin: .35rem 0 0; font-size: .875rem; }
+/* Session recap (computed; session-recap.tsx). */
+.session-recap-sections { display: grid; gap: .75rem; }
+.session-recap-sections h4 { margin: 0 0 .25rem; font-size: .95rem; }
+.session-recap-sections ul { margin: 0; padding-left: 1.1rem; list-style: disc; overflow-wrap: anywhere; }
+.session-recap-text { width: 100%; min-width: 0; font-family: inherit; }
 @media (max-width: theme(--bp-phone)) {
   .coin-split-lines { margin-left: .5rem; }
   .coin-split-entry > summary { grid-template-columns: auto minmax(0, 1fr); }

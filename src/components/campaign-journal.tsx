@@ -25,6 +25,7 @@ import {
 import { formatCopper } from "@/lib/quire/money";
 import { Button, Fold, Modal } from "./ui";
 import { SessionReportReader } from "./session-report-reader";
+import { SessionRecapButton } from "./session-recap";
 import { CoinAmountInput, FinanceReadiness } from "./finance-input";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
@@ -498,11 +499,14 @@ export function CampaignJournal({
                   {result.available && !session.endedAt && (
                     <LedgerCoverage since={session.startedAt} ledger={ledger} />
                   )}
-                  {archived && !archived.deferred && (
-                    <Button variant="secondary" onClick={() => setOpenedReportId(archived.id)}>
-                      Read session report
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <SessionRecapButton session={session} archived={archived} />
+                    {archived && !archived.deferred && (
+                      <Button variant="secondary" onClick={() => setOpenedReportId(archived.id)}>
+                        Read session report
+                      </Button>
+                    )}
+                  </div>
                   {sessionLoot(session).map((row) => (
                     <p className="coin-split-session" key={row.id}>
                       <strong>{row.title}</strong> ·{" "}

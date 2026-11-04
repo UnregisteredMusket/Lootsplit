@@ -1,0 +1,10 @@
+{
+  "title": "Session recaps in the journal",
+  "summary": "Each played session now has a Recap: a short summary of what happened, worked out from the session's records, that the DM can edit and share with the party.",
+  "items": [
+    "The recap groups loot and coin awarded, treasure-pool claims resolved, purchases and sales per shop, travel, and downtime and services, with amounts in gp, sp and cp.",
+    "Players see a recap built only from what they can already see: never other players' purses or the DM's private records.",
+    "The DM's draft for the players leaves out NPCs, hidden characters and DM-only records. Sharing posts it once as a party journal entry.",
+    "Older sessions get a recap too, from their recorded entries, or show Nothing recorded."
+  ]
+}
