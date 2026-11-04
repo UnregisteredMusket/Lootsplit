@@ -8,8 +8,8 @@
   align-items: center;
   gap: 0.5rem 0.75rem;
   padding: 0.5rem 1rem;
-  background: var(--color-lead, #c9a35a);
-  color: var(--color-bg, #14110d);
+  background: var(--color-lead);
+  color: var(--color-bg);
   min-width: 0;
 }
 .player-preview-banner p {

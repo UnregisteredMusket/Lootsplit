@@ -187,7 +187,7 @@ let ensuringName = "";
 export function ensureEconomy(): Promise<void> {
   // A preview starts on an opened campaign, and its database refuses writes (player-preview.ts).
   if (previewSeat()) return Promise.resolve();
-  const name =isEphemeralCampaign() ? "guest-memory" : activeDatabaseName();
+  const name = isEphemeralCampaign() ? "guest-memory" : activeDatabaseName();
   if (ensuring && ensuringName === name) return ensuring;
   ensuringName = name;
   ensuring = (async () => {
