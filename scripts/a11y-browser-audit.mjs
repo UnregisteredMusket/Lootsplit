@@ -118,8 +118,11 @@ function tabIn(context) {
  * /party?section=fairness at 1280 px timed out that way once, with no violation and every later
  * page in the same tab fine, and the identical page passed on the next run and in every local
  * replay (CPU-throttled, UTC, cold Vite cache); a slow runner, not a finding. Any other failure
- * is reported as unchecked. */
-const RETRIED = /crash|page\.waitForFunction: Timeout/i;
+ * is reported as unchecked. The same holds for the first app screen's wait for its opening
+ * screen (`locator.waitFor: Timeout`): on #417's run of 2026-11-04 "/" at 1280 px, the first app
+ * page after the website pages, timed out at 30 s on a cold development server with no violation,
+ * and passed on the next run. */
+const RETRIED = /crash|page\.waitForFunction: Timeout|locator\.waitFor: Timeout/i;
 async function visit(ready, path, entry, marker = "") {
   for (let attempt = 1; ; attempt++) {
     const page = await ready();
