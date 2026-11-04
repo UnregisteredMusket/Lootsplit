@@ -1,12 +1,14 @@
-import { knownUnitCopper, UNKNOWN_SALE } from "./item-identity.ts";
+import { knownUnitCopper, presentedHolding, UNKNOWN_SALE } from "./item-identity.ts";
 import type { Holding, Shop, StockLine } from "./types.ts";
 export function isService(item: Pick<Holding, "notes"> & { service?: boolean }) {
   return item.service === true || /^service$/i.test(item.notes.trim());
 }
 export function assertMerchantSale(item: Holding, shop: Shop) {
   if (isService(item)) throw Error("Services cannot be resold.");
-  // Item identification: an unidentified item sells at its presented value, so it needs one.
+  // Item identification: an unidentified item sells at its presented value, so it needs one,
+  // and shops judge it by its presented category, so a refusal never reveals the true one.
   if (knownUnitCopper(item) === null) throw Error(UNKNOWN_SALE);
+  item = presentedHolding(item);
   if (shop.acceptAnyCategory || shop.category === "mixed") return;
   const allowed = shop.acceptedCategories || [shop.category];
   if (!item.category || !allowed.includes(item.category))

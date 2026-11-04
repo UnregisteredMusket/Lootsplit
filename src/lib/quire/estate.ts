@@ -1,4 +1,5 @@
 import { assertCarried } from "./custody.ts";
+import { presentedHolding } from "./item-identity.ts";
 import {
   shipHere,
   initializeShipPurchase,
@@ -832,7 +833,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
           kind: "request",
           propertyId: h.id,
           summary:
-            `Requested withdrawal of ${cmd.quantity} ${item.name} for ${t.purses.find((p) => p.id === cmd.purseId)!.name}.`.slice(
+            `Requested withdrawal of ${cmd.quantity} ${presentedHolding(item).name} for ${t.purses.find((p) => p.id === cmd.purseId)!.name}.`.slice(
               0,
               500,
             ),
@@ -878,7 +879,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
       purseId: h.purseId,
       propertyId: h.id,
       summary:
-        `${t.purses.find((p) => p.id === cmd.purseId)!.name} ${cmd.direction === "deposit" ? "stored" : "retrieved"} ${cmd.quantity} ${item.name} at ${h.name}${cmd.donate && cmd.direction === "deposit" ? "; donated to the property owner for shared use" : ""}${cmd.override ? " (DM location override)" : ""}.`.slice(
+        `${t.purses.find((p) => p.id === cmd.purseId)!.name} ${cmd.direction === "deposit" ? "stored" : "retrieved"} ${cmd.quantity} ${presentedHolding(item).name} at ${h.name}${cmd.donate && cmd.direction === "deposit" ? "; donated to the property owner for shared use" : ""}${cmd.override ? " (DM location override)" : ""}.`.slice(
           0,
           500,
         ),

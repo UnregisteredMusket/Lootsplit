@@ -8,13 +8,16 @@
  * archived sessions, history pages and the device), character sheets, the TV display and every
  * receipt, ledger line, event or note written while the item is unidentified.
  *
- * Two layers keep the true details out of what players receive:
- * - **At write time** (`redactWritten`, run by `applyOwnedCommand` and both encounter award
- *   paths): the records a command adds name and value the item as presented, so they stay safe
- *   after the item is sold or given away.
+ * Two layers keep the true details out of what players receive, both structural only: text a
+ * person typed (chat, notes, journal entries, DM summaries) is never searched or rewritten.
+ * - **At write time**: the summaries a command generates use `presentedHolding` (sales, the
+ *   treasure pool, encounter awards, property storage), and `redactWritten` presents the
+ *   structured item fields of the ledger lines, events and service orders that command created.
  * - **At projection time** (`redactIdentity`): every holding copy is replaced by its presented
- *   form, every record tied to a secret holding takes the presented name and value, and the true
- *   name and notes are replaced as text anywhere they still appear.
+ *   form, and every structured record tied to a secret holding (`holdingId`, or an item ID with
+ *   `unitCopper`) takes the presented name, notes and value. Stored records are never changed.
+ *
+ * Records written before the DM marked an item keep what they recorded (the DM is told so).
  *
  * A sale of an unidentified item (by anyone, the DM included) is priced at the presented value,
  * so no sale price reveals the true value; without a presented value it cannot be sold.
@@ -28,8 +31,14 @@ export const unidentifiedSchema = z
     name: z.string().trim().min(1).max(160),
     description: z.string().max(4000).optional(),
     value: z.number().int().nonnegative().max(1e12).optional(),
+    /** The inventory category players see (shops buy by it); absent: `NEUTRAL_CATEGORY`. */
+    category: z.string().trim().min(1).max(80).optional(),
+    /** The weight players see; absent: the true weight (a holder can feel it). */
+    weight: z.number().min(0).max(9999).optional(),
   })
   .strict();
+/** The category an unidentified item without a presented one is told and sold as. */
+export const NEUTRAL_CATEGORY = "general";
 export type Unidentified = z.infer<typeof unidentifiedSchema>;
 
 /** Players see this where a value would be. */
@@ -66,13 +75,16 @@ export function presentedHolding<H extends Holding>(h: H): H {
   if (!isUnidentified(h)) return h;
   const u = h.unidentified;
   const { image: _image, commodityId: _commodity, materialKey: _material, valueSource: _source, ...rest } = h;
-  return {
+  const shown = {
     ...rest,
     name: u.name,
     notes: u.description ?? "",
     unitCopper: u.value ?? 0,
+    category: u.category ?? NEUTRAL_CATEGORY,
     unidentified: { ...u },
   } as H;
+  if (u.weight !== undefined) shown.weight = u.weight;
+  return shown;
 }
 
 /** The value a sale or a receipt may use: the presented value, or null when it is unknown. */
@@ -104,53 +116,27 @@ export function commandSecrets(before: readonly Holding[], after: readonly Holdi
   return now;
 }
 
-/** Text replacements, longest first: true notes, then true names (short names only as fields). */
-function needles(secrets: IdentitySecrets): Array<[string, string]> {
-  const pairs = new Map<string, string>();
-  for (const s of secrets.values()) {
-    const notes = s.trueNotes.trim();
-    if (notes.length >= 4 && notes !== s.shown.notes.trim()) pairs.set(notes, s.shown.notes);
-    const name = s.trueName.trim();
-    if (name.length >= 3 && name !== s.shown.name) pairs.set(name, s.shown.name);
-  }
-  return [...pairs].sort((a, b) => b[0].length - a[0].length);
-}
-
-const escaped = (text: string) => JSON.stringify(text).slice(1, -1);
-
 /**
  * `value` with every unidentified item presented (see the module comment). Returns `value`
  * itself when there is nothing to hide. Never mutates its input.
  */
 export function redactIdentity<T>(value: T, secrets: IdentitySecrets): T {
   if (!secrets.size) return value;
-  const text = needles(secrets);
-  const jsonText = text.map(([a, b]) => [escaped(a), escaped(b)] as [string, string]);
-  const scrub = (s: string, pairs: Array<[string, string]>) => {
-    let out = s;
-    for (const [needle, replacement] of pairs) if (out.includes(needle)) out = out.split(needle).join(replacement);
-    return out;
-  };
   const walk = (v: unknown, key: string): unknown => {
     if (typeof v === "string") {
-      // Identifiers and pictures are never prose (a short name could occur inside base64 text).
-      if (v.startsWith("data:") || key === "id" || key.endsWith("Id") || key.endsWith("Ids") || key === "image" || key === "portrait")
-        return v;
-      // Archived session snapshots are JSON text; their own holdings were projected when they
-      // were read (`projectArchivedReport`). Replace the escaped text so the JSON stays valid.
-      if (key === "snapshot") return scrub(v, jsonText);
-      // Item snapshots inside trades and barter offers (`before`) are canonical JSON of a holding.
-      if (v.length < 200000 && v.startsWith("{") && v.includes('"unitCopper"')) {
+      // Archived session snapshots are projected when they are read (`projectArchivedReport`).
+      // Item snapshots inside trades and barter offers (`before`) are canonical JSON of a holding:
+      // that structure is presented. Any other text is left exactly as written.
+      if (key !== "snapshot" && v.length < 200000 && v.startsWith("{") && v.includes('"unitCopper"')) {
         try {
           const parsed: unknown = JSON.parse(v);
           const next = walk(parsed, "");
           if (next !== parsed) return canonicalJson(parsed) === v ? canonicalJson(next) : JSON.stringify(next);
-          return scrub(v, jsonText);
         } catch {
           /* Not JSON: plain text. */
         }
       }
-      return scrub(v, text);
+      return v;
     }
     if (Array.isArray(v)) {
       let changed = false;
@@ -207,54 +193,45 @@ export function projectIdentities<T>(source: { holdings: readonly Holding[] }, p
 }
 
 /**
- * What a command wrote, kept safe: the records it added (ledger lines, notes, events and
- * journal entries other than DM-only ones), service orders and treasure-pool history name and
- * value unidentified items as presented. `before` is the table before the command; `t` is changed
- * in place.
+ * What a command created, kept safe: the structured item fields (`holdingId`-linked receipts,
+ * claims, loot links, award tags, order snapshots) of the ledger lines, events and service orders
+ * this command added, other than DM-only events, present unidentified items. Rows that existed
+ * before the command, and all prose, are untouched. `before` is the baseline taken before the
+ * command; `t` is changed in place.
  */
 export function redactWritten(
-  before: { holdings: readonly Holding[]; ledgerIds: Set<string>; noteIds: Set<string>; eventIds: Set<string>; entryIds: Set<string> },
+  before: { holdings: readonly Holding[]; ledgerIds: Set<string>; eventIds: Set<string>; orderIds: Set<string> },
   t: {
     holdings: Holding[];
     ledger: Array<{ id: string }>;
-    notes: Array<{ id: string; to?: string }>;
-    journal?: {
-      events?: Array<{ id: string; dmOnly?: boolean }>;
-      entries?: Array<{ id: string; visibility?: string }>;
-      services?: unknown;
-      [key: string]: unknown;
-    };
+    journal?: { events?: Array<{ id: string; dmOnly?: boolean }>; services?: unknown };
   },
 ) {
   const secrets = commandSecrets(before.holdings, t.holdings);
   if (!secrets.size) return;
-  const fresh = <R extends { id: string }>(rows: R[] | undefined, seen: Set<string>, keep: (r: R) => boolean = () => true) =>
-    rows?.map((r) => (!seen.has(r.id) && keep(r) ? redactIdentity(r, secrets) : r));
-  t.ledger = fresh(t.ledger, before.ledgerIds)!;
-  t.notes = fresh(t.notes, before.noteIds, (n) => n.to !== "dm")!;
+  const fresh = <R extends { id: string }>(rows: R[], seen: Set<string>, keep: (r: R) => boolean = () => true) =>
+    rows.map((r) => (!seen.has(r.id) && keep(r) ? redactIdentity(r, secrets) : r));
+  t.ledger = fresh(t.ledger, before.ledgerIds);
   const j = t.journal;
   if (!j) return;
   if (j.events) j.events = fresh(j.events, before.eventIds, (e) => !e.dmOnly);
-  if (j.entries) j.entries = fresh(j.entries, before.entryIds, (e) => e.visibility !== "dm");
-  // Service orders snapshot the item they are about (terms.item); providers stay as written.
-  const services = j.services as { orders?: unknown[] } | undefined;
-  if (services?.orders) services.orders = redactIdentity(services.orders, secrets);
-  if (j.lootClaims) j.lootClaims = redactIdentity(j.lootClaims, secrets);
+  // A new service order snapshots the item it is about (terms.item).
+  const services = j.services as { orders?: Array<{ id: string }> } | undefined;
+  if (services?.orders) services.orders = fresh(services.orders, before.orderIds);
 }
 
-/** The ID sets `redactWritten` compares against, taken before a command runs. */
+/** The baseline `redactWritten` compares against, taken before a command runs. */
 export function writtenBaseline(t: {
   holdings: readonly Holding[];
   ledger: readonly { id: string }[];
-  notes: readonly { id: string }[];
-  journal?: { events?: readonly { id: string }[]; entries?: readonly { id: string }[] };
+  journal?: { events?: readonly { id: string }[]; services?: unknown };
 }) {
+  const orders = (t.journal?.services as { orders?: Array<{ id: string }> } | undefined)?.orders ?? [];
   return {
     holdings: t.holdings.map((h) => ({ ...h })),
     ledgerIds: new Set(t.ledger.map((l) => l.id)),
-    noteIds: new Set(t.notes.map((n) => n.id)),
     eventIds: new Set((t.journal?.events ?? []).map((e) => e.id)),
-    entryIds: new Set((t.journal?.entries ?? []).map((e) => e.id)),
+    orderIds: new Set(orders.map((o) => o.id)),
   };
 }
 
@@ -284,8 +261,9 @@ export function identifyHolding(
 
 /**
  * A whole-holding write from a player (a sheet save or a turn bill) for an unidentified item:
- * the player saw the presented record, so only quantity, equipped and weight may change, and the
- * true record is kept. Throws when the player tried to change what the item is.
+ * the player saw the presented record, so only quantity and equipped may change, and the true
+ * record (with its presented record) is kept. Throws when the player tried to change what the
+ * item is.
  */
 export function keepIdentity<H extends Holding>(
   old: H,
@@ -300,8 +278,9 @@ export function keepIdentity<H extends Holding>(
     (incoming.kind ?? "item") !== (old.kind || "item")
   )
     throw Error(UNIDENTIFIED_EDIT);
+  // The weight shown may be a presented one: the true weight is kept.
+  if (incoming.weight !== undefined && incoming.weight !== (shown.weight ?? 0)) throw Error(UNIDENTIFIED_EDIT);
   const next = { ...old, quantity: incoming.quantity };
   if (incoming.equipped !== undefined) next.equipped = incoming.equipped;
-  if (incoming.weight !== undefined) next.weight = incoming.weight;
   return next;
 }

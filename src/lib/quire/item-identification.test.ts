@@ -86,7 +86,7 @@ const leaks = (value: unknown) => {
 const coins = (c: Partial<Purse["coins"]>) => ({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0, ...c });
 const shop: Shop = {
   id: "marlow", name: "Marlow's Curios", keeper: "", place: "Port Ashby", notes: "", sellRate: 1, buyRate: 0.5,
-  wealth: "modest", category: "curios", priceScale: 1, acceptedCategories: ["curios", "jewels", "smith"],
+  wealth: "modest", category: "curios", priceScale: 1, acceptedCategories: ["curios", "jewels", "smith", "general"],
 };
 function campaign(): CloudTable {
   return {
@@ -381,4 +381,119 @@ test("protocol 24: older apps finish identification drafts on the website; every
   assert.equal(tabletopResponse({ table, draft }, 24).table, table);
   // Holdings are not a strict schema: an older player's table is the same presented table.
   for (const protocol of [0, 3, 19]) assert.deepEqual(leaks(tabletopResponse({ table, draft: "[]" }, protocol)), []);
+});
+
+test("text people type is stored and returned exactly as written; structured records are still presented", async () => {
+  const { dm, aria, bram } = await room();
+  const guess = "Is Aria's thing a Ring of Djinni Summoning? Ask Bram Swordbreaker.";
+  await player(bram, "chat", [{ id: "guess", kind: "message", to: "party", purseId: "bram", text: guess }]);
+  await submitCommands({ ...dm, batchId: "note", commands: [{ id: "dm-note", kind: "journal-note", title: "Ring", text: `The ${RING.name} waits.`, visibility: "party", purseId: "", reportIds: [] }] });
+  const stored = (await roomState(dm)).table;
+  assert.equal(stored.notes.find((n) => n.id === "guess")!.text, guess, "stored unchanged");
+  assert.equal(stored.journal!.entries!.find((e) => e.id === "dm-note")!.text, `The ${RING.name} waits.`);
+  for (const seat of [aria, bram]) {
+    const view = (await roomState(seat)).table;
+    assert.equal(view.notes.find((n) => n.id === "guess")!.text, guess, "returned unchanged: no guessing test");
+    assert.equal(view.journal!.entries!.find((e) => e.id === "dm-note")!.text, `The ${RING.name} waits.`);
+    // The structured records are still presented.
+    assert.deepEqual(leaks(view.holdings), []);
+  }
+});
+
+test("a command redacts only the rows it created: an earlier DM answer and the claims survive", () => {
+  let t = sageFixture();
+  // An earlier Identify answered with words that happen to name the ring.
+  t = applyCommand(t, svcKael, identifyCommand(t, "id-bottle", "bottle"));
+  const bottleOrder = () => readServices(t.journal?.services).orders.find((o) => o.id === "id-bottle")!;
+  t = applyCommand(t, svcDm, { id: "ans", kind: "service-review", orderId: "id-bottle", before: bottleOrder(), decision: "approve", reason: "", reveal: { text: "Water. Not the Plain silver ring you hoped for.", appendToNotes: false } });
+  const before = structuredClone(bottleOrder());
+  // The DM marks the ring unidentified, then Kael asks about it: a new order.
+  t = applyCommand(t, svcDm, { id: "mark", kind: "item-unidentify", holdingId: "ring", before: null, unidentified: { name: "Dull band" } });
+  t = applyCommand(t, svcKael, identifyCommand(projectRecord(t, svcKael), "id-ring", "ring"));
+  assert.deepEqual(bottleOrder(), before, "the earlier order and its answer are untouched");
+  assert.equal(readServices(t.journal?.services).orders.find((o) => o.id === "id-ring")!.terms.item!.name, "Dull band");
+});
+
+test("presented category and weight: shops judge the presented category; the true weight stays", () => {
+  const t = campaign();
+  const ring = t.holdings[0]!;
+  // No presented category: the neutral "general"; the weight is the true weight.
+  assert.deepEqual([presentedHolding({ ...ring, weight: 0.5 }).category, presentedHolding({ ...ring, weight: 0.5 }).weight], ["general", 0.5]);
+  const jeweller: Shop = { ...shop, id: "jeweller", name: "Jeweller", acceptedCategories: ["jewels"] };
+  const general: Shop = { ...shop, id: "store", name: "General store", acceptedCategories: ["general"] };
+  const withShops = { ...t, shops: [shop, jeweller, general] };
+  // The true category (jewels) would be accepted at the jeweller: the refusal there and the sale
+  // at the general store show only the presented category.
+  assert.throws(() => applyCommand(withShops, ariaSeat, { id: "j", kind: "sell", holdingId: "ring", shopId: "jeweller", quantity: 1 }), /does not buy that item category/);
+  const sold = applyCommand(withShops, ariaSeat, { id: "g", kind: "sell", holdingId: "ring", shopId: "store", quantity: 1 });
+  assert.equal(sold.ledger.find((l) => l.id === "g")!.copper, 1250);
+  // A presented category and weight are what players see; the true weight is kept on sheet saves.
+  const marked = applyCommand(withShops, dmSeat, { id: "m", kind: "item-unidentify", holdingId: "ring", before: ring.unidentified!, unidentified: { ...ring.unidentified!, category: "curios", weight: 2 } });
+  marked.holdings[0]!.weight = 0.1;
+  const seen = projectRecord(marked, ariaSeat).holdings.find((h) => h.id === "ring")!;
+  assert.deepEqual([seen.category, seen.weight], ["curios", 2]);
+  const sheetBefore = characterSheet(marked.purses[1]!, marked.holdings);
+  const sheet = structuredClone(sheetBefore);
+  sheet.equipment.find((e: { id: string }) => e.id === "ring")!.equipped = true;
+  marked.purses[1]!.permissions = { equipment: true };
+  editCharacter(marked, ariaSeat, { purseId: "aria", before: sheetBefore, sheet }, "equip");
+  assert.equal(marked.holdings.find((h) => h.id === "ring")!.weight, 0.1);
+});
+
+test("a player's turn bill can't set, drop or change a presented record", () => {
+  const t = campaign();
+  const shown = projectRecord(t, ariaSeat).holdings.filter((h) => h.purseId === "aria");
+  const tampered = shown.map((h) =>
+    h.id === "ring"
+      ? { ...h, unidentified: { name: "Plain brass ring", value: 999999 } }
+      : h.id === "rope"
+        ? { ...h, unidentified: { name: "Mystery" } }
+        : h,
+  );
+  const bill = { purseIds: ["aria"], purses: [t.purses[1]!], holdings: tampered, stock: [], ledger: [], loans: [], notes: [] };
+  const out = applyBillToTable(t, bill as never, {} as never).table;
+  const ring = out.holdings.find((h) => h.id === "ring")!;
+  assert.deepEqual([ring.name, ring.unitCopper, ring.unidentified], [RING.name, RING.copper, t.holdings[0]!.unidentified]);
+  assert.equal(out.holdings.find((h) => h.id === "rope")!.unidentified, undefined, "a bill can't mark an item");
+  // Dropping the record keeps it too.
+  const { unidentified: _u, ...plain } = shown.find((h) => h.id === "ring")!;
+  const dropped = applyBillToTable(t, { ...bill, holdings: [plain, shown.find((h) => h.id === "rope")!] } as never, {} as never).table;
+  assert.deepEqual(dropped.holdings.find((h) => h.id === "ring")!.unidentified, t.holdings[0]!.unidentified);
+});
+
+test("award lines name their holding, so an item marked later shows players the presented value", () => {
+  let t = campaign();
+  t.ledger.push(encounterItemLine("award-r", 0, 1, "aria", { name: "Hempen rope", quantity: 1, unitCopper: 100 }, "Crypt", "rope"));
+  assert.equal(t.ledger[0]!.award!.holdingId, "rope");
+  t = applyCommand(t, dmSeat, { id: "mark-rope", kind: "item-unidentify", holdingId: "rope", before: null, unidentified: { name: "Coil of cord", value: 5 } });
+  assert.equal(t.ledger[0]!.award!.unitCopper, 100, "the DM's record keeps its recorded value");
+  assert.equal(projectRecord(t, ariaSeat).ledger.find((l) => l.id === "award-r-item-0")!.award!.unitCopper, 5);
+});
+
+test("differential: marking, a presented-category sale and a reveal run identically on the device", async () => {
+  const { dm } = await room();
+  const host = (await roomState(dm)).table;
+  const commands = [
+    { id: "d-mark", kind: "item-unidentify" as const, holdingId: "rope", before: null, unidentified: { name: "Coil of cord", value: 40, category: "curios" } },
+    { id: "d-sell", kind: "sell" as const, holdingId: "rope", shopId: "marlow", quantity: 1 },
+    { id: "d-id", kind: "item-identify" as const, holdingId: "wand", before: { name: "Carved stick" } },
+  ];
+  setSeat(DM_SEAT);
+  await applyCloudTable(host);
+  for (const c of commands) {
+    await executeLocalCommand(c);
+    await executeLocalCommand(c);
+  }
+  const device = (await economySnapshot()) as unknown as CloudTable;
+  await submitCommands({ ...dm, batchId: "d-shared", commands });
+  await submitCommands({ ...dm, batchId: "d-shared-again", commands });
+  const shared = (await roomState(dm)).table;
+  const pick = (t: CloudTable) => ({
+    holdings: [...t.holdings].sort((a, b) => a.id.localeCompare(b.id)),
+    ledger: t.ledger.filter((l) => l.id.startsWith("d-")).map(({ at: _at, ...l }) => l),
+    events: (t.journal?.events ?? []).filter((e) => e.id.startsWith("d-")).map(({ at: _at, ...e }) => e),
+    coins: t.purses.map((p) => [p.id, toCopper(p.coins)]).sort(),
+  });
+  assert.deepEqual(pick(device), pick(shared));
+  assert.equal(pick(shared).ledger.find((l) => l.id === "d-sell")!.copper, 20);
 });

@@ -22,6 +22,8 @@ export const awardTagSchema = z
     role: z.enum(["coins", "item"]),
     quantity: z.number().int().min(1).max(100000).optional(),
     unitCopper: whole.optional(),
+    /** Item lines from 2026-11-04: the holding the award created, so a later mark is matched. */
+    holdingId: id.optional(),
   })
   .strict();
 export type AwardTag = z.infer<typeof awardTagSchema>;
@@ -55,6 +57,7 @@ export function encounterItemLine(
   purseId: string,
   item: { name: string; quantity: number; unitCopper: number; unidentified?: Unidentified },
   encounterName: string,
+  holdingId?: string,
 ): LedgerLine {
   // Item identification: an item awarded unidentified is recorded as the party is told it, with
   // its presented value (or no value: "No value was recorded" in the Fairness ledger).
@@ -72,6 +75,12 @@ export function encounterItemLine(
     summary: `Encounter loot: ${item.quantity} × ${name} (${encounterName})`,
     copper: 0,
     transactionType: "adjustment",
-    award: { receiptId, role: "item", quantity: item.quantity, ...(unitCopper === undefined ? {} : { unitCopper }) },
+    award: {
+      receiptId,
+      role: "item",
+      quantity: item.quantity,
+      ...(unitCopper === undefined ? {} : { unitCopper }),
+      ...(holdingId ? { holdingId } : {}),
+    },
   };
 }

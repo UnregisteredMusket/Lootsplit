@@ -9,24 +9,28 @@ import { Button, Field, Modal, TextArea, TextInput } from "./ui";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 import { formatCopper, parsePrice } from "@/lib/quire/money";
-import { isUnidentified, UNKNOWN_VALUE, type Unidentified } from "@/lib/quire/item-identity";
+import { isUnidentified, NEUTRAL_CATEGORY, UNKNOWN_VALUE, type Unidentified } from "@/lib/quire/item-identity";
 import type { Holding } from "@/lib/quire/types";
 
 export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | null; onClose: () => void }) {
-  const { itemIdentity } = useEconomy();
+  const { itemIdentity, ledger } = useEconomy();
   const current = holding && isUnidentified(holding) ? holding.unidentified : null;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [value, setValue] = useState("");
+  const [category, setCategory] = useState("");
+  const [weight, setWeight] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const save = useCommandId(`${holding?.id}|${name}|${description}|${value}`);
+  const save = useCommandId(`${holding?.id}|${name}|${description}|${value}|${category}|${weight}`);
   const reveal = useCommandId(`${holding?.id}|reveal`);
   useEffect(() => {
     if (!holding) return;
     setName(current?.name ?? "");
     setDescription(current?.description ?? "");
     setValue(current?.value === undefined ? "" : formatCopper(current.value));
+    setCategory(current?.category ?? "");
+    setWeight(current?.weight === undefined ? "" : String(current.weight));
     setError("");
     // Reset the form when another item opens; `current` follows the holding.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -42,10 +46,17 @@ export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | nu
       setError("Enter a value such as 25 gp or 2 gp 5 sp, or leave it empty for an unknown value.");
       return null;
     }
+    const pounds = weight.trim() ? Number(weight) : undefined;
+    if (pounds !== undefined && (!Number.isFinite(pounds) || pounds < 0 || pounds > 9999)) {
+      setError("Enter a weight from 0 to 9,999, or leave it empty to keep the item's weight.");
+      return null;
+    }
     return {
       name: name.trim(),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(copper === undefined ? {} : { value: copper }),
+      ...(category.trim() ? { category: category.trim() } : {}),
+      ...(pounds === undefined ? {} : { weight: pounds }),
     };
   };
   return (
@@ -57,6 +68,20 @@ export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | nu
           if (busy) return;
           const next = record();
           if (!next) return;
+          // Records written before the mark keep what they recorded (item-identity.ts).
+          const earlier = ledger.filter(
+            (l) => l.award?.holdingId === holding.id || l.loot?.holdingId === holding.id || l.purchase?.holding?.id === holding.id || l.listingPurchase?.holding.id === holding.id,
+          ).length;
+          if (
+            !current &&
+            earlier > 0 &&
+            !(await requestConfirm({
+              title: `Mark ${holding.name} unidentified?`,
+              body: `This item already has ${earlier} ${earlier === 1 ? "record" : "records"} in Activity (such as its award). Earlier records keep the name and value they recorded; players who could read them still can. Only what happens from now on uses what players see.`,
+              confirmLabel: "Mark unidentified",
+            }))
+          )
+            return;
           setBusy(true);
           setError("");
           try {
@@ -87,6 +112,12 @@ export function ItemIdentityDialog({ holding, onClose }: { holding: Holding | nu
         </label>
         <Field label="Value players see (optional)" hint={`Empty: players see “${UNKNOWN_VALUE}”.`}>
           <TextInput aria-label="Value players see" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder="25 gp" />
+        </Field>
+        <Field label="Category players see (optional)" hint={`Shops buy it by this category. Empty: “${NEUTRAL_CATEGORY}”.`}>
+          <TextInput aria-label="Category players see" value={category} maxLength={80} onChange={(e) => setCategory(e.target.value)} placeholder={NEUTRAL_CATEGORY} />
+        </Field>
+        <Field label="Weight players see (optional)" hint="Empty: the item's own weight, which the holder can feel.">
+          <TextInput aria-label="Weight players see" inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} />
         </Field>
         {error ? (
           <p role="alert" className="text-sm">

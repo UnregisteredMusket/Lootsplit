@@ -419,8 +419,9 @@ export async function handleEncounters(db, user, path, body = {}) {
     for (const [index, item] of e.loot.entries()) {
       if (item.pool) continue;
       const p = findPurse(item.purseId);
+      const holdingId = `${receiptId}-item-${index}`; // One ID on both award paths.
       room.table.holdings.push({
-        id: crypto.randomUUID(),
+        id: holdingId,
         purseId: p.id,
         name: item.name,
         kind: "item",
@@ -430,7 +431,7 @@ export async function handleEncounters(db, user, path, body = {}) {
         ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
       });
       try {
-        room.table.ledger.push(encounterItemLine(receiptId, index, at, p.id, item, e.name));
+        room.table.ledger.push(encounterItemLine(receiptId, index, at, p.id, item, e.name, holdingId));
       } catch (err) {
         fail(err.message);
       }

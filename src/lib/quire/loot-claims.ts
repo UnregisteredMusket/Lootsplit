@@ -446,14 +446,16 @@ export function applyLootCommand(
       { holdingId: h.id, purseId: p!.id, choice: cmd.choice, at, by, commandId: cmd.id },
     ];
     (journal as { lootClaims?: LootClaims }).lootClaims = state;
+    // Item identification: the party is told an unidentified item's presented name.
+    const shown = presentedHolding(h);
     event(
       previous
-        ? `${p!.name} changed ${label(previous)} → ${label(cmd.choice)} on ${h.name}${by === "dm" ? " (marked by the DM)" : ""}`
-        : `${p!.name} marked ${label(cmd.choice)} on ${h.name}${by === "dm" ? " (marked by the DM)" : ""}`,
+        ? `${p!.name} changed ${label(previous)} → ${label(cmd.choice)} on ${shown.name}${by === "dm" ? " (marked by the DM)" : ""}`
+        : `${p!.name} marked ${label(cmd.choice)} on ${shown.name}${by === "dm" ? " (marked by the DM)" : ""}`,
       "management",
       p!.id,
     );
-    lastEvent().lootClaim = { holdingId: h.id, purseId: p!.id, name: h.name.slice(0, 200), choice: cmd.choice, previous, by };
+    lastEvent().lootClaim = { holdingId: h.id, purseId: p!.id, name: shown.name.slice(0, 200), choice: cmd.choice, previous, by };
     return;
   }
   if (cmd.kind === "loot-pool-set") {
@@ -470,16 +472,17 @@ export function applyLootCommand(
       dropClaims(t, h.id);
     }
     const fund = t.purses.find((p) => p.id === h.purseId);
+    const shown = presentedHolding(h);
     event(
       cmd.pooled
-        ? `Put in the treasure pool: ${h.name} × ${h.quantity}`
-        : `Taken out of the treasure pool (kept in ${fund?.name ?? "the party fund"}): ${h.name} × ${h.quantity}`,
+        ? `Put in the treasure pool: ${shown.name} × ${h.quantity}`
+        : `Taken out of the treasure pool (kept in ${fund?.name ?? "the party fund"}): ${shown.name} × ${h.quantity}`,
       "management",
       h.purseId,
     );
     lastEvent().lootPool = {
       holdingId: h.id,
-      name: h.name.slice(0, 200),
+      name: shown.name.slice(0, 200),
       quantity: h.quantity,
       pooled: cmd.pooled,
       ...(cmd.pooled ? { source: "dm" as const } : {}),

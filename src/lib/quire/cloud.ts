@@ -184,8 +184,12 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
     ...bill.holdings
       .filter((holding) => purseIds.has(holding.purseId))
       .map((holding) => {
-        const old = table.holdings.find((h) => h.id === holding.id && h.purseId === holding.purseId);
-        return old && isUnidentified(old) ? keepIdentity(old, holding) : holding;
+        // By item ID only: a bill can't set, drop or change a presented record.
+        const old = table.holdings.find((h) => h.id === holding.id);
+        if (old && isUnidentified(old)) return { ...keepIdentity(old, holding), purseId: holding.purseId };
+        if (holding.unidentified === undefined) return holding;
+        const { unidentified: _dropped, ...plain } = holding;
+        return plain;
       }),
   ];
   const stock = table.stock.map((line) => {
