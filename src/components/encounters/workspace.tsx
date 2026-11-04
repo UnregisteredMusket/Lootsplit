@@ -2268,7 +2268,7 @@ function EncounterEditor({
                   </div>
                   <details className="loot-row-details">
                     <summary>
-                      Details{l.notes.trim() ? " · has notes" : ""}
+                      Details{l.notes.trim() ? " · has notes" : ""}{l.unidentified ? " · unidentified" : ""}
                       <span className="sr-only"> for item {i + 1}</span>
                     </summary>
                     <label>
@@ -2289,6 +2289,61 @@ function EncounterEditor({
                         onChange={(e) => update({ notes: e.target.value })}
                       />
                     </label>
+                    {/* Item identification: players are told this record until the DM identifies it. */}
+                    <label className="loot-row-unidentified">
+                      <input
+                        type="checkbox"
+                        checked={!!l.unidentified}
+                        onChange={(e) => {
+                          const { unidentified: _u, ...rest } = l;
+                          change({
+                            ...draft,
+                            loot: draft.loot.map((r, j) =>
+                              i !== j ? r : e.target.checked ? { ...rest, unidentified: { name: "Unidentified item" } } : rest,
+                            ),
+                          });
+                        }}
+                      />{" "}
+                      Award unidentified
+                    </label>
+                    {l.unidentified ? (
+                      <>
+                        <label>
+                          Name players see
+                          <input
+                            aria-label={`Name players see for item ${i + 1}`}
+                            value={l.unidentified.name}
+                            maxLength={120}
+                            onChange={(e) => update({ unidentified: { ...l.unidentified!, name: e.target.value } })}
+                          />
+                        </label>
+                        <label>
+                          Description players see
+                          <textarea
+                            aria-label={`Description players see for item ${i + 1}`}
+                            value={l.unidentified.description ?? ""}
+                            onChange={(e) => {
+                              const { description: _d, ...rest } = l.unidentified!;
+                              update({ unidentified: e.target.value ? { ...rest, description: e.target.value } : rest });
+                            }}
+                          />
+                        </label>
+                        <label>
+                          Value players see (cp, empty for unknown)
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            aria-label={`Value players see for item ${i + 1}`}
+                            value={l.unidentified.value ?? ""}
+                            onChange={(e) => {
+                              const { value: _v, ...rest } = l.unidentified!;
+                              update({ unidentified: e.target.value === "" ? rest : { ...rest, value: n(e.target.value) } });
+                            }}
+                          />
+                        </label>
+                      </>
+                    ) : null}
                     <button
                       onClick={() => {
                         setPicked(picked.filter((x) => x !== l.id));

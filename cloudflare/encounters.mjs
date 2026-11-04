@@ -427,6 +427,7 @@ export async function handleEncounters(db, user, path, body = {}) {
         quantity: item.quantity,
         unitCopper: item.unitCopper,
         notes: item.notes,
+        ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
       });
       try {
         room.table.ledger.push(encounterItemLine(receiptId, index, at, p.id, item, e.name));

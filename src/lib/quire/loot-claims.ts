@@ -12,6 +12,7 @@ import { canonicalJson } from "./canonical-json.ts";
 import { characterVisible, seatInParty } from "./character-position.ts";
 import { isNpc, partyFunds, designatedPartyFund, recipientProblem } from "./coin-split.ts";
 import { formatCopper } from "./money.ts";
+import { knownUnitCopper, presentedHolding, redactIdentity, identitySecrets, type Unidentified } from "./item-identity.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { fairnessStandings } from "./loot-fairness.ts";
 import {
@@ -259,7 +260,7 @@ export function planLootResolution(
             const low = Math.min(...tierPurses.map((p) => running.get(p.id) ?? 0));
             const plain = next;
             next = after(tierPurses.filter((p) => (running.get(p.id) ?? 0) === low));
-            running.set(next.id, low + h.unitCopper);
+            running.set(next.id, low + (knownUnitCopper(h) ?? 0));
             if (next.id !== plain.id && !favoured.includes(next.id)) favoured.push(next.id);
           }
           awards.set(next.id, (awards.get(next.id) ?? 0) + 1);
@@ -300,10 +301,11 @@ export function planLootResolution(
     lots.push({
       holdingId: h.id,
       fundId: h.purseId,
-      name: h.name.slice(0, 200),
+      // Item identification: the resolution records the item as the party knows it.
+      name: presentedHolding(h).name.slice(0, 200),
       poolQuantity: h.quantity,
       quantity: lot.quantity,
-      unitCopper: h.unitCopper,
+      unitCopper: knownUnitCopper(h) ?? 0,
       tier,
       claims: claims.map((c) => ({ purseId: c.purseId, choice: c.choice, at: c.at, ...(c.by === "dm" ? { by: "dm" as const } : {}) })),
       unmarked: input.method === "manual" ? [] : unmarked,
@@ -531,7 +533,7 @@ export function applyLootCommand(
         at,
         purseId: award.purseId,
         shopId: null,
-        summary: `Treasure pool: ${h.name} × ${award.quantity} (${CHOICE_LABEL[award.choice]})`,
+        summary: `Treasure pool: ${presentedHolding(h).name} × ${award.quantity} (${CHOICE_LABEL[award.choice]})`,
         copper: 0,
         transactionType: "transfer",
         loot: {
@@ -540,7 +542,7 @@ export function applyLootCommand(
           role: "award",
           choice: award.choice,
           quantity: award.quantity,
-          unitCopper: h.unitCopper,
+          unitCopper: knownUnitCopper(h) ?? 0,
         },
       });
       awards.push({ ...award, holdingId: newId });
@@ -744,6 +746,8 @@ export type EncounterPoolItem = {
   notes: string;
   purseId: string;
   pool?: boolean;
+  /** Awarded unidentified (item identification): what the party is told instead. */
+  unidentified?: Unidentified;
 };
 /**
  * The pooled part of an encounter award, for both award paths (cloudflare/encounters.mjs and
@@ -769,6 +773,9 @@ export function encounterPoolRows(
   const fundId = poolFund(table, options.fundId);
   if (!fundId) throw Error("Add a party fund before sending items to the treasure pool.");
   const { receiptId, encounterId, encounterName, at } = options;
+  // Item identification: the party is told the presented name and value (item-identity.ts).
+  const told = (item: EncounterPoolItem) =>
+    item.unidentified ? { name: item.unidentified.name, unitCopper: item.unidentified.value ?? 0 } : item;
   const holdings: Holding[] = [];
   const ledger: CloudTable["ledger"] = [];
   const events: JournalEvent[] = [];
@@ -784,34 +791,37 @@ export function encounterPoolRows(
       unitCopper: item.unitCopper,
       notes: item.notes,
       pool: { at, source: "encounter", encounterId, receiptId },
+      ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
     });
     ledger.push({
       id,
       at,
       purseId: fundId,
       shopId: null,
-      summary: `Encounter loot to the treasure pool: ${item.quantity} × ${item.name} (${encounterName})`,
+      summary: `Encounter loot to the treasure pool: ${item.quantity} × ${told(item).name} (${encounterName})`,
       copper: 0,
       transactionType: "adjustment",
-      loot: { id: receiptId, holdingId: id, role: "added", quantity: item.quantity, unitCopper: item.unitCopper },
+      loot: { id: receiptId, holdingId: id, role: "added", quantity: item.quantity, unitCopper: told(item).unitCopper },
     });
     events.push({
       id: `${id}-event`,
       at,
       kind: "management",
       purseId: fundId,
-      summary: `Added to the treasure pool from ${encounterName}: ${item.name} × ${item.quantity}`.slice(0, 500),
-      lootPool: { holdingId: id, name: item.name.slice(0, 200), quantity: item.quantity, pooled: true, source: "encounter", receiptId },
+      summary: `Added to the treasure pool from ${encounterName}: ${told(item).name} × ${item.quantity}`.slice(0, 500),
+      lootPool: { holdingId: id, name: told(item).name.slice(0, 200), quantity: item.quantity, pooled: true, source: "encounter", receiptId },
     });
   }
-  const names = list(pooled.map((item) => (item.quantity > 1 ? `${item.name} × ${item.quantity}` : item.name)));
+  const names = list(pooled.map((item) => (item.quantity > 1 ? `${told(item).name} × ${item.quantity}` : told(item).name)));
   const full = `${names} from ${encounterName} ${pooled.length === 1 && pooled[0]!.quantity === 1 ? "is" : "are"} in the treasure pool. Mark Need, Greed or Pass on Party → Treasure pool.`;
+  // Item identification: what the award writes names unidentified items as presented.
+  const secrets = identitySecrets(holdings);
   return {
     fundId,
     holdings,
-    ledger,
-    events,
-    note: {
+    ledger: redactIdentity(ledger, secrets),
+    events: redactIdentity(events, secrets),
+    note: redactIdentity({
       id: `${receiptId}-pool-note`,
       at,
       from: "dm",
@@ -821,6 +831,6 @@ export function encounterPoolRows(
         full.length <= 500
           ? full
           : `${pooled.length} items from ${encounterName.slice(0, 200)} are in the treasure pool. Mark Need, Greed or Pass on Party → Treasure pool.`,
-    },
+    }, secrets),
   };
 }

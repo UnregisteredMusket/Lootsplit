@@ -14,6 +14,8 @@ import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { FinanceReadiness } from "@/components/finance-input";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { assertMerchantSale } from "@/lib/quire/merchant";
+import { unitSalePrice } from "@/lib/quire/sale-split";
+import { knownUnitCopper } from "@/lib/quire/item-identity";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
@@ -747,7 +749,8 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
   }
   const asked = Number(qty),
     payout =
-      holding && shop ? Math.max(0, Math.round(holding.unitCopper * shop.buyRate)) * asked : 0;
+      // Item identification: an unidentified item sells at its presented value (sale-split.ts).
+      holding && shop ? Math.max(0, unitSalePrice(holding, shop)) * asked : 0;
 
   useEffect(() => {
     if (!mine.some((item) => item.id === holdingId) && mine[0]) setHoldingId(mine[0].id);
@@ -788,7 +791,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
       <FinanceReadiness />
       {holding && shop && (
         <p>
-          Lot value each {formatCopper(holding.unitCopper)} · merchant rate{" "}
+          Lot value each {formatCopper(knownUnitCopper(holding) ?? 0)} · merchant rate{" "}
           {Math.round(shop.buyRate * 100)}%.{" "}
           {Number.isSafeInteger(asked) && asked > 0
             ? `Preview payout ${formatCopper(payout)}; quantity remaining ${holding.quantity - asked}.`

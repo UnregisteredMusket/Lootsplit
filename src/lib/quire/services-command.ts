@@ -1,5 +1,6 @@
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { identifyHolding } from "./item-identity.ts";
 import { financeMove, readFinance } from "./finance.ts";
 import { toCopper, formatCopper } from "./money.ts";
 import { controlOrder, downtimePending, presentAt } from "./service-core.ts";
@@ -69,8 +70,8 @@ function settle(t: CloudTable, o: ServiceOrder, at: number, approved: boolean) {
 /**
  * Identify (sage or temple): deliver the DM's answer once, in the same command as the payment.
  * The answer goes into the payer's private thread with the NPC (`id-answer`); when ticked it is
- * appended to the item's notes with the day, and the item may be renamed. Phase 5 (item
- * identification) will call its logged reveal from here, so payment and reveal stay atomic.
+ * appended to the item's notes with the day, and the item may be renamed. An unidentified item
+ * is identified here (item-identity.ts `identifyHolding`), so payment and reveal stay atomic.
  */
 function revealIdentify(t: CloudTable, o: ServiceOrder, reveal: ServiceReveal, at: number) {
   const item = o.terms.item!;
@@ -84,6 +85,9 @@ function revealIdentify(t: CloudTable, o: ServiceOrder, reveal: ServiceReveal, a
   }
   if (!c.messages.some((m) => m.id === o.id + "-answer"))
     c.messages.push({ id: o.id + "-answer", author: "npc", text: reveal.text, at });
+  // Item identification (phase 5): an unidentified item is revealed here, in the same command
+  // as the payment, with its one logged event; the answer then goes onto the true item.
+  identifyHolding(t, h, o.id, at, o.terms.npcName);
   const day = readFinance(t.journal?.finance).day;
   if (reveal.appendToNotes)
     h.notes = [h.notes, `Day ${day} · identified by ${o.terms.npcName}: ${reveal.text}`].filter(Boolean).join("\n");

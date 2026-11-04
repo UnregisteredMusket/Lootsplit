@@ -9,6 +9,7 @@
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
 import { assertCarried } from "./custody.ts";
 import { assertMerchantSale } from "./merchant.ts";
+import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -44,9 +45,12 @@ export type SaleSplitPlan = {
   split: CoinSplitPlan;
 };
 
-/** What one unit of `h` fetches at `shop`: the Sell to shop rule. */
-export function unitSalePrice(h: Pick<Holding, "unitCopper">, shop: Pick<Shop, "buyRate">): number {
-  return Math.round(h.unitCopper * shop.buyRate);
+/**
+ * What one unit of `h` fetches at `shop`: the Sell to shop rule. An unidentified item is priced at
+ * its presented value (0 when unknown, which `saleProblem` refuses), never its true one.
+ */
+export function unitSalePrice(h: Pick<Holding, "unitCopper" | "unidentified">, shop: Pick<Shop, "buyRate">): number {
+  return Math.round((knownUnitCopper(h) ?? 0) * shop.buyRate);
 }
 
 /**
@@ -91,7 +95,9 @@ export function planSaleSplit(
     throw Error("Each item can be chosen once per sale.");
   const lots: SaleLot[] = [];
   for (const lot of input.lots) {
-    const h = t.holdings.find((x) => x.id === lot.holdingId);
+    const found = t.holdings.find((x) => x.id === lot.holdingId);
+    // Item identification: names and prices as presented (item-identity.ts).
+    const h = found && presentedHolding(found);
     if (!h || h.purseId !== fund.id) throw Error(`An item is no longer in ${fund.name}. Review the sale again.`);
     if (!Number.isSafeInteger(lot.quantity) || lot.quantity < 1) throw Error("Sell a whole number of each item.");
     if (lot.quantity > h.quantity) throw Error(`Only ${h.quantity} × ${h.name} ${h.quantity === 1 ? "is" : "are"} in ${fund.name}.`);

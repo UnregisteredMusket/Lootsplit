@@ -1,0 +1,10 @@
+{
+  "title": "Unidentified items",
+  "summary": "The DM can award or mark an item as unidentified. Players see the name, description and value the DM gives it until the DM, or a sage, identifies it.",
+  "items": [
+    "Unidentified items show an Unidentified tag, and “unknown value” when the DM set no value.",
+    "Inventories, character sheets, Activity, receipts, past sessions and the player display show only what players are told.",
+    "An unidentified item sells at the value players see; one with an unknown value can't be sold until the DM sets a value or identifies it.",
+    "Identifying an item is recorded once in Activity, and a sage's Identify reveals the item when the DM answers."
+  ]
+}

@@ -144,8 +144,17 @@ export const ZONES_PROTOCOL = 18;
  * updated website.
  */
 export const MOVE_APPROVAL_PROTOCOL = 19;
+/**
+ * Protocol 24 (2026-11-04, item identification): the DM may send `item-unidentify` and
+ * `item-identify`. A holding may carry `unidentified` (the presented record); holdings are not a
+ * strict schema, so every protocol receives it, and players of every protocol receive unidentified
+ * items already presented by the server (item-identity.ts). Older clients' holding saves keep the
+ * record (commands.ts patch). Drafts with the new commands ask them to finish on the updated
+ * website.
+ */
+export const ITEM_IDENTITY_PROTOCOL = 24;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = MOVE_APPROVAL_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = ITEM_IDENTITY_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1219,12 +1228,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= MOVE_APPROVAL_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= ITEM_IDENTITY_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 24: item identification commands.
+      if (c.kind === "item-identify" || c.kind === "item-unidentify") return true;
+      if (protocol && protocol >= MOVE_APPROVAL_PROTOCOL) return false;
       // Protocol 19: "Ask the DM" move requests.
       if (String(c.kind).startsWith("map-move-request") || moveRequestText(JSON.stringify(c))) return true;
       if (protocol && protocol >= ZONES_PROTOCOL) return false;

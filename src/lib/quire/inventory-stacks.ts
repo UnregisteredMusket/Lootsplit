@@ -40,6 +40,8 @@ export function stackKey(holding: Holding, category: string): string {
     holding.custody?.kind ?? "",
     holding.reservedFor ?? "",
     !!(holding.deed || holding.property || holding.service),
+    // Item identification: an unidentified item never stacks with an identified one.
+    ...(holding.unidentified ? [holding.unidentified.name] : []),
   ]);
 }
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { unidentifiedSchema } from "../quire/item-identity.ts";
 const label = z.string().trim().min(1).max(120);
 const note = z.string().max(16000);
 const integer = z.number().int().min(0).max(1000000);
@@ -40,6 +41,11 @@ export const lootSchema = z.object({
    * sending the item somewhere else.
    */
   pool: z.boolean().optional(),
+  /**
+   * Optional (item identification, phase 5): award the item unidentified. Players are told this
+   * presented record instead of the item's name, notes and value until the DM reveals it.
+   */
+  unidentified: unidentifiedSchema.optional(),
 });
 export const tableSchema = z
   .object({

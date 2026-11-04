@@ -299,6 +299,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
               quantity: item.quantity,
               unitCopper: item.unitCopper,
               notes: item.notes,
+              ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
             });
             tx.objectStore("ledger").put(encounterItemLine(receiptId, index, at, p.id, item, e.name));
           }

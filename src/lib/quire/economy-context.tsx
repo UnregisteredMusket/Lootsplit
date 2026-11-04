@@ -207,6 +207,16 @@ type EconomyApi = {
     options?: CommandOptions,
   ) => Promise<string | null>;
   lootPoolSet: (holdingId: string, pooled: boolean, options?: CommandOptions) => Promise<string | null>;
+  /**
+   * Item identification (DM): set what players are told about an item (`item-unidentify`), or
+   * reveal it (`item-identify`, logged once). Resolves to true once accepted.
+   */
+  itemIdentity: (
+    command:
+      | Omit<Extract<CommandRequest, { kind: "item-unidentify" }>, "id">
+      | Omit<Extract<CommandRequest, { kind: "item-identify" }>, "id">,
+    options?: CommandOptions,
+  ) => Promise<boolean>;
   lootResolve: (
     input: Omit<Extract<CommandRequest, { kind: "loot-resolve" }>, "kind" | "id">,
     options?: CommandOptions,
@@ -913,6 +923,13 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             );
         });
       },
+      itemIdentity: (command, options = {}) =>
+        dmCommand(
+          { ...command, ...idOf(options) } as CommandRequest,
+          command.kind === "item-identify"
+            ? "Identified. Everyone who can see it now sees the true item."
+            : "Saved. Players see the item as you described it.",
+        ),
       lootClaim: (input, options = {}) =>
         lootCommand({ kind: "loot-claim", ...input, ...idOf(options) }),
       lootPoolSet: (holdingId, pooled, options = {}) =>

@@ -1,4 +1,5 @@
 import { canReadCharacter } from "../src/lib/quire/character-position.ts";
+import { presentedHolding } from "../src/lib/quire/item-identity.ts";
 import { hydrateStoredCampaignCharacters, campaignBody } from "./campaign-characters.mjs";
 import {
   readStoredRoom,
@@ -301,7 +302,10 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         permissions: p.permissions || {},
         manualAllowed: !observer && (await policy(db, r.campaign_code)),
         coins: observer ? { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 } : p.coins,
-        holdings: observer ? [] : room.table.holdings.filter((h) => h.purseId === p.id),
+        // Item identification: players are told unidentified items as presented.
+        holdings: observer
+          ? []
+          : room.table.holdings.filter((h) => h.purseId === p.id).map((h) => (seat.role === "dm" ? h : presentedHolding(h))),
       };
     }
     return {

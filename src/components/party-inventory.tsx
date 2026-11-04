@@ -42,6 +42,8 @@ import {
   type InventoryStack,
   stackKey,
 } from "@/lib/quire/inventory-stacks";
+import { ItemIdentityDialog } from "./item-identity-dialog";
+import { holdingValueKnown, unidentifiedLabel, UNKNOWN_VALUE } from "@/lib/quire/item-identity";
 import "./party-inventory.css";
 
 const GROUP_STORAGE = "lootsplit.inventory-group.v1";
@@ -120,6 +122,7 @@ export function PartyInventory({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Holding | null>(null);
+  const [presenting, setPresenting] = useState<Holding | null>(null);
   const [selling, setSelling] = useState<Holding | null>(null);
   const [giving, setGiving] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -314,6 +317,9 @@ export function PartyInventory({
   function menuFor(h: Holding): RecordMenuItem[] {
     const items: RecordMenuItem[] = [];
     if (manage) items.push({ label: "Edit", onSelect: () => setEditing(h) });
+    // Item identification: what players are told about an unidentified item, and Identify.
+    if (manage && h.kind === "item" && !h.service)
+      items.push({ label: h.unidentified ? "What players see / Identify" : "Mark unidentified", onSelect: () => setPresenting(h) });
     if (canGive(h))
       items.push({
         label: "Give",
@@ -353,6 +359,7 @@ export function PartyInventory({
           <span className="record-chip">{h.custody.kind === "transit" ? "In transit" : "Stored"}</span>
         ) : null}
         {h.reservedFor ? <span className="record-chip">Reserved</span> : null}
+        {h.unidentified ? <span className="record-chip">{unidentifiedLabel(h, dm)}</span> : null}
       </>
     );
   }
@@ -401,7 +408,7 @@ export function PartyInventory({
           ) : undefined
         }
         quantity={`×${h.quantity}`}
-        value={value(h.quantity * h.unitCopper)}
+        value={holdingValueKnown(h, dm) ? value(h.quantity * h.unitCopper) : UNKNOWN_VALUE}
         menu={menuFor(h)}
         menuLabel={`Actions for ${h.name}`}
         select={
@@ -440,7 +447,7 @@ export function PartyInventory({
           </>
         }
         quantity={`×${s.quantity}`}
-        value={value(s.copper)}
+        value={s.holdings.every((h) => holdingValueKnown(h, dm)) ? value(s.copper) : UNKNOWN_VALUE}
         expand={{
           open,
           label: `${open ? "Hide" : "Show"} the ${s.holdings.length} entries of ${first.name}`,
@@ -635,6 +642,7 @@ export function PartyInventory({
         </p>
       ) : null}
       <EditHolding holding={editing} onClose={() => setEditing(null)} />
+      <ItemIdentityDialog holding={presenting} onClose={() => setPresenting(null)} />
       <SellPicker holding={selling} onClose={() => setSelling(null)} />
       <BulkGive
         ids={giving}

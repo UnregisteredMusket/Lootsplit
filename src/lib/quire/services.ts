@@ -1,5 +1,6 @@
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, formatCopper } from "./money.ts";
+import { presentedHolding } from "./item-identity.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { shopVisible } from "./vendors.ts";
 import {
@@ -200,6 +201,7 @@ export function componentMatches(h: { materialKey?: string; name: string } | und
 /** Carried lots of the payer that could be handed over for a component, with why others can't. */
 export function componentCandidates(t: Table, purseId: string, c: { materialKey?: string; minCopper: number }) {
   return t.holdings
+    .map(presentedHolding)
     .filter((h) => h.purseId === purseId && h.kind === "item" && !h.service && componentMatches(h, c.materialKey))
     .map((h) => ({
       holding: h,
@@ -275,7 +277,9 @@ export function serviceQuote(
   if (offer.target === "held-item") {
     if (!request.itemHoldingId) throw Error("Carry the item you want identified.");
     const h = assertHeldItem(t, request.itemHoldingId, purseId, `Choose an item ${payer.name} owns and carries.`);
-    item = { holdingId: h.id, name: h.name.slice(0, 160), notesBefore: h.notes.slice(0, 4000) };
+    // Item identification: the order records the item as the payer knows it.
+    const shown = presentedHolding(h);
+    item = { holdingId: h.id, name: shown.name.slice(0, 160), notesBefore: shown.notes.slice(0, 4000) };
     if (units !== 1) throw Error("Ask about one item at a time.");
   } else if (request.itemHoldingId) throw Error("This offer doesn't look at an item.");
 
@@ -403,7 +407,7 @@ export function serviceQuote(
     if (given && c.supply === "party" && given.quantity !== needed)
       throw Error(`Bring ${needed} × ${c.label}.`);
     if (given) {
-      if (!componentMatches(t.holdings.find((h) => h.id === given.holdingId), c.materialKey))
+      if (!componentMatches(shownHolding(t, given.holdingId), c.materialKey))
         throw Error(`Offer a ${c.label}, not another item.`);
       const h = assertContribution(t, given.holdingId, purseId, {
         minCopper: c.minCopper,
@@ -508,11 +512,17 @@ export function serviceQuote(
     day: f.day,
     minute: f.minuteOfDay ?? 0,
     payer: payer.coins,
-    holdings: [...used.keys()].sort().map((id) => t.holdings.find((h) => h.id === id)),
-    ...(item ? { item: t.holdings.find((h) => h.id === item.holdingId) } : {}),
-    ...(stabling ? { animals: stabling.animals.map((a) => t.holdings.find((h) => h.id === a.holdingId)) } : {}),
+    // Holdings as presented: a player's preview computes this on its projected table.
+    holdings: [...used.keys()].sort().map((id) => shownHolding(t, id)),
+    ...(item ? { item: shownHolding(t, item.holdingId) } : {}),
+    ...(stabling ? { animals: stabling.animals.map((a) => shownHolding(t, a.holdingId)) } : {}),
   });
   return { terms, before, provider: p, offer };
+}
+
+function shownHolding(t: Table, id: string) {
+  const h = t.holdings.find((x) => x.id === id);
+  return h && presentedHolding(h);
 }
 
 /** One line per check the DM's approval reruns, for the Review Inbox. */

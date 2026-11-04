@@ -1,6 +1,7 @@
 import { importedArrays } from "./import-fields.mjs";
 import { canEditCharacterField } from "./permissions.mjs";
 import { blankSheet, sheetSchema, abilities, skills, modifier } from "./model.mjs";
+import { isUnidentified, keepIdentity, presentedHolding } from "../quire/item-identity.ts";
 
 /** The character ID is the purse ID. Wallet/holdings are the financial fields of
  * this same character; stored stats never contain a second spendable balance. */
@@ -87,6 +88,8 @@ function legacyNumber(text, min, max) {
  * @param {import("../quire/types.ts").Holding[]} holdings
  * @param {import("../quire/sheet.ts").CharacterSheet} [legacy] */
 export function characterSheet(purse, holdings = [], legacy) {
+  // Item identification (phase 5): a sheet lists what the character knows, so an unidentified
+  // item appears as presented for everyone, the DM included (item-identity.ts).
   return {
     ...(purse.sheet || legacyCharacter(legacy, purse.name)),
     name: purse.name,
@@ -95,6 +98,7 @@ export function characterSheet(purse, holdings = [], legacy) {
     equipment: holdings
       .filter((h) => h.purseId === purse.id && !h.custody && !h.reservedFor)
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .map(presentedHolding)
       .map((h) => ({
         id: h.id,
         name: h.name,
@@ -333,6 +337,8 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
       const id = old?.id || `${receipt}-item-${i}`;
       if (ids.has(id)) throw Error("Duplicate inventory item.");
       ids.add(id);
+      // The sheet showed the presented record: keep the true item, change only what it may.
+      if (old && isUnidentified(old)) return keepIdentity(old, item);
       // A value or quantity a player sets has no reference price (NPC barter,
       // docs/NPC-BARTER.md). A DM edit confirms it again.
       const valueChanged =

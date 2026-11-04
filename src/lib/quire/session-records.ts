@@ -35,6 +35,8 @@ import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
 import { projectJourneys } from "./journey-engine.ts";
 import { projectQuestMapLinks, projectQuests, questNamedPurses, type QuestProjectionContext } from "./quests.ts";
 import { isDeferredSnapshot } from "./history-pages.ts";
+import { identitySecrets, isUnidentified, projectIdentities, redactIdentity } from "./item-identity.ts";
+import type { Holding } from "./types.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
@@ -548,7 +550,8 @@ export function projectRecord(
   if (!dm) projectConnectedMaps(t, seat);
   if (!dm && t.journal) projectQuestMapLinks(t.journal);
   for (const p of t.purses) delete p.editBaseline;
-  return t;
+  // Item identification: unidentified items as presented, everywhere (item-identity.ts).
+  return dm ? t : projectIdentities(table, t);
 }
 type ArchivedReport = NonNullable<NonNullable<CloudTable["journal"]>["reports"]>[number];
 type RecordSeat = Pick<CloudSeat, "role" | "purseIds"> & { id?: string };
@@ -579,6 +582,10 @@ export function projectArchivedReport(
   const comparesParty = !dm && seatInParty(table, seat);
   try {
     const raw = readArchivedSnapshot(r.snapshot);
+    // Item identification: an item the DM has revealed since is shown as it truly is.
+    if (!dm)
+      for (const h of raw.holdings)
+        if (isUnidentified(h) && table.holdings.some((x) => x.id === h.id && !isUnidentified(x))) delete (h as Holding).unidentified;
     const projected = projectRecord(raw, seat, {
       ownedDevice,
       tabletopProjected: options.tabletopProjected,
@@ -588,10 +595,14 @@ export function projectArchivedReport(
       snapshot: JSON.stringify(
         dm
           ? projected
-          : {
-              ...projected,
-              fairness: fairnessProjection(r.snapshot, raw, table, seat, comparesParty, projected.ledger),
-            },
+          : // Item identification: items unidentified then (and now) as presented.
+            redactIdentity(
+              {
+                ...projected,
+                fairness: fairnessProjection(r.snapshot, raw, table, seat, comparesParty, projected.ledger),
+              },
+              new Map([...identitySecrets(table.holdings), ...identitySecrets(raw.holdings)]),
+            ),
       ),
     };
   } catch {

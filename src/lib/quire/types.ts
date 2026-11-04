@@ -39,6 +39,11 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  /**
+   * Item identification (phase 5): while present, everyone but the DM is told this presented
+   * record in place of the true name, notes and value (item-identity.ts). Absent: identified.
+   */
+  unidentified?: import("./item-identity.ts").Unidentified;
   /** In the party treasure pool (a party-fund holding the party can claim). Absent otherwise. */
   pool?: import("./loot-claims-schema.ts").LootPoolMarker;
   /** "player": a player set this value through a sheet edit, so NPC barter treats it as unreferenced. */

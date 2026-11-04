@@ -208,7 +208,8 @@ export function projectPlayerDisplay(
         ? {
             receiptId: award.receiptId,
             text: award.text,
-            items: encounter.body.loot.map((i) => ({ name: i.name, quantity: i.quantity })),
+            // Item identification: an item awarded unidentified shows its presented name.
+            items: encounter.body.loot.map((i) => ({ name: i.unidentified?.name ?? i.name, quantity: i.quantity })),
           }
         : null,
   });

@@ -18,6 +18,7 @@ import { fromCopper } from "./money.ts";
 import { mergeSheets, readSheets, type CharacterSheet } from "./sheet.ts";
 import { lesserQuantity, type BillFile } from "./table.ts";
 import { readHandouts, type Handout } from "./handouts.ts";
+import { isUnidentified, keepIdentity } from "./item-identity.ts";
 import { characterControl, type Coins, type Holding, type LedgerLine, type Purse, type Shop, type StockLine } from "./types.ts";
 
 export type CloudTable = {
@@ -176,7 +177,17 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
     const next = bill.purses.find((item) => item.id === purse.id);
     return next && purseIds.has(purse.id) ? next : { ...purse, coins: { ...purse.coins } };
   });
-  const holdings = [...table.holdings.filter((holding) => !purseIds.has(holding.purseId)), ...bill.holdings.filter((holding) => purseIds.has(holding.purseId))];
+  // Item identification: a player's bill lists unidentified items as presented; the true item is
+  // kept, with only its quantity, equipped state and weight taken from the bill (item-identity.ts).
+  const holdings = [
+    ...table.holdings.filter((holding) => !purseIds.has(holding.purseId)),
+    ...bill.holdings
+      .filter((holding) => purseIds.has(holding.purseId))
+      .map((holding) => {
+        const old = table.holdings.find((h) => h.id === holding.id && h.purseId === holding.purseId);
+        return old && isUnidentified(old) ? keepIdentity(old, holding) : holding;
+      }),
+  ];
   const stock = table.stock.map((line) => {
     const update = bill.stock.find((item) => item.id === line.id);
     if (!update) return line;

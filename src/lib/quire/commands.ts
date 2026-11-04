@@ -9,6 +9,15 @@ import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange
 import { worldCommands, readWorld, type WorldCommand } from "./world-schema.ts";
 import { journeyCommands, journeyKinds, type JourneyCommand } from "./journey-schema.ts";
 import {
+  identifyHolding,
+  isUnidentified,
+  knownUnitCopper,
+  presentedHolding,
+  redactWritten,
+  unidentifiedSchema,
+  writtenBaseline,
+} from "./item-identity.ts";
+import {
   applyJourneyCommand,
   prepareJourneyPlan,
   quoteHash,
@@ -143,6 +152,13 @@ export const commandSchema = z.discriminatedUnion("kind", [
     .strict(),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
+  /**
+   * Item identification (phase 5, DM only): set or edit what players are told about an item
+   * (`before` is the presented record the DM edited from, null for an identified item)...
+   */
+  z.object({ ...base, kind: z.literal("item-unidentify"), holdingId: id, before: unidentifiedSchema.nullable(), unidentified: unidentifiedSchema }).strict(),
+  /** ...and reveal it: one logged event, after which everyone sees the true item. */
+  z.object({ ...base, kind: z.literal("item-identify"), holdingId: id, before: unidentifiedSchema }).strict(),
   z.object({ ...base, kind: z.literal("property-plan"), holdingId: id, income: amount, upkeep: amount, periodDays: z.number().int().min(1).max(3650), active: z.boolean() }),
   z.object({
     ...base,
@@ -359,6 +375,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   const cmd = commandSchema.parse(raw);
   const at = Date.now();
   const journal = (t.journal = readJournal(t.journal));
+  // Item identification: what this command writes names unidentified items as presented.
+  const written = t.holdings.some(isUnidentified) ? writtenBaseline(t) : null;
   // Exchange editors can address a legacy city's default before its first save.
   // Other commands retain their original financial/patch preview baselines.
   if (cmd.kind.startsWith("trade-")) ensureCityExchanges(t);
@@ -653,6 +671,23 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         ? `Party location: ${market.locations.find((location) => location.id === cmd.locationId)?.name}${cmd.journeyId ? " (journey arrived)" : ""}`
         : "Party location cleared; all shops available",
     );
+  } else if (cmd.kind === "item-unidentify") {
+    dm();
+    const h = t.holdings.find((x) => x.id === cmd.holdingId);
+    if (!h) throw Error("This item no longer exists.");
+    if (h.kind !== "item" || h.deed || h.property || h.service) throw Error("Only an item can be unidentified.");
+    if (!same(h.unidentified ?? null, cmd.before)) throw Error("What players are told about this item changed. Review it again.");
+    if (same(h.unidentified ?? null, cmd.unidentified)) return t;
+    h.unidentified = { ...cmd.unidentified };
+    event(`${cmd.before ? "Unidentified item updated" : "Marked unidentified"}: ${h.name} (players see ${cmd.unidentified.name})`, "management", h.purseId);
+    journal.events[journal.events.length - 1]!.dmOnly = true;
+  } else if (cmd.kind === "item-identify") {
+    dm();
+    const h = t.holdings.find((x) => x.id === cmd.holdingId);
+    if (!h) throw Error("This item no longer exists.");
+    if (!isUnidentified(h)) throw Error("This item is already identified.");
+    if (!same(h.unidentified, cmd.before)) throw Error("What players are told about this item changed. Review it again.");
+    identifyHolding(t, h, cmd.id, at);
   } else if (cmd.kind === "property-details") {
     const h = t.holdings.find(
       (h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0,
@@ -1175,13 +1210,15 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.kind === "property") assertEstateDisposable(t, h.id);
     assertMerchantSale(h, s);
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
-    const paid = Math.round(h.unitCopper * s.buyRate) * cmd.quantity;
+    // An unidentified item sells at its presented value, never its true one (item-identity.ts).
+    const shown = presentedHolding(h);
+    const paid = Math.round(knownUnitCopper(h)! * s.buyRate) * cmd.quantity;
     coins(h.purseId, paid);
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
-    log(h.purseId, `Sold ${cmd.quantity} ${h.name} to ${s.name}`, paid, s.id);
+    log(h.purseId, `Sold ${cmd.quantity} ${shown.name} to ${s.name}`, paid, s.id);
     const linked = t.stock.find(
-      (line) => line.shopId === s.id && line.commodityId === h.commodityId && h.commodityId,
+      (line) => line.shopId === s.id && line.commodityId === shown.commodityId && shown.commodityId,
     );
     if (linked) {
       const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: linked.id, purseId: h.purseId, direction: "sell", quantity: cmd.quantity, copper: paid });
@@ -1360,11 +1397,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         at,
         purseId: fund.id,
         shopId: shop.id,
-        summary: `Sold ${lot.quantity} ${h.name} to ${shop.name}`,
+        summary: `Sold ${lot.quantity} ${lot.name} to ${shop.name}`,
         copper: lot.paid,
         transactionType: "sale",
       });
-      const linked = t.stock.find((line) => line.shopId === shop.id && line.commodityId === h.commodityId && h.commodityId);
+      const shown = presentedHolding(h);
+      const linked = t.stock.find((line) => line.shopId === shop.id && line.commodityId === shown.commodityId && shown.commodityId);
       if (linked) {
         const receipt = recordShopTrade(t, { id: lineId, at, stockId: linked.id, purseId: fund.id, direction: "sell", quantity: lot.quantity, copper: lot.paid });
         if (receipt) t.ledger[t.ledger.length - 1].trade = { receiptId: receipt.id, leg: "owner" };
@@ -1556,6 +1594,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         if (after.purseId !== current.purseId) throw Error(POOL_GUARD);
         if (!after.pool) change.after = { ...after, pool: current.pool };
       }
+      // Item identification: revealing is logged, so only `item-identify` clears the presented
+      // record; a holding saved without it (an older client) stays unidentified.
+      if (change.store === "holdings" && isUnidentified(current) && change.after !== null) {
+        const after = change.after as import("./types.ts").Holding;
+        if (!after.unidentified) change.after = { ...after, unidentified: current.unidentified };
+      }
       if (change.store === "purses" && current?.sheetReadOnlyForDm && change.after !== null) {
         const after = change.after as import("./types.ts").Purse;
         if (
@@ -1572,6 +1616,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     }
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
+  if (written) redactWritten(written, t);
   if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
     !same(originalLocations, t.journal?.market?.locations))
     ensureCityExchanges(t);
