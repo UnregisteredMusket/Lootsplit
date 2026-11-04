@@ -1593,7 +1593,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       ];
     }
   }
-  settleAttunement(t, attuned, cmd.kind === "item-attune" && cmd.attuned ? cmd.holdingId : null, event);
+  // Pushed straight to the table's journal: `event()` skips patches that change the journal, and
+  // such a patch replaces `t.journal`, yet an attunement it ends still needs its history entry.
+  settleAttunement(t, attuned, cmd.kind === "item-attune" && cmd.attuned ? cmd.holdingId : null, (summary, kind, purseId, change) => {
+    const events = (t.journal ??= readJournal(undefined)).events;
+    events.push({ id: cmd.id + "-event-" + events.length, at, summary, kind, purseId, change });
+  });
   if (journal.finance) journal.finance = readFinance(journal.finance);
   if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
     !same(originalLocations, t.journal?.market?.locations))

@@ -18,6 +18,7 @@ import { DM_SEAT, setSeat } from "./table.ts";
 import { attunedBefore, attunementFromNotes, attunementSummary, settleAttunement } from "./attunement.ts";
 import { openCatalogItem, type OpenEntry } from "./open5e.ts";
 import { projectRecord } from "./session-records.ts";
+import { readFinance } from "./finance.ts";
 import type { Holding, Shop } from "./types.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
@@ -392,4 +393,59 @@ test("offline: the same commands give the same inventory and activity, and a ret
   const link = await executeLocalCommand(attune(shared, "d8", "staff")).catch((e: Error) => e.message);
   assert.match(String(link), /DM's device or in a shared room/);
   setSeat(DM_SEAT);
+});
+
+test("a DM patch that also changes the journal still records the attunement it ends", () => {
+  const t = attuneAll(ariaSeat, ["ring"]);
+  const ring = find(t, "ring")!;
+  const journal = readJournal(t.journal);
+  const after = applyCommand(t, dmSeat, {
+    id: "pj",
+    kind: "patch",
+    changes: [
+      { store: "journal", id: "journal", before: journal, after: { ...journal, events: [...journal.events] } },
+      { store: "holdings", id: "ring", before: ring, after: null },
+    ],
+  } as Command);
+  const ended = after.journal!.events.filter((e) => e.summary.startsWith("Attunement ended"));
+  assert.equal(ended.length, 1);
+  assert.equal(ended[0]!.purseId, "aria");
+  assert.match(ended[0]!.id, /^pj-event-\d+$/);
+});
+
+test("projection: an NPC available here lists its goods without whom it is attuned to", () => {
+  const t = {
+    ...campaign(),
+    journal: readJournal({
+      market: {
+        currentLocationId: "area",
+        locations: [
+          { id: "region", name: "Eastmarch", kind: "region", parentId: null, description: "" },
+          { id: "city", name: "Port", kind: "city", parentId: "region", description: "" },
+          { id: "area", name: "Docks", kind: "area", parentId: "city", description: "" },
+        ],
+      },
+      finance: readFinance(),
+      sessions: [{ id: "session", name: "Adventure", startedAt: 1 }],
+    }),
+  };
+  let w = applyCommand(t, dmSeat, {
+    id: "npc",
+    kind: "npc-create",
+    npc: { id: "npc", name: "Mara", description: "Broker", locationId: "city", visible: true, barterAllowed: true, controllerPurseId: null },
+    copper: 0,
+    inventory: [{ name: "Ring of the broker", quantity: 1, unitCopper: 1000, notes: "" }],
+  } as Command);
+  const gem = w.holdings.find((h) => h.purseId === "npc")!;
+  w = applyCommand(w, dmSeat, { id: "req", kind: "patch", changes: [{ store: "holdings", id: gem.id, before: gem, after: { ...gem, requiresAttunement: REQ } }] });
+  w = applyCommand(w, dmSeat, attune(w, "npc-attune", gem.id, true, true));
+  assert.equal(find(w, gem.id)!.attuned, true);
+  const view = projectRecord(w, { role: "player", purseIds: ["aria"] });
+  const seen = view.holdings.find((h) => h.id === gem.id);
+  assert.ok(seen, "the NPC's goods are listed");
+  assert.equal("attuned" in seen!, false);
+  assert.equal(seen!.requiresAttunement, REQ);
+  const own = applyCommand(w, ariaSeat, attune(w, "own", "ring"));
+  const ownView = projectRecord(own, { role: "player", purseIds: ["aria"] });
+  assert.equal(ownView.holdings.find((h) => h.id === "ring")!.attuned, true, "own items keep it");
 });

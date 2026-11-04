@@ -395,6 +395,13 @@ export function projectRecord(
         visibleSites.has(h.id) ||
         (h.custody && visibleSites.has(h.custody.propertyId)),
     );
+    // Attunement is character data: shown only on holdings of characters the seat can read (an
+    // NPC available here lists its goods, not whom it is attuned to). The requirement stays.
+    for (const h of t.holdings) {
+      if (!h.attuned) continue;
+      const holder = table.purses.find((p) => p.id === h.purseId);
+      if (!holder || !canReadCharacter(table, holder, seat)) delete h.attuned;
+    }
     if (t.journal.propertyOperations) {
       const keys = new Set([
         ...estate.sites.flatMap((site) => [site.templateKey, ...site.completedTemplates]),
