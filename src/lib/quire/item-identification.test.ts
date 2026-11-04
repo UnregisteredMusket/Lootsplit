@@ -28,6 +28,7 @@ import { readWorld } from "./world-schema.ts";
 import { isUnidentified, presentedHolding, projectIdentities, redactIdentity, identitySecrets } from "./item-identity.ts";
 import type { CloudSeat } from "./cloud.ts";
 import { readServices } from "./services-schema.ts";
+import { ledgerCsv, ledgerExportRows } from "./ledger-export.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { CURRENT_TABLETOP_PROTOCOL, ITEM_IDENTITY_PROTOCOL, tabletopResponse } from "./tabletop-protocol.ts";
 import { identifyCommand, sageFixture, svcDm, svcKael, svcThorn } from "./test-fixtures/services.ts";
@@ -196,6 +197,8 @@ test("ledger lines, events, notes and archived sessions written while unidentifi
     const view = await roomState(seat === ariaSeat ? aria : bram);
     assert.deepEqual(leaks(view), [], "room view after the sale, gift and archive");
   }
+  // The ledger CSV export (players: their projected history, archived sessions included).
+  for (const seat of [ariaSeat, bramSeat]) assert.deepEqual(leaks(ledgerCsv(ledgerExportRows(archived, seat))), [], "CSV export");
   // The ring left the table: its sale line still names it as presented, for the DM too.
   assert.deepEqual(leaks(archived.ledger), []);
   assert.deepEqual(leaks(archived.journal!.events), []);

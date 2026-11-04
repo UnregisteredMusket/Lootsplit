@@ -1,5 +1,6 @@
 import { LedgerCoverage, LoadArchivedSession, LoadEarlierEntries, SearchEarlierEntries } from "./history-loader";
 import { ServiceRequests } from "./service-providers";
+import { LedgerCsvButton } from "./ledger-csv-button";
 import { LoanReviewCard, PaymentReviewCard } from "./review-cards-finance";
 import { GroupRequestInbox } from "./party-groups";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
@@ -896,6 +897,7 @@ export function CampaignJournal({
                 </option>
               ))}
             </select>
+            <LedgerCsvButton seat={archiveSeat} />
           </div>
           <p className="text-sm text-muted">
             {shownEvents.length} of {events.length} records
