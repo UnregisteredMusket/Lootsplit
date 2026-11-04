@@ -68,7 +68,7 @@ try {
     await reloadApplication(page, origin + "/features/reports");
     await page.getByRole("button", { name: /^Full activity/ }).click();
     const dmCsv = await download(page, width, "dm");
-    const dmRows = dmCsv.trim().split("\r\n");
+    const dmRows = dmCsv.trimEnd().split("\r\n"); // trim() would also drop the leading BOM
     assert.ok(dmRows[0].startsWith("﻿Date and time,Session,Record,"), "header");
     for (const id of ["old-aria", "old-bram", "old-vault", "old-dm", "new-aria", "new-bram"])
       assert.ok(dmCsv.includes(`,${id},`), `${width}: the DM's file holds ${id}`);
@@ -82,7 +82,7 @@ try {
       setSeat({ role: "player", purseIds: ["aria"], shopIds: [], openedAt: Date.now() });
     });
     // A player reads their history in My Finances → Recorded transactions.
-    await reloadApplication(page, origin + "/features/finances");
+    await openApplication(page, origin + "/features/finances");
     const playerCsv = await download(page, width, "player");
     for (const id of ["old-aria", "new-aria"])
       assert.ok(playerCsv.includes(`,${id},`), `${width}: Aria's file holds ${id}`);

@@ -52,6 +52,8 @@ export type LedgerExportRow = {
   session: string;
   record: "ledger" | "event" | "gap";
   purse: string;
+  /** The purse a ledger line belongs to; running totals are per purse, never per shown name. */
+  purseId?: string;
   counterparty: string;
   summary: string;
   type: string;
@@ -146,6 +148,7 @@ export function ledgerExportRows(table: CloudTable, seat: ArchiveSeat): LedgerEx
         session: sessionAt(part.journal, line.at, fallbackSession),
         record: "ledger",
         purse: purseName(line.purseId),
+        purseId: line.purseId,
         counterparty: shopName(line.shopId),
         summary: line.summary,
         type: lineType(line),
@@ -181,8 +184,9 @@ export function ledgerExportRows(table: CloudTable, seat: ArchiveSeat): LedgerEx
   const totals = new Map<string, number>();
   for (const row of rows) {
     if (row.record !== "ledger" || row.copper === null) continue;
-    const next = (totals.get(row.purse) ?? 0) + row.copper;
-    totals.set(row.purse, next);
+    const key = row.purseId ?? row.purse;
+    const next = (totals.get(key) ?? 0) + row.copper;
+    totals.set(key, next);
     row.runningTotal = next;
   }
   return rows;

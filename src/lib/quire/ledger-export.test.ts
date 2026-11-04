@@ -176,6 +176,23 @@ test("old saves without sessions, transaction types or reports still export", ()
   assert.deepEqual(table.ledger.map((l) => l.id), ["old-1", "old-2"], "the table is not changed");
 });
 
+test("running totals are per purse, even when two purses show the same name", () => {
+  const table: CloudTable = {
+    ...emptyCloudTable(),
+    purses: [
+      { id: "a", name: "Twin", kind: "character", coins: fromCopper(0) },
+      { id: "b", name: "Twin", kind: "character", coins: fromCopper(0) },
+    ],
+    ledger: [line("a-1", "a", 10, 1), line("b-1", "b", 7, 2), line("a-2", "a", 5, 3)],
+  };
+  const totals = ledgerExportRows(table, dm).map((r) => [r.id, r.runningTotal]);
+  assert.deepEqual(totals, [
+    ["a-1", 10],
+    ["b-1", 7],
+    ["a-2", 15],
+  ]);
+});
+
 test("CSV cells are escaped and formula injection is neutralised", () => {
   assert.equal(csvCell("plain"), "plain");
   assert.equal(csvCell("a,b"), '"a,b"');
