@@ -123,6 +123,14 @@ export function editLegacyCharacter(table, seat, incoming, before) {
     throw Error("Only the profile owner can edit this character sheet.");
   if (before && before.purseId !== p.id) throw Error("Invalid character baseline.");
   const previous = table.sheets.find((s) => s.purseId === p.id);
+  // The imported Experience box seeds a character's XP (quire/xp.ts): changing it is an XP
+  // change, so a player needs the Level permission, as for XP on the play sheet.
+  if (
+    seat.role !== "dm" &&
+    !canEditCharacterField(p, "level") &&
+    (incoming.experience || "").trim() !== (previous?.experience || "").trim()
+  )
+    throw Error("Only the DM can award XP or milestones. Ask the DM to change Experience.");
   const baseline = before || previous;
   const current = statsOnly(characterSheet(p, [], previous));
   const next = structuredClone(current);

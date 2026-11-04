@@ -136,7 +136,7 @@ test("each, milestones, NPCs and refusals", () => {
   const bram = mile.purses.find((p) => p.id === "bram")!.sheet!;
   assert.deepEqual([bram.level, bram.milestoneLevel, bram.xp], [3, 4, undefined]);
   assert.equal(levelUpTarget(bram), 4);
-  assert.equal(mile.journal!.events.at(-1)!.summary, "Milestone award: a milestone to Bram Ironfoot (level 4)");
+  assert.equal(mile.journal!.events.at(-1)!.summary, "Milestone award: a milestone to Bram Ironfoot");
   const again = applyCommand(mile, dm, commandSchema.parse({ id: "m2", kind: "xp-award", unit: "milestone", rule: "each", amount: 1, purseIds: ["bram"] }));
   assert.equal(again.purses.find((p) => p.id === "bram")!.sheet!.milestoneLevel, 5, "milestones add up before levelling");
   const npc = applyCommand(t, dm, award("n1", { purseIds: ["aria", "vex"] }));
@@ -220,6 +220,47 @@ test("shared rooms: a retry applies once, players are refused, and projections h
   // An older client's view has no XP at all.
   const oldView = tabletopResponse(await roomState({ ...BT, tabletopProtocol: 20 }), 20).table;
   assert.equal(oldView.purses.find((p) => p.id === "bram")!.sheet!.xp, undefined);
+});
+
+test("privacy: a milestone award's shared entry never reveals another player's level", async () => {
+  const room = await openRoom({ name: "Milestone DM", table: campaign() });
+  const aria = await joinRoom({ code: room.code, purseId: "aria", name: "Aria" });
+  const bram = await joinRoom({ code: room.code, purseId: "bram", name: "Bram" });
+  await choosePace({ code: room.code, token: room.token, live: true });
+  const cmd = commandSchema.parse({ id: "ms-1", kind: "xp-award", unit: "milestone", rule: "each", amount: 2, purseIds: ["aria", "bram"] });
+  await submitCommands({ code: room.code, token: room.token, batchId: "ms-1", commands: [cmd] });
+  for (const [seat, other] of [[aria, "Bram"], [bram, "Aria"]] as const) {
+    const view = (await roomState({ code: room.code, token: seat.token })).table;
+    const text = JSON.stringify(view.journal!.events);
+    assert.ok(text.includes("Milestone award: 2 milestones to Aria Thorne and Bram Ironfoot"));
+    assert.doesNotMatch(text, /level/i, `${other}'s level stays private`);
+    assert.equal(view.purses.find((p) => p.name.startsWith(other))?.sheet, undefined);
+  }
+  const ariaOwn = (await roomState({ code: room.code, token: aria.token })).table.purses.find((p) => p.id === "aria")!;
+  assert.equal(ariaOwn.sheet!.milestoneLevel, 4, "Aria's own sheet shows her milestone level");
+});
+
+test("the imported Experience box: locked players can't change it; Level permission or the DM can", () => {
+  const legacy = (experience: string) =>
+    ({ ...campaign().sheets[0], experience, purseId: "cyd" }) as CharacterSheet;
+  const cydSeat: CloudSeat = { id: "c", token: "", name: "Cyd", role: "player", purseIds: ["cyd"] };
+  const t = campaign();
+  assert.throws(
+    () => applyCommand(t, cydSeat, commandSchema.parse({ id: "l1", kind: "sheet", sheet: legacy("300000"), before: legacy("2,650") })),
+    /Only the DM can award XP/,
+  );
+  assert.equal(t.sheets[0].experience, "2,650", "nothing changed");
+  assert.equal(planXpAward(t, { unit: "xp", rule: "each", amount: 1, purseIds: ["cyd"] }).shares[0].after, 2651);
+  const open = campaign();
+  open.purses.find((p) => p.id === "cyd")!.permissions = { level: true };
+  const allowed = applyCommand(open, cydSeat, commandSchema.parse({ id: "l2", kind: "sheet", sheet: legacy("3,000"), before: legacy("2,650") }));
+  assert.equal(allowed.sheets.find((s) => s.purseId === "cyd")!.experience, "3,000");
+  const byDm = applyCommand(campaign(), dm, commandSchema.parse({ id: "l3", kind: "sheet", sheet: legacy("4,000"), before: legacy("2,650") }));
+  assert.equal(byDm.sheets.find((s) => s.purseId === "cyd")!.experience, "4,000");
+  // Once the play sheet tracks XP, the imported box is never read again.
+  const awarded = applyCommand(byDm, dm, commandSchema.parse({ id: "l4", kind: "xp-award", unit: "xp", rule: "each", amount: 10, purseIds: ["cyd"] }));
+  const later = applyCommand(awarded, dm, commandSchema.parse({ id: "l5", kind: "sheet", sheet: legacy("300000"), before: legacy("4,000") }));
+  assert.equal(planXpAward(later, { unit: "xp", rule: "each", amount: 1, purseIds: ["cyd"] }).shares[0].before, 4010);
 });
 
 test("offline: the same command gives the same sheets and entry, and a retry applies once", async () => {

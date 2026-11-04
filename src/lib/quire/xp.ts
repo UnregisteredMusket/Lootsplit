@@ -175,7 +175,8 @@ export function xpAwardSummary(plan: XpAwardPlan, reason?: string): string {
   let text: string;
   if (plan.unit === "milestone") {
     const each = plan.amount === 1 ? "a milestone" : `${plan.amount} milestones`;
-    text = `Milestone award${what}: ${each} to ${list(plan.shares.map((s) => `${s.name} (level ${s.after})`))}`;
+    // Names only: players can't read each other's sheets, so the shared text never says a level.
+    text = `Milestone award${what}: ${each} to ${list(plan.shares.map((s) => s.name))}`;
   } else if (plan.rule === "each") {
     text = `XP award${what}: ${number(plan.amount)} XP each to ${list(plan.shares.map((s) => s.name))}`;
   } else {
