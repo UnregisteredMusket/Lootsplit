@@ -261,6 +261,9 @@ jobs:
       - name: dev-item-charges
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-item-charges 180 node scripts/item-charges-browser-audit.mjs
+      - name: dev-xp-milestones
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-xp-milestones 240 node scripts/xp-milestones-browser-audit.mjs
       - name: dev-loot-review
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-loot-review 300 node scripts/loot-review-browser-audit.mjs

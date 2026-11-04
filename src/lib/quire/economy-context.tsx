@@ -250,6 +250,11 @@ type EconomyApi = {
    */
   spendItemUse: (holding: Holding, options?: CommandOptions) => Promise<boolean>;
   rechargeItem: (holding: Holding, current: number, options?: CommandOptions) => Promise<boolean>;
+  /**
+   * XP and milestones (loot phase 6): the DM's `xp-award` command (shared engine; offline through
+   * executeLocalCommand). Pass one command ID per award and reuse it on retry.
+   */
+  awardXp: (input: import("./xp.ts").XpAwardInput, options?: CommandOptions) => Promise<boolean>;
   post: (
     purseId: string,
     copper: number,
@@ -1031,6 +1036,23 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           await reload().catch(() => undefined);
           toast.error(error instanceof Error && error.message ? error.message : "The recharge was not recorded.");
+          return false;
+        }
+      },
+      awardXp: async (input, options = {}) => {
+        const gate = getCloudWatch();
+        if (gate.joined && !gate.mine) {
+          toast.error(`It is ${gate.who}'s turn.`);
+          return false;
+        }
+        try {
+          dmOnly();
+          await acceptCommand({ kind: "xp-award", ...input, ...idOf(options) });
+          toast.success(hasPendingChanges() ? "Award saved as pending. Check sync status." : "Award recorded.");
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The award could not be recorded.");
           return false;
         }
       },

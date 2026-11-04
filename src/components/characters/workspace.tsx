@@ -67,6 +67,8 @@ import { useReferenceAccess } from "@/lib/quire/use-reference-access";
 import type { OpenEntry } from "@/lib/quire/open5e";
 import { downloadJson } from "@/lib/quire/table";
 import { requestConfirm } from "@/lib/quire/confirm-store";
+import { LevelUpNotice } from "@/components/xp-level-up";
+import { xpReadout } from "@/lib/quire/xp";
 
 type Sheet = z.infer<typeof sheetSchema>;
 type Ability = keyof Sheet["scores"];
@@ -901,6 +903,17 @@ function CharacterEditor({
           </p>
         </div>
       </div>
+      {canPlay && (
+        <LevelUpNotice
+          sheet={sheet}
+          canEditLevel={canEdit("level")}
+          onLevel={(level) => {
+            set("level", level);
+            setPlayView(false);
+            setTab("details");
+          }}
+        />
+      )}
       <div className="sheet-mode-row">
         <div className="play-mode-switch">
           <button aria-pressed={playView} onClick={() => setPlayView(true)}>
@@ -2107,6 +2120,15 @@ function CharacterEditor({
                     disabled={!canEdit("level")}
                     onChange={(v) => set("level", v)}
                   />
+                  {(sheet.xp !== undefined || canEdit("level")) && (
+                    <Num
+                      label="Experience points"
+                      value={sheet.xp ?? 0}
+                      max={100000000}
+                      disabled={!canEdit("level")}
+                      onChange={(v) => set("xp", v)}
+                    />
+                  )}
                   <Num
                     label="Proficiency bonus"
                     value={sheet.proficiency}
@@ -2132,6 +2154,7 @@ function CharacterEditor({
                   Stats and class features are editable. Level changes do not automatically change
                   proficiency, HP, spells or features.
                 </p>
+                {xpReadout(sheet) && <p className="sheet-xp">{xpReadout(sheet)}</p>}
                 {canEdit("portrait") && (
                   <label>
                     Portrait
