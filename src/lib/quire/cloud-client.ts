@@ -1546,6 +1546,8 @@ export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) 
 }
 /** A player's NPC barter quote comes from the room server: the NPC's rules and purse stay there. */
 export async function requestNpcBarterQuote(input: import("./npc-barter.ts").BarterOfferInput) {
+  // Preview as player: a quote would be read with the DM's token.
+  assertNotPreviewing();
   const s = requireSession();
   const { quoteCloudNpcBarter } = await import("./cloud-api");
   return quoteCloudNpcBarter({ data: { ...input, code: s.code, token: s.token } });

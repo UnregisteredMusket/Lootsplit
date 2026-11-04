@@ -30,11 +30,14 @@ import {
 } from "./player-preview.ts";
 import { DM_SEAT, getSeat, setSeat } from "./table.ts";
 import {
+  addLexemeRows,
   applyCloudTable,
   economySnapshot,
   economyView,
   executeLocalCommand,
+  saveCatalog,
 } from "./economy.ts";
+import { starterCatalog } from "./catalog-seed.ts";
 import { getChatSnapshot, postNotes, refreshChat } from "./chat.ts";
 import { saveHandouts } from "./handouts.ts";
 import { quireDb } from "./db.ts";
@@ -313,6 +316,60 @@ test("read-only: a command attempted during preview is refused and changes nothi
   // The same command works again once the preview has stopped.
   await executeLocalCommand({ id: "after-preview", kind: "set-coins", purseId: "aria", before: coins(11), coins: coins(12) } as never);
   assert.equal((await economySnapshot()).purses.find((p) => p.id === "aria")?.coins.gp, 12);
+});
+
+test("device reads: the DM's own catalog and name lists stay out of the preview", async () => {
+  setSeat(DM_SEAT);
+  await applyCloudTable(campaign());
+  await saveCatalog({ id: "dm-secret-item", name: "Duke's signet (DM invented)", category: "curios" as never, rarity: "rare" as never, baseCopper: 9000, notes: "", origin: "hand", service: false });
+  await addLexemeRows([{ name: "Secret Conspirator", kind: "person", bookId: "", notes: "" }]);
+  const dm = await economyView();
+  assert.ok(dm.catalog.some((i) => i.id === "dm-secret-item") && dm.lexicon.length === 1);
+  startPreview({ name: "Aria", purseIds: ["aria"] });
+  try {
+    const viewed = await economyView();
+    // What a player's device holds: the built-in item list and no names.
+    assert.deepEqual(viewed.catalog.map((i) => i.id).sort(), starterCatalog().map((i) => i.id).sort());
+    assert.deepEqual(viewed.lexicon, []);
+  } finally {
+    stopPreview();
+  }
+});
+
+test("read-only: a DM command already waiting when a preview starts is refused, not run as the player", async () => {
+  setSeat(DM_SEAT);
+  await applyCloudTable(campaign());
+  const before = canonicalJson(await economySnapshot());
+  // The command passes its first check, then the preview starts before it takes the write lock.
+  const waiting = executeLocalCommand({ id: "in-flight", kind: "set-coins", purseId: "aria", before: coins(11), coins: coins(500) } as never);
+  startPreview({ name: "Bram", purseIds: ["bram"] });
+  try {
+    await assert.rejects(waiting, PreviewReadOnlyError);
+  } finally {
+    stopPreview();
+  }
+  assert.equal(canonicalJson(await economySnapshot()), before);
+  // economy.ts runs the engine with this device's own seat, captured before the lock.
+  const source = readFileSync(new URL("./economy.ts", import.meta.url), "utf8");
+  assert.ok(!source.includes("const seat = getSeat();\n  return {\n    id: \"local\""));
+  assert.equal(source.match(/const sitting = getActualSeat\(\);/g)?.length, 2);
+});
+
+test("account and DM-token reads are refused or answered from the projection during preview", () => {
+  // Character screen: the DM's account library and campaigns are never requested in a preview.
+  const characters = readFileSync(new URL("../characters/campaign-client.ts", import.meta.url), "utf8");
+  assert.match(characters, /if \(path === "sheets"\) return \(await previewedCharacterList\(previewing\.purseIds\)\) as T;/);
+  assert.match(characters, /campaigns: \[\],/);
+  // Older history pages and NPC barter quotes would be read with the DM's token.
+  const history = readFileSync(new URL("./room-history.ts", import.meta.url), "utf8");
+  const read = history.indexOf("async function read(data");
+  assert.ok(read > 0 && history.slice(read, read + 400).includes("assertNotPreviewing();"));
+  const client = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
+  const quote = client.indexOf("export async function requestNpcBarterQuote(");
+  assert.ok(quote > 0 && client.slice(quote, quote + 300).includes("assertNotPreviewing();"));
+  // Screens get no data until the reload for the current preview (or none) finishes.
+  const context = readFileSync(new URL("./economy-context.tsx", import.meta.url), "utf8");
+  assert.match(context, /const stale = preview !== loadedFor;/);
 });
 
 test("read-only: every room write of the shared-room client is refused during preview", () => {

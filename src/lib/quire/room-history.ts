@@ -15,6 +15,7 @@
  * Nothing here writes: loading history never changes the campaign.
  */
 import type { CloudTable } from "./cloud.ts";
+import { assertNotPreviewing } from "./player-preview.ts";
 import { HISTORY_LISTS, HISTORY_PROTOCOL, type HistoryCursors, type HistoryList } from "./history-pages.ts";
 
 type Scope = { code: string; token: string };
@@ -196,6 +197,8 @@ const MOVED = "The campaign changed while earlier history was loading. Try again
 
 async function read(data: { list?: HistoryList; before?: string; report?: string; held?: string[]; bulk?: boolean }) {
   if (!reader || !scope) throw Error("Open a shared campaign to load its earlier history.");
+  // Preview as player: this tab's seat is the DM's, whose older pages the preview never reads.
+  assertNotPreviewing();
   return (await reader({ data: { ...scope, tabletopProtocol: HISTORY_PROTOCOL, ...data } })) as HistoryResponse;
 }
 

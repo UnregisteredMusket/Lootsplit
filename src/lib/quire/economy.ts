@@ -111,7 +111,9 @@ import {
   setSeat,
   DM_SEAT,
   getSeat,
+  getActualSeat,
   type BillFile,
+  type Seat,
   type TableFile,
 } from "./table.ts";
 import { readSeatLock, type SeatLock } from "./lock.ts";
@@ -2796,8 +2798,10 @@ export async function economyView() {
     realm: table.realm,
     journal: readJournal(projected ? projected.journal : table.journal),
     ledger: (projected ? projected.ledger : table.ledger).sort((a, b) => b.at - a.at),
-    catalog: catalog.sort((a, b) => a.name.localeCompare(b.name)),
-    lexicon: lexicon.sort((a, b) => a.name.localeCompare(b.name)),
+    // A preview shows what a player's device holds: the built-in item list (seedCatalog) and no
+    // names, never the DM's own catalog edits or name lists, which no room sends to players.
+    catalog: (previewing ? starterCatalog() : catalog).sort((a, b) => a.name.localeCompare(b.name)),
+    lexicon: (previewing ? [] : lexicon).sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 
@@ -2859,8 +2863,7 @@ async function audit(
 }
 
 /** The device's seat as the shared engine sees it (its name signs transfer notes). */
-function localSeat() {
-  const seat = getSeat();
+function localSeat(seat: Seat) {
   return {
     id: "local",
     token: "",
@@ -2902,11 +2905,16 @@ export async function executeLocalCommand(
   const { command, receipt } = await identify(input);
   guard();
   let changedChat = false;
+  // This device's own seat, captured before the write lock: a preview that starts while the
+  // command waits never lends it the previewed player's seat (and then refuses it below).
+  const sitting = getActualSeat();
   await atomic([...ECONOMY], async (tx) => {
+    assertNotPreviewing();
     if (await alreadyApplied(tx, receipt)) return;
     const source = await readEconomyTransaction(tx);
     guard();
-    const seat = localSeat();
+    assertNotPreviewing();
+    const seat = localSeat(sitting);
     // A player-only device link holds part of the party: its treasure pool is read-only
     // (owner decision, 2026-10-23). The DM's device rolls and may enter Pen & Paper totals.
     if (seat.role !== "dm" && command.kind.startsWith("loot-"))
@@ -3022,16 +3030,20 @@ async function commitFinance(
     "meta",
   ];
   let applied = false;
+  // This device's own seat, captured before the write lock (see executeLocalCommand).
+  const sitting = getActualSeat();
   await atomic(stores, async (tx) => {
+    assertNotPreviewing();
     if (await alreadyApplied(tx, receipt)) return;
     applied = true;
     const source: CloudTable = await readEconomyTransaction(tx, settles);
     guard();
+    assertNotPreviewing();
     const execution = () => ({ source: "local" as const, random: randomTradeRoll });
     const next =
       commands.length === 1
-        ? applyCommand(source, localSeat(), commands[0], execution())
-        : applyCommandBatch(source, localSeat(), commands, execution);
+        ? applyCommand(source, localSeat(sitting), commands[0], execution())
+        : applyCommandBatch(source, localSeat(sitting), commands, execution);
     const priorShops = new Map(source.shops.map((s) => [s.id, JSON.stringify(s)]));
     const priorStock = new Map(source.stock.map((s) => [s.id, s.quantity]));
     for (const shop of next.shops)
