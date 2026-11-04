@@ -93,6 +93,10 @@ export function pendingCommandDescription(value: unknown): string {
       return `Award ${c.amount} ${c.unit === "xp" ? "XP" : c.amount === 1 ? "milestone" : "milestones"} · ${c.purseIds.length} character${c.purseIds.length === 1 ? "" : "s"}`;
     case "coin-exchange":
       return `Make change (same worth) · character ${c.purseId}`;
+    case "item-use":
+      return `Use one charge · item ${c.holdingId}`;
+    case "item-recharge":
+      return `Recharge to ${c.current} uses · item ${c.holdingId}`;
     case "sale-split":
       return `Sell ${c.lots.length} item${c.lots.length === 1 ? "" : "s"} and split ${formatCopper(c.expect.proceeds)} among ${c.recipientIds.length} · from ${c.fundId}`;
     case "post":

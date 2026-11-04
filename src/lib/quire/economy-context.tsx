@@ -235,6 +235,12 @@ type EconomyApi = {
    */
   makeChange: (purseId: string, before: Coins, after: Coins, options?: CommandOptions) => Promise<boolean>;
   /**
+   * Charges and consumables (loot phase 5): spend one use of an item (`item-use`; the
+   * controlling player or the DM) or, for the DM, set its uses left (`item-recharge`).
+   */
+  spendItemUse: (holding: Holding, options?: CommandOptions) => Promise<boolean>;
+  rechargeItem: (holding: Holding, current: number, options?: CommandOptions) => Promise<boolean>;
+  /**
    * XP and milestones (loot phase 6): the DM's `xp-award` command (shared engine; offline through
    * executeLocalCommand). Pass one command ID per award and reuse it on retry.
    */
@@ -987,6 +993,32 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           await reload().catch(() => undefined);
           toast.error(error instanceof Error && error.message ? error.message : "The coins could not be exchanged.");
+          return false;
+        }
+      },
+      spendItemUse: async (holding, options = {}) => {
+        if (!holding.uses) return false;
+        const expect = { current: holding.uses.current, quantity: holding.quantity };
+        try {
+          await acceptCommand({ kind: "item-use", holdingId: holding.id, expect, ...idOf(options) });
+          toast.success(`Used ${holding.name}.`);
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The use was not recorded.");
+          return false;
+        }
+      },
+      rechargeItem: async (holding, current, options = {}) => {
+        if (!holding.uses) return false;
+        const expect = { current: holding.uses.current, quantity: holding.quantity };
+        try {
+          await acceptCommand({ kind: "item-recharge", holdingId: holding.id, expect, current, ...idOf(options) });
+          toast.success(`${holding.name}: ${current} of ${holding.uses.max} uses.`);
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The recharge was not recorded.");
           return false;
         }
       },
