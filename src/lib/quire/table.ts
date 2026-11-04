@@ -404,6 +404,21 @@ function base64UrlToBytes(value: string): Uint8Array {
   return bytes;
 }
 
+/** Saves text built on this device (a CSV export) as a file; false when the person cancels. */
+export async function downloadText(filename: string, text: string, type: string): Promise<boolean> {
+  if (import.meta.env.VITE_MOBILE === "true") {
+    const { saveTextFile } = await import("@/lib/mobile/files");
+    return saveTextFile(filename, text);
+  }
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
 export async function downloadJson(filename: string, value: unknown): Promise<boolean> {
   const text = JSON.stringify(value);
   if (import.meta.env.VITE_MOBILE === "true") {

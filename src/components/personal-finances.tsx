@@ -1,5 +1,6 @@
 import { LedgerCoverage, LoadArchivedSession, LoadEarlierEntries, SearchEarlierEntries } from "./history-loader";
 import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
+import { LedgerCsvButton } from "./ledger-csv-button";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useState } from "react";
@@ -329,6 +330,7 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
           >
             Clear financial filters
           </Button>
+          <LedgerCsvButton seat={archiveSeat} />
           {archiveDeferred && archive ? (
             <LoadArchivedSession id={archive.id} name={archive.name} />
           ) : (
