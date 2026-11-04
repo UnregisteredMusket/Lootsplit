@@ -5,6 +5,7 @@ import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
 import { readWorld, type Npc } from "./world-schema.ts";
 import { readFinance } from "./finance.ts";
 import { toCopper, formatCopper } from "./money.ts";
+import { sweetenCopper } from "./price-breakdown.ts";
 import { barterEligible, npcAvailableHere, settleExchange } from "./world.ts";
 import { actingGroups } from "./party-groups.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
@@ -351,8 +352,7 @@ export function quoteNpcBarter(
   else if (ratio < rules.refusePercent * 10) kind = "refuse";
   else kind = "check";
   if (unwanted.length) reasons.push(`${npc.name} shows no interest in ${unwanted.join(", ")}.`);
-  const target = Math.ceil((given * rules.acceptPercent) / 100);
-  const addCopper = kind === "check" || kind === "refuse" ? Math.ceil(Math.max(0, target - received) / 10) * 10 : 0;
+  const addCopper = kind === "check" || kind === "refuse" ? sweetenCopper(given, received, rules.acceptPercent) : 0;
   return {
     mode: npcBarterMode(npc, rules),
     kind,

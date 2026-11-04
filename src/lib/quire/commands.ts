@@ -30,7 +30,7 @@ import { applyNpcBarterCommand, validateNpcBarter } from "./npc-barter.ts";
 import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
 import { applyTradeCommand, prepareTradeSeason, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
-import { applyWorldCommand, validateWorld, shopVisible, shopAsking } from "./world.ts";
+import { applyWorldCommand, validateWorld, shopVisible } from "./world.ts";
 import { cancelStaleZoneRequests } from "./zone-commands.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { estateCommands } from "./estate-schema.ts";
@@ -47,6 +47,7 @@ import { questCommands, questKinds, type QuestCommand } from "./quests-schema.ts
 import { applyXpAward, keepPurseAdvancement, xpAwardCommand, xpAwardSummary } from "./xp.ts";
 import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
+import { applyAttunementCommand, attunedBefore, attunementFromNotes, attunementCommands, attunementKinds, settleAttunement, type AttunementCommand } from "./attunement.ts";
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
@@ -78,8 +79,9 @@ import {
   editLegacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
-import { formatCopper, fromCopper, toCopper, spendCoins, priceAfterCharisma, sameCoins, exchangeSummary } from "./money.ts";
-import { charismaScore, readSheets } from "./sheet.ts";
+import { formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
+import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
+import { readSheets } from "./sheet.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
 import { listingSchema, propertyProfileSchema, propertyAvailableToGroups, validatePropertyLocations } from "./property.ts";
 import { actingGroups, activeGroups, groupInfo, MAIN_GROUP, partySplit, purseGroup } from "./party-groups.ts";
@@ -94,6 +96,7 @@ import { applyServiceCommand } from "./services-command.ts";
 // After services-command: finance must load after journal here (see services-lessons.ts).
 import { chargeLesson } from "./services-lessons.ts";
 import { validateServices } from "./services-validation.ts";
+import { isRecapEntryId, recapEntryId } from "./session-recap.ts";
 import { diffJournal, journalChangeId, journalChangePath, LEGACY_JOURNAL_CHANGE_ID, writeJournalPath } from "./journal-patch.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
@@ -352,6 +355,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   }),
   ...lootCommands,
   ...questCommands,
+  // Attunement (loot phase 5, attunement.ts): attune or end it, and the DM's per-character limit.
+  ...attunementCommands,
   // Charges and consumables (loot phase 5, item-uses.ts): Use and the DM's Recharge.
   ...itemUseCommands,
 ]);
@@ -385,6 +390,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   let journal = (t.journal = readJournal(t.journal));
   // Item identification: what this command writes names unidentified items as presented.
   const written = t.holdings.some(isUnidentified) ? writtenBaseline(t) : null;
+  // Attunement ends when an attuned item leaves its character in this command (settleAttunement).
+  const attuned = attunedBefore(t.holdings);
   // Exchange editors can address a legacy city's default before its first save.
   // Other commands retain their original financial/patch preview baselines.
   if (cmd.kind.startsWith("trade-")) ensureCityExchanges(t);
@@ -468,10 +475,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
                 : "payment",
     });
   const score = (purseId: string) =>
-    t.purses.find((p) => p.id === purseId)?.kind === "party"
-      ? null
-      : (t.purses.find((p) => p.id === purseId)?.sheet?.scores.cha ??
-        charismaScore(t.sheets.find((s) => s.purseId === purseId)));
+    charismaFor(t.purses.find((p) => p.id === purseId) ?? { id: purseId, kind: "character" }, t.sheets);
   const finance = () => (journal.finance ??= readFinance());
   const editableFinance = () => {
     dm();
@@ -948,6 +952,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         copper: delta,
         transactionType: "adjustment",
       });
+  } else if (attunementKinds.has(cmd.kind)) {
+    // The controlling player or the DM; past the limit and the limit itself: the DM. One journal
+    // event for the character's purse, which players see only for purses they hold (projectRecord).
+    applyAttunementCommand(t, cmd as AttunementCommand, seat, { dm, own, assertCarried }, event);
   } else if (cmd.kind === "xp-award") {
     // DM only (checked in applyXpAward). One journal entry lists who got what; like a coin split,
     // it is DM-only text when an NPC is among the recipients.
@@ -969,6 +977,16 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyItemUseCommand(t, cmd, { dm, own, assertCarried }, event);
   } else if (cmd.kind === "journal-note") {
     if (cmd.provenance || cmd.visibility === "dm") dm();
+    // A shared session recap (session-recap.ts): the DM's own words, posted once per session.
+    if (isRecapEntryId(cmd.id)) {
+      dm();
+      if (cmd.visibility !== "party" || cmd.purseId || cmd.reportIds.length || cmd.questId || cmd.provenance)
+        throw Error("A session recap is shared as a party journal entry.");
+      if (!journal.sessions.some((session) => recapEntryId(session.id) === cmd.id))
+        throw Error("Choose an existing campaign session for this recap.");
+      if (journal.entries?.some((entry) => entry.id === cmd.id))
+        throw Error("This session's recap is already shared.");
+    }
     if (seat.role !== "dm" || cmd.visibility === "player") {
       const p = own(cmd.purseId);
       if (p.kind !== "character") throw Error("Choose your character.");
@@ -1129,8 +1147,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (shop.closed) throw new Error("This shop is closed.");
     if (s.quantity !== null && s.quantity < cmd.quantity)
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
-    const cost =
-      priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
+    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity).total;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
     const purchasedHolding: import("./types.ts").Holding | null = isService(s)
@@ -1144,6 +1161,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
           quantity: cmd.quantity,
           unitCopper: s.copper,
           notes: s.notes,
+          // Open5e goods carry "Requires attunement" in their notes (attunement.ts).
+          ...attunementFromNotes(s.notes),
           ...(s.commodityId
             ? {
                 commodityId: s.commodityId,
@@ -1176,7 +1195,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw Error(notHere(cmd.purseId, "This property"));
     if (l.quantity !== null && l.quantity < cmd.quantity)
       throw new Error("Not enough listing stock.");
-    const cost = priceAfterCharisma(l.copper, score(cmd.purseId)) * cmd.quantity;
+    const cost = listingBreakdown(l.copper, score(cmd.purseId), cmd.quantity).total;
     coins(cmd.purseId, -cost);
     if (l.quantity !== null) l.quantity -= cmd.quantity;
     const holding: import("./types.ts").Holding = {
@@ -1233,7 +1252,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
     // An unidentified item sells at its presented value, never its true one (item-identity.ts).
     const shown = presentedHolding(h);
-    const paid = Math.round(knownUnitCopper(h)! * s.buyRate) * cmd.quantity;
+    const paid = shopSellBreakdown(s, knownUnitCopper(h)!, cmd.quantity).total;
     coins(h.purseId, paid);
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
@@ -1625,6 +1644,17 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         const after = change.after as import("./types.ts").Holding;
         if (!after.unidentified) change.after = { ...after, unidentified: current.unidentified };
       }
+      // Attunement changes through item-attune. An edit that keeps an attuned item with its
+      // character keeps the attunement and its requirement (an older client may drop them).
+      if (change.store === "holdings" && current?.attuned && change.after !== null) {
+        const after = change.after as import("./types.ts").Holding;
+        if (after.purseId === current.purseId && after.kind === "item")
+          change.after = {
+            ...after,
+            attuned: true,
+            requiresAttunement: after.requiresAttunement ?? current.requiresAttunement,
+          };
+      }
       if (change.store === "purses" && current?.sheetReadOnlyForDm && change.after !== null) {
         const after = change.after as import("./types.ts").Purse;
         if (
@@ -1640,6 +1670,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       ];
     }
   }
+  // Pushed straight to the table's journal: `event()` skips patches that change the journal, and
+  // such a patch replaces `t.journal`, yet an attunement it ends still needs its history entry.
+  settleAttunement(t, attuned, cmd.kind === "item-attune" && cmd.attuned ? cmd.holdingId : null, (summary, kind, purseId, change) => {
+    const events = (t.journal ??= readJournal(undefined)).events;
+    events.push({ id: cmd.id + "-event-" + events.length, at, summary, kind, purseId, change });
+  });
   if (journal.finance) journal.finance = readFinance(journal.finance);
   if (written) {
     identityLineage(written.holdings, t as { holdings: typeof t.holdings; journal: { events: object[] } }, cmd.id, at);

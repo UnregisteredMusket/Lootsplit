@@ -8,10 +8,10 @@ import {
   formatCopper,
   toCopper,
   parsePrice,
-  priceAfterCharisma,
   charismaOffPercent,
 } from "@/lib/quire/money";
-import { charismaScore } from "@/lib/quire/sheet";
+import { listingBreakdown, negotiatorFor } from "@/lib/quire/price-breakdown";
+import { PriceWhy } from "@/components/price-why";
 import { useDollarText } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { readServices } from "@/lib/quire/services-schema";
@@ -113,10 +113,14 @@ function BuyListing({
     available = toCopper(
       purses.find((p) => p.id === purseId)?.coins || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     );
-  const { sheets } = useEconomy();
-  const score = charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
+  const { sheets, purses: accounts } = useEconomy();
+  const seat = useSeat();
+  // The paying account negotiates, with the Charisma the `listing` command uses.
+  const negotiator = negotiatorFor(accounts.find((p) => p.id === purseId), sheets);
+  const score = negotiator?.cha ?? null;
   const percent = score === null ? 0 : charismaOffPercent(score);
-  const unit = priceAfterCharisma(listing.copper, score);
+  const breakdown = listingBreakdown(listing.copper, score, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, { negotiator });
+  const unit = breakdown.unit;
   useEffect(() => {
     if (!purses.some((purse) => purse.id === purseId)) setPurseId(purses[0]?.id ?? "");
   }, [purses, purseId]);
@@ -179,6 +183,7 @@ function BuyListing({
         {Number.isSafeInteger(asked) && asked > 0
           ? `${asked} × ${formatCopper(unit)} = ${formatCopper(unit * asked)}. Available ${formatCopper(available)}; afterward ${formatCopper(available - unit * asked)}.`
           : "Choose a whole quantity of at least one."}
+        <PriceWhy breakdown={breakdown} dm={seat.role === "dm"} />
       </p>
       <FinanceReadiness />
       {error && <p role="alert">{error}</p>}

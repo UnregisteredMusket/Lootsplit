@@ -14,6 +14,12 @@ import { tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
 import { lootLedgerSchema, lootPoolMarkerSchema } from "./loot-claims-schema.ts";
 import { awardTagSchema } from "./award-tag.ts";
 import { presentedHolding, unidentifiedSchema } from "./item-identity.ts";
+import {
+  attunementLimitSchema,
+  attunementProblem,
+  purseAttunementProblem,
+  requiresAttunementSchema,
+} from "./attunement.ts";
 import { holdingUsesSchema, usesProblem } from "./item-uses.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -37,6 +43,7 @@ const purse = z.object({
   portrait: artworkSchema.optional(),
   coins: coinsSchema,
   control: z.enum(["player", "npc"]).optional(),
+  attunementLimit: attunementLimitSchema.optional(),
 });
 export const holdingSchema = z.object({
   valueSource: z.literal("player").optional(),
@@ -55,6 +62,8 @@ export const holdingSchema = z.object({
   equipped: z.boolean().optional(),
   pool: lootPoolMarkerSchema.optional(),
   unidentified: unidentifiedSchema.optional(),
+  requiresAttunement: requiresAttunementSchema.optional(),
+  attuned: z.literal(true).optional(),
   uses: holdingUsesSchema.optional(),
 });
 
@@ -142,8 +151,13 @@ export function validateEconomyRows(value: {
       throw Error("Only an item can be unidentified. The current campaign was not changed.");
     if (key === "holdings")
       for (const holding of rows as import("./types.ts").Holding[]) {
-        const problem = usesProblem(holding);
+        const problem = usesProblem(holding) ?? attunementProblem(holding);
         if (problem) throw Error(`${presentedHolding(holding).name}: ${problem} The current campaign was not changed.`);
+      }
+    if (key === "purses")
+      for (const purse of rows as import("./types.ts").Purse[]) {
+        const problem = purseAttunementProblem(purse);
+        if (problem) throw Error(`${purse.name}: ${problem} The current campaign was not changed.`);
       }
   }
 }

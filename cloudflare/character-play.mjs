@@ -306,6 +306,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         holdings: observer
           ? []
           : room.table.holdings.filter((h) => h.purseId === p.id).map((h) => (seat.role === "dm" ? h : presentedHolding(h))),
+        // Attunement (loot phase 5): the sheet shows "Attuned 2/3" with the holdings above.
+        ...(observer || p.attunementLimit === undefined ? {} : { attunementLimit: p.attunementLimit }),
       };
     }
     return {

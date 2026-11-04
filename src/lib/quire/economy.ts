@@ -5,7 +5,8 @@ import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { validateServices } from "./services-validation.ts";
 import { serviceOrderOpen } from "./services-schema.ts";
 import { projectRecord } from "./session-records.ts";
-import { shopVisible, shopAsking, validateWorld } from "./world.ts";
+import { shopVisible, validateWorld } from "./world.ts";
+import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
@@ -41,6 +42,7 @@ import {
 } from "./estate.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { POOL_GUARD } from "./custody.ts";
+import { attunementFromNotes, attunementKinds, attunementProblem } from "./attunement.ts";
 import { usesProblem } from "./item-uses.ts";
 import { assertPoolable } from "./loot-claims.ts";
 import {
@@ -57,7 +59,6 @@ import {
   emptyCoins,
   formatCopper,
   fromCopper,
-  priceAfterCharisma,
   spendCoins,
   toCopper,
 } from "./money.ts";
@@ -70,7 +71,10 @@ import {
   refreshChat,
   rememberIncoming,
   replaceNotes,
+  showPreviewNotes,
 } from "./chat.ts";
+import { assertNotPreviewing, previewSeat } from "./player-preview.ts";
+import { seatView } from "./player-view.ts";
 import { readCloudTable, applyBillToTable, emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { readHandouts, type Handout } from "./handouts.ts";
 import { APP_VERSION } from "./version.ts";
@@ -96,7 +100,6 @@ import {
   type LoanStatus,
 } from "./market.ts";
 import {
-  charismaScore,
   loadSheets,
   mergeSheets,
   readSheets,
@@ -109,7 +112,9 @@ import {
   setSeat,
   DM_SEAT,
   getSeat,
+  getActualSeat,
   type BillFile,
+  type Seat,
   type TableFile,
 } from "./table.ts";
 import { readSeatLock, type SeatLock } from "./lock.ts";
@@ -183,6 +188,8 @@ let ensuring: Promise<void> | null = null;
 let ensuringName = "";
 
 export function ensureEconomy(): Promise<void> {
+  // A preview starts on an opened campaign, and its database refuses writes (player-preview.ts).
+  if (previewSeat()) return Promise.resolve();
   const name = isEphemeralCampaign() ? "guest-memory" : activeDatabaseName();
   if (ensuring && ensuringName === name) return ensuring;
   ensuringName = name;
@@ -917,6 +924,20 @@ export async function saveHolding(input: Holding): Promise<void> {
       );
       pooledNow = true;
     }
+    // Attunement changes through item-attune: an edit keeps it while the item stays with its
+    // character (as a shared room's edit does) and a move to another holder ends it.
+    if (old?.attuned && holding.purseId === old.purseId && holding.kind === "item")
+      holding = {
+        ...holding,
+        attuned: true,
+        requiresAttunement: holding.requiresAttunement ?? old.requiresAttunement,
+      };
+    else if (holding.attuned) {
+      const { attuned: _attuned, ...rest } = holding;
+      holding = rest;
+    }
+    const attunementProblemText = attunementProblem(holding);
+    if (attunementProblemText) throw Error(attunementProblemText);
     if (
       old?.kind === "property" &&
       (old.purseId !== holding.purseId || holding.kind !== "property")
@@ -950,6 +971,8 @@ export async function saveHolding(input: Holding): Promise<void> {
           }
         : undefined,
     );
+    if (old?.attuned && !holding.attuned)
+      await audit(tx, `Attunement ended: ${old.name} left the character`, "management", old.purseId);
   });
 }
 
@@ -1038,6 +1061,8 @@ export async function removeHolding(id: string): Promise<void> {
     }
     tx.objectStore("holdings").delete(id);
     if (old) await audit(tx, `Removed holding: ${old.name}`, "management", old.purseId);
+    if (old?.attuned)
+      await audit(tx, `Attunement ended: ${old.name} left the character`, "management", old.purseId);
   });
 }
 
@@ -1177,10 +1202,9 @@ function logLine(
 }
 
 async function charismaOf(purse: Purse, tx: IDBTransaction): Promise<number | null> {
-  if (purse.kind === "party") return null;
-  if (purse.sheet) return purse.sheet.scores.cha;
-  const sheets = readSheets(await request(tx.objectStore("meta").get("sheets")));
-  return charismaScore(sheets.find((sheet) => sheet.purseId === purse.id));
+  // The same rule as the shared command engine (`charismaFor`); sheets load only when needed.
+  if (purse.kind === "party" || purse.sheet) return charismaFor(purse, []);
+  return charismaFor(purse, readSheets(await request(tx.objectStore("meta").get("sheets"))));
 }
 
 async function atomic<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
@@ -1328,8 +1352,7 @@ export async function buyFromShop(
     if (stock.quantity !== null && stock.quantity < quantity)
       throw new Error("The shop does not have that many.");
     const score = await charismaOf(purse, tx);
-    const unit = priceAfterCharisma(shopAsking(shop, stock.copper), score);
-    const cost = unit * quantity;
+    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity).total;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
     // Each purchase is a separate lot. A matching name does not identify the
@@ -1345,6 +1368,8 @@ export async function buyFromShop(
           quantity,
           unitCopper: stock.copper,
           notes: stock.notes,
+          // Open5e goods carry "Requires attunement" in their notes (attunement.ts).
+          ...attunementFromNotes(stock.notes),
           ...(stock.commodityId
             ? {
                 commodityId: stock.commodityId,
@@ -1464,7 +1489,7 @@ export async function sellToShop(
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
-    const paid = Math.max(0, Math.round(holding.unitCopper * shop.buyRate)) * quantity;
+    const paid = shopSellBreakdown(shop, holding.unitCopper, quantity).total;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");
     tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, paid) });
     if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
@@ -1783,7 +1808,7 @@ export async function buyListing(
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!purse) throw new Error("This account no longer exists.");
     const score = await charismaOf(purse, tx);
-    const cost = priceAfterCharisma(listing.copper, score) * quantity;
+    const cost = listingBreakdown(listing.copper, score, quantity).total;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
     const sales = readSales(await request(tx.objectStore("meta").get("sales")));
@@ -2186,6 +2211,8 @@ export type QuireFile = {
 };
 
 export async function snapshot(): Promise<QuireFile> {
+  // A whole-campaign file (backups, exports, activity links) is never made during a preview.
+  assertNotPreviewing();
   const db = await quireDb();
   const tx = db.transaction(
     [
@@ -2736,6 +2763,13 @@ export async function economySnapshot(): Promise<CloudTable> {
     readEconomyTransaction(tx).then((table) => (dm ? initializeCityExchanges(tx, table) : table)),
     finish(tx),
   ]);
+  // "Preview as player": every reader of the campaign (sheets, exports, …) gets the previewed
+  // seat's view, never the DM's whole table (player-preview.ts).
+  const previewing = previewSeat();
+  if (previewing) {
+    const view = seatView(table, { purseIds: previewing.purseIds });
+    return { ...view, realm: table.realm, journal: readJournal(view.journal) };
+  }
   return table;
 }
 
@@ -2758,29 +2792,37 @@ export async function economyView() {
   const dm = getSeat().role === "dm";
   const tx = db.transaction([...ECONOMY, "catalog", "lexicon"], dm ? "readwrite" : "readonly");
   const [table, catalog, lexicon] = await Promise.all([
-    readEconomyTransaction(tx, false).then((table) =>
+    // A preview also reads the chat, to show the previewed seat's messages from its projection.
+    readEconomyTransaction(tx, previewSeat() !== null).then((table) =>
       dm ? initializeCityExchanges(tx, table) : table,
     ),
     request<CatalogItem[]>(tx.objectStore("catalog").getAll()),
     request<Lexeme[]>(tx.objectStore("lexicon").getAll()),
     finish(tx),
   ]);
+  // The DM's read-only "Preview as player" (player-preview.ts): the previewed seat's view, as the
+  // server's `view()` projects it for that seat (player-view.ts), from the DM's whole copy.
+  const previewing = previewSeat();
   // A player-only device link: one projection, with the party directory as in shared rooms
   // (cloud.server.ts seatTable), so the journal keeps the listed characters' party positions.
-  const projected =
-    getSeat().role === "player"
+  const projected = previewing
+    ? seatView(table, { purseIds: previewing.purseIds })
+    : getSeat().role === "player"
       ? projectRecord(table, getSeat(), {
           directory: true,
           tabletopProjected: getCloudWatch().joined,
         })
       : null;
+  if (previewing) showPreviewNotes(projected!.notes);
   return {
     ...(projected ?? table),
     realm: table.realm,
     journal: readJournal(projected ? projected.journal : table.journal),
     ledger: (projected ? projected.ledger : table.ledger).sort((a, b) => b.at - a.at),
-    catalog: catalog.sort((a, b) => a.name.localeCompare(b.name)),
-    lexicon: lexicon.sort((a, b) => a.name.localeCompare(b.name)),
+    // A preview shows what a player's device holds: the built-in item list (seedCatalog) and no
+    // names, never the DM's own catalog edits or name lists, which no room sends to players.
+    catalog: (previewing ? starterCatalog() : catalog).sort((a, b) => a.name.localeCompare(b.name)),
+    lexicon: (previewing ? [] : lexicon).sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 
@@ -2842,8 +2884,7 @@ async function audit(
 }
 
 /** The device's seat as the shared engine sees it (its name signs transfer notes). */
-function localSeat() {
-  const seat = getSeat();
+function localSeat(seat: Seat) {
   return {
     id: "local",
     token: "",
@@ -2874,6 +2915,8 @@ export async function executeLocalCommand(
   input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
+  // Read-only "Preview as player": refused before anything is read or written.
+  assertNotPreviewing();
   const invoked = captureDeviceMutationScope();
   const guard = () => {
     assertDeviceMutationScope(invoked);
@@ -2883,17 +2926,26 @@ export async function executeLocalCommand(
   const { command, receipt } = await identify(input);
   guard();
   let changedChat = false;
+  // This device's own seat, captured before the write lock: a preview that starts while the
+  // command waits never lends it the previewed player's seat (and then refuses it below).
+  const sitting = getActualSeat();
   await atomic([...ECONOMY], async (tx) => {
+    assertNotPreviewing();
     if (await alreadyApplied(tx, receipt)) return;
     const source = await readEconomyTransaction(tx);
     guard();
-    const seat = localSeat();
+    assertNotPreviewing();
+    const seat = localSeat(sitting);
     // A player-only device link holds part of the party: its treasure pool is read-only
     // (owner decision, 2026-10-23). The DM's device rolls and may enter Pen & Paper totals.
     if (seat.role !== "dm" && command.kind.startsWith("loot-"))
       throw Error(
         "The treasure pool is read-only on a player link. Ask the DM to mark claims at the table.",
       );
+    // Attunement: a player link holds a copy of part of the party, so a change there would never
+    // reach the DM's campaign. The DM marks it on their device (or the party plays shared).
+    if (seat.role !== "dm" && attunementKinds.has(command.kind))
+      throw Error("Attunement is tracked on the DM's device or in a shared room. Ask the DM to mark it.");
     // Charges: the player link holds a copy of part of the party, so a use there would never
     // reach the DM's campaign. The DM marks uses on their device (or the party plays shared).
     if (seat.role !== "dm" && (command.kind === "item-use" || command.kind === "item-recharge"))
@@ -2947,6 +2999,8 @@ export async function executeFinanceCommand(
   input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
+  // Read-only "Preview as player": refused before anything is read or written.
+  assertNotPreviewing();
   const invoked = captureDeviceMutationScope();
   assertDeviceMutationScope(invoked);
   assertScope?.();
@@ -2965,6 +3019,8 @@ export async function executeFinanceBatch(
   inputs: CommandRequest[],
   assertScope?: () => void,
 ): Promise<void> {
+  // Read-only "Preview as player": refused before anything is read or written.
+  assertNotPreviewing();
   const invoked = captureDeviceMutationScope();
   assertDeviceMutationScope(invoked);
   assertScope?.();
@@ -3003,16 +3059,20 @@ async function commitFinance(
     "meta",
   ];
   let applied = false;
+  // This device's own seat, captured before the write lock (see executeLocalCommand).
+  const sitting = getActualSeat();
   await atomic(stores, async (tx) => {
+    assertNotPreviewing();
     if (await alreadyApplied(tx, receipt)) return;
     applied = true;
     const source: CloudTable = await readEconomyTransaction(tx, settles);
     guard();
+    assertNotPreviewing();
     const execution = () => ({ source: "local" as const, random: randomTradeRoll });
     const next =
       commands.length === 1
-        ? applyCommand(source, localSeat(), commands[0], execution())
-        : applyCommandBatch(source, localSeat(), commands, execution);
+        ? applyCommand(source, localSeat(sitting), commands[0], execution())
+        : applyCommandBatch(source, localSeat(sitting), commands, execution);
     const priorShops = new Map(source.shops.map((s) => [s.id, JSON.stringify(s)]));
     const priorStock = new Map(source.stock.map((s) => [s.id, s.quantity]));
     for (const shop of next.shops)

@@ -10,6 +10,7 @@ import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type Spl
 import { assertCarried } from "./custody.ts";
 import { assertMerchantSale } from "./merchant.ts";
 import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
+import { shopSellBreakdown } from "./price-breakdown.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -50,7 +51,7 @@ export type SaleSplitPlan = {
  * its presented value (0 when unknown, which `saleProblem` refuses), never its true one.
  */
 export function unitSalePrice(h: Pick<Holding, "unitCopper" | "unidentified">, shop: Pick<Shop, "buyRate">): number {
-  return Math.round((knownUnitCopper(h) ?? 0) * shop.buyRate);
+  return shopSellBreakdown(shop, knownUnitCopper(h) ?? 0).unit;
 }
 
 /**

@@ -42,6 +42,8 @@ export function stackKey(holding: Holding, category: string): string {
     !!(holding.deed || holding.property || holding.service),
     // Item identification: an unidentified item never stacks with an identified one.
     ...(holding.unidentified ? [holding.unidentified.name] : []),
+    // Attunement: an attuned item is listed apart from the rest of its kind.
+    holding.attuned === true,
     // Charges: items with different uses left are listed apart.
     holding.uses ? `${holding.uses.current}/${holding.uses.max}/${holding.uses.whenEmpty}` : "",
   ]);
