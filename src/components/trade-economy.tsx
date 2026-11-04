@@ -28,6 +28,8 @@ import { canAccessEstate, physicallyHere } from "@/lib/quire/estate";
 import { readMarketLocations, locationLabel } from "@/lib/quire/shop-locations";
 import { SEASON_NAMES, clampRealm } from "@/lib/quire/scale";
 import { formatCopper, toCopper } from "@/lib/quire/money";
+import { exchangeBreakdown } from "@/lib/quire/price-breakdown";
+import { PriceWhy } from "@/components/price-why";
 import { CommandForm, CommandButton } from "./world-tools";
 import { CoinAmountInput, CopperField } from "./finance-input";
 import { AppLink } from "./app-link";
@@ -1199,12 +1201,14 @@ function TradeForm({
         <p>
           Total{" "}
           {formatCopper(
-            quantity *
-              exchange.offers.find((o) => o.commodityId === commodity.id)![
-                direction === "buy" ? "askCopper" : "bidCopper"
-              ],
+            exchangeBreakdown(exchange.offers.find((o) => o.commodityId === commodity.id)!, direction, quantity)
+              .total,
           )}
           . Stock, storage, ownership and funds are checked together when committed.
+          <PriceWhy
+            breakdown={exchangeBreakdown(exchange.offers.find((o) => o.commodityId === commodity.id)!, direction, quantity)}
+            dm={dm}
+          />
         </p>
         {dm && (
           <Tick

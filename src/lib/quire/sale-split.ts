@@ -9,6 +9,7 @@
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
 import { assertCarried } from "./custody.ts";
 import { assertMerchantSale } from "./merchant.ts";
+import { shopSellBreakdown } from "./price-breakdown.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -46,7 +47,7 @@ export type SaleSplitPlan = {
 
 /** What one unit of `h` fetches at `shop`: the Sell to shop rule. */
 export function unitSalePrice(h: Pick<Holding, "unitCopper">, shop: Pick<Shop, "buyRate">): number {
-  return Math.round(h.unitCopper * shop.buyRate);
+  return shopSellBreakdown(shop, h.unitCopper).unit;
 }
 
 /**

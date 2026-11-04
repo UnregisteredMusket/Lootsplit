@@ -11,6 +11,7 @@ import {
   formatCampaignMinute,
   npcAnswersBarter,
   oddsWords,
+  quoteNpcBarter,
   readNpcBarter,
   replyFor,
   type BarterOfferInput,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/quire/npc-barter";
 import type { BarterAttempt, BarterSide } from "@/lib/quire/npc-barter-schema";
 import { useNpcBarterQuote } from "@/lib/quire/use-npc-barter";
+import { barterSweetenBreakdown } from "@/lib/quire/price-breakdown";
+import { PriceWhy } from "@/components/price-why";
 import type { CloudTable } from "@/lib/quire/cloud";
 import type { Holding, Purse } from "@/lib/quire/types";
 import { npcServices, servicesReply, type HubService } from "@/lib/quire/service-hub";
@@ -403,6 +406,27 @@ export function NpcConversation({
   const empty = !offer || (!offer.give.copper && !offer.ask.copper && !offer.give.items.length && !offer.ask.items.length);
   const quoteState = useNpcBarterQuote(table, empty ? null : offer);
   const quote = quoteState.status === "ready" ? quoteState.quote : null;
+  // "Why add this?": the DM's own table holds the NPC's valuation; a player's quote never does,
+  // so players see the amount as the NPC's private valuation (price-breakdown.ts).
+  const sweeten = useMemo(() => {
+    if (!quote || !offer || !character || quote.addCopper <= 0 || (quote.kind !== "check" && quote.kind !== "refuse") || quote.locked)
+      return null;
+    let full: { given: number; received: number } | null = null;
+    if (dm)
+      try {
+        full = quoteNpcBarter(table, { role: "dm", id: "local" }, offer);
+      } catch {
+        full = null;
+      }
+    const b = barterSweetenBreakdown(quote.addCopper, {
+      npcName: npc.name,
+      ...(full ? { given: full.given, received: full.received, acceptPercent: state.rules.acceptPercent } : {}),
+    });
+    const speaker = `${character.name} negotiates: Persuasion ${quote.bonus >= 0 ? "+" : "−"}${Math.abs(quote.bonus)}${quote.cha === null ? "" : `, Charisma ${quote.cha}`}${quote.advantage === "normal" ? "" : `, ${advantageWord(quote.advantage).toLowerCase()}`}.`;
+    return { ...b, note: `${speaker}${b.note ? ` ${b.note}` : ""}` };
+    // The offer's JSON and the quote identify the deal; the table is part of the dependency list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote, offer ? canonicalJson(offer) : "", character?.id, dm, table, npc.name, state.rules.acceptPercent]);
   // One ID per offer, whichever reply sends it: a committed offer is never sent twice.
   const action = useCommandId(`${npc.id}|${characterId}|${offer ? canonicalJson(offer) : ""}`);
   // Each answer to an open attempt keeps its own ID across retries.
@@ -824,6 +848,11 @@ export function NpcConversation({
               Tap goods to add or remove them. {npc.name}'s purse stays private. For search and categories, use{" "}
               <AppLink href="/features/trading">Trading & Barter</AppLink>.
             </p>
+          </div>
+        )}
+        {step === "barter" && sweeten && (
+          <div className="npc-talk-why">
+            <PriceWhy breakdown={sweeten} dm={dm} label={`Why add ${formatCopper(sweeten.total)}?`} />
           </div>
         )}
         <div className="npc-talk-replies" role="group" aria-label="Your replies" ref={repliesRef}>
