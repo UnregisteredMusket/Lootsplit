@@ -251,7 +251,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         const write = roomWriteStatements(db, room, { expect: version });
         if (!write.changed(await db.batch(write.statements), write.statements))
           fail("Campaign changed. Reload and retry.", 409);
-        return { id };
+        // The new revision lets the editor save again without a refresh (audit U06).
+        return { id, revision: p.sheetRevision || 0 };
       }
       if (!Number.isSafeInteger(body.revision)) fail("Missing sheet revision.");
       const r = await db
@@ -260,14 +261,24 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         )
         .bind(JSON.stringify(sheet), Date.now(), id, user, body.revision)
         .run();
-      if (!r.meta.changes)
+      if (!r.meta.changes) {
+        // A retry after a lost response finds its own save already stored one revision on:
+        // report that save instead of a conflict. Any other difference is a real conflict.
+        const current = await db
+          .prepare("SELECT body,revision FROM play_characters WHERE id=? AND user_id=?")
+          .bind(id, user)
+          .first();
+        if (current?.revision === body.revision + 1 && current.body === JSON.stringify(sheet))
+          return { id, revision: current.revision };
         fail("This character changed on another device. Export your draft before reloading.", 409);
-    } else
-      await db
-        .prepare("INSERT INTO play_characters(id,user_id,body,updated_at) VALUES (?,?,?,?)")
-        .bind(id, user, JSON.stringify(sheet), Date.now())
-        .run();
-    return { id };
+      }
+      return { id, revision: body.revision + 1 };
+    }
+    await db
+      .prepare("INSERT INTO play_characters(id,user_id,body,updated_at) VALUES (?,?,?,?)")
+      .bind(id, user, JSON.stringify(sheet), Date.now())
+      .run();
+    return { id, revision: 0 };
   }
   if (path === "sheets/detail") {
     const r = await character(db, user, body.id);

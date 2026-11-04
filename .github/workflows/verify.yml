@@ -252,6 +252,9 @@ jobs:
       - name: dev-sell-and-split
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-sell-and-split 240 node scripts/sell-and-split-browser-audit.mjs
+      - name: dev-ledger-export
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-ledger-export 240 node scripts/ledger-export-browser-audit.mjs
       - name: dev-xp-milestones
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-xp-milestones 240 node scripts/xp-milestones-browser-audit.mjs

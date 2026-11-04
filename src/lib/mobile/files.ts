@@ -34,7 +34,9 @@ async function writeAndShare(
       ? "application/json"
       : filename.endsWith(".pdf")
         ? "application/pdf"
-        : "application/octet-stream",
+        : filename.endsWith(".csv")
+          ? "text/csv"
+          : "application/octet-stream",
   });
   if (result.action === "cancelled") return false;
   if (result.action === "saved") return true;

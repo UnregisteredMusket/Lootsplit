@@ -657,7 +657,10 @@ function CharacterEditor({
       if (id.startsWith("party:") && loadedCampaign.current !== getCampaigns().activeId)
         throw Error("Reopen the character in the current campaign before saving.");
       const parsed = sheetSchema.parse(sheet);
-      const outcome = await accountRequest<{ status?: "committed" | "pending" }>("sheets/save", {
+      const outcome = await accountRequest<{
+        status?: "committed" | "pending";
+        revision?: number;
+      }>("sheets/save", {
         id,
         sheet: parsed,
         revision: detail.revision,
@@ -665,8 +668,9 @@ function CharacterEditor({
       });
       // The save succeeded. Apply the server's copy (current permissions and revision) as
       // before. Only if that follow-up read fails, mark the draft saved anyway so a retry does
-      // not conflict; keep whatever permissions/revision the latest read applied (never the
-      // copy captured when this save started, which could reopen fields the DM just locked).
+      // not conflict: take the revision the save returned (audit U06) and keep whatever
+      // permissions the latest read applied (never the copy captured when this save started,
+      // which could reopen fields the DM just locked).
       let saved: Detail | null = null;
       try {
         saved = await accountRequest<Detail>("sheets/detail", { id });
@@ -684,7 +688,12 @@ function CharacterEditor({
         setDetail(saved);
         setSheet(saved.body);
       } else {
-        setDetail((current) => (current ? { ...current, body: parsed } : current));
+        const revision = outcome.revision;
+        setDetail((current) =>
+          current
+            ? { ...current, body: parsed, revision: revision ?? current.revision }
+            : current,
+        );
         setSheet(parsed);
         setNotice("Saved. Refresh to see the latest version.");
       }
