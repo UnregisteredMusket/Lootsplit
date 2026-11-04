@@ -497,3 +497,12 @@ test("differential: marking, a presented-category sale and a reveal run identica
   assert.deepEqual(pick(device), pick(shared));
   assert.equal(pick(shared).ledger.find((l) => l.id === "d-sell")!.copper, 20);
 });
+
+test("charges: using an unidentified item names it as presented", () => {
+  const t = campaign();
+  t.holdings[0]!.uses = { current: 3, max: 3, whenEmpty: "keep" };
+  const used = applyCommand(t, ariaSeat, { id: "use-ring", kind: "item-use", holdingId: "ring", expect: { current: 3, quantity: 1 } });
+  const event = used.journal!.events.find((e) => e.id.startsWith("use-ring"))!;
+  assert.match(event.summary, /^Used Plain brass ring \(Aria Thorne\): 2 of 3 uses left$/);
+  assert.deepEqual(leaks(projectRecord(used, ariaSeat)), []);
+});

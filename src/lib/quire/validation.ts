@@ -14,6 +14,7 @@ import { tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
 import { lootLedgerSchema, lootPoolMarkerSchema } from "./loot-claims-schema.ts";
 import { awardTagSchema } from "./award-tag.ts";
 import { unidentifiedSchema } from "./item-identity.ts";
+import { holdingUsesSchema, usesProblem } from "./item-uses.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z
@@ -54,6 +55,7 @@ export const holdingSchema = z.object({
   equipped: z.boolean().optional(),
   pool: lootPoolMarkerSchema.optional(),
   unidentified: unidentifiedSchema.optional(),
+  uses: holdingUsesSchema.optional(),
 });
 
 const shop = z.object({
@@ -138,6 +140,11 @@ export function validateEconomyRows(value: {
       throw Error("A deed must belong to its property owner. The current campaign was not changed.");
     if (key === "holdings" && (rows as import("./types.ts").Holding[]).some((h) => h.unidentified && (h.kind !== "item" || h.deed || h.property || h.service)))
       throw Error("Only an item can be unidentified. The current campaign was not changed.");
+    if (key === "holdings")
+      for (const holding of rows as import("./types.ts").Holding[]) {
+        const problem = usesProblem(holding);
+        if (problem) throw Error(`${holding.name}: ${problem} The current campaign was not changed.`);
+      }
   }
 }
 

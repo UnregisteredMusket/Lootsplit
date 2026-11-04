@@ -44,6 +44,8 @@ export type Holding = {
    * record in place of the true name, notes and value (item-identity.ts). Absent: identified.
    */
   unidentified?: import("./item-identity.ts").Unidentified;
+  /** Charges or uses of the current item (loot phase 5, item-uses.ts). Absent: not tracked. */
+  uses?: import("./item-uses.ts").HoldingUses;
   /** In the party treasure pool (a party-fund holding the party can claim). Absent otherwise. */
   pool?: import("./loot-claims-schema.ts").LootPoolMarker;
   /** "player": a player set this value through a sheet edit, so NPC barter treats it as unreferenced. */
