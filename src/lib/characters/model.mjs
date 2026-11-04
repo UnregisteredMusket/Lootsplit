@@ -44,6 +44,10 @@ export const sheetSchema = z
     classes: short,
     background: short,
     level: z.number().int().min(1).max(20),
+    /** XP and milestones (tabletop protocol 21): total experience points, absent = not tracked yet. */
+    xp: z.number().int().min(0).max(100_000_000).optional(),
+    /** The level this character's milestone awards have reached (absent = no milestones yet). */
+    milestoneLevel: z.number().int().min(1).max(20).optional(),
     edition: z.enum(["2014", "2024", "custom"]),
     description: notes,
     portrait: z

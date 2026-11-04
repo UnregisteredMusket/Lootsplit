@@ -272,6 +272,7 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
     table.holdings,
     table.sheets?.find((s) => s.purseId === p.id),
   );
+  keepAdvancement(before, next, current);
   assertGameplayEdit(p, seat, before, next);
   const statChange = !same(statsOnly(before), statsOnly(next));
   if (statChange && seat.role === "dm" && p.sheetReadOnlyForDm)
@@ -375,6 +376,18 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
   return characterSheet(p, table.holdings);
 }
 
+/** XP and milestones (tabletop protocol 21): a client that doesn't know these fields sends
+ * neither in its baseline or its sheet, so the stored values are kept rather than erased.
+ * @param {import("./model.mjs").PlaySheet} before
+ * @param {import("./model.mjs").PlaySheet} next
+ * @param {import("./model.mjs").PlaySheet} current */
+export function keepAdvancement(before, next, current) {
+  for (const key of /** @type {const} */ (["xp", "milestoneLevel"]))
+    if (before[key] === undefined && next[key] === undefined && current[key] !== undefined) {
+      before[key] = current[key];
+      next[key] = current[key];
+    }
+}
 /** Authoritative gameplay allowlist. Permission to build a sheet never grants money/items.
  * @param {import('../quire/types.ts').Purse} purse
  * @param {{role:string}} seat
@@ -410,6 +423,12 @@ export function assertGameplayEdit(purse, seat, before, next) {
     );
   if (!canEditCharacterField(purse, "coins") && !same(before.coins, next.coins))
     throw Error("Only the DM can adjust funds.");
+  // Experience is the DM's award; a player who may edit the level may also correct it.
+  if (
+    !canEditCharacterField(purse, "level") &&
+    (before.xp !== next.xp || before.milestoneLevel !== next.milestoneLevel)
+  )
+    throw Error("Only the DM can award XP or milestones.");
   for (const item of canEditCharacterField(purse, "equipment") ? [] : next.equipment) {
     const old = before.equipment.find((x) => x.id === item.id);
     if (
