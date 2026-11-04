@@ -13,7 +13,7 @@ import { custodySchema, estateKey } from "./estate-schema.ts";
 import { tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
 import { lootLedgerSchema, lootPoolMarkerSchema } from "./loot-claims-schema.ts";
 import { awardTagSchema } from "./award-tag.ts";
-import { unidentifiedSchema } from "./item-identity.ts";
+import { presentedHolding, unidentifiedSchema } from "./item-identity.ts";
 import { holdingUsesSchema, usesProblem } from "./item-uses.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -143,7 +143,7 @@ export function validateEconomyRows(value: {
     if (key === "holdings")
       for (const holding of rows as import("./types.ts").Holding[]) {
         const problem = usesProblem(holding);
-        if (problem) throw Error(`${holding.name}: ${problem} The current campaign was not changed.`);
+        if (problem) throw Error(`${presentedHolding(holding).name}: ${problem} The current campaign was not changed.`);
       }
   }
 }

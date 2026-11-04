@@ -13,6 +13,7 @@ import {
   isUnidentified,
   knownUnitCopper,
   presentedHolding,
+  identityLineage,
   redactWritten,
   unidentifiedSchema,
   writtenBaseline,
@@ -682,7 +683,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.kind !== "item" || h.deed || h.property || h.service) throw Error("Only an item can be unidentified.");
     if (!same(h.unidentified ?? null, cmd.before)) throw Error("What players are told about this item changed. Review it again.");
     if (same(h.unidentified ?? null, cmd.unidentified)) return t;
-    h.unidentified = { ...cmd.unidentified };
+    // The server's lineage IDs stay with the item (identityLineage).
+    h.unidentified = { ...cmd.unidentified, ...(h.unidentified?.ids ? { ids: h.unidentified.ids } : {}) };
     event(`${cmd.before ? "Unidentified item updated" : "Marked unidentified"}: ${h.name} (players see ${cmd.unidentified.name})`, "management", h.purseId);
     journal.events[journal.events.length - 1]!.dmOnly = true;
   } else if (cmd.kind === "item-identify") {
@@ -1628,7 +1630,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     }
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
-  if (written) redactWritten(written, t);
+  if (written) {
+    identityLineage(written.holdings, t);
+    redactWritten(written, t);
+  }
   if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
     !same(originalLocations, t.journal?.market?.locations))
     ensureCityExchanges(t);

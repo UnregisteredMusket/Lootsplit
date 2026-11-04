@@ -35,6 +35,11 @@ export const unidentifiedSchema = z
     category: z.string().trim().min(1).max(80).optional(),
     /** The weight players see; absent: the true weight (a holder can feel it). */
     weight: z.number().min(0).max(9999).optional(),
+    /**
+     * Earlier holding IDs of this item (a give, a pool resolution, a storage move made a new
+     * holding), set by the server so records linked to them stay presented (`identityLineage`).
+     */
+    ids: z.array(z.string().min(1).max(150)).max(50).optional(),
   })
   .strict();
 /** The category an unidentified item without a presented one is told and sold as. */
@@ -100,9 +105,68 @@ export type IdentitySecrets = Map<string, IdentitySecret>;
 export function identitySecrets(holdings: readonly Holding[]): IdentitySecrets {
   const secrets: IdentitySecrets = new Map();
   for (const h of holdings)
-    if (isUnidentified(h))
-      secrets.set(h.id, { trueName: h.name, trueNotes: h.notes, trueCopper: h.unitCopper, shown: presentedHolding(h) });
+    if (isUnidentified(h)) {
+      const secret = { trueName: h.name, trueNotes: h.notes, trueCopper: h.unitCopper, shown: presentedHolding(h) };
+      // Records linked to the item's earlier holding IDs are presented too.
+      for (const id of [h.id, ...(h.unidentified.ids ?? [])]) if (!secrets.has(id)) secrets.set(id, secret);
+    }
   return secrets;
+}
+
+/** The presented record without the server's bookkeeping, for comparing two copies of an item. */
+function sameItem(a: Holding & { unidentified: Unidentified }, b: Holding & { unidentified: Unidentified }) {
+  const { ids: _a, ...ua } = a.unidentified;
+  const { ids: _b, ...ub } = b.unidentified;
+  return a.name === b.name && a.notes === b.notes && a.unitCopper === b.unitCopper && canonicalJson(ua) === canonicalJson(ub);
+}
+
+/**
+ * After a command: an unidentified holding with a new ID (a give, a pool resolution, a storage
+ * move or a trade copied it) records the IDs of the holding it came from, so records linked to
+ * those IDs stay presented. An unidentified item the command removed without a successor (sold,
+ * used up) leaves `presentedCopper` on the live ledger lines linked to it: it can no longer be
+ * revealed, so those lines show players the presented value from now on. `t` changes in place.
+ */
+export function identityLineage(
+  before: readonly Holding[],
+  t: { holdings: Holding[]; ledger: Array<{ award?: { holdingId?: string; presentedCopper?: number }; loot?: { holdingId: string; presentedCopper?: number } }> },
+) {
+  const earlier = before.filter(isUnidentified);
+  if (!earlier.length) return;
+  const known = new Set(before.map((h) => h.id));
+  const successors = new Set<string>();
+  for (const h of t.holdings) {
+    if (!isUnidentified(h)) continue;
+    if (known.has(h.id)) {
+      successors.add(h.id);
+      continue;
+    }
+    const from = earlier.filter((b) => b.id !== h.id && sameItem(b, h));
+    if (!from.length) continue;
+    const ids = [...new Set([...(h.unidentified.ids ?? []), ...from.flatMap((b) => [b.id, ...(b.unidentified.ids ?? [])])])].slice(-50);
+    h.unidentified = { ...h.unidentified, ids };
+    for (const b of from) successors.add(b.id);
+  }
+  const ended = earlier.filter((b) => !successors.has(b.id) && !t.holdings.some((h) => h.id === b.id));
+  if (!ended.length) return;
+  const value = new Map<string, number>();
+  for (const b of ended) for (const id of [b.id, ...(b.unidentified.ids ?? [])]) value.set(id, b.unidentified.value ?? 0);
+  for (const line of t.ledger) {
+    for (const link of [line.award, line.loot])
+      if (link?.holdingId && value.has(link.holdingId) && link.presentedCopper === undefined)
+        link.presentedCopper = value.get(link.holdingId)!;
+  }
+}
+
+/** Players' copies of ledger lines: a recorded `presentedCopper` replaces the value they see. */
+export function presentLedgerLines<T extends { award?: object; loot?: object }>(lines: T[]): T[] {
+  if (!lines.some((l) => (l.award && "presentedCopper" in l.award) || (l.loot && "presentedCopper" in l.loot))) return lines;
+  const present = <L extends object>(link: L | undefined) => {
+    if (!link || !("presentedCopper" in link)) return link;
+    const { presentedCopper, ...rest } = link as L & { presentedCopper: number };
+    return "unitCopper" in rest ? { ...rest, unitCopper: presentedCopper } : rest;
+  };
+  return lines.map((l) => ({ ...l, ...(l.award ? { award: present(l.award) } : {}), ...(l.loot ? { loot: present(l.loot) } : {}) }));
 }
 
 /**
@@ -123,21 +187,11 @@ export function commandSecrets(before: readonly Holding[], after: readonly Holdi
 export function redactIdentity<T>(value: T, secrets: IdentitySecrets): T {
   if (!secrets.size) return value;
   const walk = (v: unknown, key: string): unknown => {
-    if (typeof v === "string") {
-      // Archived session snapshots are projected when they are read (`projectArchivedReport`).
-      // Item snapshots inside trades and barter offers (`before`) are canonical JSON of a holding:
-      // that structure is presented. Any other text is left exactly as written.
-      if (key !== "snapshot" && v.length < 200000 && v.startsWith("{") && v.includes('"unitCopper"')) {
-        try {
-          const parsed: unknown = JSON.parse(v);
-          const next = walk(parsed, "");
-          if (next !== parsed) return canonicalJson(parsed) === v ? canonicalJson(next) : JSON.stringify(next);
-        } catch {
-          /* Not JSON: plain text. */
-        }
-      }
-      return v;
-    }
+    // Text is never parsed or rewritten: item snapshots stored as text (trade and barter
+    // `before`, property `itemBefore`) are written in their presented form at source, and
+    // anything a person typed is returned exactly as written.
+    if (typeof v === "string") return v;
+    void key;
     if (Array.isArray(v)) {
       let changed = false;
       const next = v.map((item) => {
@@ -189,7 +243,16 @@ export function redactIdentity<T>(value: T, secrets: IdentitySecrets): T {
  * returned as it is.
  */
 export function projectIdentities<T>(source: { holdings: readonly Holding[] }, projected: T): T {
-  return redactIdentity(projected, identitySecrets(source.holdings));
+  const out = redactIdentity(projected, identitySecrets(source.holdings));
+  const ledger = (out as { ledger?: Array<{ award?: object; loot?: object }> }).ledger;
+  if (!Array.isArray(ledger)) return out;
+  const shown = presentLedgerLines(ledger);
+  return shown === ledger ? out : ({ ...out, ledger: shown } as T);
+}
+
+/** Item snapshot text for a stored record (trades, barter, withdrawals): the presented form. */
+export function snapshotText(h: Holding): string {
+  return canonicalJson(presentedHolding(h));
 }
 
 /**

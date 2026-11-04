@@ -24,7 +24,7 @@ import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
 import { tokenInsideGrid } from "./tabletop-geometry.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
-import { presentedHolding } from "./item-identity.ts";
+import { snapshotText } from "./item-identity.ts";
 import { actingGroups, groupPlace, groupRefs, MAIN_GROUP, resolveGroup } from "./party-groups.ts";
 import { applyGroupMapPosition } from "./party-groups-command.ts";
 import { validatePartyGroups } from "./party-groups-validation.ts";
@@ -296,7 +296,9 @@ function eligible(t: CloudTable, trade: Pick<Trade, "left" | "right">) {
     for (const item of side.items) {
       const h = t.holdings.find((h) => h.id === item.holdingId && h.purseId === side.purseId);
       // Item identification: a player offered the item as presented (item-identity.ts).
-      if (!h || (canonicalJson(h) !== item.before && canonicalJson(presentedHolding(h)) !== item.before) || h.quantity < item.quantity)
+      // Item identification: an unidentified item is offered in its presented form only, by
+      // anyone, so an offer can't test a guess at the true item.
+      if (!h || (h.unidentified ? snapshotText(h) : canonicalJson(h)) !== item.before || h.quantity < item.quantity)
         throw Error("An offered lot changed. Review a fresh offer before accepting.");
       assertCarried(h);
       if (h.service) throw Error("Services cannot be transferred.");

@@ -148,6 +148,8 @@ export const lootLedgerSchema = z
     choice: lootAwardChoiceSchema.optional(),
     quantity: units,
     unitCopper: whole,
+    /** Set when the unidentified item ended (sold, used up): players see this value (item-identity.ts). */
+    presentedCopper: whole.optional(),
   })
   .strict();
 export type LootLedgerLink = z.infer<typeof lootLedgerSchema>;

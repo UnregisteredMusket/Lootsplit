@@ -36,8 +36,8 @@ export function useFairness(): { table: FairTable; viewer: FairViewer; ready: bo
   const economy = useEconomy();
   const seat = useSeat();
   const table = useMemo(
-    () => ({ purses: economy.purses, ledger: economy.ledger, journal: economy.journal }),
-    [economy.purses, economy.ledger, economy.journal],
+    () => ({ purses: economy.purses, ledger: economy.ledger, journal: economy.journal, holdings: economy.holdings }),
+    [economy.purses, economy.ledger, economy.journal, economy.holdings],
   );
   const viewer = useMemo(
     () => ({ dm: seat.role === "dm", purseIds: seat.role === "dm" ? [] : seat.purseIds }),

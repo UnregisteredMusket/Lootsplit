@@ -25,9 +25,10 @@ import { DEFERRED_REPORT_PREFIX, isDeferredSnapshot } from "./history-pages.ts";
 import { characterVisible, inParty } from "./character-position.ts";
 import { isNpc } from "./coin-split.ts";
 import type { CloudTable } from "./cloud.ts";
+import { identitySecrets, presentLedgerLines, redactIdentity } from "./item-identity.ts";
 import type { LedgerLine, Purse } from "./types.ts";
 
-export type FairTable = Pick<CloudTable, "purses" | "ledger" | "journal">;
+export type FairTable = Pick<CloudTable, "purses" | "ledger" | "journal"> & { holdings?: CloudTable["holdings"] };
 export type FairViewer = { dm: boolean; purseIds: string[] };
 type Journal = NonNullable<CloudTable["journal"]>;
 type Session = Journal["sessions"][number];
@@ -677,7 +678,10 @@ export function fairnessStandings(t: FairTable, basis: "campaign" | "session"): 
     if (!active) throw Error("No session is running. Favour whoever is behind using campaign-to-date totals instead.");
     period = active.id;
   }
-  const index = indexOf(t);
+  // Item identification: the totals land in a receipt players read, so they count unidentified
+  // items at their presented value (item-identity.ts), the same on the DM's preview and server.
+  const shown = t.holdings ? presentLedgerLines(redactIdentity(t.ledger, identitySecrets(t.holdings))) : presentLedgerLines(t.ledger);
+  const index = indexOf({ ...t, ledger: shown });
   const out = new Map<string, number>();
   for (const r of index.receipts) if (period === "campaign" || r.period === period) out.set(r.purseId, (out.get(r.purseId) ?? 0) + r.coins + r.items);
   return out;

@@ -37,7 +37,7 @@ import {
   type CloudTable,
 } from "./cloud.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
-import { identitySecrets, projectIdentities, redactIdentity } from "./item-identity.ts";
+import { identitySecrets, presentLedgerLines, projectIdentities, redactIdentity } from "./item-identity.ts";
 import { HistoryNeeded, runOnWorkingSet } from "./history-window.server.ts";
 import { receiptForLine } from "./ledger-reversal.ts";
 import { DEFERRED_REPORT_PREFIX, isDeferredSnapshot } from "./history-pages.ts";
@@ -919,7 +919,7 @@ async function historyProjector(table: CloudTable, seat: CloudSeat, code: string
     )
   ).slice(0, 32);
   return {
-    ledger: (lines) => redactIdentity(lines.filter(line), secrets),
+    ledger: (lines) => (dm ? lines.filter(line) : presentLedgerLines(redactIdentity(lines.filter(line), secrets))),
     notes: (notes) => redactIdentity(notes.filter((note) => readNote(note)), secrets),
     visible: (list, keys) => {
       if (!keys) return true;

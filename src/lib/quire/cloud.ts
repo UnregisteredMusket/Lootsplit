@@ -186,6 +186,8 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
       .map((holding) => {
         // By item ID only: a bill can't set, drop or change a presented record.
         const old = table.holdings.find((h) => h.id === holding.id);
+        // Another purse's item can't be taken over by naming its ID.
+        if (old && !purseIds.has(old.purseId)) throw Error("This report changes an item another character holds. Nothing was changed.");
         if (old && isUnidentified(old)) return { ...keepIdentity(old, holding), purseId: holding.purseId };
         if (holding.unidentified === undefined) return holding;
         const { unidentified: _dropped, ...plain } = holding;

@@ -215,7 +215,7 @@ export function planLootResolution(
         `${h?.name ?? "An item"} is no longer in the treasure pool. Claims changed. Nothing moved; review again.`,
       );
     if (!Number.isSafeInteger(lot.quantity) || lot.quantity < 1 || lot.quantity > h.quantity)
-      throw Error(`Only ${h.quantity} × ${h.name} ${h.quantity === 1 ? "is" : "are"} in the pool.`);
+      throw Error(`Only ${h.quantity} × ${presentedHolding(h).name} ${h.quantity === 1 ? "is" : "are"} in the pool.`);
     const claims = lotClaims(t, h.id, state);
     const choiceOf = new Map(claims.map((c) => [c.purseId, c.choice]));
     const need = claimants.filter((p) => choiceOf.get(p.id) === "need").map((p) => p.id);
@@ -228,7 +228,7 @@ export function planLootResolution(
     let tier: "need" | "greed" | null = null;
     let needsRolls = false;
     if (input.method === "manual") {
-      if (!lot.awards?.length) throw Error(`Choose who receives ${h.name}.`);
+      if (!lot.awards?.length) throw Error(`Choose who receives ${presentedHolding(h).name}.`);
       let total = 0;
       for (const award of lot.awards) {
         const p = byId.get(award.purseId);
@@ -242,13 +242,13 @@ export function planLootResolution(
         if (isNpc(t, p!)) npc = true;
       }
       if (total !== lot.quantity)
-        throw Error(`${h.name}: the recipients' items must add up to ${lot.quantity}.`);
+        throw Error(`${presentedHolding(h).name}: the recipients' items must add up to ${lot.quantity}.`);
     } else {
       if (lot.awards) throw Error("Only one-at-a-time resolutions name recipients.");
       const tierIds = need.length ? need : greed;
       tier = need.length ? "need" : greed.length ? "greed" : null;
       if (!tierIds.length)
-        throw Error(`No claims on ${h.name}: resolve it yourself or keep it in the pool.`);
+        throw Error(`No claims on ${presentedHolding(h).name}: resolve it yourself or keep it in the pool.`);
       if (input.method === "round-robin") {
         const tierPurses = tierIds.map((id) => byId.get(id)!);
         for (let unit = 0; unit < lot.quantity; unit++) {
@@ -524,7 +524,7 @@ export function applyLootCommand(
   const receiptLots: LootResolution["lots"] = [];
   for (const [i, lot] of plan.lots.entries()) {
     const h = t.holdings.find((x) => x.id === lot.holdingId)!;
-    if (!lot.awards.length) throw Error(`${h.name} could not be resolved. Nothing moved.`);
+    if (!lot.awards.length) throw Error(`${presentedHolding(h).name} could not be resolved. Nothing moved.`);
     h.quantity -= lot.quantity;
     const { pool: _pool, equipped: _equipped, ...item } = h;
     const awards: LootResolution["lots"][number]["awards"] = [];

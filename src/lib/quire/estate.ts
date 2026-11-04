@@ -1,5 +1,5 @@
 import { assertCarried } from "./custody.ts";
-import { presentedHolding } from "./item-identity.ts";
+import { presentedHolding, snapshotText } from "./item-identity.ts";
 import {
   shipHere,
   initializeShipPurchase,
@@ -749,7 +749,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
       const item = t.holdings.find((i) => i.id === request.holdingId);
       if (
         !item ||
-        canonicalJson(item) !== request.itemBefore ||
+        !sameSnapshot(item, request.itemBefore) ||
         item.reservedFor ||
         item.custody?.kind !== "property" ||
         item.custody.propertyId !== request.propertyId
@@ -823,7 +823,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
           purseId: cmd.purseId,
           requestedBy: seat.id,
           quantity: cmd.quantity,
-          itemBefore: canonicalJson(item),
+          itemBefore: snapshotText(item),
           status: "pending",
           reason: "",
         });
@@ -851,7 +851,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
         request.holdingId !== item.id ||
         request.purseId !== cmd.purseId ||
         request.quantity !== cmd.quantity ||
-        request.itemBefore !== canonicalJson(item)
+        !sameSnapshot(item, request.itemBefore)
       )
         throw Error(
           "An unchanged DM-approved withdrawal is required. Submit a fresh request if the goods changed.",
@@ -1817,4 +1817,9 @@ export function previewEstate(
     notices,
     rules: working.journal!.finance!.rules,
   };
+}
+
+/** A withdrawal's item snapshot: the presented form (newer requests) or the true one (older). */
+function sameSnapshot(item: import("./types.ts").Holding, text: string) {
+  return text === snapshotText(item) || text === canonicalJson(item);
 }

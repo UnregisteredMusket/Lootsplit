@@ -311,7 +311,8 @@ export function serviceQuote(
     const ids = request.stabling.animalHoldingIds;
     if (new Set(ids).size !== ids.length) throw Error("Choose each animal once.");
     const animals = ids.map((hid) => {
-      const h = t.holdings.find((x) => x.id === hid);
+      // Item identification: an unidentified animal is judged and named as presented.
+      const h = shownHolding(t, hid);
       const owner = h && t.purses.find((x) => x.id === h.purseId);
       if (!h || h.kind !== "item" || h.quantity < 1 || !mountLike(h as typeof h & { category?: string }))
         throw Error("Choose animals: horses, ponies, mules and the like.");
@@ -415,12 +416,12 @@ export function serviceQuote(
         equipped: `Unequip the ${c.label} before handing it over.`,
       });
       used.set(h.id, (used.get(h.id) ?? 0) + given.quantity);
-      if (used.get(h.id)! > h.quantity) throw Error(`You don't carry enough ${h.name}.`);
+      if (used.get(h.id)! > h.quantity) throw Error(`You don't carry enough ${presentedHolding(h).name}.`);
       components.push({
         key: c.key,
         label: c.label,
         holdingId: h.id,
-        holdingName: h.name,
+        holdingName: presentedHolding(h).name,
         quantity: given.quantity,
         supplied: "party" as const,
         copper: 0,

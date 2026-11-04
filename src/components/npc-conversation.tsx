@@ -5,6 +5,7 @@ import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { readWorld, type Npc } from "@/lib/quire/world-schema";
 import { npcAvailableHere } from "@/lib/quire/world";
 import { canonicalJson } from "@/lib/quire/canonical-json";
+import { snapshotText } from "@/lib/quire/item-identity";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import {
   STANCE_LINES,
@@ -388,7 +389,7 @@ export function NpcConversation({
       .filter(([, q]) => q > 0)
       .flatMap(([id, quantity]) => {
         const h = lots.find((l) => l.id === id);
-        return h ? [{ holdingId: id, quantity: Math.min(quantity, h.quantity), before: canonicalJson(h) }] : [];
+        return h ? [{ holdingId: id, quantity: Math.min(quantity, h.quantity), before: snapshotText(h) }] : [];
       }),
   });
   const offer: BarterOfferInput | null =

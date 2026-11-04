@@ -31,7 +31,12 @@ import { readServices } from "./services-schema.ts";
 import { ledgerCsv, ledgerExportRows } from "./ledger-export.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { CURRENT_TABLETOP_PROTOCOL, ITEM_IDENTITY_PROTOCOL, tabletopResponse } from "./tabletop-protocol.ts";
-import { identifyCommand, sageFixture, svcDm, svcKael, svcThorn } from "./test-fixtures/services.ts";
+import { identifyCommand, sageFixture, stableFixture, stablingCommand, svcDm, svcKael, svcThorn } from "./test-fixtures/services.ts";
+import { readEstate, recipeSchema } from "./estate-schema.ts";
+import { estatePreset } from "./estate-catalogue.ts";
+import { readFinance } from "./finance.ts";
+import { blankShop } from "./economy.ts";
+import { fairnessStandings } from "./loot-fairness.ts";
 import type { Holding, Purse, Shop } from "./types.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
@@ -298,10 +303,10 @@ test("a player's trade offer snapshots the item as presented; the server accepts
   const moved = t.holdings.find((h) => h.purseId === "bram" && h.unidentified);
   assert.equal(moved?.name, RING.name, "the true item moves, still unidentified");
   assert.deepEqual(leaks(projectRecord(t, bramSeat)), []);
-  // A DM's offer for an NPC snapshots the true item: the projection presents it.
-  const redacted = redactIdentity({ before: canonicalJson(campaign().holdings[0]) }, identitySecrets(campaign().holdings));
-  assert.deepEqual(leaks(redacted), []);
-  assert.equal(JSON.parse(redacted.before).name, "Plain brass ring");
+  // Text is never parsed: a stored snapshot string is returned as written (offers only ever
+  // store the presented form, which the server enforces).
+  const text = { before: canonicalJson(campaign().holdings[0]) };
+  assert.equal(redactIdentity(text, identitySecrets(campaign().holdings)), text);
 });
 
 test("encounter awards: unidentified items are written as presented, the holding keeps the truth", () => {
@@ -505,4 +510,124 @@ test("charges: using an unidentified item names it as presented", () => {
   const event = used.journal!.events.find((e) => e.id.startsWith("use-ring"))!;
   assert.match(event.summary, /^Used Plain brass ring \(Aria Thorne\): 2 of 3 uses left$/);
   assert.deepEqual(leaks(projectRecord(used, ariaSeat)), []);
+});
+
+test("JSON-shaped chat is text: a right and a wrong guess both come back exactly as written", async () => {
+  const { aria, bram } = await room();
+  const right = JSON.stringify({ id: "ring", name: RING.name, unitCopper: RING.copper, unidentified: { name: "Plain brass ring" } });
+  const wrong = JSON.stringify({ id: "ring", name: "Ring of Fire", unitCopper: 1234 });
+  await player(bram, "c1", [{ id: "g-right", kind: "message", to: "party", purseId: "bram", text: right }]);
+  await player(bram, "c2", [{ id: "g-wrong", kind: "message", to: "party", purseId: "bram", text: wrong }]);
+  for (const seat of [aria, bram]) {
+    const notes = (await roomState(seat)).table.notes;
+    assert.equal(notes.find((n) => n.id === "g-right")!.text, right);
+    assert.equal(notes.find((n) => n.id === "g-wrong")!.text, wrong);
+  }
+  // A trade offer can't test a guess either: only the presented snapshot is accepted.
+  const offer = (before: string) => ({
+    id: "o", kind: "trade-offer" as const, tradeId: "t", revision: null, actorId: "aria", note: "",
+    left: { purseId: "aria", copper: 0, items: [{ holdingId: "ring", quantity: 1, before }] },
+    right: { purseId: "bram", copper: 1, items: [] },
+  });
+  assert.throws(() => applyCommand(campaign(), ariaSeat, offer(canonicalJson(campaign().holdings[0]))), /changed/);
+});
+
+test("an item's records stay presented after it moves to a new holding ID or is sold", () => {
+  let t = campaign();
+  t.ledger.push(encounterItemLine("award-r", 0, 1, "aria", { name: "Hempen rope", quantity: 2, unitCopper: 100 }, "Crypt", "rope"));
+  t.holdings[2]!.quantity = 2;
+  t = applyCommand(t, dmSeat, { id: "mark-rope", kind: "item-unidentify", holdingId: "rope", before: null, unidentified: { name: "Coil of cord", value: 5 } });
+  const seen = (tt: CloudTable) => projectRecord(tt, ariaSeat).ledger.find((l) => l.id === "award-r-item-0")!.award!.unitCopper;
+  assert.equal(seen(t), 5);
+  // Aria gives one coil to Bram: the new holding carries the earlier ID.
+  t = applyCommand(t, ariaSeat, { id: "gv", kind: "give", fromId: "aria", toId: "bram", copper: 0, holdingId: "rope", quantity: 1 });
+  assert.deepEqual(t.holdings.find((h) => h.id === "gv-item")!.unidentified!.ids, ["rope"]);
+  // Then she sells hers and Bram gives his away: the line keeps the presented value.
+  t = applyCommand(t, ariaSeat, { id: "sl", kind: "sell", holdingId: "rope", shopId: "marlow", quantity: 1 });
+  assert.equal(seen(t), 5);
+  t = applyCommand(t, bramSeat, { id: "gv2", kind: "give", fromId: "bram", toId: "hoard", copper: 0, holdingId: "gv-item", quantity: 1 });
+  assert.deepEqual(t.holdings.find((h) => h.id === "gv2-item")!.unidentified!.ids, ["rope", "gv-item"]);
+  assert.equal(seen(t), 5);
+  assert.equal(t.ledger.find((l) => l.id === "award-r-item-0")!.award!.unitCopper, 100, "the DM's record keeps its value");
+  // Fully sold: the live line records what players see from now on.
+  t = applyCommand(t, dmSeat, { id: "sl2", kind: "sell", holdingId: "gv2-item", shopId: "marlow", quantity: 1 });
+  assert.equal(t.ledger.find((l) => l.id === "award-r-item-0")!.award!.presentedCopper, 5);
+  assert.equal(seen(t), 5);
+  // Favour totals (stored in a receipt players read) count the presented value.
+  const fresh = campaign();
+  fresh.ledger.push(encounterItemLine("award-f", 0, 1, "aria", { name: "Hempen rope", quantity: 1, unitCopper: 100 }, "Crypt", "rope"));
+  const marked = applyCommand(fresh, dmSeat, { id: "mk", kind: "item-unidentify", holdingId: "rope", before: null, unidentified: { name: "Coil of cord", value: 5 } });
+  assert.equal(fairnessStandings(marked, "campaign").get("aria"), 5);
+});
+
+function estateFixture(): CloudTable {
+  return {
+    ...emptyCloudTable(),
+    purses: [
+      { id: "party", name: "Party treasury", kind: "party", coins: coins({ cp: 10000 }) },
+      { id: "hero", name: "Alwen", kind: "character", coins: coins({ cp: 1000 }) },
+    ],
+    holdings: [
+      { id: "warehouse", name: "Party warehouse", purseId: "party", kind: "property", unitCopper: 5000, quantity: 1, notes: "", locationId: "city", property: { type: "other", condition: "ready" } },
+      { id: "timber", name: "Timber", purseId: "hero", kind: "item", quantity: 10, unitCopper: 100, weight: 2, notes: "" },
+    ],
+    shops: [{ ...blankShop(), id: "shop", name: "Post office", locationId: "city", keeper: "Clerk", buyRate: 1 }],
+    journal: readJournal({
+      finance: readFinance(),
+      market: {
+        currentLocationId: "area",
+        locations: [
+          { id: "region", name: "Eastmarch", kind: "region", parentId: null, description: "" },
+          { id: "city", name: "Brackenport", kind: "city", parentId: "region", description: "" },
+          { id: "area", name: "Dock Ward", kind: "area", parentId: "city", description: "" },
+        ],
+      },
+      propertyOperations: readEstate({
+        templates: [estatePreset("warehouse"), estatePreset("house"), { ...estatePreset("land"), recipes: [recipeSchema.parse({ key: "build", name: "Build", resultTemplateKey: "house", laborDays: 2, laborCostCopper: 200, materials: [] })] }],
+        materials: [],
+        sites: [{ propertyId: "warehouse", templateKey: "warehouse", enabled: true, access: "party-members", accessPurseIds: [], capacityWeight: null, completedTemplates: [], notes: "" }],
+        postal: { feeCopper: 10, deliveryDays: 2, offices: [{ shopId: "shop", allowTown: false }] },
+      }),
+    }),
+  };
+}
+const heroSeat: CloudSeat = { id: "hero-seat", name: "Hero", token: "hero", role: "player", purseIds: ["hero"] };
+
+test("a player cancels their own withdrawal of an unidentified stored item; nothing names it", () => {
+  let t = estateFixture();
+  t = applyCommand(t, dmSeat, { id: "mk", kind: "item-unidentify", holdingId: "timber", before: null, unidentified: { name: "Bundle of sticks", value: 50 } });
+  t = applyCommand(t, heroSeat, { id: "dep", kind: "estate-storage", propertyId: "warehouse", holdingId: "timber", quantity: 4, direction: "deposit", purseId: "hero", override: false });
+  t.journal!.propertyOperations!.sites[0]!.withdrawalApproval = true;
+  const item = t.holdings.find((h) => h.custody?.kind === "property")!;
+  assert.ok(isUnidentified(item));
+  t = applyCommand(t, heroSeat, { id: "wd", kind: "estate-storage", propertyId: "warehouse", holdingId: item.id, quantity: 2, direction: "withdraw", purseId: "hero", override: false });
+  const seen = projectRecord(t, heroSeat).journal!.propertyOperations!.withdrawals.find((r: { id: string }) => r.id === "wd")!;
+  assert.ok(!JSON.stringify(seen).includes("Timber"));
+  const cancelled = applyCommand(t, heroSeat, { id: "cx", kind: "estate-withdrawal-review", requestId: "wd", before: canonicalJson(seen), status: "cancelled", reason: "never mind" });
+  assert.equal(cancelled.journal!.propertyOperations!.withdrawals.find((r) => r.id === "wd")!.status, "cancelled");
+  const view = projectRecord(cancelled, heroSeat);
+  assert.ok(!JSON.stringify({ events: view.journal!.events, holdings: view.holdings }).includes("Timber"));
+});
+
+test("service refusals name an unidentified animal as presented", () => {
+  const t = stableFixture();
+  t.holdings.find((h) => h.id === "pony")!.unidentified = { name: "Covered shape" };
+  const refusal = () => {
+    try {
+      stablingCommand(t, "s", ["pony"]);
+      return "";
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+  assert.equal(refusal(), "Choose animals: horses, ponies, mules and the like.");
+  t.holdings.find((h) => h.id === "pony")!.unidentified = { name: "Small grey steed" };
+  assert.match(refusal(), /^Small grey steed isn't Kael's/);
+});
+
+test("a turn bill can't take another character's item by naming its ID", () => {
+  const t = campaign();
+  const wand = projectRecord(t, bramSeat).holdings.find((h) => h.id === "wand")!;
+  const bill = { purseIds: ["aria"], purses: [t.purses[1]!], holdings: [...t.holdings.filter((h) => h.purseId === "aria").map(presentedHolding), { ...wand, purseId: "aria" }], stock: [], ledger: [], loans: [], notes: [] };
+  assert.throws(() => applyBillToTable(t, bill as never, {} as never), /another character holds/);
 });

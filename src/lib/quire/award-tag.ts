@@ -24,6 +24,8 @@ export const awardTagSchema = z
     unitCopper: whole.optional(),
     /** Item lines from 2026-11-04: the holding the award created, so a later mark is matched. */
     holdingId: id.optional(),
+    /** Set when the unidentified item ended (sold, used up): players see this value (item-identity.ts). */
+    presentedCopper: whole.optional(),
   })
   .strict();
 export type AwardTag = z.infer<typeof awardTagSchema>;
