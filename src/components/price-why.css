@@ -1,0 +1,36 @@
+/* "Why this price?" (price-why.tsx): a small text button and a breakdown that wraps at 320 px. */
+.price-why { display: block; min-width: 0; }
+.price-why-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.1rem;
+  font-size: 0.8rem;
+  color: var(--color-lead);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.price-why-toggle:focus-visible { outline: 2px solid var(--color-lead); outline-offset: 2px; border-radius: 0.25rem; }
+.price-why-panel {
+  display: block;
+  max-width: 28rem;
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.4rem;
+  background: var(--color-subtle);
+  color: var(--color-fg);
+  font-size: 0.85rem;
+}
+.price-why-row { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.1rem 0; }
+.price-why-row > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.price-why-row > :last-child { flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.price-why-sub { display: block; margin: 0.15rem 0 0.25rem 0.75rem; padding-left: 0.5rem; border-left: 2px solid var(--color-border); color: var(--color-muted); }
+.price-why-total { margin-top: 0.25rem; padding-top: 0.3rem; border-top: 1px solid var(--color-border); font-weight: 600; }
+.price-why-note, .price-why-dm { display: block; margin-top: 0.3rem; color: var(--color-muted); overflow-wrap: anywhere; }
+.price-why-dm { font-size: 0.75rem; }
+.npc-talk-why { padding: 0 1rem; min-width: 0; }
+@media (max-width: 430px) { .npc-talk-why { padding: 0 .45rem; } }

@@ -35,6 +35,7 @@ import {
   useMemo,
   useState,
   useRef,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
@@ -87,6 +88,7 @@ import {
   type QuireFile,
 } from "./economy.ts";
 import { subscribeCampaigns } from "./campaigns.ts";
+import { getPreview, subscribePreview, type PlayerPreview } from "./player-preview.ts";
 import { getCloudWatch, subscribeCloudWatch } from "./cloud-turn.ts";
 import {
   captureDeviceBackup,
@@ -194,7 +196,7 @@ type EconomyApi = {
     kind: Holding["kind"],
     quantity: number,
     unitCopper: number,
-    metadata?: Pick<Holding, "notes" | "category"> & { pool?: boolean },
+    metadata?: Pick<Holding, "notes" | "category" | "requiresAttunement"> & { pool?: boolean },
   ) => Promise<void>;
   /** Resolves `true` when removed; `false` after a shown error. */
   deleteHolding: (id: string) => Promise<boolean>;
@@ -234,6 +236,13 @@ type EconomyApi = {
    * authoritative `coin-exchange` command (owner or DM; logged as the purse's activity).
    */
   makeChange: (purseId: string, before: Coins, after: Coins, options?: CommandOptions) => Promise<boolean>;
+  /**
+   * Attunement (loot phase 5): attune the holder's character to an item or end it (`item-attune`;
+   * the controlling player or the DM, past the limit the DM with `override`), and the DM's
+   * per-character limit (`attunement-limit`; `null` is the default of 3).
+   */
+  attuneItem: (holding: Holding, attuned: boolean, options?: CommandOptions & { override?: boolean }) => Promise<boolean>;
+  setAttunementLimit: (purse: Purse, limit: number | null, options?: CommandOptions) => Promise<boolean>;
   /**
    * Charges and consumables (loot phase 5): spend one use of an item (`item-use`; the
    * controlling player or the DM) or, for the DM, set its uses left (`item-recharge`).
@@ -360,6 +369,7 @@ function fault(error: unknown, fallback: string) {
   toast.error(error instanceof Error ? error.message : fallback);
 }
 
+const noPreview = () => null;
 export function EconomyProvider({ children }: { children: ReactNode }) {
   const [journal, setJournal] = useState<Journal>({ sessions: [], requests: [], events: [] });
   const [ready, setReady] = useState(false);
@@ -378,9 +388,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
   const ledgerRef = useRef(ledger);
   ledgerRef.current = ledger;
   const reloadSequence = useRef(0);
+  // "Preview as player": the preview the economy below was read for. Until a reload for the
+  // current preview (or for none) finishes, screens get no data, so the player layout never
+  // renders the DM's data (nor the DM layout the player's) for a frame.
+  const preview = useSyncExternalStore(subscribePreview, getPreview, noPreview);
+  const [loadedFor, setLoadedFor] = useState<PlayerPreview | null>(null);
   const reload = useCallback(async () => {
     const sequence = ++reloadSequence.current;
     const campaignKey = activeCampaignId();
+    // The preview (or none) this read is for: a preview started or stopped meanwhile drops it.
+    const viewing = getPreview();
     await ensureEconomy();
     // A once-per-campaign safety copy. Never bypass an existing password-protected-save policy.
     if (
@@ -412,6 +429,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       journal: nextJournal,
     } = await economyView();
     if (sequence !== reloadSequence.current || campaignKey !== activeCampaignId()) return;
+    if (viewing !== getPreview()) return;
+    setLoadedFor(viewing);
     setPurses(nextPurses.sort((a, b) => a.name.localeCompare(b.name)));
     setHoldings(nextHoldings.sort((a, b) => a.name.localeCompare(b.name)));
     setShops(nextShops.sort((a, b) => a.name.localeCompare(b.name)));
@@ -468,6 +487,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     () =>
       subscribeSheetChanges(() => {
         void reload();
+      }),
+    [reload],
+  );
+  // Starting or stopping "Preview as player" switches every screen between the DM's data and the
+  // previewed seat's view, read again from this device (no campaign reload, nothing written).
+  useEffect(
+    () =>
+      subscribePreview(() => {
+        void reload().catch((error) => fault(error, "This view could not refresh."));
       }),
     [reload],
   );
@@ -909,6 +937,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               unitCopper,
               notes: metadata?.notes ?? "",
               ...(metadata?.category ? { category: metadata.category } : {}),
+              ...(metadata?.requiresAttunement && kind === "item"
+                ? { requiresAttunement: metadata.requiresAttunement }
+                : {}),
               ...(metadata?.pool ? { pool: { at: Date.now(), source: "add-loot" as const } } : {}),
             });
           },
@@ -993,6 +1024,42 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           await reload().catch(() => undefined);
           toast.error(error instanceof Error && error.message ? error.message : "The coins could not be exchanged.");
+          return false;
+        }
+      },
+      attuneItem: async (holding, attuned, options = {}) => {
+        const expect = { purseId: holding.purseId, attuned: !!holding.attuned };
+        try {
+          await acceptCommand({
+            kind: "item-attune",
+            holdingId: holding.id,
+            attuned,
+            ...(options.override ? { override: true as const } : {}),
+            expect,
+            ...idOf(options),
+          });
+          toast.success(attuned ? `Attuned to ${holding.name}.` : `Attunement to ${holding.name} ended.`);
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The attunement was not changed.");
+          return false;
+        }
+      },
+      setAttunementLimit: async (purse, limit, options = {}) => {
+        try {
+          await acceptCommand({
+            kind: "attunement-limit",
+            purseId: purse.id,
+            limit,
+            expect: purse.attunementLimit ?? null,
+            ...idOf(options),
+          });
+          toast.success(`${purse.name} can attune to ${limit ?? 3} item${(limit ?? 3) === 1 ? "" : "s"}.`);
+          return true;
+        } catch (error) {
+          await reload().catch(() => undefined);
+          toast.error(error instanceof Error && error.message ? error.message : "The limit was not changed.");
           return false;
         }
       },
@@ -1421,7 +1488,30 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     attempt,
   ]);
 
-  return <EconomyContext.Provider value={api}>{children}</EconomyContext.Provider>;
+  const stale = preview !== loadedFor;
+  const shown = useMemo<EconomyApi>(
+    () =>
+      stale
+        ? {
+            ...api,
+            ready: false,
+            journal: { sessions: [], requests: [], events: [] },
+            purses: [],
+            holdings: [],
+            shops: [],
+            stock: [],
+            ledger: [],
+            catalog: [],
+            lexicon: [],
+            listings: [],
+            loans: [],
+            sheets: [],
+          }
+        : api,
+    [api, stale],
+  );
+
+  return <EconomyContext.Provider value={shown}>{children}</EconomyContext.Provider>;
 }
 
 export function useEconomy() {

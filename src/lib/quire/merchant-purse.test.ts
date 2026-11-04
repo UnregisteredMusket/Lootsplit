@@ -26,6 +26,7 @@ import {
   purchaseLimited,
   projectMerchantPurse,
 } from "./merchant.ts";
+import { shopSellBreakdown, viewerBreakdown } from "./price-breakdown.ts";
 import type { Holding, Shop } from "./types.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
@@ -185,6 +186,24 @@ test("the purchase limit caps what the shop pays for one item", () => {
   assert.equal(merchantUnitOffer(sword, t.shops[0]), 600);
   assert.equal(purchaseLimited(sword, t.shops[0]), true);
   assert.equal(copper(act(t, sell(2), "limited"), "a"), 5_000 + 1_200);
+});
+
+test("Why this payout? lists the off-list rate and purchase limit and matches what the shop pays", () => {
+  const shop = marlow({ offListPercent: 40, purchaseLimit: 600 });
+  const t = campaign(shop);
+  for (const h of t.holdings) {
+    const b = shopSellBreakdown(shop, h.unitCopper, 2, h);
+    assert.equal(b.unit, merchantUnitOffer(h, shop), h.name);
+    assert.equal(b.base.copper + b.factors.reduce((n, f) => n + f.copper, 0), b.unit, h.name);
+  }
+  // Longsword: 2,000 → 1,000 at 50%, capped at 600. Potion: 1,000 → 500 → 200 off-list.
+  assert.deepEqual(shopSellBreakdown(shop, 2_000, 1, t.holdings[0]).factors.map((f) => [f.key, f.copper]), [["buy-rate", -1_000], ["purchase-limit", -400]]);
+  assert.deepEqual(shopSellBreakdown(shop, 1_000, 1, t.holdings[1]).factors.map((f) => [f.key, f.copper]), [["buy-rate", -500], ["off-list", -300]]);
+  // Public shop terms: players see the same factors; the purse is never a factor.
+  const b = shopSellBreakdown(shop, 1_000, 1, t.holdings[1]);
+  assert.deepEqual(viewerBreakdown(b, false), b);
+  // An old shop's breakdown is unchanged.
+  assert.deepEqual(shopSellBreakdown({ buyRate: 0.5 }, 2_000, 3), shopSellBreakdown(marlow({ merchantPurse: undefined }), 2_000, 3, t.holdings[0]));
 });
 
 test("off the buy list: refused unless the shop buys anything else at a penalty", () => {

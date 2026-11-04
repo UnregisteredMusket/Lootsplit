@@ -40,7 +40,9 @@ import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
 import { FairnessLedger } from "@/components/fairness-ledger";
 import { partyFunds } from "@/lib/quire/coin-split";
+import { attunementFromNotes } from "@/lib/quire/attunement";
 import { PartyGroupsPanel, PlayerGroupCard, SplitPartyButton } from "@/components/party-groups";
+import { PreviewAsPlayerButton } from "@/components/player-preview";
 import { XpAward } from "@/components/xp-award";
 import { XpLine } from "@/components/xp-level-up";
 
@@ -52,7 +54,10 @@ export const Route = createFileRoute("/party")({
     section?: "funds" | "characters" | "pool" | "fairness";
     period?: string;
     character?: string;
+    /** "1": open the DM's "Preview as player" chooser (command palette). */
+    preview?: string;
   } => ({
+    ...(search.preview === "1" || search.preview === 1 ? { preview: "1" } : {}),
     action:
       search.action === "add" ||
       search.action === "give" ||
@@ -86,6 +91,7 @@ function PartyPage() {
     section: requestedSection,
     period: fairPeriod = "campaign",
     character: fairCharacter,
+    preview: openPreview,
   } = Route.useSearch();
   const navigate = Route.useNavigate();
   // Router hash (not the window's) so this also works in a split-view pane.
@@ -139,6 +145,7 @@ function PartyPage() {
           // Add loot is the DM's; players never see a control they cannot use (P6).
           seat.role === "dm" ? (
             <>
+              <PreviewAsPlayerButton openOnMount={openPreview === "1"} />
               {!readOnly && <SplitPartyButton />}
               <Button
                 disabled={!economy.ready || visible.length === 0 || readOnly}
@@ -1066,6 +1073,8 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               await addHolding(purseId, name.trim(), kind, quantity, copper, {
                 notes,
                 category,
+                // Open5e loot carries "Requires attunement" in its notes (attunement.ts).
+                ...attunementFromNotes(notes),
                 ...(poolable && pool ? { pool: true } : {}),
               });
               setName("");

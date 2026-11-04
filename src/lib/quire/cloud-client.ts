@@ -37,6 +37,12 @@ import { setCloudWatch } from "./cloud-turn.ts";
 import { applyCloudTable, economySnapshot, snapshot } from "./economy.ts";
 import { getSeat, setSeat, downloadJson, resumedPlayerSeat } from "./table.ts";
 import {
+  PreviewReadOnlyError,
+  assertNotPreviewing,
+  previewActive as playerPreviewActive,
+  subscribePreview,
+} from "./player-preview.ts";
+import {
   applyCommand,
   commandSchema,
   compactPatch,
@@ -140,6 +146,9 @@ let acceptedPoll:
     }
   | undefined;
 export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
+  // Preview as player: the sheet may read the roll policy and the character's roll log (both
+  // read-only on the server); a roll itself is refused.
+  if (!body.policy && !body.log) assertNotPreviewing();
   const s = requireSession();
   if (
     !body.policy &&
@@ -356,7 +365,32 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
   // ~60 useSyncExternalStore readers in both split-view panes stay idle.
   if (!same) for (const fn of listeners) fn();
 }
+/**
+ * The room as the previewed player seat sees it (player-preview.ts): a player role, and none of
+ * the DM-only readouts (departed seats and their invitations, the storage notice, recoveries).
+ * Memoized per room view, so external-store readers keep a stable snapshot.
+ */
+let previewedRoom: { from: typeof view; as: typeof view } | null = null;
+function asPreviewedPlayer(room: typeof view): typeof view {
+  if (previewedRoom?.from !== room)
+    previewedRoom = {
+      from: room,
+      as: {
+        ...room,
+        role: "player",
+        seatId: "",
+        departed: [],
+        storageWarning: null,
+        recoveries: [],
+        unverifiedRecoveries: 0,
+      },
+    };
+  return previewedRoom.as;
+}
 export function getCloudTable() {
+  return playerPreviewActive() ? asPreviewedPlayer(roomView()) : roomView();
+}
+function roomView() {
   // Owner changes can occur while no room is connected. Keep the external-store
   // snapshot stable except when the authorized recovery list actually changes.
   // recoveryVisibility() is cached until storage changes, so this getter stays
@@ -391,7 +425,9 @@ export function subscribeCloudTable(fn: () => void) {
     window.addEventListener("storage", storageChanged);
   }
   listeners.add(fn);
+  const preview = subscribePreview(fn);
   return () => {
+    preview();
     listeners.delete(fn);
     if (!listeners.size && typeof window !== "undefined") {
       window.removeEventListener("lootsplit-account-changed", refreshRecoveryVisibility);
@@ -701,6 +737,9 @@ if (typeof window !== "undefined") {
 async function refresh(conditional = false) {
   const s = session();
   if (!s) return;
+  // The DM's read-only "Preview as player" (player-preview.ts) shows the room as it was when the
+  // preview started: nothing is applied to this device until it ends (the next poll catches up).
+  if (playerPreviewActive()) return;
   const campaignKey = key();
   let remote: RoomView | import("./cloud.server.ts").RoomUnchanged;
   const sameSeat =
@@ -1099,6 +1138,8 @@ export async function queueCommand(
   input: CommandRequest,
   expected?: ExpectedMutationScope,
 ): Promise<EconomyMutationOutcome> {
+  // Preview as player: refused before anything is queued, so nothing is sent after it ends.
+  if (playerPreviewActive()) return Promise.reject(new PreviewReadOnlyError());
   const invoked = captureMutationScope();
   const guard = () => {
     assertMutationScope(invoked);
@@ -1217,6 +1258,8 @@ export async function queueCommandBatch(
   inputs: CommandRequest[],
   expected?: ExpectedMutationScope,
 ): Promise<EconomyMutationOutcome> {
+  // Preview as player: refused before anything is queued, so nothing is sent after it ends.
+  if (playerPreviewActive()) return Promise.reject(new PreviewReadOnlyError());
   const invoked = captureMutationScope();
   const guard = () => {
     assertMutationScope(invoked);
@@ -1255,6 +1298,8 @@ export function runSharedMutation(
   work: () => Promise<unknown>,
   expected?: ExpectedMutationScope,
 ): Promise<EconomyMutationOutcome> {
+  // Preview as player: refused before anything is queued, so nothing is sent after it ends.
+  if (playerPreviewActive()) return Promise.reject(new PreviewReadOnlyError());
   const invoked = captureMutationScope();
   const guard = () => {
     assertMutationScope(invoked);
@@ -1414,6 +1459,7 @@ export async function leaveTable() {
   await detachTable(true);
 }
 export async function disconnectClosedRoom() {
+  assertNotPreviewing();
   const saved = await exportPending();
   if (!saved)
     throw new Error(
@@ -1459,6 +1505,7 @@ export function pendingActions() {
   );
 }
 export async function importPending(file: File) {
+  assertNotPreviewing();
   if (file.size > 2_000_000) throw new Error("Recovery file is too large.");
   const raw = JSON.parse(await file.text());
   const { commandSchema } = await import("./commands.ts");
@@ -1507,6 +1554,8 @@ export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) 
 }
 /** A player's NPC barter quote comes from the room server: the NPC's rules and purse stay there. */
 export async function requestNpcBarterQuote(input: import("./npc-barter.ts").BarterOfferInput) {
+  // Preview as player: a quote would be read with the DM's token.
+  assertNotPreviewing();
   const s = requireSession();
   const { quoteCloudNpcBarter } = await import("./cloud-api");
   return quoteCloudNpcBarter({ data: { ...input, code: s.code, token: s.token } });
@@ -1649,6 +1698,8 @@ export async function requestMapSignals(
   mapId: string,
   ping?: import("./map-signals.ts").MapPingInput,
 ) {
+  // Preview as player: no ping is sent, and the DM's token would read the DM's signals.
+  assertNotPreviewing();
   const s = requireSession(),
     campaign = key();
   const { requestCloudMapSignals } = await import("./cloud-api.ts");
@@ -1662,6 +1713,9 @@ export async function requestMapSignals(
 
 /** Private media travels separately; a stale campaign response never enters another window. */
 export async function requestMapAssets(request: unknown) {
+  // Preview as player: map media may be read (it is the projected map's), never uploaded.
+  const action = (request as { action?: unknown } | null)?.action;
+  if (action !== "manifest" && action !== "read") assertNotPreviewing();
   const s = requireSession(),
     campaign = key();
   const { requestCloudMapAssets } = await import("./cloud-api.ts");
@@ -1672,6 +1726,8 @@ export async function requestMapAssets(request: unknown) {
 
 /** The seat's initiative panel (revealed order, round, own HP); null when not shown here. */
 export async function readSharedMapCombatOrder(mapId:string) {
+  // The DM's token reads the DM's order: not available in a player preview.
+  assertNotPreviewing();
   const expected=captureMutationScope(),current=requireSession();
   const {readMapCombatOrder}=await import("./cloud-api");
   const {mapCombatOrderSchema}=await import("./map-combat-schema");
@@ -1680,6 +1736,8 @@ export async function readSharedMapCombatOrder(mapId:string) {
   return result===null?null:mapCombatOrderSchema.parse(result);
 }
 export async function readSharedMapCombat(mapId:string) {
+  // The DM's token reads the DM's combat HUD: not available in a player preview.
+  assertNotPreviewing();
   const expected=captureMutationScope(),current=requireSession();
   const {readMapCombatPresentation}=await import("./cloud-api");
   const {mapCombatHudSchema}=await import("./map-combat-schema");

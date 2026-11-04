@@ -8,7 +8,8 @@
  */
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
 import { assertCarried } from "./custody.ts";
-import { assertMerchantSale, merchantShortfall, merchantUnitOffer, revealPurse } from "./merchant.ts";
+import { assertMerchantSale, merchantShortfall, revealPurse } from "./merchant.ts";
+import { shopSellBreakdown } from "./price-breakdown.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -45,11 +46,11 @@ export type SaleSplitPlan = {
 };
 
 /**
- * What one unit of `h` fetches at `shop`: the Sell to shop rule, including the off-list rate and
- * purchase limit (merchant.ts). The shop's purse is checked by the command for the whole sale.
+ * What one unit of `h` fetches at `shop`: the Sell to shop rule (price-breakdown.ts), including
+ * the off-list rate and purchase limit. The shop's purse is checked for the whole sale.
  */
-export function unitSalePrice(h: Pick<Holding, "unitCopper" | "notes" | "category">, shop: Shop): number {
-  return merchantUnitOffer(h, shop);
+export function unitSalePrice(h: Pick<Holding, "unitCopper" | "category">, shop: Shop): number {
+  return shopSellBreakdown(shop, h.unitCopper, 1, h).unit;
 }
 
 /**

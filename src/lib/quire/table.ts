@@ -60,6 +60,7 @@ export type Seat = {
 export const DM_SEAT: Seat = { role: "dm", purseIds: [], shopIds: [], openedAt: 0, elevated: false };
 
 import { isEphemeralCampaign } from "./guest-storage.ts";
+import { PreviewReadOnlyError, previewSeat, stopPreview, subscribePreview } from "./player-preview.ts";
 const KEY = "quire.seat.v1";
 const listeners = new Set<() => void>();
 let seat: Seat = DM_SEAT;
@@ -77,7 +78,16 @@ function remember(next: Seat) {
   for (const listener of listeners) listener();
 }
 
+/**
+ * The seat the app acts as: the previewed player seat during the DM's read-only "Preview as player"
+ * (player-preview.ts), otherwise this device's own seat.
+ */
 export function getSeat(): Seat {
+  return previewSeat() ?? getActualSeat();
+}
+
+/** This device's own seat, never the preview's. */
+export function getActualSeat(): Seat {
   if (!loaded && typeof window !== "undefined") {
     loaded = true;
     try {
@@ -95,6 +105,8 @@ export function getSeat(): Seat {
 }
 
 export function reloadSeat() {
+  // Another campaign (or a reloaded one): a preview never outlives the campaign it showed.
+  stopPreview();
   loaded = false;
   seat = DM_SEAT;
   getSeat();
@@ -102,13 +114,19 @@ export function reloadSeat() {
 }
 
 export function setSeat(next: Seat) {
+  // A preview's seat is never saved as this device's seat, and the role cannot change meanwhile.
+  if (previewSeat()) throw new PreviewReadOnlyError();
   loaded = true;
   remember(normalizeSeat(next));
 }
 
 export function subscribeSeat(listener: () => void) {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  const preview = subscribePreview(listener);
+  return () => {
+    preview();
+    return listeners.delete(listener);
+  };
 }
 
 export function normalizeSeat(input: Partial<Seat> | null | undefined): Seat {

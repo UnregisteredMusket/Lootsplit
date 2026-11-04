@@ -8,6 +8,7 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { Button, Modal } from "./ui";
 import { SessionReportReader } from "./session-report-reader";
+import { SessionRecapButton } from "./session-recap";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
 import { readSessionSummary } from "@/lib/quire/archive-reader";
@@ -325,6 +326,9 @@ export function JournalNotes() {
             <p className="text-sm text-muted">
               Received/spent excludes internal coin transfers. Net is balance movement.
             </p>
+            <div>
+              <SessionRecapButton session={linkedSession} archived={linkedArchive} />
+            </div>
             {sessionChronicleEntries(journal.entries || [], seat, linkedSession.id).map((entry) => (
               <AppLink className="settings-link" key={entry.id} href={journalEntryHref(entry.id)}>
                 Read linked journal entry · {entry.title}
