@@ -205,7 +205,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 5 | 88s → 938s | +850s | +965.91% |
-| Development / gameplay | open | 4 | 145s → 1074s | +929s | +640.69% |
+| Development / gameplay | open | 5 | 145s → 1269s | +1124s | +775.17% |
 | Development / accounts / dev-member | open | 4 | 6s → 13s | +7s | +116.67% |
 | Development / accounts / dev-character | open | 2 | 13s → 20s | +7s | +53.85% |
 | Code checks and immutable builds / lint | open | 6 | 7s → 26s | +19s | +271.43% |
@@ -394,7 +394,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) | open | 3 | 434s → 710s | +276s | +63.59% |
 | Verify preserved functionality | open | 3 | 1179s → 6506s | +5327s | +451.82% |
 | Encrypted offsite database backup / initial queue | open | 4 | 5s → 160s | +155s | +3100% |
-| backup / Export consistently and encrypt before writing to disk | open | 6 | 3s → 21s | +18s | +600% |
+| backup / Export consistently and encrypt before writing to disk | open | 7 | 3s → 31s | +28s | +933.33% |
 | Development / gameplay (balanced v2) / dev-finance | open | 2 | 43s → 72s | +29s | +67.44% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 5 | 35s → 166s | +131s | +374.29% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 28s → 48s | +20s | +71.43% |
@@ -484,7 +484,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 5 | 1s → 17s | +16s | +1600% |
 | Development / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 5 | 1s → 20s | +19s | +1900% |
 | Development / governance / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 1s → 5s | +4s | +400% |
-| Development / accounts-2 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 5s | +3s | +150% |
+| Development / accounts-2 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 2s → 6s | +4s | +200% |
 | Development / world / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 4 | 3s → 19s | +16s | +533.33% |
 | Development / governance / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 5s → 14s | +9s | +180% |
 | Development / world / Run npx playwright install --with-deps chromium | open | 5 | 20s → 246s | +226s | +1130% |
@@ -517,7 +517,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | deploy / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 3 | 3s → 29s | +26s | +866.67% |
 | deploy / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 4s | +2s | +100% |
 | Change scope / Run node scripts/change-scope.mjs | open | 3 | 1s → 5s | +4s | +400% |
-| Development / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 1s → 5s | +4s | +400% |
+| Development / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 8s | +7s | +700% |
 | Development / economy / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 7 | 3s → 22s | +19s | +633.33% |
 | Development / economy / Run npm ci | open | 2 | 16s → 305s | +289s | +1806.25% |
 | Development / economy / dev-properties | open | 3 | 61s → 99s | +38s | +62.3% |
@@ -916,6 +916,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / gameplay / dev-loot-claims | open | 2 | 36s → 54s | +18s | +50% |
 | verify / Development / economy / dev-trade-economy | open | 2 | 113s → 154s | +41s | +36.28% |
 | Development / desktop / dev-map-tiles-1 | open | 2 | 66s → 100s | +34s | +51.52% |
+| Development / desktop / dev-map-tiles-1 | open | 2 | 74s → 104s | +30s | +40.54% |
 | Development / accounts / dev-human-check | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / accounts / dev-human-check | open | 2 | 4s → 6s | +2s | +50% |
 | Accessibility (axe-core) / Check public, DM and player screens at 1280 and 390 px, light and dark | open | 2 | 126s → 204s | +78s | +61.9% |
@@ -943,6 +944,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-04T17:39:42Z | job: Development / gameplay | 1074s → 1269s | +195s | +18.16% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40898074864/job/123534458024) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41876283126/job/126736542571) |
+| 2026-11-04T17:24:24Z | step: Development / gameplay / dev-price-breakdown | 15s → 27s | +12s | +80% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41802891895/job/126482786233) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41876283126/job/126736542571) |
+| 2026-11-04T17:18:40Z | step: Development / accounts-2 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40723063592/job/122939043965) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41876283126/job/126736542506) |
+| 2026-11-04T17:15:30Z | step: backup / Export consistently and encrypt before writing to disk | 21s → 31s | +10s | +47.62% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40853768063/job/123379474309) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41875543308/job/126733814419) |
+| 2026-11-04T17:02:57Z | step: Development / gameplay / dev-price-breakdown | 15s → 26s | +11s | +73.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41792382833/job/126456824943) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41872658965/job/126723779457) |
+| 2026-11-04T17:00:35Z | step: Development / desktop / dev-map-tiles-1 | 90s → 104s | +14s | +15.56% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40249600368/job/121338427054) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41872658965/job/126723779629) |
+| 2026-11-04T16:57:35Z | step: Development / world / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 5s → 8s | +3s | +60% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40676288230/job/122775507522) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41872658965/job/126723779435) |
 | 2026-11-04T09:32:14Z | step: Code checks and immutable builds / typecheck | 40s → 47s | +7s | +17.5% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40250375677/job/121340740537) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41807609851/job/126498444934) |
 | 2026-11-04T09:32:10Z | step: Development / gameplay / dev-item-identification | 21s → 26s | +5s | +23.81% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41787962702/job/126435125282) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41807609851/job/126498509630) |
 | 2026-11-04T09:16:10Z | step: Development / gameplay / dev-merchant-purse | 17s → 26s | +9s | +52.94% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41792224453/job/126453090558) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41805316827/job/126490819173) |
