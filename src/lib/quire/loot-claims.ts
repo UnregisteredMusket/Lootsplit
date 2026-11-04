@@ -13,6 +13,7 @@ import { characterVisible, seatInParty } from "./character-position.ts";
 import { isNpc, partyFunds, designatedPartyFund, recipientProblem } from "./coin-split.ts";
 import { formatCopper } from "./money.ts";
 import { POOL_GUARD } from "./custody.ts";
+import { movedUses } from "./item-uses.ts";
 import { fairnessStandings } from "./loot-fairness.ts";
 import {
   lootClaimsSchema,
@@ -525,7 +526,15 @@ export function applyLootCommand(
     for (const [j, award] of lot.awards.entries()) {
       const newId = `${cmd.id}-${i}-${j}`;
       if (t.holdings.some((x) => x.id === newId)) throw Error("This resolution was already recorded.");
-      t.holdings.push({ ...item, id: newId, purseId: award.purseId, quantity: award.quantity });
+      // Charges: the lot's partly used current item goes with the first award when the whole lot
+      // leaves the fund; every other moved item starts full (item-uses.ts).
+      t.holdings.push({
+        ...item,
+        id: newId,
+        purseId: award.purseId,
+        quantity: award.quantity,
+        ...movedUses(h, j === 0 ? h.quantity : 1),
+      });
       t.ledger.push({
         id: newId,
         at,
