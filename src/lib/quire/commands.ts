@@ -37,6 +37,7 @@ import { questCommands, questKinds, type QuestCommand } from "./quests-schema.ts
 import { applyXpAward, keepPurseAdvancement, xpAwardCommand, xpAwardSummary } from "./xp.ts";
 import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
+import { applyAttunementCommand, attunedBefore, attunementFromNotes, attunementCommands, attunementKinds, settleAttunement, type AttunementCommand } from "./attunement.ts";
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
@@ -335,6 +336,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   }),
   ...lootCommands,
   ...questCommands,
+  // Attunement (loot phase 5, attunement.ts): attune or end it, and the DM's per-character limit.
+  ...attunementCommands,
   // Charges and consumables (loot phase 5, item-uses.ts): Use and the DM's Recharge.
   ...itemUseCommands,
 ]);
@@ -366,6 +369,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   const at = Date.now();
   // `let`: archiveSession replaces t.journal, and everything after it must write to the new one.
   let journal = (t.journal = readJournal(t.journal));
+  // Attunement ends when an attuned item leaves its character in this command (settleAttunement).
+  const attuned = attunedBefore(t.holdings);
   // Exchange editors can address a legacy city's default before its first save.
   // Other commands retain their original financial/patch preview baselines.
   if (cmd.kind.startsWith("trade-")) ensureCityExchanges(t);
@@ -911,6 +916,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         copper: delta,
         transactionType: "adjustment",
       });
+  } else if (attunementKinds.has(cmd.kind)) {
+    // The controlling player or the DM; past the limit and the limit itself: the DM. One journal
+    // event for the character's purse, which players see only for purses they hold (projectRecord).
+    applyAttunementCommand(t, cmd as AttunementCommand, seat, { dm, own, assertCarried }, event);
   } else if (cmd.kind === "xp-award") {
     // DM only (checked in applyXpAward). One journal entry lists who got what; like a coin split,
     // it is DM-only text when an NPC is among the recipients.
@@ -1107,6 +1116,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
           quantity: cmd.quantity,
           unitCopper: s.copper,
           notes: s.notes,
+          // Open5e goods carry "Requires attunement" in their notes (attunement.ts).
+          ...attunementFromNotes(s.notes),
           ...(s.commodityId
             ? {
                 commodityId: s.commodityId,
@@ -1579,6 +1590,17 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         if (after.purseId !== current.purseId) throw Error(POOL_GUARD);
         if (!after.pool) change.after = { ...after, pool: current.pool };
       }
+      // Attunement changes through item-attune. An edit that keeps an attuned item with its
+      // character keeps the attunement and its requirement (an older client may drop them).
+      if (change.store === "holdings" && current?.attuned && change.after !== null) {
+        const after = change.after as import("./types.ts").Holding;
+        if (after.purseId === current.purseId && after.kind === "item")
+          change.after = {
+            ...after,
+            attuned: true,
+            requiresAttunement: after.requiresAttunement ?? current.requiresAttunement,
+          };
+      }
       if (change.store === "purses" && current?.sheetReadOnlyForDm && change.after !== null) {
         const after = change.after as import("./types.ts").Purse;
         if (
@@ -1594,6 +1616,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       ];
     }
   }
+  // Pushed straight to the table's journal: `event()` skips patches that change the journal, and
+  // such a patch replaces `t.journal`, yet an attunement it ends still needs its history entry.
+  settleAttunement(t, attuned, cmd.kind === "item-attune" && cmd.attuned ? cmd.holdingId : null, (summary, kind, purseId, change) => {
+    const events = (t.journal ??= readJournal(undefined)).events;
+    events.push({ id: cmd.id + "-event-" + events.length, at, summary, kind, purseId, change });
+  });
   if (journal.finance) journal.finance = readFinance(journal.finance);
   if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
     !same(originalLocations, t.journal?.market?.locations))

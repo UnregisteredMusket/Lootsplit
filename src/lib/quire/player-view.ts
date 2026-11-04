@@ -94,6 +94,7 @@ export function playerTable(table: CloudTable, record: CloudTable, seat: CloudSe
           profileId: _profile,
           editBaseline: _baseline,
           rolls: _rolls,
+          attunementLimit: _attunementLimit,
           ...ownPurse
         } = p;
         return ownPurse;

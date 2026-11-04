@@ -113,6 +113,7 @@ export async function characterRequest<T>(
         manualAllowed: policy.manualAllowed,
         coins: body.coins,
         holdings: table.holdings.filter((h) => h.purseId === p.id),
+        ...(p.attunementLimit === undefined ? {} : { attunementLimit: p.attunementLimit }),
       },
     } as T;
   }

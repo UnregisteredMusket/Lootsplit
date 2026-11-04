@@ -93,6 +93,10 @@ export function pendingCommandDescription(value: unknown): string {
       return `Award ${c.amount} ${c.unit === "xp" ? "XP" : c.amount === 1 ? "milestone" : "milestones"} · ${c.purseIds.length} character${c.purseIds.length === 1 ? "" : "s"}`;
     case "coin-exchange":
       return `Make change (same worth) · character ${c.purseId}`;
+    case "item-attune":
+      return `${c.attuned ? `Attune${c.override ? " past the limit" : ""}` : "End attunement"} · item ${c.holdingId}`;
+    case "attunement-limit":
+      return `Attunement limit ${c.limit ?? "default"} · character ${c.purseId}`;
     case "item-use":
       return `Use one charge · item ${c.holdingId}`;
     case "item-recharge":

@@ -41,6 +41,7 @@ import {
 } from "./estate.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { POOL_GUARD } from "./custody.ts";
+import { attunementFromNotes, attunementKinds, attunementProblem } from "./attunement.ts";
 import { usesProblem } from "./item-uses.ts";
 import { assertPoolable } from "./loot-claims.ts";
 import {
@@ -924,6 +925,20 @@ export async function saveHolding(input: Holding): Promise<void> {
       );
       pooledNow = true;
     }
+    // Attunement changes through item-attune: an edit keeps it while the item stays with its
+    // character (as a shared room's edit does) and a move to another holder ends it.
+    if (old?.attuned && holding.purseId === old.purseId && holding.kind === "item")
+      holding = {
+        ...holding,
+        attuned: true,
+        requiresAttunement: holding.requiresAttunement ?? old.requiresAttunement,
+      };
+    else if (holding.attuned) {
+      const { attuned: _attuned, ...rest } = holding;
+      holding = rest;
+    }
+    const attunementProblemText = attunementProblem(holding);
+    if (attunementProblemText) throw Error(attunementProblemText);
     if (
       old?.kind === "property" &&
       (old.purseId !== holding.purseId || holding.kind !== "property")
@@ -957,6 +972,8 @@ export async function saveHolding(input: Holding): Promise<void> {
           }
         : undefined,
     );
+    if (old?.attuned && !holding.attuned)
+      await audit(tx, `Attunement ended: ${old.name} left the character`, "management", old.purseId);
   });
 }
 
@@ -1045,6 +1062,8 @@ export async function removeHolding(id: string): Promise<void> {
     }
     tx.objectStore("holdings").delete(id);
     if (old) await audit(tx, `Removed holding: ${old.name}`, "management", old.purseId);
+    if (old?.attuned)
+      await audit(tx, `Attunement ended: ${old.name} left the character`, "management", old.purseId);
   });
 }
 
@@ -1352,6 +1371,8 @@ export async function buyFromShop(
           quantity,
           unitCopper: stock.copper,
           notes: stock.notes,
+          // Open5e goods carry "Requires attunement" in their notes (attunement.ts).
+          ...attunementFromNotes(stock.notes),
           ...(stock.commodityId
             ? {
                 commodityId: stock.commodityId,
@@ -2924,6 +2945,10 @@ export async function executeLocalCommand(
       throw Error(
         "The treasure pool is read-only on a player link. Ask the DM to mark claims at the table.",
       );
+    // Attunement: a player link holds a copy of part of the party, so a change there would never
+    // reach the DM's campaign. The DM marks it on their device (or the party plays shared).
+    if (seat.role !== "dm" && attunementKinds.has(command.kind))
+      throw Error("Attunement is tracked on the DM's device or in a shared room. Ask the DM to mark it.");
     // Charges: the player link holds a copy of part of the party, so a use there would never
     // reach the DM's campaign. The DM marks uses on their device (or the party plays shared).
     if (seat.role !== "dm" && (command.kind === "item-use" || command.kind === "item-recharge"))
