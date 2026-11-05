@@ -20,6 +20,7 @@ const featureAudits = {
   "price-breakdown": "scripts/price-breakdown-browser-audit.mjs",
   // Black-market markup labels are audited inside the price-breakdown audit.
   "market-markup": "scripts/price-breakdown-browser-audit.mjs",
+  "event-modifiers": "scripts/event-modifiers-browser-audit.mjs",
   "preview-as-player": "scripts/preview-as-player-browser-audit.mjs",
   "ledger-export": "scripts/ledger-export-browser-audit.mjs",
   "item-charges": "scripts/item-charges-browser-audit.mjs",

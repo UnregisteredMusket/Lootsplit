@@ -47,6 +47,7 @@ import {
   type Negotiator,
 } from "@/lib/quire/price-breakdown";
 import { shopAsking } from "@/lib/quire/vendors";
+import { eventRate, lineEvents } from "@/lib/quire/market-events";
 import { blackMarketPremium, markupDisplay, shopMarkupNote } from "@/lib/quire/market-markup";
 import { PriceWhy } from "@/components/price-why";
 import { useDollarText, useShowDollars } from "@/lib/quire/prefs";
@@ -514,12 +515,15 @@ function StockRow({
   );
   // The `buy` command's own price: list × markup (× black-market premium), then Charisma.
   const charisma = negotiator?.cha ?? null;
+  // Named market events active today (market-events.ts), exactly as the `buy` command applies them.
+  const events = lineEvents(journal, shop, line);
   const breakdown = shopBuyBreakdown(shop, line.copper, charisma, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, {
     negotiator,
     markup: markupDisplay(journal),
+    events,
     ...(dm ? { listDerivation: listPriceDerivation(shop, line, realm) } : {}),
   });
-  const asking = shopAsking(shop, line.copper);
+  const asking = shopAsking(shop, line.copper, eventRate(events));
   const percent = charisma === null ? 0 : charismaOffPercent(charisma);
   const unit = breakdown.unit;
   const price = unit * asked;

@@ -264,6 +264,9 @@ jobs:
       - name: dev-price-breakdown
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-price-breakdown 240 node scripts/price-breakdown-browser-audit.mjs
+      - name: dev-event-modifiers
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-event-modifiers 240 node scripts/event-modifiers-browser-audit.mjs
       - name: dev-preview-as-player
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs

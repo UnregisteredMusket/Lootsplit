@@ -4,8 +4,10 @@
  * can never disagree with the amount moved (price-breakdown.test.ts proves it over generated
  * inputs). Nothing here is stored; it is computed from records the viewer already has.
  *
- * Rounding is unchanged: a shop's asking price rounds once (list × markup × black-market
- * premium), Charisma then rounds once, and the quantity multiplies the whole-copper unit price.
+ * Rounding is unchanged: a shop's asking price rounds once (list × market events × markup ×
+ * black-market premium), Charisma then rounds once, and the quantity multiplies the whole-copper
+ * unit price. Named market events (market-events.ts) are listed one factor each, by name; a secret
+ * one is DM-only, so players see it folded into "Other adjustments".
  */
 import { charismaOffPercent, formatCopper, groupThousands, priceAfterCharisma } from "./money.ts";
 import { shopAsking } from "./vendors.ts";
@@ -14,6 +16,7 @@ import { charismaScore } from "./sheet.ts";
 import { offListPercent, onBuyList, stockCategory } from "./merchant.ts";
 import { forSale } from "./item-identity.ts";
 import { blackMarketPremium, markupTier, type MarkupDisplay } from "./market-markup.ts";
+import { eventRate, MAX_EVENT_RATE, MIN_EVENT_RATE, unlimitedEventRate, type MarketEventEffect } from "./market-events.ts";
 import type { CharacterSheet } from "./sheet.ts";
 import type { ItemCategory, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
 
@@ -144,14 +147,45 @@ export function shopBuyBreakdown(
     listDerivation?: PriceFactor[];
     /** How players see the black-market markup (the campaign setting; missing = descriptions). */
     markup?: MarkupDisplay;
+    /** Today's active market events for this line (market-events.ts `lineEvents`). */
+    events?: readonly MarketEventEffect[];
   } = {},
 ): PriceBreakdown {
-  const asking = shopAsking(shop, copper);
+  const events = options.events ?? [];
+  const rate = eventRate(events);
+  const asking = shopAsking(shop, copper, rate);
   const unit = priceAfterCharisma(asking, cha);
   const factors: PriceFactor[] = [];
-  const marked = shop.sellRate === 1 ? copper : Math.round(copper * shop.sellRate);
+  // Each event is shown at its share of the running whole-copper total; the asking price itself
+  // rounds once, and the last factor below takes up any difference.
+  let exact = copper,
+    shown = copper;
+  for (const e of events) {
+    exact *= e.permille / 1000;
+    const now = Math.round(exact);
+    factors.push({
+      key: `event-${e.id}`,
+      label: e.secret ? `Market event: ${e.name} (secret: players see Other adjustments)` : `Market event: ${e.name}`,
+      percent: pct(e.permille / 1000),
+      copper: now - shown,
+      ...(e.secret ? { dmOnly: true } : {}),
+    });
+    shown = now;
+  }
+  if (events.length && rate !== unlimitedEventRate(events)) {
+    exact = copper * rate;
+    const now = Math.round(exact);
+    factors.push({
+      key: "event-limit",
+      label: `Market events limited to ×${MIN_EVENT_RATE}–×${MAX_EVENT_RATE}`,
+      copper: now - shown,
+      ...(events.some((e) => e.secret) ? { dmOnly: true } : {}),
+    });
+    shown = now;
+  }
+  const marked = shop.sellRate === 1 ? shown : Math.round(exact * shop.sellRate);
   if (shop.sellRate !== 1)
-    factors.push({ key: "markup", label: `Shop sells at ${Math.round(shop.sellRate * 1000) / 10}%`, percent: pct(shop.sellRate), copper: marked - copper });
+    factors.push({ key: "markup", label: `Shop sells at ${Math.round(shop.sellRate * 1000) / 10}%`, percent: pct(shop.sellRate), copper: marked - shown });
   if (shop.blackMarket) {
     // Players see the markup (owner, 2026-11-04): as a description or as the percent, by the
     // DM's setting. The DM's label always carries the percent and what players are shown.

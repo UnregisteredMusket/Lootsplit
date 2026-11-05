@@ -1,0 +1,12 @@
+/* Named market events (market-events.tsx): a two-column form on wide screens, one on phones. */
+.market-event-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+.market-event-form,
+.market-event-form fieldset,
+.market-event-row {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
