@@ -1,0 +1,11 @@
+{
+  "title": "XP from encounters",
+  "summary": "The DM's encounter loot review now suggests XP from the encounter's enemies and can give it to the party together with the loot, once.",
+  "items": [
+    "The suggestion adds each enemy's XP, or the XP for its challenge rating when it has none. Allies give no XP.",
+    "The XP is split evenly among the ticked party characters in whole numbers; any remainder goes to the character the DM picks or stays unawarded, and the journal says so. The DM can change the total or set each share.",
+    "A party that levels by milestones is offered Mark milestone instead of XP.",
+    "Encounters awarded earlier can get their XP once from Award XP on the awarded encounter. A retry never gives XP twice.",
+    "Levels still never change by themselves: each sheet shows Ready to level up."
+  ]
+}

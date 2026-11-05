@@ -82,6 +82,8 @@ import {
   valueEcho,
 } from "@/lib/encounters/loot-review";
 import { FeatureHeader } from "../feature-header";
+import { EncounterXpChooser, EncounterXpReceiptView, type EncounterXpChoice } from "./encounter-xp";
+import type { EncounterXpReceipt } from "@/lib/quire/encounter-xp";
 type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
@@ -104,6 +106,8 @@ type Detail = {
   purses: Purse[];
   /** Shared rooms: party membership and split settings for the DM's coin-split preview. */
   splitTable?: SplitTable;
+  /** XP from encounters: "milestone" when the party levels by milestones (absent on older servers). */
+  xpMode?: "xp" | "milestone";
   award: null | {
     receiptId: string;
     at: number;
@@ -112,6 +116,8 @@ type Detail = {
     coinSplitId?: string;
     /** Treasure-pool items' fund (prompt 2, phase 2). Absent on older awards. */
     poolFundId?: string;
+    /** XP from encounters: what the award gave, once. Absent on older awards and awards without XP. */
+    xp?: EncounterXpReceipt;
   };
 };
 /** The recipient select's value for "Treasure pool · <fund>" (never a purse ID). */
@@ -538,7 +544,9 @@ function EncounterEditor({
     [summarySessionId, setSummarySessionId] = useState(""),
     // Loot review multi-select (Q2): which loot rows "Assign selected to…" applies to. Draft only.
     [picked, setPicked] = useState<string[]>([]),
-    [lastCoinRecipient, setLastCoinRecipient] = useState("");
+    [lastCoinRecipient, setLastCoinRecipient] = useState(""),
+    // XP from encounters: the DM's choice, sent with the award (never stored in the draft).
+    [xpChoice, setXpChoice] = useState<EncounterXpChoice>({ input: null, problem: "" });
   const editing = useRef(false);
   editing.current = dirty || busy;
   useEffect(
@@ -655,7 +663,7 @@ function EncounterEditor({
       setDirty(false);
       onDirty(false);
       onSaved();
-      if (path === "award" && id.startsWith("local-")) await reloadEconomy();
+      if ((path === "award" || path === "award-xp") && id.startsWith("local-")) await reloadEconomy();
       if (path === "award") {
         void playSound("loot");
         // Result toast (design D9). An award is locked against a second one and has no reversal
@@ -675,6 +683,8 @@ function EncounterEditor({
           ? "Saved. Refresh to see the latest version."
           : path === "award"
             ? "Loot transferred. This encounter cannot award loot again."
+            : path === "award-xp"
+              ? "XP awarded. This encounter cannot award XP again."
             : path === "conclude"
               ? "Encounter concluded. Review recipients and loot before transferring."
               : "Encounter saved.",
@@ -1165,6 +1175,43 @@ function EncounterEditor({
                   </div>
                 )}
               </section>
+            )}
+            {detail.award?.xp ? (
+              <EncounterXpReceiptView
+                receipt={detail.award.xp}
+                name={(purseId) => detail.purses.find((p) => p.id === purseId)?.name ?? "Removed character"}
+              />
+            ) : (
+              detail.award &&
+              !detail.readOnly && (
+                // Encounters awarded without XP (including before XP from encounters) get it once.
+                <div className="encounter-award-xp">
+                  <EncounterXpChooser
+                    key={`${detail.id}-xp`}
+                    combatants={detail.body.combatants}
+                    table={splitTable}
+                    mode={detail.xpMode ?? "xp"}
+                    onChange={setXpChoice}
+                  />
+                  {xpChoice.input && (
+                    <button
+                      disabled={busy}
+                      onClick={async () => {
+                        if (
+                          await requestConfirm({
+                            title: xpChoice.input!.unit === "xp" ? "Award this XP?" : "Mark this milestone?",
+                            body: `Each chosen character's sheet records it once, with one party journal entry for “${detail.body.name}”.`,
+                            confirmLabel: xpChoice.input!.unit === "xp" ? "Award XP" : "Mark milestone",
+                          })
+                        )
+                          void action("award-xp", { xp: xpChoice.input });
+                      }}
+                    >
+                      {xpChoice.input.unit === "xp" ? "Award XP" : "Mark milestone"}
+                    </button>
+                  )}
+                </div>
+              )
             )}
             {lootSummary && (
               <div className="character-toolbar">
@@ -1722,8 +1769,8 @@ function EncounterEditor({
             </div>
             <p className="text-sm text-muted">
               D&D 2014 estimate for a same-level party, including group-size multipliers. Custom
-              actions, terrain and house rules can change the challenge. XP is informational and is
-              not awarded automatically.
+              actions, terrain and house rules can change the challenge. XP is never awarded
+              automatically: the loot review suggests it and you choose what to give.
             </p>
             <h3>
               <FantasyIcon ui="Dice" size={26} /> Generate editable enemies
@@ -2646,6 +2693,13 @@ function EncounterEditor({
                     </ul>
                   )}
                 </section>
+                <EncounterXpChooser
+                  key={`${detail.id}-review-xp`}
+                  combatants={draft.combatants}
+                  table={splitTable}
+                  mode={detail.xpMode ?? "xp"}
+                  onChange={setXpChoice}
+                />
                 <div className="encounter-readiness" aria-label="Before transferring">
                   {readiness.transfer.length ? (
                     <>
@@ -2781,8 +2835,8 @@ function EncounterEditor({
               {formatCopper(lootValueCopper(draft.loot))}
             </small>
             <small className="loot-review-footer-recipients">{recipientSummary(awardPreview)}</small>
-            {readiness.transfer.length > 0 && (
-              <small className="loot-review-footer-reason">{readiness.transfer[0]}</small>
+            {(readiness.transfer.length > 0 || xpChoice.problem) && (
+              <small className="loot-review-footer-reason">{readiness.transfer[0] ?? xpChoice.problem}</small>
             )}
           </div>
           <div className="loot-review-footer-actions">
@@ -2796,16 +2850,22 @@ function EncounterEditor({
             )}
             <button
               className="loot-review-transfer"
-              disabled={readiness.transfer.length > 0}
+              disabled={readiness.transfer.length > 0 || !!xpChoice.problem}
               onClick={async () => {
                 if (
                   await requestConfirm({
                     title: "Transfer the reviewed loot?",
-                    body: `The reviewed loot from “${draft.name}” goes to the selected campaign inventories.`,
+                    body: `The reviewed loot from “${draft.name}” goes to the selected campaign inventories.${
+                      xpChoice.input?.unit === "xp"
+                        ? ` ${xpChoice.input.total.toLocaleString("en-US")} XP goes to the chosen characters' sheets.`
+                        : xpChoice.input
+                          ? " The chosen characters' sheets each mark a milestone."
+                          : ""
+                    }`,
                     confirmLabel: "Transfer loot",
                   })
                 )
-                  void action("award");
+                  void action("award", xpChoice.input ? { xp: xpChoice.input } : {});
               }}
             >
               Transfer loot once
