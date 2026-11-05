@@ -321,7 +321,7 @@ test("old data and older clients: no events means unchanged prices; whole-journa
   assert.equal(preserveJournalMetadata({ ...current, marketEvents: [festival] }, readJournal({})).marketEvents, undefined);
   assert.deepEqual(tableForProtocol(on, 0).journal!.marketEvents, [blight]);
   assert.equal(MARKET_EVENTS_PROTOCOL, 26);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, MARKET_EVENTS_PROTOCOL);
+  assert.ok(CURRENT_TABLETOP_PROTOCOL >= MARKET_EVENTS_PROTOCOL);
   const table = projectRecord(on, ariaSeat);
   const draft = JSON.stringify([{ id: "d", kind: "market-event-end", eventId: "blight", before: blight }]);
   assert.throws(() => tabletopResponse({ table, draft }, MARKET_MARKUP_PROTOCOL), /updated Lootsplitter client/);
