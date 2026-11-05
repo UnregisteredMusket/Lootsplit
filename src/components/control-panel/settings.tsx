@@ -126,6 +126,7 @@ export function ManagementPanel({
           content: <><PlayerPermissions /><ReferenceControls /></>,
           icon: "Party",
           links: [
+            ["What players can see", "/features/visibility"],
             ["Party & character assignments", "/party"],
             ["Room members & permissions", "/share?tab=room"],
             ["Assigned character sheets", "/characters"],

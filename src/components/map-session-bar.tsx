@@ -3,6 +3,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { readTabletopSession } from "@/lib/quire/tabletop";
+import { sessionSwitchCommand } from "@/lib/quire/visibility-center";
 import { mapType } from "@/lib/quire/map-tiles";
 import type { CampaignMap } from "@/lib/quire/world-schema";
 import { CommandButton } from "./world-tools";
@@ -59,26 +60,14 @@ export function MapSessionBar({ map }: { map?: CampaignMap }) {
           </CommandButton>
         )}
         {dm && session.activeMapId && (
-          <CommandButton
-            input={{
-              kind: "tabletop-session",
-              before: table.journal.world?.tabletop ?? null,
-              session: { ...session, playerBrowsing: !session.playerBrowsing },
-            }}
-          >
+          <CommandButton input={sessionSwitchCommand(table.journal, "playerBrowsing")}>
             {session.playerBrowsing
               ? "Restrict browsing to active scene"
               : "Allow shared-scene browsing"}
           </CommandButton>
         )}
         {dm && (
-          <CommandButton
-            input={{
-              kind: "tabletop-session",
-              before: table.journal.world?.tabletop ?? null,
-              session: { ...session, tvEnabled: !session.tvEnabled },
-            }}
-          >
+          <CommandButton input={sessionSwitchCommand(table.journal, "tvEnabled")}>
             {session.tvEnabled
               ? "Disable TV / player display"
               : "Enable optional TV / player display"}

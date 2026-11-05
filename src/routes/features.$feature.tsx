@@ -34,6 +34,7 @@ import { DowntimeJourneys } from "@/components/map-journeys";
 import { QuestsScreen } from "@/components/quests";
 import { ReviewInbox } from "@/components/review-inbox";
 import { FeatureHeader } from "@/components/feature-header";
+import { VisibilityCenter } from "@/components/visibility-center";
 // Load exchange editors only for this screen. Downtime shares the small review
 // without pulling every market editor into startup.
 const TradeEconomyPanel = lazy(() =>
@@ -56,6 +57,7 @@ const FEATURE_EYEBROWS: Record<Feature, string> = {
   reports: "Records",
   review: "Records",
   music: "Table",
+  visibility: "Players & permissions",
 };
 export const Route = createFileRoute("/features/$feature")({
   validateSearch: (
@@ -122,6 +124,7 @@ function FeaturePage() {
             {feature === "trading" && <CampaignTrading />}
             {feature === "time" && <SessionTime initialHours={hours} />}
             {feature === "music" && <LocalAudioPanel />}
+            {feature === "visibility" && <VisibilityCenter />}
             {feature === "bank" && (
               <>
                 <p>
