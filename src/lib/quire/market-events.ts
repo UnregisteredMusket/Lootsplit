@@ -10,7 +10,9 @@
  *   day, so "End now" (end day = today) stops it at once.
  * - It is applied when a shop's asking price is computed (price-breakdown.ts `shopBuyBreakdown`),
  *   never by rewriting stored stock prices, and rounds once with the shop's markup and premium.
- *   Sale payouts, market listings and exchange quotes are not list prices and are unchanged.
+ *   What a shop pays for an item sold to it (`shopSellBreakdown`, `sell` and `sale-split`) is
+ *   multiplied the same way, by the item's (presented) category, rounding once with the buy rate.
+ *   Market listings and exchange quotes are not shop prices and are unchanged.
  * - The DM adds, edits and ends events with `market-event` / `market-event-end` (stale-checked,
  *   one DM-only journal event each). Ended events stay in the campaign as history; nothing deletes
  *   them. Stored in `journal.marketEvents` (tabletop protocol 26), at most `MARKET_EVENT_LIMIT`.
@@ -21,7 +23,8 @@
  */
 import { z } from "zod";
 import { locationPath, readMarketLocations, type MarketLocations } from "./shop-locations.ts";
-import type { Shop, StockLine } from "./types.ts";
+import { forSale } from "./item-identity.ts";
+import type { Holding, ItemCategory, Shop, StockLine } from "./types.ts";
 
 /** Ended events stay as history; this caps the stored list (about 250 bytes each). */
 export const MARKET_EVENT_LIMIT = 300;
@@ -40,7 +43,7 @@ export const EVENT_CATEGORIES = [
   "stable",
   "scribe",
   "jewels",
-] as const;
+] as const satisfies readonly ItemCategory[];
 
 const id = z.string().min(1).max(150);
 const day = z.number().int().nonnegative().max(1e9);
@@ -110,7 +113,8 @@ export function readMarketEvents(value: unknown): MarketEvent[] {
 
 export type EventStatus = "upcoming" | "active" | "ended";
 export function eventStatus(e: Pick<MarketEvent, "startDay" | "endDay">, today: number): EventStatus {
-  if (today >= e.endDay) return "ended";
+  // An upcoming event ended early (End now) keeps endDay = startDay: it never applied.
+  if (today >= e.endDay || e.endDay <= e.startDay) return "ended";
   return today < e.startDay ? "upcoming" : "active";
 }
 
@@ -138,12 +142,33 @@ function lineCategory(line: Pick<StockLine, "category">, shop: Pick<Shop, "categ
 
 /**
  * Today's active events that change a shop line's asking price, in a fixed order (start day,
- * then ID) so every engine multiplies them identically. Commands and screens both call this.
+ * then ID). Commands and screens both call this.
  */
 export function lineEvents(
   journal: JournalLike,
   shop: Pick<Shop, "id" | "locationId" | "category">,
   line: Pick<StockLine, "category">,
+): MarketEventEffect[] {
+  return categoryEvents(journal, shop, lineCategory(line, shop));
+}
+
+/**
+ * Today's active events that change what a shop pays for an item sold to it (`sell`,
+ * `sale-split`), by the item's category; an unidentified item by its presented one. An item
+ * without a category is covered only by all-items events.
+ */
+export function saleEvents(
+  journal: JournalLike,
+  shop: Pick<Shop, "id" | "locationId">,
+  item: Pick<Holding, "category" | "unidentified">,
+): MarketEventEffect[] {
+  return categoryEvents(journal, shop, forSale(item).category || undefined);
+}
+
+function categoryEvents(
+  journal: JournalLike,
+  shop: Pick<Shop, "id" | "locationId">,
+  category: string | undefined,
 ): MarketEventEffect[] {
   if (!journal?.marketEvents) return [];
   let events: MarketEvent[];
@@ -154,17 +179,20 @@ export function lineEvents(
   }
   const today = campaignDay(journal);
   const market = readMarketLocations(journal.market);
-  const category = lineCategory(line, shop);
   return events
     .filter((e) => eventStatus(e, today) === "active" && eventCovers(e, shop, category, market))
     .sort((a, b) => a.startDay - b.startDay || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map((e) => ({ id: e.id, name: e.name, permille: e.permille, ...(e.secret ? { secret: true as const } : {}) }));
 }
 
-/** The product of the events' multipliers, kept within ×0.1–×10. No events: exactly 1. */
+/**
+ * The product of the events' multipliers, kept within ×0.1–×10 (`eventRate`). No events: exactly
+ * 1. Multiplied in ascending permille order, so the same events give the same rate in any order
+ * (a player's projected copy lists hidden events differently from the DM's).
+ */
 export function unlimitedEventRate(events: readonly Pick<MarketEventEffect, "permille">[]): number {
   let rate = 1;
-  for (const e of events) rate *= e.permille / 1000;
+  for (const permille of events.map((e) => e.permille).sort((a, b) => a - b)) rate *= permille / 1000;
   return rate;
 }
 export function eventRate(events: readonly Pick<MarketEventEffect, "permille">[]): number {

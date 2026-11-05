@@ -49,7 +49,7 @@ import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { applyAttunementCommand, attunedBefore, attunementFromNotes, attunementCommands, attunementKinds, settleAttunement, type AttunementCommand } from "./attunement.ts";
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
-import { applyMarketEventCommand, lineEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
+import { applyMarketEventCommand, lineEvents, saleEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -1290,9 +1290,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.kind === "property") assertEstateDisposable(t, h.id);
     assertMerchantSale(h, s);
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
-    // An unidentified item sells at its presented value and category (shopSellBreakdown).
+    // An unidentified item sells at its presented value and category (shopSellBreakdown), with
+    // today's market events for that category, exactly as the shop's Why this payout? shows.
     const shown = presentedHolding(h);
-    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h).total;
+    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events: saleEvents(journal, s, h) }).total;
     // Merchant purse: the shop pays from it, or the whole sale is refused.
     merchantPays(s, paid);
     coins(h.purseId, paid);

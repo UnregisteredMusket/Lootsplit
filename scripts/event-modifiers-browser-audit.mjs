@@ -2,7 +2,8 @@
 // "Blight in the Riverlands" (provisions ×1.8, 21 days) and a secret "Guild levy" (×1.2, all items)
 // under Economic rules → Market events; both list as Active; the baker's Why this price? names the
 // blight (+266 cp) and the levy (DM-only), and buying charges exactly the total; the stored stock
-// price is unchanged. A player seat sees the blight in Market → Market events and in the
+// price is unchanged. Selling a sack of grain to the baker pays what Why this payout? shows, with
+// both events. A player seat sees the blight in Market → Market events and in the
 // breakdown, the levy only as "Other adjustments" and never by name. End now moves the blight to
 // Ended (kept as history) and the price drops back. No sideways scrolling at 1280, 390 and 320 px.
 // Never targets a real campaign.
@@ -72,7 +73,7 @@ try {
       aria.sheet.scores.cha = 10;
       await applyCloudTable({
         purses: [aria],
-        holdings: [],
+        holdings: [{ id: "sack", purseId: "aria", name: "Sack of grain", kind: "item", quantity: 2, unitCopper: 333, notes: "", category: "provisions" }],
         shops: [{
           id: "baker", name: "Riverside Baker", keeper: "", place: "", notes: "", sellRate: 1.1, buyRate: 0.5,
           wealth: "modest", category: "provisions", priceScale: 1,
@@ -99,6 +100,20 @@ try {
       ["Guild levy", 1200, 12, 19, true],
     ]);
     assert.ok(books.logs.length === 2 && books.logs.every((l) => l.dmOnly), "one DM-only log line each");
+
+    // Selling one sack: 333 × 1.2 × 1.8 = 719.28, × 50% = 359.64 → 360 cp, as Why this payout? shows.
+    await openApplication(page, origin + "/shop/baker");
+    await chooseOption(page.getByLabel("Paying from", { exact: true }), "aria");
+    await page.getByRole("button", { name: "Why this payout?" }).first().click();
+    const payout = page.getByRole("region", { name: "Price breakdown" }).first();
+    for (const text of ["Lot value", "Market event: Blight in the Riverlands +80%", "Shop buys at 50%", "360 cp"])
+      await payout.getByText(text, { exact: false }).first().waitFor();
+    assert.equal(await sideways(page), false, `${width}: the payout breakdown scrolls sideways`);
+    await page.getByRole("button", { name: "Sell", exact: true }).click();
+    await page.getByText("Sale recorded.").first().waitFor();
+    const sold = await snapshot(page);
+    assert.equal(sold.aria - books.aria, 360, `${width}: the sale pays the payout breakdown's total`);
+    books = sold;
 
     // DM breakdown: 333 × 1.8 × 1.2 = 719.28 (the two events, in start-day then ID order, add 386);
     // × 1.1 = 791 (+72).

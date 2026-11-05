@@ -14,12 +14,13 @@ import { openRoom, joinRoom, roomState, submitCommands, choosePace } from "./clo
 import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { applyCommand, type Command } from "./commands.ts";
 import { preserveJournalMetadata, readJournal } from "./journal.ts";
-import { applyCloudTable, buyFromShop, economySnapshot, executeLocalCommand } from "./economy.ts";
+import { applyCloudTable, buyFromShop, economySnapshot, executeLocalCommand, sellToShop } from "./economy.ts";
 import { DM_SEAT, setSeat } from "./table.ts";
 import { projectRecord } from "./session-records.ts";
 import { seatView } from "./player-view.ts";
 import { fromCopper, toCopper } from "./money.ts";
-import { breakdownLines, shopBuyBreakdown, viewerBreakdown, type PriceBreakdown } from "./price-breakdown.ts";
+import { breakdownLines, shopBuyBreakdown, shopSellBreakdown, viewerBreakdown, type PriceBreakdown } from "./price-breakdown.ts";
+import { planSaleSplit, unitSalePrice } from "./sale-split.ts";
 import { shopAsking } from "./vendors.ts";
 import {
   campaignDay,
@@ -28,6 +29,8 @@ import {
   eventStatus,
   lineEvents,
   MARKET_EVENT_LIMIT,
+  saleEvents,
+  unlimitedEventRate,
   readMarketEvents,
   type MarketEvent,
 } from "./market-events.ts";
@@ -38,7 +41,7 @@ import {
   tableForProtocol,
   tabletopResponse,
 } from "./tabletop-protocol.ts";
-import type { Shop, StockLine } from "./types.ts";
+import type { Holding, Shop, StockLine } from "./types.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
 const sql = new DatabaseSync(":memory:");
@@ -155,6 +158,22 @@ const withEvents = (t: CloudTable, ...events: MarketEvent[]) => {
   events.forEach((e, i) => (next = applyCommand(next, dmSeat, add(`add-${i}-${e.id}`, e))));
   return next;
 };
+/** Goods to sell: Aria's grain and an unidentified jewel presented as grain, and a party fund's grain. */
+const goods = (t: CloudTable): CloudTable => {
+  const item = (id: string, purseId: string, unitCopper: number, category: string, extra: Partial<Holding> = {}): Holding => ({
+    id, purseId, name: id, kind: "item", quantity: 4, unitCopper, notes: "", category, ...extra,
+  });
+  return {
+    ...t,
+    purses: [...t.purses, { id: "hoard", name: "The Hoard", kind: "party", coins: fromCopper(0) }],
+    holdings: [
+      item("sack", "aria", 333, "provisions"),
+      item("gem", "aria", 5000, "jewels", { unidentified: { name: "Seed pouch", value: 333, category: "provisions" } }),
+      item("cloak", "aria", 1000, "cloth"),
+      item("hoard-grain", "hoard", 333, "provisions"),
+    ],
+  };
+};
 const sum = (b: PriceBreakdown) => b.base.copper + b.factors.reduce((n, f) => n + f.copper, 0);
 const wallet = (t: CloudTable, id: string) => toCopper(t.purses.find((p) => p.id === id)!.coins);
 
@@ -186,6 +205,20 @@ test("logic: days, scope, category, combined rate and status", () => {
   assert.equal(eventRate([{ permille: 100 }, { permille: 100 }]), 0.1);
   assert.equal(effectText(1800), "×1.8 (+80%)");
   assert.equal(effectText(900), "×0.9 (−10%)");
+  // The combined rate does not depend on the events' order (a player's copy orders them differently).
+  const many = [1001, 1333, 900, 7770, 999, 1100].map((permille) => ({ permille }));
+  assert.equal(unlimitedEventRate(many), unlimitedEventRate([...many].reverse()));
+  assert.equal(eventRate(many), eventRate([many[3]!, many[0]!, many[5]!, many[1]!, many[4]!, many[2]!]));
+  // An event ended before it started never applies and counts as ended.
+  assert.equal(eventStatus({ startDay: 8, endDay: 8 }, 3), "ended");
+  // Selling to a shop: the item's category (an unidentified item's presented one) decides.
+  const sold = goods(t);
+  const [sack, gem, cloak] = sold.holdings;
+  assert.deepEqual(saleEvents(j, baker, sack!).map((e) => e.id), ["blight", "festival"]);
+  assert.deepEqual(saleEvents(j, baker, gem!).map((e) => e.id), ["blight", "festival"], "presented as provisions");
+  assert.deepEqual(saleEvents(j, baker, cloak!).map((e) => e.id), ["festival"]);
+  assert.deepEqual(saleEvents(j, far, sack!).map((e) => e.id), ["festival"]);
+  assert.deepEqual(saleEvents(j, baker, { category: undefined }).map((e) => e.id), ["festival"], "no category: all-items events only");
 });
 
 test("breakdown: each event by name, rounding once; the asking price is shopAsking's", () => {
@@ -258,7 +291,11 @@ test("commands: DM only, stale-checked, validated, one DM-only event each; End n
   // Ending an upcoming event: it ends on its start day, without ever applying.
   const upcoming = withEvents(campaign(1), festival);
   const cancelled = applyCommand(upcoming, dmSeat, { id: "p15", kind: "market-event-end", eventId: "festival", before: festival });
-  assert.equal(readMarketEvents(cancelled.journal!.marketEvents)[0]!.endDay, festival.startDay);
+  const called = readMarketEvents(cancelled.journal!.marketEvents)[0]!;
+  assert.equal(called.endDay, festival.startDay);
+  assert.equal(eventStatus(called, 1), "ended");
+  assert.equal(eventStatus(called, festival.startDay), "ended", "it never becomes active");
+  assert.throws(() => applyCommand(cancelled, dmSeat, { id: "p15b", kind: "market-event-end", eventId: "festival", before: called }), /already ended/);
   // No money or stock moves; stored stock prices are never rewritten.
   assert.deepEqual(ended.purses, t.purses);
   assert.deepEqual(ended.stock, t.stock);
@@ -394,4 +431,55 @@ test("offline: the device runs the same commands and charges the same price; ret
   const refused = await executeLocalCommand(add("d5", { ...festival, id: "f2" })).catch((e: Error) => e.message);
   assert.match(String(refused), /DM/);
   setSeat(DM_SEAT);
+});
+
+test("selling: the payout takes today's events with the buy rate, rounded once, in rooms, offline and in sell and split", async () => {
+  const t = withEvents(goods(campaign(10)), blight, festival);
+  const sack = t.holdings[0]!;
+  // 333 × 0.9 × 1.8 × 0.5 = 269.73 → 270 per sack; the breakdown adds up and names the events.
+  const b = shopSellBreakdown(baker, 333, 2, sack, { events: saleEvents(t.journal, baker, sack) });
+  assert.equal(b.unit, 270);
+  assert.equal(sum(b), b.unit);
+  assert.deepEqual(breakdownLines(b).slice(0, 4), [
+    "Lot value: 333 cp",
+    "Market event: Blight in the Riverlands: +266 cp",
+    "Market event: Harvest festival: −60 cp",
+    "Shop buys at 50%: −269 cp",
+  ]);
+  // No events: exactly the payout before this feature.
+  assert.deepEqual(shopSellBreakdown(baker, 333, 2, sack, { events: [] }), shopSellBreakdown(baker, 333, 2, sack));
+  // Shared `sell` pays the breakdown total; the unidentified gem sells as presented, with the events.
+  const sold = applyCommand(t, ariaSeat, { id: "s1", kind: "sell", holdingId: "sack", shopId: "baker", quantity: 2 });
+  assert.equal(wallet(sold, "aria") - wallet(t, "aria"), 540);
+  const gem = applyCommand(t, ariaSeat, { id: "s2", kind: "sell", holdingId: "gem", shopId: "baker", quantity: 1 });
+  assert.equal(wallet(gem, "aria") - wallet(t, "aria"), 270);
+  // The player's projected copy quotes the same payout (Why this payout?).
+  const view = projectRecord(t, ariaSeat);
+  const mine = view.holdings.find((h) => h.id === "sack")!;
+  assert.equal(shopSellBreakdown(baker, mine.unitCopper, 2, mine, { events: saleEvents(view.journal, baker, mine) }).total, 540);
+  // Sell and split prices each lot the same way, and its reviewed total must match.
+  assert.equal(unitSalePrice(t.holdings[3]!, baker, t.journal), 270);
+  const plan = planSaleSplit(t, { fundId: "hoard", shopId: "baker", lots: [{ holdingId: "hoard-grain", quantity: 4 }], recipientIds: ["aria", "bram"], rule: "party-fund" }, { actor: "dm" });
+  assert.equal(plan.proceeds, 1080);
+  const split = applyCommand(t, dmSeat, {
+    id: "ss", kind: "sale-split", fundId: "hoard", shopId: "baker", lots: [{ holdingId: "hoard-grain", quantity: 4 }],
+    recipientIds: ["aria", "bram"], remainder: { rule: "party-fund" }, expect: { proceeds: 1080, share: 540, remainderTo: null },
+  });
+  assert.equal(wallet(split, "aria") - wallet(t, "aria"), 540);
+  // A review made without the events (668, as an older client would quote it) is refused, never paid differently.
+  assert.throws(() =>
+    applyCommand(t, dmSeat, {
+      id: "ss2", kind: "sale-split", fundId: "hoard", shopId: "baker", lots: [{ holdingId: "hoard-grain", quantity: 4 }],
+      recipientIds: ["aria", "bram"], remainder: { rule: "party-fund" }, expect: { proceeds: 668, share: 334, remainderTo: null },
+    }),
+  );
+  // Offline: the device pays the same, once per command ID.
+  setSeat(DM_SEAT);
+  await applyCloudTable(t);
+  const start = wallet(await economySnapshot(), "aria");
+  await sellToShop({ holdingId: "sack", shopId: "baker", quantity: 2 }, { commandId: "s1" });
+  await sellToShop({ holdingId: "sack", shopId: "baker", quantity: 2 }, { commandId: "s1" });
+  const after = await economySnapshot();
+  assert.equal(wallet(after, "aria") - start, 540);
+  assert.equal(after.holdings.find((h) => h.id === "sack")!.quantity, 2);
 });

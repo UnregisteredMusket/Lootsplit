@@ -240,7 +240,7 @@ function EventForm({ before, onDone }: { before: MarketEvent | null; onDone?: ()
             label="Price multiplier"
             hint={
               Number.isFinite(multiplier) && multiplier >= 0.1 && multiplier <= 10
-                ? `${effectText(Math.round(multiplier * 1000))} on list prices.`
+                ? `${effectText(Math.round(multiplier * 1000))} on shop prices and payouts.`
                 : "From 0.1 to 10: 1.8 is +80%, 0.9 is −10%."
             }
           >
@@ -309,7 +309,7 @@ function EventRow({ event, today, names }: { event: MarketEvent; today: number; 
       <span className="block text-muted">
         {status === "ended"
           ? event.endDay === event.startDay
-            ? `Ended before it started (day ${event.startDay})`
+            ? `Ended on its start day (day ${event.startDay})`
             : `Days ${event.startDay}–${event.endDay - 1} · ended`
           : status === "upcoming"
             ? `Starts day ${event.startDay} · ends day ${event.endDay}`
@@ -350,8 +350,9 @@ export function MarketEventsManager() {
   return (
     <div className="market-events-manager" data-testid="market-events-manager">
       <p className="text-sm text-muted">
-        Named, timed price changes, e.g. a blight or a festival. An active event multiplies the asking price of
-        what it covers when the price is shown and charged; stored shop prices are not rewritten. Days follow
+        Named, timed price changes, e.g. a blight or a festival. An active event multiplies what shops charge for
+        the goods it covers, and what they pay for them, when the price is shown and charged; stored shop
+        prices are not rewritten. Days follow
         Session Time (today is day {today}). Ended events stay here as history.
       </p>
       {groups.map((g) => (
