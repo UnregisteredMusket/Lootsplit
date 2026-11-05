@@ -6,7 +6,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-import { navigateApplication, openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
