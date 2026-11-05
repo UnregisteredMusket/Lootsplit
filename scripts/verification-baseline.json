@@ -33,6 +33,7 @@
   "node scripts/recovery-step.mjs dev-merchant-purse 240 node scripts/merchant-purse-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-price-breakdown 240 node scripts/price-breakdown-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-visibility-center 240 node scripts/visibility-center-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-ledger-export 240 node scripts/ledger-export-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-item-charges 180 node scripts/item-charges-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-xp-milestones 240 node scripts/xp-milestones-browser-audit.mjs",

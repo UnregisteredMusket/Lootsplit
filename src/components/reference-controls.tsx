@@ -7,6 +7,7 @@ import {
   referenceSections,
 } from "@/lib/quire/reference-access";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
+import { referencePolicyCommand } from "@/lib/quire/visibility-center";
 
 export function ReferenceControls() {
   const economy = useEconomy(),
@@ -15,15 +16,13 @@ export function ReferenceControls() {
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   if (seat.role !== "dm") return null;
-  async function save(next: ReferencePolicy) {
+  async function save(change: Partial<ReferencePolicy>) {
     setBusy(true);
     setNotice("");
     try {
-      const outcome = await economy.commandOutcome({
-        kind: "reference-policy",
-        before: policy,
-        policy: next,
-      });
+      const outcome = await economy.commandOutcome(
+        referencePolicyCommand(economy.journal, change),
+      );
       setNotice(mutationNotice(outcome, "Player reference access saved."));
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Unable to save reference access.");
@@ -42,7 +41,7 @@ export function ReferenceControls() {
         <input
           type="checkbox"
           checked={policy.enabled}
-          onChange={(e) => void save({ ...policy, enabled: e.target.checked })}
+          onChange={(e) => void save({ enabled: e.target.checked })}
         />
         Allow player reference lookup
       </label>
@@ -54,7 +53,6 @@ export function ReferenceControls() {
             aria-label={`Allow ${section} lookup`}
             onChange={(e) =>
               void save({
-                ...policy,
                 sections: referenceSections.filter((s) =>
                   s === section ? e.target.checked : policy.sections.includes(s),
                 ),
@@ -68,7 +66,7 @@ export function ReferenceControls() {
         <input
           type="checkbox"
           checked={policy.allowDuringEncounters}
-          onChange={(e) => void save({ ...policy, allowDuringEncounters: e.target.checked })}
+          onChange={(e) => void save({ allowDuringEncounters: e.target.checked })}
         />
         Allow lookup during active encounters
       </label>

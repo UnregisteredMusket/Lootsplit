@@ -3,6 +3,7 @@ import type { CloudTable } from "@/lib/quire/cloud";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { setFollowMe, useFollowMe } from "@/lib/quire/follow-pref";
 import { readTabletopSession } from "@/lib/quire/tabletop";
+import { sessionSwitchCommand } from "@/lib/quire/visibility-center";
 
 /**
  * Settings › Players & display (map tokens PR 7; mockup player-token-move frame 4): the DM's
@@ -41,7 +42,7 @@ export function FollowViewSettings({
             setBusy(true);
             setError("");
             try {
-              await commandOutcome({ kind: "tabletop-session", before: table.journal?.world?.tabletop ?? null, session: { ...session, followView: !on } });
+              await commandOutcome(sessionSwitchCommand(table.journal, "followView"));
             } catch (e) {
               setError(e instanceof Error ? e.message : "The setting could not be saved. Try again.");
             } finally {

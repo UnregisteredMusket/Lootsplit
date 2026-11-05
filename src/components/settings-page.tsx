@@ -5,6 +5,7 @@ import { SoundSettings } from "@/components/sound-settings";
 import { TestModeSettings } from "@/components/test-mode";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { Link } from "@tanstack/react-router";
+import { AppLink } from "@/components/app-link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/shell";
@@ -100,6 +101,7 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
       {ready ? (
         <>
           {!financial && <><Link to="/share" className="quick-action mt-5">Multiplayer — rooms, players & notifications →</Link>
+          <AppLink href="/features/visibility" className="quick-action mt-3">What players can see — visibility settings & preview →</AppLink>
           <Fold title="Sound effects"><SoundSettings /></Fold>
       <Fold anchorId="gameplay" title="Roll mode" hint="Physical dice or in-app dice."><RollModeSetting /></Fold>
           <PasswordSettings />

@@ -267,6 +267,9 @@ jobs:
       - name: dev-preview-as-player
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs
+      - name: dev-visibility-center
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-visibility-center 240 node scripts/visibility-center-browser-audit.mjs
       - name: dev-ledger-export
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-ledger-export 240 node scripts/ledger-export-browser-audit.mjs

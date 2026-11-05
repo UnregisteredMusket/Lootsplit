@@ -85,6 +85,7 @@ export function paletteActions(dm: boolean, sessionActive: boolean): PaletteEntr
         action("Split the party", "Party → Split the party", "/party?action=split", "groups"),
         action("Invite players", "Multiplayer → Room", "/share?tab=room", "invite link host"),
         action("Preview as player", "Party → Preview as player (read-only)", "/party?preview=1", "view as player check hidden seat"),
+        action("What players can see", "Visibility settings, hidden counts & preview", "/features/visibility", "visibility hidden reveal secret dm only fog black market"),
       ]
     : [
         action("Request a payment", "Bank", "/features/bank", "pay spend coins"),

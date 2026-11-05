@@ -17,6 +17,8 @@ export const featureScreens = {
   /** Glossary: "Shop schedules" (was "Shop Management"; shops themselves are run from Market). */
   shops: { title: "Shop schedules", dm: true },
   music: { title: "Music & Ambience", dm: true },
+  /** Every player-visibility setting and hidden-record count in one place (visibility-center.ts). */
+  visibility: { title: "What players can see", dm: true },
 };
 export type Feature = keyof typeof featureScreens;
 /** The title this seat sees (players read "Quest log"). */
@@ -36,7 +38,7 @@ export function safeReturn(value: unknown): string {
   const url = new URL(value, "https://lootsplit.invalid");
   if (url.origin !== "https://lootsplit.invalid") return "/?view=home";
   if (
-    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|features|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|quests|shops|music|npcs|trading|time))?$/.test(
+    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|features|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|quests|shops|music|npcs|trading|time|visibility))?$/.test(
       url.pathname,
     )
   )

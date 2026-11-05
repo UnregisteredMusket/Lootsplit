@@ -1,4 +1,5 @@
 import { CharacterPlacement } from "./character-placement";
+import { companionFundsCommand } from "@/lib/quire/visibility-center";
 import { copyName } from "@/lib/quire/duplicate";
 import { actingGroups, seatGroups } from "@/lib/quire/party-groups";
 import { MapRecordStrip } from "./map-record-strip";
@@ -270,13 +271,7 @@ export function LocationNpcs() {
               controller always sees its NPC's funds.
             </p>
             <p>Party can see companion NPC funds: {world.companionFundsVisible ? "on" : "off"}.</p>
-            <CommandButton
-              input={{
-                kind: "companion-funds-visibility",
-                before: world.companionFundsVisible ?? false,
-                visible: !world.companionFundsVisible,
-              }}
-            >
+            <CommandButton input={companionFundsCommand(t.journal)}>
               {world.companionFundsVisible
                 ? "Keep companion funds private"
                 : "Show companion funds to the party"}
