@@ -223,6 +223,11 @@ type EconomyApi = {
     input: Omit<Extract<CommandRequest, { kind: "loot-resolve" }>, "kind" | "id">,
     options?: CommandOptions,
   ) => Promise<string | null>;
+  /** Return to party (DM, loot-return.ts): a departed character's items and coins. Null when accepted, else the refusal. */
+  lootReturn: (
+    input: Omit<Extract<CommandRequest, { kind: "loot-return" }>, "kind" | "id">,
+    options?: CommandOptions,
+  ) => Promise<string | null>;
   // Money and item actions take `{ commandId }`: one ID per user action, reused
   // on retry, so a repeated submit is applied once (see command-id.ts).
   buy: (
@@ -984,6 +989,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           { kind: "loot-resolve", ...input, ...idOf(options) },
           "Treasure pool resolved. It appears once in Activity and the party chat.",
           true,
+        ),
+      lootReturn: (input, options = {}) =>
+        lootCommand(
+          { kind: "loot-return", ...input, ...idOf(options) },
+          input.to.pool ? "Returned to the party. The items are in the treasure pool, unclaimed." : "Returned to the party.",
+          input.copper > 0,
         ),
       deleteHolding: (id) =>
         attempt(async () => {

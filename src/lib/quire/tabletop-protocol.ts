@@ -180,8 +180,15 @@ export const MARKET_MARKUP_PROTOCOL = 25;
  * to finish on the updated website.
  */
 export const MARKET_EVENTS_PROTOCOL = 26;
+/**
+ * Protocol 27 (2026-11-05, return to party): the DM may send `loot-return` (loot-return.ts). It
+ * adds no stored field, but a turn-based DM seat's staged draft reaches every device on that seat,
+ * and older clients' strict command schema rejects the unknown kind. Drafts with it ask them to
+ * finish on the updated website. (26 is reserved for market events, 28 for another feature.)
+ */
+export const LOOT_RETURN_PROTOCOL = 27;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = MARKET_EVENTS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = LOOT_RETURN_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1314,12 +1321,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= MARKET_EVENTS_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= LOOT_RETURN_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 27: return a departed character's items and coins to the party.
+      if (c.kind === "loot-return") return true;
+      if (protocol && protocol >= MARKET_EVENTS_PROTOCOL) return false;
       // Protocol 26: named market events.
       if (c.kind === "market-event" || c.kind === "market-event-end") return true;
       if (protocol && protocol >= MARKET_MARKUP_PROTOCOL) return false;

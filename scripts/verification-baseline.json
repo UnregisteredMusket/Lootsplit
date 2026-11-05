@@ -29,6 +29,7 @@
   "node scripts/recovery-step.mjs dev-make-change 180 node scripts/make-change-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-attunement 180 node scripts/attunement-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-sell-and-split 240 node scripts/sell-and-split-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-departed-holdings 240 node scripts/departed-holdings-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-item-identification 240 node scripts/item-identification-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-merchant-purse 240 node scripts/merchant-purse-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-price-breakdown 240 node scripts/price-breakdown-browser-audit.mjs",

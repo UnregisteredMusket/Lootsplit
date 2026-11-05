@@ -14,6 +14,8 @@ import { SearchSelect } from "./search-select";
 import { LocationOptions } from "./market-locations";
 import { CommandForm, CommandButton } from "./world-tools";
 import { AppLink } from "./app-link";
+import { DepartedPrompt, ReturnToParty } from "./return-to-party";
+import { departedSummary, isDeparted } from "@/lib/quire/loot-return";
 
 export function CharacterPlacement({
   selectedId = "",
@@ -25,6 +27,8 @@ export function CharacterPlacement({
   const t = useWorldTable(),
     seat = useSeat();
   const [selected, setSelected] = useState(npcId || selectedId);
+  // Return to party: the character the DM just took out of the party (or hid), for the prompt.
+  const [leftId, setLeftId] = useState<string | null>(null);
   useEffect(() => {
     if (npcId || selectedId) setSelected(npcId || selectedId);
   }, [npcId, selectedId]);
@@ -63,20 +67,29 @@ export function CharacterPlacement({
         </label>
       )}
       <p className="text-sm text-muted">
-        Leaving the party keeps the same sheet, funds, inventory and history. Individual locations
+        Leaving the party keeps the same sheet, funds, inventory and history; you can then return
+        chosen items and coins to the party (Return to party). Individual locations
         remain fixed when the party moves. NPC sheets can be shared separately from their records.
       </p>
+      {p && leftId === p.id && <DepartedPrompt table={t} purse={p} onKeep={() => setLeftId(null)} />}
       {p && (
         <PlacementEditor
           key={`${p.id}:${canonicalJson(characterPosition(t, p))}`}
           p={p}
           table={t}
+          onLeft={() => setLeftId(p.id)}
         />
+      )}
+      {p && leftId !== p.id && isDeparted(t, p) && departedSummary(t, p) && (
+        <details className="world-card">
+          <summary>Return {p.name}'s items and coins to the party ({departedSummary(t, p)})</summary>
+          <ReturnToParty table={t} purse={p} />
+        </details>
       )}
     </section>
   );
 }
-function PlacementEditor({ p, table: t }: { p: Purse; table: CloudTable }) {
+function PlacementEditor({ p, table: t, onLeft }: { p: Purse; table: CloudTable; onLeft: () => void }) {
   const s = characterPosition(t, p),
     market = readMarketLocations(t.journal?.market);
   const [joined, setJoined] = useState(s.inParty),
@@ -109,6 +122,10 @@ function PlacementEditor({ p, table: t }: { p: Purse; table: CloudTable }) {
           visible !== s.visible ||
           sheetVisible !== s.sheetVisible
         }
+        // Leaving the party or being hidden offers Return to party (never automatic).
+        onDone={() => {
+          if ((s.inParty && !joined) || (s.visible && !visible)) onLeft();
+        }}
         submit={() => ({
           kind: "character-position",
           purseId: p.id,

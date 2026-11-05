@@ -108,7 +108,7 @@ export function lotClaims(t: LootTable, holdingId: string, state = readLootClaim
 }
 
 /** FNV-1a (two 32-bit lanes): a short, deterministic fingerprint shared by client and server. */
-function hash(text: string): string {
+export function hash(text: string): string {
   let a = 0x811c9dc5,
     b = 0x01000193 ^ 0x5bd1e995;
   for (let i = 0; i < text.length; i++) {
