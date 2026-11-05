@@ -43,6 +43,7 @@ import { creditCoins } from "./coin-split.ts";
 import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
 import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
 import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
+import { applyLootReturn, lootReturnCommand } from "./loot-return.ts";
 import { questCommands, questKinds, type QuestCommand } from "./quests-schema.ts";
 import { applyXpAward, keepPurseAdvancement, xpAwardCommand, xpAwardSummary } from "./xp.ts";
 import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
@@ -354,6 +355,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
       .max(10000),
   }),
   ...lootCommands,
+  // Return to party (loot-return.ts): a departed character's items and coins back to the party.
+  lootReturnCommand,
   ...questCommands,
   // Attunement (loot phase 5, attunement.ts): attune or end it, and the DM's per-character limit.
   ...attunementCommands,
@@ -514,6 +517,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
   } else if (lootKinds.has(cmd.kind)) {
     applyLootCommand(t, seat, cmd as LootCommand, at, execution, event);
+  } else if (cmd.kind === "loot-return") {
+    applyLootReturn(t, seat, cmd, at, event);
   } else if (questKinds.has(cmd.kind)) {
     applyQuestCommand(t, seat, cmd as QuestCommand, at);
   } else if (journeyKinds.has(cmd.kind)) {

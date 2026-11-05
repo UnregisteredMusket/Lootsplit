@@ -1,5 +1,7 @@
 import { SavedTick, useSavedTick } from "@/components/saved-tick";
 import { CharacterPlacement } from "@/components/character-placement";
+import { departedSummary } from "@/lib/quire/loot-return";
+import { useWorldTable } from "@/lib/quire/use-world-table";
 import { inParty } from "@/lib/quire/character-position";
 import { CharacterPermissionsSheet } from "@/components/character-permissions";
 import { toast } from "sonner";
@@ -809,6 +811,7 @@ function MakeChange({ purse }: { purse: Purse }) {
 
 function PurseCard({ purse }: { purse: Purse }) {
   const { updatePurse, setPurseCoins, deletePurse, makeChange } = useEconomy();
+  const table = useWorldTable();
   const nameSaved = useSavedTick();
   const seat = useSeat();
   const cloud = getCloudTable();
@@ -971,7 +974,11 @@ function PurseCard({ purse }: { purse: Purse }) {
             <RemoveButton
               label="Remove account"
               title={`Remove ${purse.name}?`}
-              body="This account and its holdings are deleted. Transaction history is retained."
+              body={
+                purse.kind === "character" && departedSummary(table, purse)
+                  ? `${purse.name} has ${departedSummary(table, purse)}. Removing deletes this account and its holdings; transaction history is retained. To keep them for the party, cancel and use Return to party in Party → Characters (take ${purse.name} out of the party first).`
+                  : "This account and its holdings are deleted. Transaction history is retained."
+              }
               onRemove={() => void deletePurse(purse.id)}
             />
           ) : null}

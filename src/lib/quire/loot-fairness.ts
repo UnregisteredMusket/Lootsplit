@@ -247,6 +247,9 @@ function notCountedReason(line: LedgerLine): string {
   if (line.transactionType === "payment") return "Payments are not counted";
   if (line.split) return "A split of a character's own coins is not counted (it was counted when first received)";
   if (/wage|downtime/i.test(line.summary)) return "Wages and downtime are not counted";
+  // Return to party (loot-return.ts): what the character received still counts as received.
+  if (line.transactionType === "transfer" && line.summary.startsWith("Returned to the party: "))
+    return "Returned to the party; it was counted when first received";
   if (line.transactionType === "transfer" || /^(Gave |Transfer )/.test(line.summary)) return "Give between characters is not loot";
   if (line.transactionType === "void") return "Reversal of a line that does not count";
   return "Not loot (DM adjustment or other record)";
