@@ -51,9 +51,9 @@ The generator retrieves the SRD 5.1 creature index through Open5e, retaining sou
 ### XP from encounters (2026-11-05)
 
 - **Choice.** The loot review's Experience section suggests XP from the enemies (own XP, else SRD 5.2.1 XP by CR) and splits it among the ticked party characters with the `xp-award` rule; the DM may change the total or each share, mark a milestone, or give none. Milestone parties (`campaignXpMode`) are offered Mark milestone or Nothing. The choice is sent as `xp` with `encounters/award`; drafts don't store it.
-- **One applier.** Both paths call `applyEncounterXp` (`src/lib/quire/encounter-xp.ts`) inside the existing exactly-once award: the same sheet write and journal entry as `xp-award`. The receipt keeps `xp`.
-- **Later.** `encounters/award-xp` gives an awarded encounter without `xp` its XP once (guarded by the receipt's empty `xp`, the room version and DM membership). Detail responses add `xpMode`.
-- **Tests.** `src/lib/encounters/local-xp.test.ts`; browser audit `scripts/encounter-xp-browser-audit.mjs` (`npm run verify:focus -- encounter-xp`).
+- **One applier.** Both paths call `applyEncounterXp` (`src/lib/quire/encounter-xp.ts`) inside the existing exactly-once award: the same sheet write and journal entry as `xp-award`. The receipt keeps `xp`. The journal entry's note is the DM's optional `xp.reason` ("Reason players see": prefilled with the encounter name, trimmed, at most 120 characters like `xp-award`'s; empty means "Encounter"); requests without it use the encounter name (`encounterXpReason`).
+- **Later.** `encounters/award-xp` gives an awarded encounter without `xp` its XP once (guarded by the receipt's empty `xp`, the room version and DM membership). Detail responses add `xpMode`. A request that loses a race returns `duplicate: true` with the winner's receipt, and the page says "XP was already awarded: N XP".
+- **Tests.** `src/lib/encounters/local-xp.test.ts`, `scripts/encounter-xp-worker.test.mjs` (Worker permissions, replay, forced race, reason); browser audit `scripts/encounter-xp-browser-audit.mjs` (`npm run verify:focus -- encounter-xp`).
 
 ## Verification
 

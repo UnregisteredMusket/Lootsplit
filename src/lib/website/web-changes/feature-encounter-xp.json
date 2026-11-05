@@ -5,7 +5,8 @@
     "The suggestion adds each enemy's XP, or the XP for its challenge rating when it has none. Allies give no XP.",
     "The XP is split evenly among the ticked party characters in whole numbers; any remainder goes to the character the DM picks or stays unawarded, and the journal says so. The DM can change the total or set each share.",
     "A party that levels by milestones is offered Mark milestone instead of XP.",
-    "Encounters awarded earlier can get their XP once from Award XP on the awarded encounter. A retry never gives XP twice.",
+    "Reason players see sets the note on the party journal entry. It starts as the encounter's name, so the DM can change it when the name is a spoiler; left empty, it says Encounter.",
+    "Encounters awarded earlier can get their XP once from Award XP on the awarded encounter. A retry never gives XP twice, and if another tab or device got there first, the page says how much XP was already awarded.",
     "Levels still never change by themselves: each sheet shows Ready to level up."
   ]
 }

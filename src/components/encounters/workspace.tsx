@@ -83,7 +83,7 @@ import {
 } from "@/lib/encounters/loot-review";
 import { FeatureHeader } from "../feature-header";
 import { EncounterXpChooser, EncounterXpReceiptView, type EncounterXpChoice } from "./encounter-xp";
-import type { EncounterXpReceipt } from "@/lib/quire/encounter-xp";
+import { encounterXpReason, type EncounterXpReceipt } from "@/lib/quire/encounter-xp";
 type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
@@ -120,6 +120,12 @@ type Detail = {
     xp?: EncounterXpReceipt;
   };
 };
+/** Award XP lost a race: what the request that won gave (from the award's receipt). */
+function xpAlreadyNotice(xp: EncounterXpReceipt): string {
+  return xp.unit === "xp"
+    ? `XP was already awarded: ${xp.total.toLocaleString("en-US")} XP. Nothing more was given.`
+    : `A milestone was already marked for ${xp.shares.length} ${xp.shares.length === 1 ? "character" : "characters"}. Nothing more was given.`;
+}
 /** The recipient select's value for "Treasure pool · <fund>" (never a purse ID). */
 const POOL_VALUE = "__treasure_pool__";
 type Roll = {
@@ -635,11 +641,17 @@ function EncounterEditor({
     setError("");
     setNotice("");
     try {
-      await encounterRequest(`encounters/${path}`, {
-        id,
-        revision: detail.revision,
-        ...extra,
-      });
+      const outcome = await encounterRequest<{ award?: Detail["award"]; duplicate?: boolean } | undefined>(
+        `encounters/${path}`,
+        {
+          id,
+          revision: detail.revision,
+          ...extra,
+        },
+      );
+      // Award XP: a concurrent request (another tab or device) can win the race. Then this one
+      // gave nothing, and the notice reports what the winner gave, never this DM's own total.
+      const xpAlready = path === "award-xp" && outcome?.duplicate ? outcome.award?.xp : undefined;
       // The mutation succeeded. Apply the server's copy as before; only if that follow-up read
       // fails, mark the draft saved anyway so a retry does not conflict.
       let refreshed = true;
@@ -680,11 +692,15 @@ function EncounterEditor({
       }
       setNotice(
         !refreshed
-          ? "Saved. Refresh to see the latest version."
+          ? xpAlready
+            ? `${xpAlreadyNotice(xpAlready)} Refresh to see it.`
+            : "Saved. Refresh to see the latest version."
           : path === "award"
             ? "Loot transferred. This encounter cannot award loot again."
-            : path === "award-xp"
-              ? "XP awarded. This encounter cannot award XP again."
+            : xpAlready
+              ? xpAlreadyNotice(xpAlready)
+              : path === "award-xp"
+                ? "XP awarded. This encounter cannot award XP again."
             : path === "conclude"
               ? "Encounter concluded. Review recipients and loot before transferring."
               : "Encounter saved.",
@@ -1189,6 +1205,7 @@ function EncounterEditor({
                   <EncounterXpChooser
                     key={`${detail.id}-xp`}
                     combatants={detail.body.combatants}
+                    encounterName={detail.body.name}
                     table={splitTable}
                     mode={detail.xpMode ?? "xp"}
                     onChange={setXpChoice}
@@ -1200,7 +1217,7 @@ function EncounterEditor({
                         if (
                           await requestConfirm({
                             title: xpChoice.input!.unit === "xp" ? "Award this XP?" : "Mark this milestone?",
-                            body: `Each chosen character's sheet records it once, with one party journal entry for “${detail.body.name}”.`,
+                            body: `Each chosen character's sheet records it once, with one party journal entry players see as “${encounterXpReason(xpChoice.input!, detail.body.name)}”.`,
                             confirmLabel: xpChoice.input!.unit === "xp" ? "Award XP" : "Mark milestone",
                           })
                         )
@@ -2696,6 +2713,7 @@ function EncounterEditor({
                 <EncounterXpChooser
                   key={`${detail.id}-review-xp`}
                   combatants={draft.combatants}
+                  encounterName={draft.name}
                   table={splitTable}
                   mode={detail.xpMode ?? "xp"}
                   onChange={setXpChoice}

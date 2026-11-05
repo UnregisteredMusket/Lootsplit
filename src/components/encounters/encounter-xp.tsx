@@ -9,6 +9,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { isNpc, splitRecipients, type SplitTable } from "@/lib/quire/coin-split";
 import {
+  ENCOUNTER_XP_NEUTRAL_REASON,
+  encounterXpReason,
   encounterXpShares,
   suggestEncounterXp,
   type EncounterXpInput,
@@ -25,15 +27,19 @@ const whole = (text: string) => {
   const clean = text.replace(/[, ]/g, "");
   return /^\d+$/.test(clean) ? Number(clean) : NaN;
 };
+const REASON_MAX = 120;
 const selectClass = "min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg";
 
 export function EncounterXpChooser({
   combatants,
+  encounterName,
   table,
   mode,
   onChange,
 }: {
   combatants: Creature[];
+  /** Prefills "Reason players see"; the DM can edit it or clear it (a prep name can be a spoiler). */
+  encounterName: string;
   table: SplitTable;
   /** "milestone": the party levels by milestones (from its sheets). */
   mode: "xp" | "milestone";
@@ -50,6 +56,8 @@ export function EncounterXpChooser({
   const [total, setTotal] = useState(() => (suggestion.total ? String(suggestion.total) : ""));
   const [own, setOwn] = useState<Record<string, string> | null>(null);
   const [remainderTo, setRemainderTo] = useState("");
+  // The party journal entry's note, which every player sees. Sent as typed; the server trims it.
+  const [reason, setReason] = useState(() => encounterName.trim().slice(0, REASON_MAX));
   const ticked = purseIds.filter((id) => eligible.some((p) => p.id === id));
   const name = (id: string) => eligible.find((p) => p.id === id)?.name ?? "Removed character";
 
@@ -59,14 +67,16 @@ export function EncounterXpChooser({
   try {
     if (kind !== "none") {
       if (!ticked.length) throw Error("Choose at least one character.");
-      if (kind === "milestone") input = { unit: "milestone", purseIds: ticked };
+      if (reason.trim().length > REASON_MAX)
+        throw Error(`Keep the reason players see to ${REASON_MAX} characters.`);
+      if (kind === "milestone") input = { unit: "milestone", purseIds: ticked, reason };
       else if (own) {
         const shares = ticked.map((id) => whole(own[id] ?? "0"));
         if (shares.some((s) => !Number.isSafeInteger(s) || s > MAX_XP_AWARD))
           throw Error("Enter each share as a whole number of XP.");
         const sum = shares.reduce((a, b) => a + b, 0);
         if (sum < 1 || sum > MAX_XP_AWARD) throw Error(`Give from 1 to ${n(MAX_XP_AWARD)} XP in all.`);
-        input = { unit: "xp", purseIds: ticked, total: sum, shares };
+        input = { unit: "xp", purseIds: ticked, total: sum, shares, reason };
       } else {
         const value = whole(total);
         if (!Number.isSafeInteger(value) || value < 1 || value > MAX_XP_AWARD)
@@ -75,6 +85,7 @@ export function EncounterXpChooser({
           unit: "xp",
           purseIds: ticked,
           total: value,
+          reason,
           ...(remainderTo && ticked.includes(remainderTo) ? { remainderTo } : {}),
         };
       }
@@ -201,6 +212,21 @@ export function EncounterXpChooser({
               )}
             </>
           )}
+          <label className="coin-split-field">
+            <span>Reason players see</span>
+            <input
+              className={selectClass}
+              maxLength={REASON_MAX}
+              placeholder={ENCOUNTER_XP_NEUTRAL_REASON}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <small>
+              Every player sees this in the party journal:{" "}
+              <q>{encounterXpReason({ reason }, encounterName)}</q>. Change it if the encounter&apos;s
+              name gives something away; left empty, it says {ENCOUNTER_XP_NEUTRAL_REASON}.
+            </small>
+          </label>
           {preview ? (
             <ul className="coin-split-preview" aria-label="XP preview">
               {preview.shares.map((s) => (

@@ -86,6 +86,8 @@ try {
     await xp.getByText("Suggested: 500 XP (Goblin 50, Ogre 450 by CR).").waitFor();
     assert.equal(await xp.getByLabel("Total XP").inputValue(), "500");
     await xp.getByText("2 XP is not awarded.").waitFor();
+    // Reason players see: prefilled with the encounter's name (kept here).
+    assert.equal(await xp.getByLabel("Reason players see").inputValue(), "Goblin ambush");
     await xp.getByLabel("Who gets the XP remainder").selectOption({ label: "Give it to Aria Thorne" });
     await xp.getByText("Aria Thorne +168 XP").waitFor();
     assert.equal(await sideways(page), false, `${width}: the loot review scrolls sideways`);
@@ -120,6 +122,9 @@ try {
     await later.getByLabel("XP for Bram Ironfoot").fill("250");
     await later.getByLabel("XP for Cass of the Reeds").fill("0");
     await later.getByText("Bram Ironfoot +250 XP").waitFor();
+    // A prep name can be a spoiler: the DM replaces what players see in the journal.
+    assert.equal(await later.getByLabel("Reason players see").inputValue(), "Old crypt");
+    await later.getByLabel("Reason players see").fill("The barrow");
     assert.equal(await sideways(page), false, `${width}: Award XP scrolls sideways`);
     await page.getByRole("button", { name: "Award XP", exact: true }).click();
     await answerThemedDialog(page);
@@ -127,7 +132,7 @@ try {
     b = await books(page);
     assert.deepEqual(b.xp, { hoard: null, aria: 868, bram: 716, cass: 166 });
     assert.equal(b.events.length, 2);
-    assert.equal(b.events[1], "XP award (Old crypt): 350 XP split among 3: Aria Thorne 100, Bram Ironfoot 250 and Cass of the Reeds 0");
+    assert.equal(b.events[1], "XP award (The barrow): 350 XP split among 3: Aria Thorne 100, Bram Ironfoot 250 and Cass of the Reeds 0");
     await page.getByRole("region", { name: "Experience awarded" }).getByText("350 XP").waitFor();
     await page.screenshot({ path: `${output}/award-later-${width}.png`, fullPage: width === 1280 });
     assert.deepEqual(errors, []);

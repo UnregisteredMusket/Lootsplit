@@ -66,6 +66,13 @@ const purseIds = z
   .min(1)
   .max(MAX_SPLIT_RECIPIENTS)
   .refine((ids) => new Set(ids).size === ids.length, "Choose each character once.");
+/**
+ * "Reason players see": the party journal entry's note, validated and trimmed exactly like the
+ * `xp-award` reason. The DM's chooser prefills the encounter's name, which can be a spoiler
+ * ("Secret Lich Ambush"); cleared, the entry says "Encounter". Absent (older clients), the entry
+ * names the encounter as before.
+ */
+const reason = z.string().trim().max(120).optional();
 /** What the DM chose for an encounter's XP (sent with the award request; never stored as a draft). */
 export const encounterXpSchema = z.discriminatedUnion("unit", [
   z
@@ -78,10 +85,11 @@ export const encounterXpSchema = z.discriminatedUnion("unit", [
       remainderTo: id.nullable().optional(),
       /** The DM's own share for each of `purseIds`, in order; their sum is `total`. */
       shares: z.array(z.number().int().min(0).max(MAX_XP_AWARD)).max(MAX_SPLIT_RECIPIENTS).optional(),
+      reason,
     })
     .strict(),
   // "Mark milestone": one milestone to each chosen character.
-  z.object({ unit: z.literal("milestone"), purseIds }).strict(),
+  z.object({ unit: z.literal("milestone"), purseIds, reason }).strict(),
 ]);
 export type EncounterXpInput = z.infer<typeof encounterXpSchema>;
 
@@ -171,6 +179,13 @@ export function planEncounterXp(t: XpTable, input: EncounterXpInput): XpAwardPla
   return { unit: "xp", rule: "split", amount: input.total, shares, remainder: 0, remainderTo: null, npc: checked.npc };
 }
 
+/** What a cleared "Reason players see" shows players. */
+export const ENCOUNTER_XP_NEUTRAL_REASON = "Encounter";
+/** The journal entry's note: the DM's "Reason players see", else (older requests) the encounter name. */
+export function encounterXpReason(input: Pick<EncounterXpInput, "reason">, encounterName: string): string | undefined {
+  if (input.reason !== undefined) return input.reason.trim().slice(0, 120) || ENCOUNTER_XP_NEUTRAL_REASON;
+  return encounterName.trim().slice(0, 120) || undefined;
+}
 /**
  * Gives an encounter's XP or milestone to a private working copy of the campaign (callers commit
  * it in their own atomic write): the DM only, the same sheet write and the same one journal entry
@@ -180,6 +195,7 @@ export function applyEncounterXp(
   t: XpTable,
   seat: { role: string },
   raw: unknown,
+  /** `reason`: the encounter's name, used only when the request has no "Reason players see". */
   options: { id: string; at: number; reason: string },
 ): { plan: XpAwardPlan; receipt: EncounterXpReceipt } {
   if (seat.role !== "dm") throw Error("Only the DM can award XP or milestones.");
@@ -190,7 +206,7 @@ export function applyEncounterXp(
     throw Error("This party levels by milestones. Mark a milestone instead of awarding XP.");
   const plan = applyXpPlan(t, planEncounterXp(t, input));
   const journal = (t.journal = readJournal(t.journal));
-  const reason = options.reason.trim().slice(0, 120) || undefined;
+  const reason = encounterXpReason(input, options.reason);
   journal.events.push({
     id: `${options.id}-event-${journal.events.length}`,
     at: options.at,

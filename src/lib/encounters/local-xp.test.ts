@@ -324,3 +324,33 @@ test("milestone parties: the detail says so, XP is refused on both paths, a mile
   await d.call("/award", { revision: 2, xp: mark });
   assert.deepEqual(sheetsOf(await economySnapshot()), sheetsOf(shared));
 });
+
+test("Reason players see: the DM's words, \"Encounter\" when cleared, the name for older requests, on both paths", async () => {
+  const cases: [label: string, reason: string | undefined, expected: RegExp][] = [
+    ["edited", "  Trouble on the road ", /^XP award \(Trouble on the road\): /],
+    ["cleared", " ", /^XP award \(Encounter\): /],
+    ["older request", undefined, /^XP award \(Goblin ambush\): /],
+  ];
+  for (const [label, reason, expected] of cases) {
+    const xp = { ...SPLIT, ...(reason === undefined ? {} : { reason }) };
+    const s = await sharedFixture();
+    await s.call<Award>("dm", "/award", { id: s.id, revision: 2 });
+    await s.call<Award>("dm", "/award-xp", { id: s.id, xp });
+    const view = await s.bramView();
+    assert.match(xpEvents(view)[0]!.summary, expected, `shared, ${label}`);
+    const shared = xpEvents(await s.table());
+    s.db.close();
+    const d = await deviceFixture();
+    await d.call<Award>("/award", { revision: 2, xp });
+    assert.deepEqual(xpEvents(await economySnapshot()), shared, `device matches shared, ${label}`);
+  }
+  // Validated like xp-award's reason, on both paths: nothing given.
+  const tooLong = { ...SPLIT, reason: "x".repeat(121) };
+  const s = await sharedFixture();
+  await assert.rejects(s.call("dm", "/award", { id: s.id, revision: 2, xp: tooLong }));
+  assert.equal(xpEvents(await s.table()).length, 0);
+  s.db.close();
+  const d = await deviceFixture();
+  await assert.rejects(d.call("/award", { revision: 2, xp: tooLong }));
+  assert.equal(xpEvents(await economySnapshot()).length, 0);
+});
