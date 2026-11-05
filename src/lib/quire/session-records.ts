@@ -372,16 +372,21 @@ export function projectRecord(
           ),
         !!world.partyPosition,
       );
-    // Market events (market-events.ts): today's active events only; an open event whose place this
-    // seat can see by name (no DM note); secret ones, or ones at hidden places or shops, only as
-    // unnamed "Other adjustments" on the visible shops they affect. Decided on the whole campaign.
-    if (table.journal?.marketEvents) {
-      const events = projectMarketEvents(table.journal, {
+    // Market events (market-events.ts): today's active events only, with today as their only day;
+    // an open event whose place this seat can see by name (no DM note). Secret ones, or ones at
+    // hidden places or shops, are never sent: the visible shops they affect get one combined rate
+    // per category (`marketAdjustments`). Decided on the whole campaign.
+    if (table.journal?.marketEvents || table.journal?.marketAdjustments) {
+      const projected = projectMarketEvents(table.journal, {
         shops: t.shops,
         locationIds: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
       });
-      if (events) t.journal.marketEvents = events;
-      else delete t.journal.marketEvents;
+      delete t.journal.marketEvents;
+      delete t.journal.marketAdjustments;
+      if (projected) {
+        t.journal.marketEvents = projected.events;
+        if (projected.adjustments.length) t.journal.marketAdjustments = projected.adjustments;
+      }
     }
     // Journeys: status, progress and terrain; private routes and fogged waypoints are cut here.
     projectJourneys(

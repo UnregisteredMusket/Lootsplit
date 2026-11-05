@@ -49,7 +49,7 @@ import { applyQuestCommand, questReadable, questsOf } from "./quests.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { applyAttunementCommand, attunedBefore, attunementFromNotes, attunementCommands, attunementKinds, settleAttunement, type AttunementCommand } from "./attunement.ts";
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
-import { applyMarketEventCommand, lineEvents, saleEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
+import { applyMarketEventCommand, lineEvents, OLD_CLIENT_EVENT_PRICE, saleEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -561,6 +561,18 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyShipCommand(t, seat, cmd as ShipCommand, at);
   } else if (cmd.kind.startsWith("estate-")) {
     finance();
+    if (execution.marketEventsUnsupported && cmd.kind === "estate-delivery") {
+      // An older app quoted the supplier's price without market events (estate.ts `delivery`).
+      const line = t.stock.find((x) => x.id === cmd.stockId),
+        vendor = line && t.shops.find((x) => x.id === line.shopId),
+        payer = t.purses.find((p) => p.id === cmd.purseId);
+      if (line && vendor && payer) {
+        const events = lineEvents(journal, vendor, line),
+          cha = charismaFor(payer, t.sheets);
+        if (events.length && shopBuyBreakdown(vendor, line.copper, cha, 1, { events }).unit !== shopBuyBreakdown(vendor, line.copper, cha).unit)
+          throw Error(OLD_CLIENT_EVENT_PRICE);
+      }
+    }
     applyEstateCommand(t, seat, cmd as import("./estate-schema.ts").EstateCommand, at);
   } else if (cmd.kind === "listing-edit") {
     dm();
@@ -1186,7 +1198,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (s.quantity !== null && s.quantity < cmd.quantity)
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
     // Named market events apply at read time, exactly as the shop's Why this price? shows them.
-    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events: lineEvents(journal, shop, s) }).total;
+    const events = lineEvents(journal, shop, s);
+    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events }).total;
+    // An older app showed the price without them: refused rather than charged a price it never saw.
+    if (execution.marketEventsUnsupported && events.length && cost !== shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity).total)
+      throw Error(OLD_CLIENT_EVENT_PRICE);
     coins(cmd.purseId, -cost);
     creditMerchant(shop, cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
@@ -1293,7 +1309,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // An unidentified item sells at its presented value and category (shopSellBreakdown), with
     // today's market events for that category, exactly as the shop's Why this payout? shows.
     const shown = presentedHolding(h);
-    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events: saleEvents(journal, s, h) }).total;
+    const events = saleEvents(journal, s, h);
+    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events }).total;
+    if (execution.marketEventsUnsupported && events.length && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h).total)
+      throw Error(OLD_CLIENT_EVENT_PRICE);
     // Merchant purse: the shop pays from it, or the whole sale is refused.
     merchantPays(s, paid);
     coins(h.purseId, paid);
@@ -1466,6 +1485,16 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       // The purse is checked below (merchantPays), in the batch order that keeps a hidden purse hidden.
       { actor: seat.role === "dm" ? "dm" : "player", projected, skipPurse: true },
     );
+    // An older app planned the sale without market events: refused with a reason, never paid.
+    if (
+      execution.marketEventsUnsupported &&
+      plan.proceeds !== cmd.expect.proceeds &&
+      plan.lots.some((lot) => {
+        const h = t.holdings.find((x) => x.id === lot.holdingId)!;
+        return saleEvents(journal, shop, h).length > 0;
+      })
+    )
+      throw Error(OLD_CLIENT_EVENT_PRICE);
     if (
       plan.proceeds !== cmd.expect.proceeds ||
       plan.split.share !== cmd.expect.share ||

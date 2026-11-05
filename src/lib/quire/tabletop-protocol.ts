@@ -171,9 +171,11 @@ export const ITEM_IDENTITY_PROTOCOL = 24;
 export const MARKET_MARKUP_PROTOCOL = 25;
 /**
  * Protocol 26 (2026-11-05, named market events): the DM may send `market-event` and
- * `market-event-end`, and the journal may carry `marketEvents` (market-events.ts). The top-level
+ * `market-event-end`, and the journal may carry `marketEvents` (and, on a player's copy,
+ * `marketAdjustments`; market-events.ts). The top-level
  * journal schema is not strict, so every protocol receives the table unchanged (older clients drop
- * the key and price without events until they update; the server charges with them); their
+ * the key and price without events until they update, so the server refuses their purchases,
+ * sales and deliveries whose price an event changes: `marketEventsUnsupported`); their
  * whole-journal writes keep the stored events (journal.ts). Drafts with the new commands ask them
  * to finish on the updated website.
  */

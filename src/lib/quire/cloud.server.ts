@@ -63,6 +63,7 @@ import {
   refuseOldClientGroupActions,
   upgradeOldClientCommands,
   ZONES_PROTOCOL,
+  MARKET_EVENTS_PROTOCOL,
 } from "./tabletop-protocol.ts";
 
 /**
@@ -1110,6 +1111,8 @@ export async function submitCommands(input: {
         playerSeats: room.seats.filter((s) => s.role === "player").map((s) => ({ id: s.id, purseIds: s.purseIds })),
         // A client older than zone requests is told to update instead of "ask the party".
         zoneRequestsUnsupported: (input.tabletopProtocol ?? 0) < ZONES_PROTOCOL,
+        // Market events: an older app's prices omit them, so a changed price is refused, not charged.
+        marketEventsUnsupported: (input.tabletopProtocol ?? 0) < MARKET_EVENTS_PROTOCOL,
         random: (draw) => {
           const key = command.id + ":" + draw;
           if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());

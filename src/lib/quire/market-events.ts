@@ -17,9 +17,11 @@
  *   one DM-only journal event each). Ended events stay in the campaign as history; nothing deletes
  *   them. Stored in `journal.marketEvents` (tabletop protocol 26), at most `MARKET_EVENT_LIMIT`.
  * - Players (session-records.ts `projectRecord`) receive only today's active events: an open event
- *   whose place they can see, by name without the DM's note; a secret event, or one scoped to a
- *   place or shop hidden from them, only as an unnamed "Other adjustments" entry per visible shop
- *   it affects, so their prices still equal the charge.
+ *   whose place they can see, by name without the DM's note and with today as its only day. Secret
+ *   events and ones scoped to a place or shop hidden from them are never sent: for each visible
+ *   shop they affect, `journal.marketAdjustments` carries the server's combined rate for that
+ *   shop's goods (at most one entry per shop and category, so neither their number nor their
+ *   order shows), which the player's prices use as the total, so they still equal the charge.
  */
 import { z } from "zod";
 import { locationPath, readMarketLocations, type MarketLocations } from "./shop-locations.ts";
@@ -46,6 +48,12 @@ export const EVENT_CATEGORIES = [
 ] as const satisfies readonly ItemCategory[];
 
 const id = z.string().min(1).max(150);
+/**
+ * A DM event's ID: letters, digits, "-" and "_" (the form uses a UUID). The synthetic
+ * "Other adjustments" effect (`OTHER_ADJUSTMENTS_ID`) can never be one.
+ */
+const eventId = z.string().regex(/^[A-Za-z0-9_-]{1,150}$/, "A market event ID uses letters, digits, - and _.");
+export const OTHER_ADJUSTMENTS_ID = "~other-adjustments";
 const day = z.number().int().nonnegative().max(1e9);
 export const marketEventScopeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("realm") }).strict(),
@@ -54,7 +62,7 @@ export const marketEventScopeSchema = z.discriminatedUnion("kind", [
 ]);
 export const marketEventSchema = z
   .object({
-    id,
+    id: eventId,
     name: z.string().trim().min(1).max(80),
     scope: marketEventScopeSchema,
     /** Missing: every item. */
@@ -87,18 +95,36 @@ export const marketEventCommands = [
     .object({
       id,
       kind: z.literal("market-event"),
-      eventId: id,
+      eventId,
       before: marketEventSchema.nullable(),
       after: marketEventSchema,
     })
     .strict(),
   /** DM: End now. The end day becomes today (or the start day of one that hasn't started). */
-  z.object({ id, kind: z.literal("market-event-end"), eventId: id, before: marketEventSchema }).strict(),
+  z.object({ id, kind: z.literal("market-event-end"), eventId, before: marketEventSchema }).strict(),
 ] as const;
+/**
+ * A player's copy only (projectMarketEvents): the combined rate of every active event on one
+ * visible shop's goods of one category, as the server computes it (`eventRate`, clamped), sent
+ * where an event the player may not see takes part. Missing category: the shop's goods without an
+ * entry of their own. Valid on `day` only. One entry per shop and category at most (11 per shop).
+ */
+export const marketAdjustmentSchema = z
+  .object({
+    shopId: id,
+    category: z.enum(EVENT_CATEGORIES).optional(),
+    rate: z.number().min(MIN_EVENT_RATE).max(MAX_EVENT_RATE),
+    day,
+  })
+  .strict();
+export type MarketAdjustment = z.infer<typeof marketAdjustmentSchema>;
+/** No count limit: it is bounded by the shops (11 per shop), never by the DM's event list. */
+export const marketAdjustmentsSchema = z.array(marketAdjustmentSchema);
+
 export type MarketEventCommand = z.infer<(typeof marketEventCommands)[number]>;
 export const marketEventKinds = new Set<string>(["market-event", "market-event-end"]);
 
-type JournalLike = { finance?: unknown; market?: unknown; marketEvents?: unknown } | undefined | null;
+type JournalLike = { finance?: unknown; market?: unknown; marketEvents?: unknown; marketAdjustments?: unknown } | undefined | null;
 
 /** The campaign's Session Time day (finance.ts `day`; missing means day 0). */
 export function campaignDay(journal: JournalLike): number {
@@ -132,8 +158,18 @@ export function eventCovers(
   return locationPath(market, shop.locationId).some((l) => l.id === locationId);
 }
 
-/** What a price needs from an event; players' unnamed entries carry "Other adjustments". */
-export type MarketEventEffect = Pick<MarketEvent, "id" | "name" | "permille" | "secret">;
+/**
+ * What a price needs from an event. On a player's copy, events they may not see come as one
+ * "Other adjustments" effect whose `total` is the combined rate of every event on the line.
+ */
+export type MarketEventEffect = Pick<MarketEvent, "id" | "name" | "permille" | "secret"> & {
+  /** The whole combined rate (already clamped); replaces the product of the other effects. */
+  total?: number;
+};
+
+/** The category key a rate is decided by: one of the event categories, or none. */
+const categoryKey = (category: string | undefined) =>
+  (EVENT_CATEGORIES as readonly string[]).includes(category ?? "") ? (category as MarketEvent["category"]) : undefined;
 
 /** The item category a stock line is priced as (merchant.ts `stockCategory`). */
 function lineCategory(line: Pick<StockLine, "category">, shop: Pick<Shop, "category">): string {
@@ -170,14 +206,28 @@ function categoryEvents(
   shop: Pick<Shop, "id" | "locationId">,
   category: string | undefined,
 ): MarketEventEffect[] {
-  if (!journal?.marketEvents) return [];
+  if (!journal?.marketEvents && !journal?.marketAdjustments) return [];
+  const today = campaignDay(journal);
+  const open = activeCovering(journal, shop, category, today);
+  const adjustment = findAdjustment(journal, shop.id, categoryKey(category), today);
+  return adjustment === undefined
+    ? open
+    : [...open, { id: OTHER_ADJUSTMENTS_ID, name: "Other adjustments", permille: 1000, secret: true, total: adjustment }];
+}
+
+function activeCovering(
+  journal: NonNullable<JournalLike>,
+  shop: Pick<Shop, "id" | "locationId">,
+  category: string | undefined,
+  today: number,
+): MarketEventEffect[] {
   let events: MarketEvent[];
   try {
     events = readMarketEvents(journal.marketEvents);
   } catch {
     return [];
   }
-  const today = campaignDay(journal);
+  if (!events.length) return [];
   const market = readMarketLocations(journal.market);
   return events
     .filter((e) => eventStatus(e, today) === "active" && eventCovers(e, shop, category, market))
@@ -185,17 +235,36 @@ function categoryEvents(
     .map((e) => ({ id: e.id, name: e.name, permille: e.permille, ...(e.secret ? { secret: true as const } : {}) }));
 }
 
+/** A player's copy: the shop's combined rate for this category (or its default entry) today. */
+function findAdjustment(journal: NonNullable<JournalLike>, shopId: string, key: MarketEvent["category"], today: number) {
+  if (!journal.marketAdjustments) return undefined;
+  let list: MarketAdjustment[];
+  try {
+    list = marketAdjustmentsSchema.parse(journal.marketAdjustments);
+  } catch {
+    return undefined;
+  }
+  const mine = list.filter((a) => a.shopId === shopId && a.day === today);
+  return (mine.find((a) => key !== undefined && a.category === key) ?? mine.find((a) => a.category === undefined))?.rate;
+}
+
+/** An older app (protocol < 26) shows prices without market events; it is never charged them. */
+export const OLD_CLIENT_EVENT_PRICE =
+  "A market event changes this price, and this older Lootsplitter app can't show it. Finish this on the updated website; nothing was charged or paid.";
+
 /**
  * The product of the events' multipliers, kept within ×0.1–×10 (`eventRate`). No events: exactly
  * 1. Multiplied in ascending permille order, so the same events give the same rate in any order
  * (a player's projected copy lists hidden events differently from the DM's).
  */
-export function unlimitedEventRate(events: readonly Pick<MarketEventEffect, "permille">[]): number {
+export function unlimitedEventRate(events: readonly Pick<MarketEventEffect, "permille" | "total">[]): number {
+  const total = events.find((e) => e.total !== undefined)?.total;
+  if (total !== undefined) return total;
   let rate = 1;
   for (const permille of events.map((e) => e.permille).sort((a, b) => a - b)) rate *= permille / 1000;
   return rate;
 }
-export function eventRate(events: readonly Pick<MarketEventEffect, "permille">[]): number {
+export function eventRate(events: readonly Pick<MarketEventEffect, "permille" | "total">[]): number {
   if (!events.length) return 1;
   return Math.min(MAX_EVENT_RATE, Math.max(MIN_EVENT_RATE, unlimitedEventRate(events)));
 }
@@ -291,50 +360,59 @@ export function applyMarketEventCommand(
 }
 
 /**
- * A player's events (projectRecord): today's active events only. An open event whose place the
- * seat can see is sent by name without the DM's note; a secret event, or one whose location or
- * shop is hidden from the seat, becomes one unnamed "Other adjustments" entry per visible shop it
- * affects (so the seat's prices equal the charge), with today as its only day.
+ * A player's events (projectRecord): today's active events only, each with today as its only day
+ * (upcoming and ended ones, and real schedules, stay with the DM). An open event whose place the
+ * seat can see is sent by name without the DM's note. Secret events and ones whose location or
+ * shop is hidden from the seat are never sent; where they take part in a visible shop's price,
+ * `adjustments` carries that shop's combined rate (the server's `eventRate`, clamped) per
+ * category, at most one entry per shop and category. A copy projected again keeps its own.
  */
 export function projectMarketEvents(
   journal: JournalLike,
-  visible: { shops: Pick<Shop, "id" | "locationId" | "category">[]; locationIds: Set<string> },
-): MarketEvent[] | undefined {
-  if (!journal?.marketEvents) return undefined;
+  visible: { shops: Pick<Shop, "id" | "locationId">[]; locationIds: Set<string> },
+): { events: MarketEvent[]; adjustments: MarketAdjustment[] } | undefined {
+  if (!journal?.marketEvents && !journal?.marketAdjustments) return undefined;
   let events: MarketEvent[];
   try {
     events = readMarketEvents(journal.marketEvents);
   } catch {
-    return [];
+    return { events: [], adjustments: [] };
   }
   const today = campaignDay(journal);
-  const market = readMarketLocations(journal.market);
   const shopIds = new Set(visible.shops.map((s) => s.id));
-  const out: MarketEvent[] = [];
-  let hidden = 0;
-  for (const e of events) {
-    if (eventStatus(e, today) !== "active") continue;
-    const placeVisible =
-      e.scope.kind === "realm" ||
+  const active = events.filter((e) => eventStatus(e, today) === "active");
+  const shown = (e: MarketEvent) =>
+    !e.secret &&
+    (e.scope.kind === "realm" ||
       (e.scope.kind === "location" && visible.locationIds.has(e.scope.locationId)) ||
-      (e.scope.kind === "shop" && shopIds.has(e.scope.shopId));
-    if (!e.secret && placeVisible) {
-      const { note: _note, ...open } = e;
-      out.push(open);
-      continue;
-    }
-    for (const shop of visible.shops)
-      if (eventCovers({ scope: e.scope }, shop, undefined, market))
-        out.push({
-          id: `other-adjustment-${++hidden}`,
-          name: "Other adjustments",
-          scope: { kind: "shop", shopId: shop.id },
-          ...(e.category ? { category: e.category } : {}),
-          permille: e.permille,
-          startDay: today,
-          endDay: today + 1,
-          secret: true,
-        });
+      (e.scope.kind === "shop" && shopIds.has(e.scope.shopId)));
+  const out = active.filter(shown).map(({ note: _note, ...open }) => ({ ...open, startDay: today, endDay: today + 1 }));
+  // Already a player's copy (an archive or device copy projected again): keep its adjustments.
+  let kept: MarketAdjustment[] = [];
+  try {
+    kept = marketAdjustmentsSchema.parse(journal.marketAdjustments ?? []).filter((a) => shopIds.has(a.shopId));
+  } catch {
+    kept = [];
   }
-  return out;
+  const hidden = active.filter((e) => !shown(e));
+  const adjustments: MarketAdjustment[] = [...kept];
+  if (hidden.length) {
+    const market = readMarketLocations(journal.market);
+    for (const shop of visible.shops) {
+      const touches = hidden.filter((e) => eventCovers({ scope: e.scope }, shop, undefined, market));
+      if (!touches.length || kept.some((a) => a.shopId === shop.id)) continue;
+      const rateFor = (category: MarketEvent["category"]) =>
+        eventRate(active.filter((e) => eventCovers(e, shop, category, market)));
+      // The shop's default: goods of no event category, and any category without its own entry.
+      const fallback = touches.some((e) => !e.category) ? rateFor(undefined) : undefined;
+      if (fallback !== undefined) adjustments.push({ shopId: shop.id, rate: fallback, day: today });
+      for (const category of EVENT_CATEGORIES) {
+        const rate = rateFor(category);
+        const needed =
+          fallback !== undefined ? rate !== fallback : touches.some((e) => e.category === category);
+        if (needed) adjustments.push({ shopId: shop.id, category, rate, day: today });
+      }
+    }
+  }
+  return { events: out, adjustments };
 }

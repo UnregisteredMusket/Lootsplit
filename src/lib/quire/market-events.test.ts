@@ -29,6 +29,7 @@ import {
   eventStatus,
   lineEvents,
   MARKET_EVENT_LIMIT,
+  OTHER_ADJUSTMENTS_ID,
   saleEvents,
   unlimitedEventRate,
   readMarketEvents,
@@ -339,13 +340,12 @@ test("projection: players get today's open events without the note; secret and h
     const text = JSON.stringify(view.journal);
     for (const secret of ["Duke hoards", "Secret guild levy", "Guild\"", "Hill famine", "hills\"", "Watch raid", "Coming war", "Old fair"])
       assert.doesNotMatch(text, new RegExp(secret), secret);
-    const open = events.filter((e) => !e.secret);
-    assert.deepEqual(open.map((e) => e.id), ["blight"]);
-    assert.equal(open[0]!.note, undefined);
-    // The secret levy affects the two visible shops' provisions: one unnamed entry for each.
-    const other = events.filter((e) => e.secret);
-    assert.ok(other.every((e) => e.name === "Other adjustments" && e.scope.kind === "shop" && e.startDay === 10 && e.endDay === 11));
-    assert.deepEqual(other.map((e) => (e.scope as { shopId: string }).shopId).sort(), ["baker", "smith"]);
+    // Only the open blight, without its note and with today as its only day; no secret entries.
+    assert.deepEqual(events.map((e) => [e.id, e.startDay, e.endDay, e.note, e.secret]), [["blight", 10, 11, undefined, undefined]]);
+    // The secret levy affects the two visible shops' provisions: one combined rate for each.
+    const adjustments = view.journal!.marketAdjustments!;
+    assert.deepEqual(adjustments.map((a) => [a.shopId, a.category, a.day]).sort(), [["baker", "provisions", 10], ["smith", "provisions", 10]]);
+    assert.deepEqual(readJournal(view.journal).marketAdjustments, adjustments, "the player's copy parses");
     // The player's own price for grain equals what the DM's campaign charges.
     const grain = view.stock.find((s) => s.id === "grain")!;
     const mine = shopBuyBreakdown(baker, grain.copper, null, 1, { events: lineEvents(view.journal, baker, grain) });
@@ -365,13 +365,114 @@ test("projection: players get today's open events without the note; secret and h
   assert.equal(projectRecord(t, ariaSeat).journal!.events.some((e) => /Market event/.test(e.summary)), false);
   // A campaign without events projects without the key.
   assert.equal("marketEvents" in projectRecord(campaign(10), ariaSeat).journal!, false);
+  // Projected again (an archive or a device copy of a player's view): the same prices.
+  const again = projectRecord(projectRecord(t, ariaSeat), ariaSeat);
+  const grain = again.stock.find((s) => s.id === "grain")!;
+  assert.equal(
+    shopBuyBreakdown(baker, 333, null, 1, { events: lineEvents(again.journal, baker, grain) }).total,
+    shopBuyBreakdown(baker, 333, null, 1, { events: lineEvents(t.journal, baker, t.stock[0]!) }).total,
+  );
+});
+
+test("projection: many shops and many secret events fold into one rate per shop; the player's price is the charge", () => {
+  const t0 = campaign(10);
+  const shops: Shop[] = Array.from({ length: 40 }, (_, i) => ({ ...baker, id: `s${i}`, name: `Shop ${i}`, sellRate: 1 + (i % 3) / 10 }));
+  t0.shops = [...t0.shops, ...shops];
+  t0.stock = [...t0.stock, ...shops.flatMap((s, i) => [line(`g${i}`, s.id, 1000, "provisions"), line(`c${i}`, s.id, 777, "cloth"), line(`n${i}`, s.id, 555)])];
+  const secret = Array.from({ length: 12 }, (_, i): MarketEvent => ({
+    id: `levy-${i}`, name: `Levy ${i}`, scope: { kind: "realm" }, permille: [1200, 1333, 900, 2500][i % 4]!,
+    ...(i % 3 === 1 ? { category: "provisions" as const } : {}), startDay: 0, endDay: 99, secret: true,
+  }));
+  // Twelve secret events multiply past ×10: the clamp must match the server's exactly.
+  const t = withEvents(t0, blight, festival, ...secret);
+  const view = projectRecord(t, ariaSeat);
+  const parsed = readJournal(view.journal);
+  assert.deepEqual(readMarketEvents(parsed.marketEvents).map((e) => e.id), ["blight", "festival"]);
+  const perShop = new Map<string, number>();
+  for (const a of parsed.marketAdjustments!) perShop.set(a.shopId, (perShop.get(a.shopId) ?? 0) + 1);
+  assert.ok([...perShop.values()].every((n) => n <= 11), "at most one entry per shop and category");
+  assert.doesNotMatch(JSON.stringify(view.journal), /Levy|levy-/);
+  for (const s of view.stock) {
+    const shop = t.shops.find((x) => x.id === s.shopId)!;
+    const server = t.stock.find((x) => x.id === s.id)!;
+    const charged = shopBuyBreakdown(shop, server.copper, 14, 3, { events: lineEvents(t.journal, shop, server) });
+    const shown = shopBuyBreakdown(shop, s.copper, 14, 3, { events: lineEvents(parsed, shop, s) });
+    assert.equal(shown.total, charged.total, s.id);
+    assert.equal(sum(viewerBreakdown(shown, false)), shown.unit);
+  }
+  // Sales too: every category the shop could be paid for.
+  for (const shop of view.shops)
+    for (const category of [undefined, "provisions", "cloth", "jewels", "weapon"]) {
+      const item = { category, unidentified: undefined };
+      const charged = shopSellBreakdown(shop, 1000, 2, item, { events: saleEvents(t.journal, shop, item) }).total;
+      assert.equal(shopSellBreakdown(shop, 1000, 2, item, { events: saleEvents(parsed, shop, item) }).total, charged, `${shop.id} ${category}`);
+    }
+  // A shared room buys at the projected price.
+  const bought = applyCommand(t, ariaSeat, { id: "many-buy", kind: "buy", stockId: "g7", purseId: "aria", quantity: 3 });
+  const g7 = view.stock.find((x) => x.id === "g7")!;
+  const shop7 = t.shops.find((x) => x.id === "s7")!;
+  assert.equal(wallet(t, "aria") - wallet(bought, "aria"), shopBuyBreakdown(shop7, 1000, null, 3, { events: lineEvents(parsed, shop7, g7) }).total);
+});
+
+test("IDs: a DM event can't take the synthetic Other adjustments ID or any odd ID", () => {
+  const t = campaign(10);
+  for (const bad of [OTHER_ADJUSTMENTS_ID, "other adjustments", "a/b", ""])
+    assert.throws(() => applyCommand(t, dmSeat, { id: "bad", kind: "market-event", eventId: bad, before: null, after: { ...festival, id: bad } }), bad);
+  // An open event named like the fold never changes a player's price.
+  const look = withEvents(campaign(10), { ...festival, id: "other-adjustments", name: "Other adjustments" }, { ...blight, id: "x", secret: true });
+  const view = projectRecord(look, ariaSeat);
+  const grain = view.stock.find((s) => s.id === "grain")!;
+  assert.equal(
+    shopBuyBreakdown(baker, 333, null, 1, { events: lineEvents(view.journal, baker, grain) }).total,
+    shopBuyBreakdown(baker, 333, null, 1, { events: lineEvents(look.journal, baker, look.stock[0]!) }).total,
+  );
+});
+
+test("older apps (protocol 25): a price an event changes is refused; unchanged lines trade as before", async () => {
+  const table = goods(campaign(10));
+  table.shops = table.shops.map((s) => (s.id === "baker" ? { ...s, acceptAnyCategory: true } : s));
+  const dm = await openRoom({ name: "Old app", table });
+  const aria = await joinRoom({ code: dm.code, purseId: "aria", name: "Aria" });
+  const DT = { code: dm.code, token: dm.token, tabletopProtocol: MARKET_EVENTS_PROTOCOL };
+  const OLD = { code: dm.code, token: aria.token, tabletopProtocol: MARKET_MARKUP_PROTOCOL };
+  await choosePace({ code: dm.code, token: dm.token, live: true });
+  await submitCommands({ ...DT, batchId: "o0", commands: [add("o0", blight)] });
+  const state = async () => (await roomState({ code: dm.code, token: dm.token })).table;
+  const start = wallet(await state(), "aria");
+  // Grain (provisions in the Riverlands) is changed by the blight: refused, nothing moves.
+  await assert.rejects(
+    submitCommands({ ...OLD, batchId: "o1", commands: [{ id: "o1", kind: "buy", stockId: "grain", purseId: "aria", quantity: 1 }] }),
+    /older Lootsplitter app/,
+  );
+  await assert.rejects(
+    submitCommands({ ...OLD, batchId: "o2", commands: [{ id: "o2", kind: "sell", holdingId: "sack", shopId: "baker", quantity: 1 }] }),
+    /older Lootsplitter app/,
+  );
+  assert.equal(wallet(await state(), "aria"), start);
+  // Lace (cloth) and the cloak aren't changed by any event: they trade exactly as before.
+  await submitCommands({ ...OLD, batchId: "o3", commands: [{ id: "o3", kind: "buy", stockId: "lace", purseId: "aria", quantity: 1 }] });
+  await submitCommands({ ...OLD, batchId: "o4", commands: [{ id: "o4", kind: "sell", holdingId: "cloak", shopId: "baker", quantity: 1 }] });
+  assert.equal(wallet(await state(), "aria") - start, -1100 + 500);
+  // The updated app is charged the event price.
+  await submitCommands({ ...OLD, tabletopProtocol: MARKET_EVENTS_PROTOCOL, batchId: "o5", commands: [{ id: "o5", kind: "buy", stockId: "grain", purseId: "aria", quantity: 1 }] });
+  assert.equal(wallet(await state(), "aria") - start, -1100 + 500 - Math.round(333 * 1.8 * 1.1));
+  // Sell and split planned without the event (167 per sack) is refused with the same reason.
+  const old = { ...table, journal: readJournal({ ...table.journal }) };
+  const unchanged = planSaleSplit(old, { fundId: "hoard", shopId: "baker", lots: [{ holdingId: "hoard-grain", quantity: 1 }], recipientIds: ["aria"], rule: "party-fund" }, { actor: "dm" });
+  await assert.rejects(
+    submitCommands({
+      code: dm.code, token: dm.token, tabletopProtocol: MARKET_MARKUP_PROTOCOL, batchId: "o6",
+      commands: [{ id: "o6", kind: "sale-split", fundId: "hoard", shopId: "baker", lots: [{ holdingId: "hoard-grain", quantity: 1 }], recipientIds: ["aria"], remainder: { rule: "party-fund" }, expect: { proceeds: unchanged.proceeds, share: unchanged.split.share, remainderTo: unchanged.split.remainderTo } }],
+    }),
+    /older Lootsplitter app/,
+  );
 });
 
 test("shared rooms: players refused, a retry applies once, and buy charges the breakdown", async () => {
   const dm = await openRoom({ name: "Events DM", table: campaign(10) });
   const aria = await joinRoom({ code: dm.code, purseId: "aria", name: "Aria" });
   const DT = { code: dm.code, token: dm.token };
-  const AT = { code: dm.code, token: aria.token };
+  const AT = { code: dm.code, token: aria.token, tabletopProtocol: MARKET_EVENTS_PROTOCOL };
   await choosePace({ ...DT, live: true });
   const state = async () => (await roomState(DT)).table;
   await assert.rejects(submitCommands({ ...AT, batchId: "r0", commands: [add("r0", blight)] }));

@@ -144,7 +144,9 @@ export function listPriceDerivation(
 function eventFactors(factors: PriceFactor[], copper: number, events: readonly MarketEventEffect[], rate: number) {
   let exact = copper,
     shown = copper;
+  const total = events.find((e) => e.total !== undefined);
   for (const e of events) {
+    if (e.total !== undefined) continue;
     exact *= e.permille / 1000;
     const now = Math.round(exact);
     factors.push({
@@ -156,7 +158,13 @@ function eventFactors(factors: PriceFactor[], copper: number, events: readonly M
     });
     shown = now;
   }
-  if (events.length && rate !== unlimitedEventRate(events)) {
+  if (total) {
+    // A player's copy: events they may not see, as the rest of the server's combined rate.
+    exact = copper * rate;
+    const now = Math.round(exact);
+    factors.push({ key: "event-other", label: "Other adjustments", copper: now - shown, dmOnly: true });
+    shown = now;
+  } else if (events.length && rate !== unlimitedEventRate(events)) {
     exact = copper * rate;
     const now = Math.round(exact);
     factors.push({
