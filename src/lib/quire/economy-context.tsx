@@ -110,6 +110,7 @@ import { presentReceipt } from "./receipt.ts";
 import { DM_SEAT, buildBill, downloadJson, getSeat, readShare, setSeat } from "./table.ts";
 import type { RarityFlags, ShelfDraft } from "./compose.ts";
 import { DEFAULT_REALM } from "./scale.ts";
+import { itemDetailsFor } from "./item-details.ts";
 import type {
   CatalogItem,
   Coins,
@@ -196,7 +197,11 @@ type EconomyApi = {
     kind: Holding["kind"],
     quantity: number,
     unitCopper: number,
-    metadata?: Pick<Holding, "notes" | "category" | "requiresAttunement"> & { pool?: boolean },
+    /**
+     * Optional details set in the same save (item-details.ts): charges (`uses`), the attunement
+     * requirement and the presented record of an item added unidentified. Items only.
+     */
+    metadata?: Pick<Holding, "notes" | "category" | "requiresAttunement" | "uses" | "unidentified"> & { pool?: boolean },
   ) => Promise<void>;
   /** Resolves `true` when removed; `false` after a shown error. */
   deleteHolding: (id: string) => Promise<boolean>;
@@ -952,9 +957,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               unitCopper,
               notes: metadata?.notes ?? "",
               ...(metadata?.category ? { category: metadata.category } : {}),
-              ...(metadata?.requiresAttunement && kind === "item"
-                ? { requiresAttunement: metadata.requiresAttunement }
-                : {}),
+              // Charges, attunement and the presented record go in the same save, so the item
+              // never exists without them (one holding row; one patch in a shared room).
+              ...(kind === "item" && metadata ? itemDetailsFor(metadata) : {}),
               ...(metadata?.pool ? { pool: { at: Date.now(), source: "add-loot" as const } } : {}),
             });
           },

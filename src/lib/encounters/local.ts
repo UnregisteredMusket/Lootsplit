@@ -14,6 +14,7 @@ import {
 import { applyEncounterSplit, type EncounterCoinSplitReceipt } from "../quire/coin-split.ts";
 import { encounterPoolRows } from "../quire/loot-claims.ts";
 import { encounterCoinLine, encounterItemLine } from "../quire/award-tag.ts";
+import { itemDetailsFor } from "../quire/item-details.ts";
 import { readJournal } from "../quire/journal.ts";
 import { creatureIndex } from "./index.mjs";
 import { parseDice, throwDice } from "../characters/model.mjs";
@@ -300,7 +301,8 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
               quantity: item.quantity,
               unitCopper: item.unitCopper,
               notes: item.notes,
-              ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
+              // Charges, attunement and the presented record, in this same write (item-details.ts).
+              ...itemDetailsFor(item),
             });
             tx.objectStore("ledger").put(encounterItemLine(receiptId, index, at, p.id, item, e.name, holdingId));
           }

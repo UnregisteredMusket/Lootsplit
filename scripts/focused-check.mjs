@@ -17,6 +17,7 @@ const featureAudits = {
   "sell-and-split": "scripts/sell-and-split-browser-audit.mjs",
   "departed-holdings": "scripts/departed-holdings-browser-audit.mjs",
   "item-identification": "scripts/item-identification-browser-audit.mjs",
+  "award-item-details": "scripts/award-item-details-browser-audit.mjs",
   "merchant-purse": "scripts/merchant-purse-browser-audit.mjs",
   "price-breakdown": "scripts/price-breakdown-browser-audit.mjs",
   // Black-market markup labels are audited inside the price-breakdown audit.

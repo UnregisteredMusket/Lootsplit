@@ -3,6 +3,7 @@ import type { CampaignMap, MapToken } from "./world-schema.ts";
 import { expandTabletopHistory, tabletopHasFogDiffs } from "./fog-history.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { placeFromBox, tokenBox, tokenFootprint } from "./tabletop-geometry.ts";
+import { hasItemDetails } from "./item-details.ts";
 
 /**
  * The current tabletop table shape; 3 added compact fog history, continued brush strokes, fog
@@ -187,8 +188,17 @@ export const MARKET_EVENTS_PROTOCOL = 26;
  * finish on the updated website. (26 is reserved for market events, 28 for another feature.)
  */
 export const LOOT_RETURN_PROTOCOL = 27;
+/**
+ * Protocol 28 (2026-11-05, award item details): the DM's `npc-item` may carry the item's `uses`,
+ * `requiresAttunement` and `unidentified` (item-details.ts). Older clients parse `npc-item` with a
+ * strict item schema, so drafts with those fields ask them to finish on the updated website.
+ * The holdings it creates are not a strict schema, so every protocol receives them (players
+ * already presented). Encounter loot and Add loot need no protocol: they reach the room as an
+ * award or a holding `patch`, which older clients read.
+ */
+export const AWARD_DETAILS_PROTOCOL = 28;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = LOOT_RETURN_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = AWARD_DETAILS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1321,12 +1331,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= LOOT_RETURN_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= AWARD_DETAILS_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 28: an NPC inventory lot with charges, attunement or a presented record.
+      if (c.kind === "npc-item" && hasItemDetails(c.item)) return true;
+      if (protocol && protocol >= LOOT_RETURN_PROTOCOL) return false;
       // Protocol 27: return a departed character's items and coins to the party.
       if (c.kind === "loot-return") return true;
       if (protocol && protocol >= MARKET_EVENTS_PROTOCOL) return false;

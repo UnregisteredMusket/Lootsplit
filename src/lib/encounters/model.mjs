@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { unidentifiedSchema } from "../quire/item-identity.ts";
+import { holdingUsesSchema } from "../quire/item-uses.ts";
+import { requiresAttunementSchema } from "../quire/attunement.ts";
 const label = z.string().trim().min(1).max(120);
 const note = z.string().max(16000);
 const integer = z.number().int().min(0).max(1000000);
@@ -46,6 +48,12 @@ export const lootSchema = z.object({
    * presented record instead of the item's name, notes and value until the DM reveals it.
    */
   unidentified: unidentifiedSchema.optional(),
+  /**
+   * Optional (award item details, item-details.ts): the holding's charges and attunement
+   * requirement, set on the new holding in the award's one write. Absent: as before.
+   */
+  uses: holdingUsesSchema.optional(),
+  requiresAttunement: requiresAttunementSchema.optional(),
 });
 export const tableSchema = z
   .object({
