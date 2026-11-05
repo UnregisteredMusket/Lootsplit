@@ -199,12 +199,12 @@ test("shared engine: every switch flips its setting, a stale before is refused, 
   const ids = ["black-market", "black-market-markup", "companion-funds", "follow-view", "tv-display", "reference-enabled", "reference-encounters"];
   for (const id of ids) {
     const before = toggle(visibilityCenter(t), id);
-    assert.throws(() => run(t, before.command!, aria), undefined, `${id}: a player was allowed`);
+    assert.throws(() => run(t, before.command!, aria), /Only the DM can/, `${id}: a player was allowed`);
     const next = run(t, before.command!);
     const after = toggle(visibilityCenter(next), id);
     assert.equal(after.on, !before.on, `${id} did not flip`);
     // The same command again (a new ID) carries the old `before`: refused, nothing changes.
-    assert.throws(() => run(next, before.command!), undefined, `${id}: a stale before was accepted`);
+    assert.throws(() => run(next, before.command!), /changed\. (Refresh|Review)/, `${id}: a stale before was accepted`);
     t = next;
   }
 });

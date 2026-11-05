@@ -124,7 +124,12 @@ try {
     await page.getByRole("button", { name: "Preview as Aria Thorne" }).click();
     const banner = page.locator(".player-preview-banner");
     await banner.getByText("Previewing as Aria Thorne").waitFor();
-    await navigateApplication(page, origin + "/features/visibility");
+    // The preview opens the player's Home, which has no link to this DM page; a typed address would
+    // reload and end the preview. The browser's Back button returns here inside the preview.
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goBack();
+    await page.waitForURL((u) => u.pathname === "/features/visibility");
+    await banner.getByText("Previewing as Aria Thorne").waitFor();
     await page.getByRole("heading", { name: "Not available in preview" }).waitFor();
     assert.equal(await page.getByTestId("visibility-center").count(), 0, `${width}: the page rendered in a preview`);
     await banner.getByRole("button", { name: "Stop preview" }).click();
