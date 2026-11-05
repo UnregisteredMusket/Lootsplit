@@ -133,7 +133,9 @@ async function awardXpLater(db, user, d, e, body) {
     fail("Return the campaign turn to the DM before awarding XP.", 409);
   const room = structuredClone(d.room),
     at = Date.now(),
-    xpId = `${stored.receipt_id}-xp`;
+    // Unique per request: the room write below requires this request's own receipt, so a
+    // concurrent Award XP that lost the race writes nothing (not even an identical campaign).
+    xpId = `${stored.receipt_id}-xp-${crypto.randomUUID()}`;
   let xp;
   try {
     xp = applyEncounterXp(room.table, d.seat, body.xp, { id: xpId, at, reason: e.name }).receipt;
@@ -170,7 +172,7 @@ async function awardXpLater(db, user, d, e, body) {
     .first();
   const saved = after ? JSON.parse(after.body) : null;
   if (!saved?.xp) fail("The encounter or campaign changed. Reload and try again.", 409);
-  return { award: saved, duplicate: saved.xp.id !== xpId || saved.xp.at !== at };
+  return { award: saved, duplicate: saved.xp.id !== xpId };
 }
 export { creatureIndex } from "../src/lib/encounters/index.mjs";
 import { creatureIndex } from "../src/lib/encounters/index.mjs";

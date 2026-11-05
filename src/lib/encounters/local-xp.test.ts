@@ -270,6 +270,40 @@ test("encounters awarded without XP (and before this change) get XP once from Aw
   assert.deepEqual(legacy[0]!.award, { receiptId: "r", at: 1 });
 });
 
+test("two Award XP requests in flight at once: one gives the XP, the other writes nothing", async () => {
+  const s = await sharedFixture();
+  await s.call<Award>("dm", "/award", { id: s.id, revision: 2 });
+  const revision = async () => (await s.db.prepare("SELECT revision FROM campaign_rooms WHERE code=?").bind(s.code).first()).revision as number;
+  const start = await revision();
+  // Both requests read the same campaign before either writes; another campaign write lands
+  // between the two batches. The second batch must neither give XP nor overwrite that write.
+  const batch = s.db.batch.bind(s.db);
+  const waiting: Array<() => void> = [];
+  let calls = 0;
+  s.db.batch = async (statements: unknown[]) => {
+    const mine = ++calls;
+    if (mine === 1) await new Promise<void>((go) => waiting.push(go));
+    else {
+      waiting.shift()!();
+      await new Promise((r) => setTimeout(r, 20));
+      await s.db.prepare("UPDATE campaign_rooms SET revision=revision+1 WHERE code=?").bind(s.code).run();
+    }
+    return batch(statements);
+  };
+  const results = await Promise.allSettled([
+    s.call<Award>("dm", "/award-xp", { id: s.id, xp: SPLIT }),
+    s.call<Award>("dm", "/award-xp", { id: s.id, xp: SPLIT }),
+  ]);
+  s.db.batch = batch;
+  const given = results.filter((r) => r.status === "fulfilled" && !r.value.duplicate);
+  assert.equal(given.length, 1, "exactly one request gives the XP");
+  assert.equal(await revision(), start + 2, "the later campaign write is not overwritten");
+  const shared = await s.table();
+  assert.deepEqual([xpOf(shared, "aria"), xpOf(shared, "bram")], [766, 466]);
+  assert.equal(xpEvents(shared).length, 1);
+  s.db.close();
+});
+
 test("milestone parties: the detail says so, XP is refused on both paths, a milestone is marked once", async () => {
   const s = await sharedFixture(true);
   assert.equal((await s.call<{ xpMode: string }>("dm", "/detail", { id: s.id })).xpMode, "milestone");
