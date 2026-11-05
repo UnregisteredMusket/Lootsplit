@@ -169,8 +169,19 @@ export const ITEM_IDENTITY_PROTOCOL = 24;
  * with the new command ask them to finish on the updated website.
  */
 export const MARKET_MARKUP_PROTOCOL = 25;
+/**
+ * Protocol 26 (2026-11-05, named market events): the DM may send `market-event` and
+ * `market-event-end`, and the journal may carry `marketEvents` (and, on a player's copy,
+ * `marketAdjustments`; market-events.ts). The top-level
+ * journal schema is not strict, so every protocol receives the table unchanged (older clients drop
+ * the key and price without events until they update, so the server refuses their purchases,
+ * sales and deliveries whose price an event changes: `marketEventsUnsupported`); their
+ * whole-journal writes keep the stored events (journal.ts). Drafts with the new commands ask them
+ * to finish on the updated website.
+ */
+export const MARKET_EVENTS_PROTOCOL = 26;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = MARKET_MARKUP_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = MARKET_EVENTS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1303,12 +1314,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= MARKET_MARKUP_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= MARKET_EVENTS_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 26: named market events.
+      if (c.kind === "market-event" || c.kind === "market-event-end") return true;
+      if (protocol && protocol >= MARKET_MARKUP_PROTOCOL) return false;
       // Protocol 25: the black-market markup display setting.
       if (c.kind === "black-market-markup") return true;
       if (protocol && protocol >= ITEM_IDENTITY_PROTOCOL) return false;

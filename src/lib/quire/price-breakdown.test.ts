@@ -75,6 +75,75 @@ test("shop purchase: the breakdown total equals the engine's price for every gen
   assert.ok(checked > 5000);
 });
 
+test("market events: the breakdown equals list × events × markup × premium, rounded once, for generated inputs", () => {
+  const r = rng(26);
+  const PERMILLE = [100, 250, 500, 900, 999, 1000, 1001, 1100, 1333, 1800, 2500, 7770, 10000];
+  let checked = 0;
+  for (const sellRate of RATES)
+    for (const premium of PREMIUMS)
+      for (const blackMarket of [false, true]) {
+        const shop = { sellRate, blackMarket, ...(premium === undefined ? {} : { blackMarketPremium: premium }) };
+        for (let i = 0; i < 6; i++) {
+          const events = Array.from({ length: Math.floor(r() * 4) }, (_, n) => ({
+            id: `e${n}`,
+            name: `Event ${n}`,
+            permille: pick(r, PERMILLE),
+            ...(r() < 0.4 ? { secret: true as const } : {}),
+          }));
+          let rate = 1;
+          for (const p of events.map((e) => e.permille).sort((x, y) => x - y)) rate *= p / 1000;
+          rate = events.length ? Math.min(10, Math.max(0.1, rate)) : 1;
+          const copper = pick(r, COPPER),
+            cha = pick(r, CHA),
+            qty = 1 + Math.floor(r() * 20);
+          const b = shopBuyBreakdown(shop, copper, cha, qty, { events });
+          const expected =
+            priceAfterCharisma(Math.round(copper * rate * sellRate * (blackMarket ? (premium ?? 1.5) : 1)), cha) * qty;
+          assert.equal(b.total, expected, JSON.stringify({ shop, copper, cha, qty, events }));
+          assert.equal(shopBuyBreakdown(shop, copper, cha, qty, { events: [...events].reverse() }).total, b.total, "order-independent");
+          assert.equal(sum(b), b.unit, `factors add up: ${breakdownLines(b).join(" | ")}`);
+          const player = viewerBreakdown(b, false);
+          assert.equal(sum(player), b.unit);
+          assert.equal(player.total, b.total);
+          assert.ok(!JSON.stringify(player).includes("secret"), "secret events are folded for players");
+          checked++;
+        }
+      }
+  assert.ok(checked > 1000);
+});
+
+test("market events on sales: the payout equals value × events × buy rate, rounded once, for generated inputs", () => {
+  const r = rng(27);
+  const PERMILLE = [100, 250, 500, 900, 999, 1000, 1001, 1100, 1333, 1800, 2500, 7770, 10000];
+  let checked = 0;
+  for (let i = 0; i < 4000; i++) {
+    const events = Array.from({ length: Math.floor(r() * 4) }, (_, n) => ({
+      id: `e${n}`,
+      name: `Event ${n}`,
+      permille: pick(r, PERMILLE),
+      ...(r() < 0.4 ? { secret: true as const } : {}),
+    }));
+    const sorted = events.map((e) => e.permille).sort((x, y) => x - y);
+    let rate = 1;
+    for (const p of sorted) rate *= p / 1000;
+    rate = events.length ? Math.min(10, Math.max(0.1, rate)) : 1;
+    const unit = pick(r, COPPER),
+      buyRate = pick(r, RATES),
+      qty = 1 + Math.floor(r() * 99);
+    const sale = shopSellBreakdown({ buyRate }, unit, qty, undefined, { events });
+    assert.equal(sale.total, Math.max(0, Math.round(unit * rate * buyRate)) * qty, JSON.stringify({ unit, buyRate, events }));
+    if (!events.length) assert.equal(sale.total, legacy.sellServer(unit, buyRate, qty));
+    assert.equal(sum(sale), sale.unit, breakdownLines(sale).join(" | "));
+    // The same events in another order (a player's projected copy) give the same payout.
+    assert.equal(shopSellBreakdown({ buyRate }, unit, qty, undefined, { events: [...events].reverse() }).total, sale.total);
+    const player = viewerBreakdown(sale, false);
+    assert.equal(sum(player), sale.unit);
+    assert.ok(!JSON.stringify(player).includes("secret"), "secret events are folded for players");
+    checked++;
+  }
+  assert.ok(checked >= 4000);
+});
+
 test("shop sale, market listing, exchange and barter: the breakdown equals the engine for generated inputs", () => {
   const r = rng(11);
   for (let i = 0; i < 4000; i++) {

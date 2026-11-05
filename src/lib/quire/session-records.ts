@@ -25,6 +25,7 @@ import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
 import { projectMerchantPurse } from "./merchant.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
+import { projectMarketEvents } from "./market-events.ts";
 import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
 import { propertyAvailableToGroups } from "./property.ts";
 import { projectPartyGroups } from "./party-groups-project.ts";
@@ -371,6 +372,22 @@ export function projectRecord(
           ),
         !!world.partyPosition,
       );
+    // Market events (market-events.ts): today's active events only, with today as their only day;
+    // an open event whose place this seat can see by name (no DM note). Secret ones, or ones at
+    // hidden places or shops, are never sent: the visible shops they affect get one combined rate
+    // per category (`marketAdjustments`). Decided on the whole campaign.
+    if (table.journal?.marketEvents || table.journal?.marketAdjustments) {
+      const projected = projectMarketEvents(table.journal, {
+        shops: t.shops,
+        locationIds: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
+      });
+      delete t.journal.marketEvents;
+      delete t.journal.marketAdjustments;
+      if (projected) {
+        t.journal.marketEvents = projected.events;
+        if (projected.adjustments.length) t.journal.marketAdjustments = projected.adjustments;
+      }
+    }
     // Journeys: status, progress and terrain; private routes and fogged waypoints are cut here.
     projectJourneys(
       table,

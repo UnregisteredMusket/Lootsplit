@@ -1,0 +1,10 @@
+{
+  "title": "Market events: blights, festivals and other timed price changes",
+  "summary": "DMs can add named market events that raise or lower shop prices for a while, such as a blight that makes grain dearer or a harvest festival with cheaper food.",
+  "items": [
+    "An event covers the whole realm, one place or one shop, and all items or one kind of goods, from a start day for a number of in-game days.",
+    "Events change what shops charge and what they pay for those goods. Why this price? and Why this payout? name the event and show its effect, and the purchase or sale moves exactly that total.",
+    "Players see the events in effect where they are under Market events; a DM can keep an event secret, so players see only “Other adjustments”.",
+    "Ending an event keeps it in the campaign's history."
+  ]
+}

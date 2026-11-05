@@ -7,6 +7,7 @@ import { serviceOrderOpen } from "./services-schema.ts";
 import { projectRecord } from "./session-records.ts";
 import { shopVisible, validateWorld } from "./world.ts";
 import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
+import { lineEvents, saleEvents } from "./market-events.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
@@ -1352,7 +1353,8 @@ export async function buyFromShop(
     if (stock.quantity !== null && stock.quantity < quantity)
       throw new Error("The shop does not have that many.");
     const score = await charismaOf(purse, tx);
-    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity).total;
+    // The same market events the shared `buy` command applies (market-events.ts).
+    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity, { events: lineEvents(journal, shop, stock) }).total;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
     // Each purchase is a separate lot. A matching name does not identify the
@@ -1493,7 +1495,8 @@ export async function sellToShop(
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
-    const paid = shopSellBreakdown(shop, holding.unitCopper, quantity, holding).total;
+    // The same market events the shared `sell` command applies (market-events.ts).
+    const paid = shopSellBreakdown(shop, holding.unitCopper, quantity, holding, { events: saleEvents(journal, shop, holding) }).total;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");
     // Merchant purse: paid from it or the sale is refused, as in the shared command.
     const merchant = structuredClone(shop);

@@ -4,6 +4,7 @@ import { useSeatGroups } from "@/lib/quire/use-seat-groups";
 import { BlacksmithOrders } from "@/components/blacksmith-services";
 import { ServiceOrders } from "@/components/service-providers";
 import { BlackMarketToggle } from "@/components/black-market";
+import { MarketEventsList } from "@/components/market-events";
 import { shopVisible } from "@/lib/quire/world";
 import { LedgerArt } from "@/components/ledger-art";
 import { MarketLocationsPanel, LocationOptions } from "@/components/market-locations";
@@ -390,6 +391,7 @@ function MarketPage() {
           </ul>
         </section>
       ) : null}
+      {ready ? <MarketEventsList /> : null}
       {seat.role === "dm" ? (
         <Fold title="Create a shop" hint="Type, wealth, and stock.">
           <ShopComposer />
