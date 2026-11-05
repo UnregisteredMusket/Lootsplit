@@ -16,6 +16,7 @@ const featureAudits = {
   "attunement": "scripts/attunement-browser-audit.mjs",
   "sell-and-split": "scripts/sell-and-split-browser-audit.mjs",
   "departed-holdings": "scripts/departed-holdings-browser-audit.mjs",
+  "economy-health": "scripts/economy-health-browser-audit.mjs",
   "item-identification": "scripts/item-identification-browser-audit.mjs",
   "award-item-details": "scripts/award-item-details-browser-audit.mjs",
   "merchant-purse": "scripts/merchant-purse-browser-audit.mjs",
