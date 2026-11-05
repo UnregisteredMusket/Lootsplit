@@ -7,7 +7,6 @@ import "./commands.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import "fake-indexeddb/auto";
-import { localAccountDb } from "../../../scripts/account-dev-db.mjs";
 import { openRoom, joinRoom, roomState, submitCommands, choosePace } from "./cloud.server.ts";
 import { applyCommand, tablePatch, type Command } from "./commands.ts";
 import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
@@ -25,6 +24,7 @@ import { DM_SEAT, setSeat } from "./table.ts";
 import type { Holding, Purse } from "./types.ts";
 
 // Disposable in-memory D1 stand-in with every migration; never a real campaign.
+const { localAccountDb } = await import(new URL("../../../scripts/account-dev-db.mjs", import.meta.url).href);
 const db = localAccountDb();
 (globalThis as { __env__?: unknown }).__env__ = { DB: db };
 
@@ -254,7 +254,7 @@ test("Add loot refuses invalid details on the device, and a non-item can't carry
   await applyCloudTable(campaign());
   await assert.rejects(saveHolding({ ...NEW("aria"), uses: { current: 9, max: 7, whenEmpty: "keep" } }), /Uses must be whole numbers/);
   await assert.rejects(saveHolding({ ...NEW("aria"), unidentified: { name: "" } }), /name players see/);
-  await assert.rejects(saveHolding({ ...NEW("aria"), kind: "property", uses: undefined, requiresAttunement: undefined }), /Only items/);
+  await assert.rejects(saveHolding({ ...NEW("aria"), kind: "property", uses: undefined, requiresAttunement: undefined }), /Only an item can be unidentified/);
   assert.equal((await economySnapshot()).holdings.length, 0);
   // Without the fields Add loot is the same save as before.
   await saveHolding({ id: "plain", purseId: "aria", name: "Rope", kind: "item", quantity: 1, unitCopper: 100, notes: "" });
@@ -300,7 +300,8 @@ test("npc-item: the lot carries the details in the same command; DM only; device
   assert.deepEqual([lot.purseId, lot.uses, lot.requiresAttunement, lot.unidentified], ["npc-vel", DETAILS.uses, DETAILS.requiresAttunement, SHOWN]);
   assert.equal(presentedHolding(lot).name, SHOWN.name);
   assert.throws(() => applyCommand(withNpc(), ariaSeat, npcItem("n2")), /Only the DM/);
-  assert.throws(() => applyCommand(withNpc(), dmSeat, { ...npcItem("n3"), item: { ...npcItem("n3").item, uses: { current: 9, max: 7, whenEmpty: "keep" } } } as Command));
+  const n3 = npcItem("n3") as Extract<Command, { kind: "npc-item" }>;
+  assert.throws(() => applyCommand(withNpc(), dmSeat, { ...n3, item: { ...n3.item, uses: { current: 9, max: 7, whenEmpty: "keep" } } } as Command));
   const old = applyCommand(withNpc(), dmSeat, npcItem("n4", false)).holdings.find((h) => h.id === "n4-item")!;
   assert.equal(hasItemDetails(old), false);
   // Players' projections of the NPC's stock are presented.
@@ -324,4 +325,23 @@ test("protocol 28: older apps finish npc-item drafts with details on the website
     assert.throws(() => tabletopResponse({ table, draft: withDetails }, protocol), /updated Lootsplitter client/);
   assert.equal(tabletopResponse({ table, draft: withDetails }, AWARD_DETAILS_PROTOCOL).table, table);
   assert.equal(tabletopResponse({ table, draft: without }, MARKET_MARKUP_PROTOCOL).table, table);
+});
+
+test("a shared room refuses invalid details in a DM's Add loot patch, as the device does", async () => {
+  setSeat(DM_SEAT);
+  const r = await sharedRoom();
+  await choosePace({ ...r.dm, live: true });
+  const before = campaign();
+  for (const [bad, error] of [
+    [{ ...NEW("aria"), id: "bad-uses", uses: { current: 9, max: 7, whenEmpty: "keep" as const } }, /./],
+    [{ ...NEW("aria"), id: "bad-kind", kind: "property" as const, uses: undefined, requiresAttunement: undefined }, /Only an item can be unidentified/],
+  ] as const) {
+    const patch = { ...tablePatch(before, { ...before, holdings: [bad as Holding] }), id: `bad-${bad.id}` };
+    await assert.rejects(
+      submitCommands({ code: r.dm.code, token: r.dm.token, batchId: `b-${patch.id}`, commands: [patch] }),
+      error,
+    );
+    await assert.rejects(saveHolding(bad as Holding), error);
+  }
+  assert.equal((await roomState(r.dm)).table.holdings.length, 0, "nothing was created");
 });

@@ -888,8 +888,12 @@ export async function saveHolding(input: Holding): Promise<void> {
   const usesError = usesProblem(holding);
   if (usesError) throw new Error(usesError);
   // Item identification: the same rule as the room's row validation (validation.ts).
-  if (holding.unidentified !== undefined && (holding.kind !== "item" || !isUnidentified(holding)))
-    throw new Error(itemDetailsProblem(holding.kind, { unidentified: holding.unidentified }) ?? "Only an item can be unidentified.");
+  if (holding.unidentified !== undefined) {
+    if (holding.kind !== "item" || holding.deed || holding.property || holding.service)
+      throw new Error("Only an item can be unidentified.");
+    if (!isUnidentified(holding))
+      throw new Error(itemDetailsProblem("item", { unidentified: holding.unidentified }) ?? "Enter the name players see.");
+  }
   const db = await quireDb();
   await atomic(["holdings", "meta", "purses"], async (tx) => {
     const old = await request<Holding | undefined>(tx.objectStore("holdings").get(holding.id));

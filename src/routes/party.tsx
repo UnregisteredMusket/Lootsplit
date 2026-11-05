@@ -1019,6 +1019,13 @@ function AddHolding({ purses }: { purses: Purse[] }) {
   const [category, setCategory] = useState("");
   // Award item details (item-details.ts): charges, attunement and "award unidentified".
   const [details, setDetails] = useState<ItemDetails>({});
+  // Notes that say "Requires attunement" (Open5e loot, attunement.ts) turn the switch on until the
+  // DM turns it off; what the switch shows is what the item gets.
+  const [attunementSet, setAttunementSet] = useState(false);
+  const shownDetails: ItemDetails =
+    !attunementSet && details.requiresAttunement === undefined
+      ? { ...details, ...attunementFromNotes(notes) }
+      : details;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1048,9 +1055,11 @@ function AddHolding({ purses }: { purses: Purse[] }) {
             setPrice(formatCopper(item.baseCopper));
             setNotes(item.notes);
             setCategory(item.category);
-            // Open5e loot carries "Requires attunement" in its notes (attunement.ts).
+            // Open5e loot carries "Requires attunement" in its notes (attunement.ts), which
+            // the switch then shows.
             const { requiresAttunement: _r, ...rest } = details;
-            setDetails({ ...rest, ...attunementFromNotes(item.notes) });
+            setDetails(rest);
+            setAttunementSet(false);
             setSource("custom");
             setError("");
           }}
@@ -1074,7 +1083,7 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               setError("Enter a name, value, recipient, and a positive whole-number quantity.");
               return;
             }
-            const extra = kind === "item" ? details : {};
+            const extra = kind === "item" ? shownDetails : {};
             const problem = itemDetailsProblem(kind, extra);
             if (problem) {
               setError(problem);
@@ -1086,9 +1095,8 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               await addHolding(purseId, name.trim(), kind, quantity, copper, {
                 notes,
                 category,
-                // Open5e loot carries "Requires attunement" in its notes (attunement.ts); the
-                // switch below, when set, says what the item requires.
-                ...attunementFromNotes(notes),
+                // Charges, attunement (from the switch, which notes saying "Requires
+                // attunement" turn on) and the presented record.
                 ...extra,
                 ...(poolable && pool ? { pool: true } : {}),
               });
@@ -1098,6 +1106,7 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               setCategory("");
               setQty("1");
               setDetails({});
+              setAttunementSet(false);
             } catch (error) {
               setError(
                 error instanceof Error
@@ -1194,7 +1203,15 @@ function AddHolding({ purses }: { purses: Purse[] }) {
             />
           </label>
           {kind === "item" ? (
-            <ItemDetailsFields value={details} onChange={setDetails} itemName={name} />
+            <ItemDetailsFields
+              value={shownDetails}
+              onChange={(next) => {
+                if ((next.requiresAttunement === undefined) !== (shownDetails.requiresAttunement === undefined))
+                  setAttunementSet(true);
+                setDetails(next);
+              }}
+              itemName={name}
+            />
           ) : null}
           {error && (
             <p role="alert" className="text-sm">
