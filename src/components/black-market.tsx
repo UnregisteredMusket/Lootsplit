@@ -2,6 +2,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { readWorld } from "@/lib/quire/world-schema";
 import { MARKUP_TIERS, markupDisplay } from "@/lib/quire/market-markup";
+import { blackMarketCommand, markupDisplayCommand } from "@/lib/quire/visibility-center";
 import { CommandButton } from "./world-tools";
 import { Fold } from "./ui";
 /**
@@ -26,13 +27,7 @@ export function MarkupDisplaySetting() {
         }).join(", ")}
         .
       </p>
-      <CommandButton
-        input={{
-          kind: "black-market-markup",
-          before: display,
-          display: percents ? "descriptions" : "percentages",
-        }}
-      >
+      <CommandButton input={markupDisplayCommand(journal)}>
         {percents ? "Show descriptions to players" : "Show percentages to players"}
       </CommandButton>
     </div>
@@ -49,7 +44,7 @@ export function BlackMarketToggle() {
         rare or illegal goods in each vendor's stock editor.
       </p>
       <p>Black market is {active ? "available" : "hidden"}.</p>
-      <CommandButton input={{ kind: "black-market", before: active, active: !active }}>
+      <CommandButton input={blackMarketCommand(journal)}>
         {active ? "Hide black market" : "Reveal black market"}
       </CommandButton>
       <h3 className="mt-4 text-sm font-medium">Markup players see</h3>

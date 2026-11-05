@@ -1,0 +1,11 @@
+{
+  "title": "What players can see: one page for the DM",
+  "summary": "DMs have a new page that gathers every setting deciding what players see, with how many records are hidden, in one place.",
+  "items": [
+    "Open it from Settings, Settings & Management → Players & permissions, the Features list or the command palette.",
+    "Simple switches, such as the black market, companion funds, map follow and the TV display, work right on the page. Each one also stays where it was.",
+    "Hidden NPCs, private maps, DM-only pins, hidden quest objectives, unidentified items and more show a count and a link to where you edit them.",
+    "Start the read-only preview as any player character from the same page.",
+    "Players never see this page or its counts."
+  ]
+}

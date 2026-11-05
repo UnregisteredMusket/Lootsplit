@@ -79,6 +79,21 @@ export const HELP_GROUPS: HelpGroup[] = [
           ["Campaign", "/share?tab=room"],
         ],
       },
+      {
+        id: "visibility-center",
+        title: "What players can see: every visibility setting in one place",
+        audience: "DM",
+        paragraphs: [
+          "Settings → What players can see (also Settings & Management → Players & permissions, the Features list, or “What players can see” in the command palette, Ctrl/⌘ K) lists every setting that decides what players see, grouped by area: People & characters, Shops & market, Maps & tabletop, Quests & journal, Items and Reference lookup. Each line shows its current state.",
+          "Simple switches work in place: the black market, black-market markup (descriptions or percentages), party companion NPC funds, character tokens following players' map view, browsing other shared maps during an active scene, the optional TV display, and player reference lookup (on/off and during encounters). Each sends the same change as its original control, which stays where it was; if the setting changed meanwhile, the change is refused so you can look again.",
+          "Things hidden one record at a time show a count and a link to where you edit them: hidden characters and NPCs, private NPC sheets, hidden party groups, black-market vendors, shop purses kept from players, hidden trade exchanges, private maps, maps with fog, DM-only markers, tokens, pins, scene links and area templates, portrait pins, quests not revealed yet, hidden objectives, DM-only chronicle lines and journal entries, and unidentified items. The counts are shown only to you; players never see this page.",
+          "Preview as a player starts the read-only player preview for any player character straight from the page.",
+        ],
+        links: [
+          ["What players can see", "/features/visibility"],
+          ["Settings", "/settings"],
+        ],
+      },
     ],
   },
   {

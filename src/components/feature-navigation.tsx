@@ -98,6 +98,8 @@ export function FeatureCards({
                                 ? "Financial requests & character imports"
                                 : id === "music"
                                   ? "Device playlists, playback & audio credits"
+                                  : id === "visibility"
+                                    ? "Every player-visibility setting, hidden counts & preview"
                                   : id === "economy" ? "Regional trade goods & seasonal supply and demand" : "Shop availability & restocking"}
               </p>
             </>
