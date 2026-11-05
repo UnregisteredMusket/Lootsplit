@@ -465,3 +465,19 @@ test("offline: the same commands give the same campaign, a retry applies once, a
   assert.match(String(link), /read-only on a player link/);
   setSeat(DM_SEAT);
 });
+
+test("protocol 27: an older client with a staged loot-return draft is asked to finish on the website", async () => {
+  const { tabletopResponse, LOOT_RETURN_PROTOCOL, CURRENT_TABLETOP_PROTOCOL, MARKET_MARKUP_PROTOCOL } = await import("./tabletop-protocol.ts");
+  assert.equal(LOOT_RETURN_PROTOCOL, 27);
+  assert.equal(CURRENT_TABLETOP_PROTOCOL, LOOT_RETURN_PROTOCOL);
+  const table = emptyCloudTable();
+  const draft = JSON.stringify([
+    { id: "r1", kind: "loot-return", purseId: "aster", to: { fundId: "hoard", pool: true }, items: [], copper: 5, expect: "abc" },
+  ]);
+  for (const old of [0, 20, MARKET_MARKUP_PROTOCOL, 26])
+    assert.throws(() => tabletopResponse({ table, draft }, old), /updated Lootsplitter client/, `protocol ${old}`);
+  const current = tabletopResponse({ table, draft }, LOOT_RETURN_PROTOCOL);
+  assert.equal(JSON.parse(current.draft)[0].kind, "loot-return");
+  // Without the draft, older clients read the room as before.
+  assert.equal(tabletopResponse({ table, draft: "[]" }, MARKET_MARKUP_PROTOCOL).table, table);
+});
