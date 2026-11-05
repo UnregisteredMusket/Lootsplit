@@ -48,6 +48,13 @@ The generator retrieves the SRD 5.1 creature index through Open5e, retaining sou
 - **Remembered recipient (Q3).** The last One purse coin recipient is kept per campaign (room code, or `device:<campaign id>`) in `localStorage` under `lootsplit.award.coinRecipient.*`, read and written in try/catch. It is only offered ("Coins to <name>, as last time") when the award has coins and no recipient, and only if that purse still exists; it never decides anything by itself.
 - **No new data.** No new command, field, migration or projection; awards and old saves read exactly as before.
 
+### XP from encounters (2026-11-05)
+
+- **Choice.** The loot review's Experience section suggests XP from the enemies (own XP, else SRD 5.2.1 XP by CR) and splits it among the ticked party characters with the `xp-award` rule; the DM may change the total or each share, mark a milestone, or give none. Milestone parties (`campaignXpMode`) are offered Mark milestone or Nothing. The choice is sent as `xp` with `encounters/award`; drafts don't store it.
+- **One applier.** Both paths call `applyEncounterXp` (`src/lib/quire/encounter-xp.ts`) inside the existing exactly-once award: the same sheet write and journal entry as `xp-award`. The receipt keeps `xp`. The journal entry's note is the DM's optional `xp.reason` ("Reason players see": prefilled with the encounter name, trimmed, at most 120 characters like `xp-award`'s; empty means "Encounter"); requests without it use the encounter name (`encounterXpReason`).
+- **Later.** `encounters/award-xp` gives an awarded encounter without `xp` its XP once (guarded by the receipt's empty `xp`, the room version and DM membership). Detail responses add `xpMode`. A request that loses a race returns `duplicate: true` with the winner's receipt, and the page says "XP was already awarded: N XP".
+- **Tests.** `src/lib/encounters/local-xp.test.ts`, `scripts/encounter-xp-worker.test.mjs` (Worker permissions, replay, forced race, reason); browser audit `scripts/encounter-xp-browser-audit.mjs` (`npm run verify:focus -- encounter-xp`).
+
 ## Verification
 
 Service tests cover ownership/DM permissions, revoked memberships, revision conflicts, manual/automatic rolls, weighted results, review before transfer, recipient validation, pending turns, turn ownership, repeated transfers, concurrent room changes, and transactional rollback after an injected inventory-write failure.

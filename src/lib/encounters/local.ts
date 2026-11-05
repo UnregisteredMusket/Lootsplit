@@ -19,6 +19,8 @@ import { readJournal } from "../quire/journal.ts";
 import { creatureIndex } from "./index.mjs";
 import { parseDice, throwDice } from "../characters/model.mjs";
 import { announceSheetChange } from "../quire/party-sheet-links.ts";
+import { applyEncounterXp, campaignXpMode, encounterXpReceiptSchema } from "../quire/encounter-xp.ts";
+import { readSheets } from "../quire/sheet.ts";
 
 const rollSchema = z.object({
   seq: z.number().int(),
@@ -46,6 +48,8 @@ export const localEncounterSchema = z.object({
       at: z.number(),
       ...awardSplitReceiptSchema,
       poolFundId: z.string().max(120).optional(),
+      /** XP from encounters: who got what, once (absent on older awards and awards without XP). */
+      xp: encounterXpReceiptSchema.optional(),
     })
     .nullable(),
 });
@@ -78,6 +82,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
     total?: number;
     formula?: string;
     label?: string;
+    xp?: unknown;
   };
   const databaseName = activeDatabaseName();
   if (path === "encounters/index" || path === "encounters/generate") {
@@ -151,8 +156,43 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
       const r = rows.find((r) => r.id === b.id);
       if (!r) throw new Error("Encounter not found in this device campaign.");
       result = { id: r.id };
-      if (path === "encounters/detail") result = { ...r, purses };
-      else if (path === "encounters/log") {
+      // XP from encounters: the same applier as the shared Worker path (encounter-xp.ts).
+      const giveXp = async (receiptId: string, at: number) => {
+        const journal = readJournal(
+          (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
+        );
+        const sheets = readSheets(await request(tx.objectStore("meta").get("sheets")));
+        const table = { purses, journal, sheets };
+        const { plan, receipt } = applyEncounterXp(table, getSeat(), b.xp, {
+          id: `${receiptId}-xp`,
+          at,
+          reason: r.body.name,
+        });
+        for (const share of plan.shares) tx.objectStore("purses").put(purses.find((p) => p.id === share.purseId)!);
+        tx.objectStore("meta").put({ id: "journal", value: table.journal });
+        return receipt;
+      };
+      if (path === "encounters/detail") {
+        const sheets = readSheets(await request(tx.objectStore("meta").get("sheets")));
+        const journal = readJournal(
+          (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
+        );
+        result = { ...r, purses, xpMode: campaignXpMode({ purses, journal, sheets }) };
+      } else if (path === "encounters/award-xp") {
+        // "Award XP" on an awarded encounter: once, guarded by the award's receipt.
+        if (getCloudWatch().joined)
+          throw new Error(
+            "Import this encounter into the saved DM campaign to award multiplayer XP, or return to Local Mode to award this device campaign.",
+          );
+        if (r.status !== "awarded" || !r.award) throw new Error("Transfer this encounter's loot first.");
+        if (r.award.xp) result = { award: r.award, duplicate: true };
+        else {
+          r.award = { ...r.award, xp: await giveXp(r.award.receiptId, Date.now()) };
+          r.updated_at = Date.now();
+          changed = true;
+          result = { award: r.award, duplicate: false };
+        }
+      } else if (path === "encounters/log") {
         const before = b.before ?? Number.MAX_SAFE_INTEGER;
         const history = r.rolls.filter((x) => x.seq < before).sort((a, b) => b.seq - a.seq);
         result = { rolls: history.slice(0, 50), more: history.length > 50 };
@@ -306,7 +346,15 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             });
             tx.objectStore("ledger").put(encounterItemLine(receiptId, index, at, p.id, item, e.name, holdingId));
           }
-          r.award = { receiptId, at, ...(splitReceipt ?? {}), ...(pool ? { poolFundId: pool.fundId } : {}) };
+          // XP from encounters, in this same transaction (the shared path does it in its batch).
+          const xp = b.xp !== undefined && b.xp !== null ? await giveXp(receiptId, at) : null;
+          r.award = {
+            receiptId,
+            at,
+            ...(splitReceipt ?? {}),
+            ...(pool ? { poolFundId: pool.fundId } : {}),
+            ...(xp ? { xp } : {}),
+          };
           r.status = "awarded";
           result = { award: r.award, duplicate: false };
         } else throw new Error("Unknown encounter action.");

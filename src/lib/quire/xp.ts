@@ -239,7 +239,13 @@ export function keepPurseAdvancement(
  */
 export function applyXpAward(t: XpTable, seat: { role: string }, cmd: XpAwardCommand): XpAwardPlan {
   if (seat.role !== "dm") throw Error("Only the DM can award XP or milestones.");
-  const plan = planXpAward(t, cmd);
+  return applyXpPlan(t, planXpAward(t, cmd));
+}
+/**
+ * Writes a checked plan to the recipients' play sheets (the one sheet write `xp-award` and an
+ * encounter's XP award share). Callers check the DM and commit with their own revision check.
+ */
+export function applyXpPlan(t: XpTable, plan: XpAwardPlan): XpAwardPlan {
   for (const share of plan.shares) {
     const p = t.purses.find((x) => x.id === share.purseId)!;
     const sheet = playSheet(t, p);
