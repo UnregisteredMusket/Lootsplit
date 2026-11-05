@@ -110,12 +110,15 @@ try {
     assert.equal(await page.evaluate(() => localStorage.getItem("quire.economy-health.target.v1")), "10");
     await panel.screenshot({ path: `test-results/economy-health/weeks-${width}.png` });
 
-    // A player (preview as Aria) never sees it.
-    await navigateApplication(page, origin + "/party");
-    await page.getByRole("button", { name: "Preview as player" }).click();
-    await page.getByRole("dialog", { name: "Preview as player" }).getByRole("button", { name: "Aria Thorne" }).click();
-    await page.locator(".player-preview-banner").getByText("Previewing as Aria Thorne").waitFor();
-    await navigateApplication(page, origin + "/features/reports");
+    // A player seat (Aria) never sees it. (Preview as player cannot open Review Reports: that
+    // screen is outside the preview, so a real player seat on this device is used instead.)
+    await page.evaluate(async () => {
+      const t = await import("/src/lib/quire/table.ts");
+      t.setSeat({ ...t.getSeat(), role: "player", purseIds: ["aria"] });
+    });
+    await reloadApplication(page, origin + "/features/reports");
+    await page.locator("main h1").first().waitFor();
+    assert.equal(await page.evaluate(async () => (await import("/src/lib/quire/table.ts")).getSeat().role), "player");
     await page.waitForTimeout(500);
     assert.equal(await page.locator("section.economy-health").count(), 0, `${width}: a player preview shows economy health`);
     assert.equal(await page.getByText("Mysterious windfall").count(), 0);
