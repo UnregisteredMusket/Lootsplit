@@ -67399,5 +67399,22 @@
     "finishedAt": "2026-11-04T09:59:58Z",
     "durationMs": 23000,
     "trendId": "41810638638:1:6339c67f0ad67ad97c477dd0c12b1aca36370230160ab2d0eeace32f4eebf35d"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-visibility-center\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "42054608377:1:e88c24f1a8ff638393214c3f04c539dfa50f45ef7deab7689b8bd9efca982faa",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-visibility-center\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / gameplay / dev-visibility-center",
+    "environment": "ubuntu-latest",
+    "commit": "6c6babc0080e0cd00ba010bf8105dd04de098346",
+    "runId": 42054608377,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42054608377/job/127339546695",
+    "outcome": "failure",
+    "startedAt": "2026-11-05T15:29:36Z",
+    "finishedAt": "2026-11-05T15:30:16Z",
+    "durationMs": 40000,
+    "trendId": "42054608377:1:e88c24f1a8ff638393214c3f04c539dfa50f45ef7deab7689b8bd9efca982faa"
   }
 }
