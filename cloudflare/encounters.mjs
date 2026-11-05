@@ -9,6 +9,7 @@ import { parseDice, throwDice } from "../src/lib/characters/model.mjs";
 import { applyEncounterSplit } from "../src/lib/quire/coin-split.ts";
 import { encounterPoolRows } from "../src/lib/quire/loot-claims.ts";
 import { encounterCoinLine, encounterItemLine } from "../src/lib/quire/award-tag.ts";
+import { itemDetailsFor } from "../src/lib/quire/item-details.ts";
 import {
   readStoredRoom,
   readMemberRooms,
@@ -428,7 +429,8 @@ export async function handleEncounters(db, user, path, body = {}) {
         quantity: item.quantity,
         unitCopper: item.unitCopper,
         notes: item.notes,
-        ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
+        // Charges, attunement and the presented record, in this same write (item-details.ts).
+        ...itemDetailsFor(item),
       });
       try {
         room.table.ledger.push(encounterItemLine(receiptId, index, at, p.id, item, e.name, holdingId));

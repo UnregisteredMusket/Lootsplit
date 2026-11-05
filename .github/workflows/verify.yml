@@ -258,6 +258,9 @@ jobs:
       - name: dev-item-identification
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-item-identification 240 node scripts/item-identification-browser-audit.mjs
+      - name: dev-award-item-details
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-award-item-details 240 node scripts/award-item-details-browser-audit.mjs
       - name: dev-merchant-purse
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-merchant-purse 240 node scripts/merchant-purse-browser-audit.mjs

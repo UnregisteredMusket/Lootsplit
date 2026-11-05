@@ -6,6 +6,7 @@ import { artworkSchema } from "./artwork.ts";
 import { npcBarterConfigSchema, npcBarterStateSchema } from "./npc-barter-schema.ts";
 import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tile, tokenTabletopFields } from "./tabletop-schema.ts";
 import { tokenFootprint } from "./tabletop-geometry.ts";
+import { itemDetailsShape } from "./item-details.ts";
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
 const copper = z.number().int().min(0).max(1e12);
@@ -768,7 +769,11 @@ export const worldCommands = [
   z.object({ id, kind: z.literal("npc-save"), before: npcSchema, npc: npcSchema }),
   z.object({ id, kind: z.literal("npc-import"), before: z.string(), document: npcImportSchema }),
   z.object({ id, kind: z.literal("npc-funds"), npcId: id, before: copper, copper }),
-  z.object({ id, kind: z.literal("npc-item"), npcId: id, item: npcItemSchema }),
+  /**
+   * The item may carry its charges, attunement requirement and presented record (protocol 28,
+   * item-details.ts), set on the new holding by this same command.
+   */
+  z.object({ id, kind: z.literal("npc-item"), npcId: id, item: z.object({ ...npcItemSchema.shape, ...itemDetailsShape }).strict() }),
   z.object({
     id,
     kind: z.literal("npc-remove-item"),

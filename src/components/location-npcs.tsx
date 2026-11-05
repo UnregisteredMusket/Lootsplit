@@ -30,6 +30,8 @@ import { NpcBarterConfigForm } from "./npc-barter-desk";
 import { npcAnswersBarter } from "@/lib/quire/npc-barter";
 import { npcPinOpensHub } from "@/lib/quire/place-hub";
 import { requestConfirm } from "@/lib/quire/confirm-store";
+import { ItemDetailsFields } from "./item-details-fields";
+import { itemDetailsProblem, type ItemDetails } from "@/lib/quire/item-details";
 
 export function LocationNpcs() {
   const t = useWorldTable(),
@@ -539,6 +541,8 @@ function NpcInteraction({
     [qty, setQty] = useState("1"),
     [value, setValue] = useState("0"),
     [notes, setNotes] = useState(""),
+    // Award item details (item-details.ts): charges, attunement and "award unidentified".
+    [itemDetails, setItemDetails] = useState<ItemDetails>({}),
     [funds, setFunds] = useState(
       String(toCopper(table.purses.find((p) => p.id === npc.id)!.coins)),
     );
@@ -587,14 +591,19 @@ function NpcInteraction({
           <CommandForm
             label="Add NPC inventory lot"
             dirty={!!itemName}
-            submit={() => ({
-              kind: "npc-item",
-              npcId: npc.id,
-              item: { name: itemName, quantity: Number(qty), unitCopper: Number(value), notes },
-            })}
+            submit={() => {
+              const problem = itemDetailsProblem("item", itemDetails);
+              if (problem) throw Error(problem);
+              return {
+                kind: "npc-item",
+                npcId: npc.id,
+                item: { name: itemName, quantity: Number(qty), unitCopper: Number(value), notes, ...itemDetails },
+              };
+            }}
             onDone={() => {
               setItemName("");
               setNotes("");
+              setItemDetails({});
             }}
           >
             <label>
@@ -632,6 +641,7 @@ function NpcInteraction({
               Item notes
               <textarea maxLength={4000} value={notes} onChange={(e) => setNotes(e.target.value)} />
             </label>
+            <ItemDetailsFields value={itemDetails} onChange={setItemDetails} itemName={itemName} />
           </CommandForm>
           <CommandForm
             label="Set NPC funds"

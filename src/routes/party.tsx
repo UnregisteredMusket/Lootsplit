@@ -41,6 +41,8 @@ import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
 import { FairnessLedger } from "@/components/fairness-ledger";
 import { partyFunds } from "@/lib/quire/coin-split";
 import { attunementFromNotes } from "@/lib/quire/attunement";
+import { ItemDetailsFields } from "@/components/item-details-fields";
+import { itemDetailsProblem, type ItemDetails } from "@/lib/quire/item-details";
 import { PartyGroupsPanel, PlayerGroupCard, SplitPartyButton } from "@/components/party-groups";
 import { PreviewAsPlayerButton } from "@/components/player-preview";
 import { XpAward } from "@/components/xp-award";
@@ -1015,6 +1017,8 @@ function AddHolding({ purses }: { purses: Purse[] }) {
   const [source, setSource] = useState<"custom" | "open5e">("custom");
   const [notes, setNotes] = useState("");
   const [category, setCategory] = useState("");
+  // Award item details (item-details.ts): charges, attunement and "award unidentified".
+  const [details, setDetails] = useState<ItemDetails>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1044,6 +1048,9 @@ function AddHolding({ purses }: { purses: Purse[] }) {
             setPrice(formatCopper(item.baseCopper));
             setNotes(item.notes);
             setCategory(item.category);
+            // Open5e loot carries "Requires attunement" in its notes (attunement.ts).
+            const { requiresAttunement: _r, ...rest } = details;
+            setDetails({ ...rest, ...attunementFromNotes(item.notes) });
             setSource("custom");
             setError("");
           }}
@@ -1067,14 +1074,22 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               setError("Enter a name, value, recipient, and a positive whole-number quantity.");
               return;
             }
+            const extra = kind === "item" ? details : {};
+            const problem = itemDetailsProblem(kind, extra);
+            if (problem) {
+              setError(problem);
+              return;
+            }
             setSaving(true);
             setError("");
             try {
               await addHolding(purseId, name.trim(), kind, quantity, copper, {
                 notes,
                 category,
-                // Open5e loot carries "Requires attunement" in its notes (attunement.ts).
+                // Open5e loot carries "Requires attunement" in its notes (attunement.ts); the
+                // switch below, when set, says what the item requires.
                 ...attunementFromNotes(notes),
+                ...extra,
                 ...(poolable && pool ? { pool: true } : {}),
               });
               setName("");
@@ -1082,6 +1097,7 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               setNotes("");
               setCategory("");
               setQty("1");
+              setDetails({});
             } catch (error) {
               setError(
                 error instanceof Error
@@ -1177,6 +1193,9 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               onChange={(event) => setNotes(event.target.value)}
             />
           </label>
+          {kind === "item" ? (
+            <ItemDetailsFields value={details} onChange={setDetails} itemName={name} />
+          ) : null}
           {error && (
             <p role="alert" className="text-sm">
               {error}

@@ -25,6 +25,7 @@ import { tokenInsideGrid } from "./tabletop-geometry.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
 import { snapshotText } from "./item-identity.ts";
+import { itemDetailsFor } from "./item-details.ts";
 import { markupDisplay } from "./market-markup.ts";
 import { actingGroups, groupPlace, groupRefs, MAIN_GROUP, resolveGroup } from "./party-groups.ts";
 import { applyGroupMapPosition } from "./party-groups-command.ts";
@@ -721,7 +722,8 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     dm();
     if (!w.npcs.some((n) => n.id === cmd.npcId)) throw Error("NPC no longer exists.");
     if (cmd.kind === "npc-item")
-      t.holdings.push({ ...cmd.item, id: cmd.id + "-item", purseId: cmd.npcId, kind: "item" });
+      // Charges, attunement and the presented record in this same command (item-details.ts).
+      t.holdings.push({ ...cmd.item, ...itemDetailsFor(cmd.item), id: cmd.id + "-item", purseId: cmd.npcId, kind: "item" });
     else {
       const h = t.holdings.find(
         (h) => h.id === cmd.holdingId && h.purseId === cmd.npcId && h.kind === "item",

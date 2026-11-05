@@ -44,6 +44,8 @@ import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { attunementFromNotes, attunementKinds, attunementProblem } from "./attunement.ts";
 import { usesProblem } from "./item-uses.ts";
+import { itemDetailsProblem } from "./item-details.ts";
+import { isUnidentified, presentedHolding } from "./item-identity.ts";
 import { assertPoolable } from "./loot-claims.ts";
 import {
   coinsSchema,
@@ -885,6 +887,9 @@ export async function saveHolding(input: Holding): Promise<void> {
     throw new Error("Enter a valid quantity and value.");
   const usesError = usesProblem(holding);
   if (usesError) throw new Error(usesError);
+  // Item identification: the same rule as the room's row validation (validation.ts).
+  if (holding.unidentified !== undefined && (holding.kind !== "item" || !isUnidentified(holding)))
+    throw new Error(itemDetailsProblem(holding.kind, { unidentified: holding.unidentified }) ?? "Only an item can be unidentified.");
   const db = await quireDb();
   await atomic(["holdings", "meta", "purses"], async (tx) => {
     const old = await request<Holding | undefined>(tx.objectStore("holdings").get(holding.id));
@@ -951,11 +956,15 @@ export async function saveHolding(input: Holding): Promise<void> {
       journal,
     });
     tx.objectStore("holdings").put(holding);
+    // Item identification: this event reaches players who can read the holder (a shared room
+    // receives it in the same patch), so it names an unidentified item as presented. The DM's
+    // record of the true item is a DM-only event, as `item-unidentify` writes.
+    const told = presentedHolding(holding);
     await audit(
       tx,
       pooledNow
-        ? `Put in the treasure pool: ${holding.name} × ${holding.quantity}`
-        : `Recorded holding: ${holding.name} ×${holding.quantity}`,
+        ? `Put in the treasure pool: ${told.name} × ${holding.quantity}`
+        : `Recorded holding: ${told.name} ×${holding.quantity}`,
       "management",
       holding.purseId,
       undefined,
@@ -963,7 +972,7 @@ export async function saveHolding(input: Holding): Promise<void> {
         ? {
             lootPool: {
               holdingId: holding.id,
-              name: holding.name.slice(0, 200),
+              name: told.name.slice(0, 200),
               quantity: holding.quantity,
               pooled: true,
               source: holding.pool!.source,
@@ -971,8 +980,17 @@ export async function saveHolding(input: Holding): Promise<void> {
           }
         : undefined,
     );
+    if (!old && isUnidentified(holding))
+      await audit(
+        tx,
+        `Added unidentified: ${holding.name} (players see ${holding.unidentified.name})`.slice(0, 500),
+        "management",
+        holding.purseId,
+        undefined,
+        { dmOnly: true },
+      );
     if (old?.attuned && !holding.attuned)
-      await audit(tx, `Attunement ended: ${old.name} left the character`, "management", old.purseId);
+      await audit(tx, `Attunement ended: ${presentedHolding(old).name} left the character`, "management", old.purseId);
   });
 }
 
@@ -2874,7 +2892,7 @@ async function audit(
   kind: "prices" | "management",
   purseId?: string,
   change?: Journal["events"][number]["change"],
-  extra?: Pick<Journal["events"][number], "lootPool">,
+  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly">,
 ) {
   const store = tx.objectStore("meta");
   const row = await request<{ value: unknown } | undefined>(store.get("journal"));

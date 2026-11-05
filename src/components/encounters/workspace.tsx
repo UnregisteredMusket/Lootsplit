@@ -82,6 +82,8 @@ import {
   valueEcho,
 } from "@/lib/encounters/loot-review";
 import { FeatureHeader } from "../feature-header";
+import { ItemDetailsFields } from "../item-details-fields";
+import { itemDetailsLabel } from "@/lib/quire/item-details";
 type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
@@ -2268,7 +2270,8 @@ function EncounterEditor({
                   </div>
                   <details className="loot-row-details">
                     <summary>
-                      Details{l.notes.trim() ? " · has notes" : ""}{l.unidentified ? " · unidentified" : ""}
+                      Details{l.notes.trim() ? " · has notes" : ""}
+                      {itemDetailsLabel(l) ? ` · ${itemDetailsLabel(l)}` : ""}
                       <span className="sr-only"> for item {i + 1}</span>
                     </summary>
                     <label>
@@ -2344,6 +2347,30 @@ function EncounterEditor({
                         </label>
                       </>
                     ) : null}
+                    {/* Award item details: the new holding's charges and attunement (item-details.ts). */}
+                    <ItemDetailsFields
+                      identification={false}
+                      itemName={l.name.trim() || `item ${i + 1}`}
+                      value={{
+                        ...(l.uses ? { uses: l.uses } : {}),
+                        ...(l.requiresAttunement !== undefined ? { requiresAttunement: l.requiresAttunement } : {}),
+                      }}
+                      onChange={(next) => {
+                        const { uses: _u, requiresAttunement: _r, ...rest } = l;
+                        change({
+                          ...draft,
+                          loot: draft.loot.map((r, j) =>
+                            i !== j
+                              ? r
+                              : {
+                                  ...rest,
+                                  ...(next.uses ? { uses: next.uses } : {}),
+                                  ...(next.requiresAttunement !== undefined ? { requiresAttunement: next.requiresAttunement } : {}),
+                                },
+                          ),
+                        });
+                      }}
+                    />
                     <button
                       onClick={() => {
                         setPicked(picked.filter((x) => x !== l.id));

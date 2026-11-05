@@ -224,7 +224,7 @@ test("older clients: their whole-journal writes keep the stored setting; protoco
   // The journal schema is not strict, so every protocol gets the same table.
   assert.equal(tableForProtocol(on, 0).journal!.blackMarketMarkup, "percentages");
   assert.equal(MARKET_MARKUP_PROTOCOL, 25);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, MARKET_MARKUP_PROTOCOL);
+  assert.ok(CURRENT_TABLETOP_PROTOCOL >= MARKET_MARKUP_PROTOCOL);
   const table = projectRecord(on, ariaSeat);
   const draft = JSON.stringify([{ id: "d", kind: "black-market-markup", before: "descriptions", display: "percentages" }]);
   assert.throws(() => tabletopResponse({ table, draft }, ITEM_IDENTITY_PROTOCOL), /updated Lootsplitter client/);
