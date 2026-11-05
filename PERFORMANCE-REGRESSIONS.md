@@ -394,7 +394,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) | open | 3 | 434s → 710s | +276s | +63.59% |
 | Verify preserved functionality | open | 3 | 1179s → 6506s | +5327s | +451.82% |
 | Encrypted offsite database backup / initial queue | open | 4 | 5s → 160s | +155s | +3100% |
-| backup / Export consistently and encrypt before writing to disk | open | 7 | 3s → 31s | +28s | +933.33% |
+| backup / Export consistently and encrypt before writing to disk | open | 8 | 3s → 128s | +125s | +4166.67% |
 | Development / gameplay (balanced v2) / dev-finance | open | 2 | 43s → 72s | +29s | +67.44% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 5 | 35s → 166s | +131s | +374.29% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 28s → 48s | +20s | +71.43% |
@@ -944,6 +944,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-05T17:26:25Z | step: backup / Export consistently and encrypt before writing to disk | 31s → 128s | +97s | +312.9% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41875543308/job/126733814419) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42074128988/job/127409645428) |
 | 2026-11-04T17:39:42Z | job: Development / gameplay | 1074s → 1269s | +195s | +18.16% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40898074864/job/123534458024) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41876283126/job/126736542571) |
 | 2026-11-04T17:24:24Z | step: Development / gameplay / dev-price-breakdown | 15s → 27s | +12s | +80% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41802891895/job/126482786233) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41876283126/job/126736542571) |
 | 2026-11-04T17:18:40Z | step: Development / accounts-2 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40723063592/job/122939043965) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41876283126/job/126736542506) |
