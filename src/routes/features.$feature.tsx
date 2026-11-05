@@ -4,6 +4,7 @@ import { SessionTime } from "@/components/session-time";
 import { PinToDesk } from "@/components/control-panel/pins";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { CampaignReports } from "@/components/campaign-reports";
+import { EconomyHealth } from "@/components/economy-health";
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useSyncExternalStore } from "react";
 import { Shell } from "@/components/shell";
@@ -194,6 +195,7 @@ function FeaturePage() {
             {feature === "reports" && (
               <>
                 <CampaignReports />
+                {dm && <EconomyHealth />}
                 <CampaignJournal section="reports" />
                 <PriceHistory />
                 <AppLink className="settings-link" href="/party?section=funds">

@@ -15,6 +15,7 @@ const featureAudits = {
   "make-change": "scripts/make-change-browser-audit.mjs",
   "attunement": "scripts/attunement-browser-audit.mjs",
   "sell-and-split": "scripts/sell-and-split-browser-audit.mjs",
+  "economy-health": "scripts/economy-health-browser-audit.mjs",
   "item-identification": "scripts/item-identification-browser-audit.mjs",
   "merchant-purse": "scripts/merchant-purse-browser-audit.mjs",
   "price-breakdown": "scripts/price-breakdown-browser-audit.mjs",
