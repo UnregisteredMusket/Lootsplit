@@ -8,7 +8,7 @@ import { dirname } from "node:path";
 import { migrationIdentity } from "./standby-artifact.mjs";
 
 let recoveryStage = "configuration";
-class SafeBackupError extends Error {}
+export class SafeBackupError extends Error {}
 const magic = Buffer.from("LOOTSPLIT-BACKUP-1\n");
 export const primaryOrigin = deploymentOrigins.website;
 export const productionDatabase = "0a200e96-ae2e-47b5-9869-c1f4d316148f";
@@ -59,31 +59,37 @@ export function restoreFile(snapshot, filename, expected = migrationIdentity()) 
   } catch (error) { db?.close(); rmSync(filename, { force: true }); throw error; }
 }
 
-export async function exportD1({ accountId, token, fetcher = fetch }) {
+/** Exports the production database through the D1 polling API. Large exports can take several minutes, so the
+ * loop waits up to `deadlineMs` (default 12 minutes, inside the workflow's 20-minute job limit) and reports a
+ * timeout or Cloudflare-side failure by stage and status only; the signed snapshot URL is never logged. */
+export async function exportD1({ accountId, token, fetcher = fetch, deadlineMs = 12 * 60_000, pollMs = 2000, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
   assert.match(accountId || "", /^[a-f0-9]{32}$/);
   assert.ok(token, "Missing export token");
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${productionDatabase}/export`;
-  let bookmark;
-  for (let attempt = 0; attempt < 180; attempt++) {
+  const started = now();
+  let bookmark, lastStatus = "not started", polls = 0;
+  while (now() - started < deadlineMs) {
+    polls++;
     const response = await fetcher(endpoint, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ output_format: "polling", current_bookmark: bookmark }), signal: AbortSignal.timeout(30000) });
     if (!response.ok) throw new SafeBackupError(`D1 export HTTP ${response.status}`);
     const body = await response.json();
-    assert.ok(body.success && body.result?.success, "D1 export failed");
+    if (!(body.success && body.result?.success)) throw new SafeBackupError("D1 export was refused by Cloudflare");
     const state = body.result;
+    lastStatus = typeof state.status === "string" ? state.status.slice(0, 40) : "unknown";
     if (state.status === "complete") {
       const url = new URL(state.result.signed_url);
       assert.equal(url.protocol, "https:");
       // This URL grants temporary access to the full database. Never log it.
-      const download = await fetcher(url, { signal: AbortSignal.timeout(120000) });
-      assert.ok(download.ok, "Snapshot download failed");
+      const download = await fetcher(url, { signal: AbortSignal.timeout(180000) });
+      if (!download.ok) throw new SafeBackupError(`Snapshot download HTTP ${download.status}`);
       return download.text();
     }
-    assert.notEqual(state.status, "error", "D1 export failed");
-    assert.ok(typeof state.at_bookmark === "string" && state.at_bookmark.length > 0, "Missing export bookmark");
+    if (state.status === "error") throw new SafeBackupError("D1 export reported an error");
+    if (!(typeof state.at_bookmark === "string" && state.at_bookmark.length > 0)) throw new SafeBackupError("D1 export returned no bookmark");
     bookmark = state.at_bookmark;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await sleep(pollMs);
   }
-  throw new Error("D1 export timeout");
+  throw new SafeBackupError(`D1 export still ${lastStatus} after ${Math.round((now() - started) / 1000)} s (${polls} polls)`);
 }
 
 export async function authorizeRestore(filename, fenceId, fetcher = fetch) {

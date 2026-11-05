@@ -12,7 +12,7 @@ import { validateActivation } from "../standby/state.mjs";
 import { recoveryGuard } from "../cloudflare/recovery-guard.mjs";
 import { handleAccounts } from "../cloudflare/accounts.mjs";
 import { migrationIdentity } from "./standby-artifact.mjs";
-import { seal, unseal, makeSnapshot, restoreFile, authorizeRestore, exportD1 } from "./standby-backup.mjs";
+import { seal, unseal, makeSnapshot, restoreFile, authorizeRestore, exportD1, SafeBackupError } from "./standby-backup.mjs";
 
 const schema = () => migrationIdentity().migrations.map((name) => readFileSync(`cloudflare/migrations/${name}`, "utf8")).join("\n") +
   "\nCREATE TABLE d1_migrations(name TEXT PRIMARY KEY);\n" + migrationIdentity().migrations.map((name) => `INSERT INTO d1_migrations VALUES('${name}');`).join("\n");
@@ -133,4 +133,20 @@ test("export polls a consistent bookmark and does not forward API credentials to
     return new Response("synthetic SQL");
   } });
   assert.equal(sql, "synthetic SQL"); assert.equal(step, 3);
+});
+
+test("a slow export keeps polling past three minutes and a timeout names its stage, never the signed URL", async () => {
+  let clock = 0, polls = 0;
+  const slow = { fetcher: async () => { polls++; return Response.json({ success: true, result: { success: true, status: "active", at_bookmark: "b" } }); },
+    now: () => clock, sleep: async (ms) => { clock += ms; } };
+  const sql = await exportD1({ accountId: "a".repeat(32), token: "t", ...slow, fetcher: async (url) => {
+    if (url instanceof URL) return new Response("late SQL");
+    polls++;
+    return polls < 200 ? Response.json({ success: true, result: { success: true, status: "active", at_bookmark: "b" } })
+      : Response.json({ success: true, result: { success: true, status: "complete", result: { signed_url: "https://storage.example/secret" } } });
+  } });
+  assert.equal(sql, "late SQL"); assert.ok(clock > 180_000, "waited longer than the old 3-minute cap");
+  clock = 0; polls = 0;
+  await assert.rejects(exportD1({ accountId: "a".repeat(32), token: "t", deadlineMs: 60_000, ...slow }), (error) =>
+    error instanceof SafeBackupError && /still active after 60 s/.test(error.message) && !/storage\.example/.test(error.message));
 });
