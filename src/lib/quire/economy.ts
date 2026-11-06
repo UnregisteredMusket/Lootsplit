@@ -25,7 +25,7 @@ import { partyGroupKinds } from "./party-groups-schema.ts";
 import { readMarketLocations } from "./shop-locations.ts";
 import { locationLabel } from "./shop-locations.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
-import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
+import { readFinance, assertFinanceAccountRemovable } from "./finance.ts";
 import { readLocalEncounters } from "../encounters/local.ts";
 import { readJournal, readValidatedJournal, type Journal } from "./journal.ts";
 import { blankSheet } from "../characters/model.mjs";
@@ -64,6 +64,7 @@ import {
   emptyCoins,
   formatCopper,
   fromCopper,
+  sameCoins,
   spendCoins,
   toCopper,
 } from "./money.ts";
@@ -1998,43 +1999,17 @@ export async function askLoan(
 export async function decideLoan(id: string, status: LoanStatus): Promise<void> {
   if (status === "pending") return;
   if (getSeat().role === "player") throw new Error("Only the DM can approve or deny loans.");
-  const decided = await atomic(["purses", "ledger", "meta"], async (tx) => {
-    const loans = readLoans(await request(tx.objectStore("meta").get("loans")));
-    const loan = loans.find((item) => item.id === id);
-    if (!loan || loan.status !== "pending") return null;
-    if (status === "approved") {
-      const purse = await request<Purse | undefined>(tx.objectStore("purses").get(loan.purseId));
-      if (!purse) throw new Error("This account no longer exists.");
-      tx.objectStore("purses").put({
-        ...purse,
-        coins: gain(purse.coins, loan.copper),
-      });
-      const row = await request<{ value: unknown } | undefined>(
-        tx.objectStore("meta").get("journal"),
-      );
-      const journal = readJournal(row?.value);
-      (journal.finance ??= readFinance()).loans.push(loanFromRequest(loan));
-      journal.finance = readFinance(journal.finance);
-      tx.objectStore("meta").put({ id: "journal", value: journal });
-      tx.objectStore("ledger").put(
-        logLine(
-          purse.id,
-          null,
-          `Approved a loan of ${formatCopper(loan.copper)}`,
-          loan.copper,
-          "loan",
-        ),
-      );
-    }
-    tx.objectStore("meta").put({
-      id: "loans",
-      loans: loans.map((item) => (item.id === id ? { ...item, status } : item)),
-    });
-    const notes = readNotes(await request(tx.objectStore("meta").get("chat")));
-    tx.objectStore("meta").put({
-      id: "chat",
-      notes: readNotes([
-        ...notes,
+  // The device runs the shared `decision` command (economy parity review, 2026-11-06): the same
+  // coins, ledger line, coin limit and finance record as a shared room. A loan that is already
+  // decided (a second press) or gone stays a quiet no-op, and the device keeps its decision note.
+  let decided = false;
+  await runLocalCommand({ kind: "decision", loanId: id, status }, undefined, {
+    skip: (source) => source.loans.find((loan) => loan.id === id)?.status !== "pending",
+    amend: (next) => {
+      const loan = next.loans.find((item) => item.id === id)!;
+      decided = true;
+      next.notes = readNotes([
+        ...next.notes,
         {
           id: `${loan.id}-decision-note`,
           at: Date.now(),
@@ -2043,9 +2018,8 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
           purseId: loan.purseId,
           text: `Loan of ${formatCopper(loan.copper)} ${status}.`,
         },
-      ]),
-    });
-    return loan;
+      ]);
+    },
   });
   if (decided) await refreshChat();
 }
@@ -2144,7 +2118,9 @@ export async function setCoins(
   purseId: string,
   coins: Coins,
   summary?: string,
-  options: TradeOptions = {},
+  // `before`: the coins the DM edited from. A purse that changed meanwhile is refused, as the
+  // shared `set-coins` command does. Callers that omit it keep the earlier behavior.
+  options: TradeOptions & { before?: Coins } = {},
 ): Promise<void> {
   if (!coinsSchema.safeParse(coins).success)
     throw new Error(
@@ -2168,6 +2144,8 @@ export async function setCoins(
       throw new Error(
         "The previous coin balance cannot be represented exactly. Export the original save before repairing it.",
       );
+    if (options.before && !sameCoins(purse.coins, options.before))
+      throw new Error("These coins changed. Review the purse and try again.");
     const delta = toCopper(next) - toCopper(purse.coins);
     if (!Number.isSafeInteger(delta))
       throw new Error(
@@ -2191,6 +2169,16 @@ export async function postCopper(
   if (!summary.trim()) throw new Error("Write what the money was for.");
   if (!Number.isSafeInteger(copper) || copper === 0)
     throw new Error("Enter a valid amount in whole copper.");
+  // The shared `post` command's bounds (at most 1,000,000,000,000 cp, a 500-character note).
+  const parsed = commandSchema.safeParse({
+    kind: "post",
+    id: options.commandId || "device-post",
+    purseId,
+    copper,
+    summary,
+  });
+  if (!parsed.success)
+    throw new Error(parsed.error.issues[0]?.message || "Enter a valid amount in whole copper.");
   const receipt = await actionReceipt(options.commandId, () =>
     canonicalJson({
       kind: "post",
@@ -2209,7 +2197,10 @@ export async function postCopper(
         "The previous coin balance cannot be represented exactly. Export the original save before repairing it.",
       );
     const nextTotal = toCopper(purse.coins) + copper;
-    if (!Number.isSafeInteger(nextTotal) || nextTotal < 0) throw new Error("Insufficient funds.");
+    // A credit never takes a purse past the shared 1,000,000,000,000 cp limit; an older device
+    // save already above it can still be spent down (finance-integrity legacy balances).
+    if (!Number.isSafeInteger(nextTotal) || nextTotal < 0 || (copper > 0 && nextTotal > 1e12))
+      throw new Error("Insufficient funds.");
     tx.objectStore("purses").put({
       ...purse,
       coins: copper < 0 ? spendCoins(purse.coins, -copper)! : gain(purse.coins, copper),
@@ -2958,6 +2949,19 @@ export async function executeLocalCommand(
   input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
+  return runLocalCommand(input, assertScope, {});
+}
+
+/**
+ * `executeLocalCommand` with device-only additions inside the same write lock: `skip` leaves the
+ * campaign unchanged (no error) for the state read under the lock, and `amend` adds device-only
+ * records (such as a chat note) to the command's result before it is written.
+ */
+async function runLocalCommand(
+  input: CommandRequest,
+  assertScope: (() => void) | undefined,
+  hooks: { skip?: (source: CloudTable) => boolean; amend?: (next: CloudTable) => void },
+): Promise<void> {
   // Read-only "Preview as player": refused before anything is read or written.
   assertNotPreviewing();
   const invoked = captureDeviceMutationScope();
@@ -2997,11 +3001,13 @@ export async function executeLocalCommand(
     // never reach the DM. The DM records it on their device (or the party plays shared).
     if (seat.role !== "dm" && favorKinds.has(command.kind))
       throw Error("Favor requests go to the DM's device or a shared room. Ask the DM to record it.");
+    if (hooks.skip?.(source)) return;
     const next = applyCommand(source, seat, command, {
       source: "local",
       random: randomTradeRoll,
       manualRolls: seat.role === "dm",
     });
+    hooks.amend?.(next);
     for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) {
       const prior = new Map(source[store].map((row) => [row.id, JSON.stringify(row)]));
       const retained = new Set(next[store].map((row) => row.id));
