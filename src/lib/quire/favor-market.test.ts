@@ -13,13 +13,13 @@ import { readFileSync } from "node:fs";
 import { openRoom, joinRoom, roomState, submitCommands, choosePace } from "./cloud.server.ts";
 import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { applyCommand, type Command } from "./commands.ts";
-import { readJournal } from "./journal.ts";
+import { readArchivedSnapshot, readJournal } from "./journal.ts";
 import { applyCloudTable, economySnapshot, executeLocalCommand } from "./economy.ts";
 import { DM_SEAT, setSeat } from "./table.ts";
-import { archiveSession, projectRecord } from "./session-records.ts";
+import { archiveSession, projectArchivedReport, projectRecord } from "./session-records.ts";
 import { seatView } from "./player-view.ts";
 import { fromCopper } from "./money.ts";
-import { defaultFactionDraft, factionSchema, readFactions, type FactionDraft } from "./factions.ts";
+import { defaultFactionDraft, factionSchema, hiddenFactionIds, readFactions, type FactionDraft } from "./factions.ts";
 import { FAVOR_TEMPLATES, type FavorEntry } from "./favor-market-schema.ts";
 import { pendingFavorRequests } from "./favor-market.ts";
 import { CURRENT_TABLETOP_PROTOCOL, FACTIONS_PROTOCOL, FAVOR_MARKET_PROTOCOL, tabletopResponse } from "./tabletop-protocol.ts";
@@ -374,4 +374,32 @@ test("old data and older apps: PR A factions read back, PR A's reader drops the 
   assert.equal(tabletopResponse(response, FAVOR_MARKET_PROTOCOL).table, t);
   const plain = { table: t, draft: "[]" };
   assert.equal(tabletopResponse(plain, FACTIONS_PROTOCOL).table, t, "protocol 29 still gets the table unchanged");
+});
+
+test("a faction hidden after a session was archived keeps its market and requests out of that archive (review of #439)", () => {
+  let t = world();
+  t = as(ariaSeat, t, ask("q1", "hand", "rumour", "aria", 4));
+  t = run(t, decide("d1", "hand", "q1", true));
+  archiveSession(t, "s-old", "Old session", 1);
+  t = run(t, { id: "h1", kind: "faction-visibility", factionId: "hand", revision: 5, hidden: true });
+  const report = t.journal!.reports![0]!;
+  // The room's archive reader and the account export both read it with today's hidden factions.
+  const room = JSON.stringify(projectArchivedReport(report, t, ariaSeat));
+  const exported = JSON.stringify(
+    projectRecord(readArchivedSnapshot(report.snapshot), ariaSeat, { hiddenFactions: hiddenFactionIds(t) }),
+  );
+  for (const text of [room, exported])
+    for (const secret of ["Black Hand", "A rumour about a rival", "harbourmaster", "Safe house"])
+      assert.ok(!text.includes(secret), secret);
+});
+
+test("a request ID that is not this character's own request is refused without saying whose it is (review of #439)", () => {
+  let t = world();
+  t = as(bramSeat, t, ask("q-bram", "hand", "safe", "bram", 3));
+  // Aria's retry of her own request is a no-op; reusing Bram's ID is refused like any reused ID.
+  t = as(ariaSeat, t, ask("q-aria", "hand", "safe", "aria", 3));
+  const again = as(ariaSeat, t, ask("q-aria", "hand", "safe", "aria", 3));
+  assert.equal(faction(again, "hand").favorRequests!.length, 2);
+  assert.throws(() => as(ariaSeat, t, ask("q-bram", "hand", "safe", "aria", 3)), /could not be sent/);
+  assert.throws(() => as(ariaSeat, t, ask("q-aria", "hand", "rumour", "aria", 4)), /could not be sent/);
 });

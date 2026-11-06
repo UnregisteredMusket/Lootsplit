@@ -198,7 +198,13 @@ export function applyFavorCommand(
     room();
     const base = { id: cmd.id, entryId: entry.id, characterId: p.id, name: entry.name, kind: entry.kind, cost: entry.cost, at };
     if (cmd.kind === "favor-request") {
-      if (requests.some((r) => r.id === cmd.id)) return;
+      // A retry of this character's own request is a no-op; an ID that belongs to anything else is
+      // refused the same way as a reused ID anywhere, so it says nothing about other requests.
+      const same = requests.find((r) => r.id === cmd.id);
+      if (same) {
+        if (same.characterId === p.id && same.entryId === entry.id) return;
+        throw Error("This request could not be sent. Refresh and try again; nothing was spent.");
+      }
       const waiting = requests.filter((r) => r.status === "pending" && r.characterId === p.id).length;
       if (waiting >= MAX_PENDING_FAVOR_REQUESTS)
         throw Error(`${p.name} already has ${MAX_PENDING_FAVOR_REQUESTS} requests waiting with ${f.name}.`);

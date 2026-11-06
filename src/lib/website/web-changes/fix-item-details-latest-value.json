@@ -1,0 +1,8 @@
+{
+  "title": "Item charges keep the numbers you type",
+  "summary": "When adding or awarding an item, the uses left and the unidentified details now keep what you typed, even if you type or click quickly.",
+  "items": [
+    "Typing the maximum uses and then the uses left straight away no longer resets the uses left to the maximum.",
+    "Choosing what happens when the last use is spent, right after typing, keeps the uses left you entered."
+  ]
+}
