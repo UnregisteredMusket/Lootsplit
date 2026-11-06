@@ -107,6 +107,16 @@ export function pendingCommandDescription(value: unknown): string {
       return `${c.before ? "Edit" : "Add"} market event: ${c.after.name}`;
     case "market-event-end":
       return `End market event: ${c.before.name}`;
+    case "faction-save":
+      return `${c.revision === null ? "Add" : "Edit"} faction: ${c.faction.name}`;
+    case "faction-visibility":
+      return `${c.hidden ? "Hide" : "Reveal"} faction · ${c.factionId}`;
+    case "faction-delete":
+      return `${c.deleted ? "Delete" : "Restore"} faction · ${c.factionId}`;
+    case "faction-renown":
+      return `Renown change for ${c.characters.length} character${c.characters.length === 1 ? "" : "s"} · faction ${c.factionId}`;
+    case "faction-favor-grant":
+      return `Favor change for ${c.characters.length} character${c.characters.length === 1 ? "" : "s"} · faction ${c.factionId}`;
     case "sale-split":
       return `Sell ${c.lots.length} item${c.lots.length === 1 ? "" : "s"} and split ${formatCopper(c.expect.proceeds)} among ${c.recipientIds.length} · from ${c.fundId}`;
     case "post":

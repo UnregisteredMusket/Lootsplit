@@ -19,6 +19,7 @@ import { tradeEconomySchema } from "./trade-economy-schema.ts";
 import { validateTradeEconomy } from "./trade-economy.ts";
 import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
 import { marketAdjustmentsSchema, marketEventsSchema } from "./market-events.ts";
+import { factionAdjustmentsSchema, factionsSchema } from "./factions.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { validatePropertyLocations, listingSchema } from "./property.ts";
 import type { CloudTable } from "./cloud.ts";
@@ -99,6 +100,13 @@ const journalFields = z.object({
   marketEvents: marketEventsSchema.optional(),
   /** A player's copy only: combined rates where events they may not see apply (market-events.ts). */
   marketAdjustments: marketAdjustmentsSchema.optional(),
+  /**
+   * Factions, renown and favor (factions.ts), deleted ones kept as history. Changes only through
+   * the DM's faction commands (tabletop protocol 29).
+   */
+  factions: factionsSchema.optional(),
+  /** A player's copy only: combined rates where factions they may not see apply (factions.ts). */
+  factionAdjustments: factionAdjustmentsSchema.optional(),
   finance: financeSchema.optional(),
   reports: z
     .array(
@@ -336,6 +344,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   delete next.blackMarketMarkup;
   delete next.marketEvents;
   delete next.marketAdjustments;
+  delete next.factions;
+  delete next.factionAdjustments;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -499,6 +509,10 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     // drop the unknown key, so their whole-journal writes keep the stored events.
     ...(current.marketEvents ? { marketEvents: current.marketEvents } : {}),
     ...(current.marketAdjustments ? { marketAdjustments: current.marketAdjustments } : {}),
+    // Factions change only through their commands; older clients (protocol 28 and earlier) drop
+    // the unknown key, so their whole-journal writes keep the stored factions.
+    ...(current.factions ? { factions: current.factions } : {}),
+    ...(current.factionAdjustments ? { factionAdjustments: current.factionAdjustments } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);

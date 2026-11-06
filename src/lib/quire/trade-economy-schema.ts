@@ -205,6 +205,11 @@ export type TradeExecution = {
    */
   marketEventsUnsupported?: boolean;
   /**
+   * Factions: the client predates them (protocol < 29), so it shows prices without faction
+   * standing. A purchase, sale or delivery whose price a faction changes is refused (factions.ts).
+   */
+  factionsUnsupported?: boolean;
+  /**
    * Merchant purses hidden from the seat (merchant.ts): shortfalls are collected here and the
    * batch refuses them only after every other command validated, so another failure in the same
    * batch can never reveal whether a sale fit the purse. Set by `applyCommandBatch`.

@@ -26,6 +26,7 @@ import { readFinance } from "./finance.ts";
 import { projectMerchantPurse } from "./merchant.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 import { projectMarketEvents } from "./market-events.ts";
+import { projectFactions } from "./factions.ts";
 import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
 import { propertyAvailableToGroups } from "./property.ts";
 import { projectPartyGroups } from "./party-groups-project.ts";
@@ -389,6 +390,13 @@ export function projectRecord(
         if (projected.adjustments.length) t.journal.marketAdjustments = projected.adjustments;
       }
     }
+    // Factions (factions.ts): visible ones only, with this seat's own characters' standing and the
+    // party's tier; prices only for that tier and the visible shops. Hidden factions are never
+    // sent: visible shops they change get one combined rate (`factionAdjustments`).
+    projectFactions(table, t.journal, seat, {
+      shops: t.shops,
+      locationIds: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
+    });
     // Journeys: status, progress and terrain; private routes and fogged waypoints are cut here.
     projectJourneys(
       table,

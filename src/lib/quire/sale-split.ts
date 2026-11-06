@@ -2,7 +2,7 @@
  * Sell and split (future-development prompt 2, phase 4; mockup approved by the owner on
  * 2026-11-03). One pure planner, used by the shared `sale-split` command (commands.ts, also run
  * offline through executeLocalCommand) and by the dialog's preview: price the chosen party-fund
- * items at one open shop exactly as Sell to shop does (value × today's market events × buy rate,
+ * items at one open shop exactly as Sell to shop does (value × today's market events × faction standing × buy rate,
  * rounded to whole copper per unit), then plan an even split of the proceeds with the coin-split planner. Nothing is sold
  * unless the split is also valid, so a sale is never left unsplit.
  */
@@ -12,6 +12,7 @@ import { assertMerchantSale, merchantShortfall, revealPurse } from "./merchant.t
 import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
 import { shopSellBreakdown } from "./price-breakdown.ts";
 import { saleEvents } from "./market-events.ts";
+import { factionEffects } from "./factions.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -57,8 +58,13 @@ export function unitSalePrice(
   shop: Shop,
   /** The campaign journal: today's market events change the payout (market-events.ts). */
   journal?: SaleSplitTable["journal"],
+  /** The campaign's purses: the party's faction standing changes it too (factions.ts). */
+  purses: SaleSplitTable["purses"] = [],
 ): number {
-  return shopSellBreakdown(shop, h.unitCopper, 1, h, { events: saleEvents(journal, shop, h) }).unit;
+  return shopSellBreakdown(shop, h.unitCopper, 1, h, {
+    events: saleEvents(journal, shop, h),
+    factions: factionEffects(journal, purses, shop),
+  }).unit;
 }
 
 /**
@@ -70,6 +76,7 @@ export function saleProblem(
   shop: Shop,
   actor: "dm" | "player",
   journal?: SaleSplitTable["journal"],
+  purses: SaleSplitTable["purses"] = [],
 ): string | null {
   if (h.kind !== "item" || h.deed || h.property) return "Sell properties one at a time with Sell to shop.";
   if (h.pool && actor !== "dm")
@@ -81,7 +88,7 @@ export function saleProblem(
     return error instanceof Error ? error.message : "This item can't be sold here.";
   }
   if (h.equipped) return "Unequip this item before selling it.";
-  if (unitSalePrice(h, shop, journal) < 1) return `${shop.name} pays nothing for this item.`;
+  if (unitSalePrice(h, shop, journal, purses) < 1) return `${shop.name} pays nothing for this item.`;
   return null;
 }
 
@@ -114,9 +121,9 @@ export function planSaleSplit(
     if (!h || h.purseId !== fund.id) throw Error(`An item is no longer in ${fund.name}. Review the sale again.`);
     if (!Number.isSafeInteger(lot.quantity) || lot.quantity < 1) throw Error("Sell a whole number of each item.");
     if (lot.quantity > h.quantity) throw Error(`Only ${h.quantity} × ${h.name} ${h.quantity === 1 ? "is" : "are"} in ${fund.name}.`);
-    const problem = saleProblem(h, shop, options.actor, t.journal);
+    const problem = saleProblem(h, shop, options.actor, t.journal, t.purses);
     if (problem) throw Error(`${h.name}: ${problem}`);
-    const unitPaid = unitSalePrice(h, shop, t.journal);
+    const unitPaid = unitSalePrice(h, shop, t.journal, t.purses);
     lots.push({
       holdingId: h.id,
       name: h.name,

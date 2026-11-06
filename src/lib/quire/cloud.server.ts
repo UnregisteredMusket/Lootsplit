@@ -64,6 +64,7 @@ import {
   upgradeOldClientCommands,
   ZONES_PROTOCOL,
   MARKET_EVENTS_PROTOCOL,
+  FACTIONS_PROTOCOL,
 } from "./tabletop-protocol.ts";
 
 /**
@@ -1113,6 +1114,8 @@ export async function submitCommands(input: {
         zoneRequestsUnsupported: (input.tabletopProtocol ?? 0) < ZONES_PROTOCOL,
         // Market events: an older app's prices omit them, so a changed price is refused, not charged.
         marketEventsUnsupported: (input.tabletopProtocol ?? 0) < MARKET_EVENTS_PROTOCOL,
+        // Factions: an older app's prices omit faction standing, so a changed price is refused.
+        factionsUnsupported: (input.tabletopProtocol ?? 0) < FACTIONS_PROTOCOL,
         random: (draw) => {
           const key = command.id + ":" + draw;
           if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());

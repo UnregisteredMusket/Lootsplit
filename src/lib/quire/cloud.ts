@@ -140,6 +140,12 @@ export function readCloudTableForImport(value: unknown): CloudTable | null {
   // Market events: `marketAdjustments` belong only to a player's projected copy (market-events.ts).
   // A room opened or a campaign imported from such a copy must not keep them as frozen prices.
   if (table.journal) delete table.journal.marketAdjustments;
+  // Factions (factions.ts): the same for `factionAdjustments` and the projected party tier, so an
+  // imported copy prices from its stored standing.
+  if (table.journal) {
+    delete table.journal.factionAdjustments;
+    for (const f of table.journal.factions ?? []) delete f.party;
+  }
   return table;
 }
 /**
