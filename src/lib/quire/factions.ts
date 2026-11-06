@@ -37,6 +37,7 @@ import { isNpc } from "./coin-split.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Purse, Shop } from "./types.ts";
+import { favorMarketSchema, favorRequestsSchema, projectFavorMarket } from "./favor-market-schema.ts";
 
 export const MAX_FACTIONS = 100;
 export const MIN_RENOWN = -1000;
@@ -108,8 +109,8 @@ export const factionDraftSchema = z
 export type FactionDraft = z.infer<typeof factionDraftSchema>;
 
 /**
- * A stored faction. Parsed with unknown keys stripped (not strict), so a later field (PR B's
- * `favorMarket` list) never breaks a reader of this version.
+ * A stored faction. Parsed with unknown keys stripped (not strict), so a later field never breaks
+ * a reader of this version (PR A's readers drop `favorMarket` and `favorRequests` this way).
  */
 export const factionSchema = z.object({
   id: factionIdSchema,
@@ -127,6 +128,10 @@ export const factionSchema = z.object({
   shopPriceByTier: z.record(id, priceTableSchema).optional(),
   /** characterId → [renown, favor]; a character with neither has no entry. */
   standing: z.record(id, z.tuple([renown, favor])),
+  /** The favor market (favor-market.ts, PR B): the DM's entries; none by default. */
+  favorMarket: favorMarketSchema.optional(),
+  /** Players' requests and the DM's purchases, decided ones kept as history. */
+  favorRequests: favorRequestsSchema.optional(),
   /** The definition's revision (faction-save, visibility, delete); standing changes don't bump it. */
   revision: z.number().int().nonnegative(),
   /**
@@ -458,6 +463,9 @@ export function applyFactionCommand(
       ...fields,
       ...(current.hidden ? { hidden: true } : {}),
       standing: current.standing,
+      // The favor market changes only through its own commands (favor-market.ts).
+      ...(current.favorMarket ? { favorMarket: current.favorMarket } : {}),
+      ...(current.favorRequests ? { favorRequests: current.favorRequests } : {}),
       revision: current.revision + 1,
     });
     factions[factions.indexOf(current)] = next;
@@ -579,6 +587,8 @@ export function projectFactions(
       // odd-sized party (and gives the other's away in a party of two), so it stays with the DM.
       party: f.party ? { tier: f.party.tier } : { tier: tier.id },
     };
+    // The favor market: visible entries without secrets or notes, and only this seat's requests.
+    projectFavorMarket(f, projected, own);
     return projected;
   });
   const adjustments: FactionAdjustment[] = [];

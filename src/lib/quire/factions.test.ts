@@ -584,7 +584,7 @@ test("offline parity: the device runs the same commands, and commands.ts and eco
 test("old saves: a stored faction from this version reads back, and unknown later fields are ignored", () => {
   const t = world();
   const raw = JSON.parse(JSON.stringify(t.journal));
-  raw.factions[0].favorMarket = [{ id: "x", name: "Safe house", cost: 3 }];
+  raw.factions[0].laterField = [{ id: "x", name: "Safe house", cost: 3 }];
   const journal = readJournal(raw);
   assert.deepEqual(readFactions((journal as { factions?: unknown }).factions).map((f: Faction) => f.name), ["The Black Hand", "Harbour Guild", "The Pale Court"]);
   assert.deepEqual(readJournal({}).events, []);

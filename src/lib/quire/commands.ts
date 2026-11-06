@@ -52,6 +52,7 @@ import { applyAttunementCommand, attunedBefore, attunementFromNotes, attunementC
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
 import { applyMarketEventCommand, lineEvents, OLD_CLIENT_EVENT_PRICE, saleEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
 import { applyFactionCommand, factionCommands, factionEffects, factionKinds, OLD_CLIENT_FACTION_PRICE, type FactionCommand } from "./factions.ts";
+import { applyFavorCommand, favorCommands, favorKinds, type FavorCommand } from "./favor-market.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -368,6 +369,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...marketEventCommands,
   // Factions, Renown and Favor (factions.ts; tabletop protocol 29): DM-only.
   ...factionCommands,
+  // The favor market (favor-market.ts; tabletop protocol 30): players ask, the DM decides.
+  ...favorCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export type CommandInput = Command extends infer C
@@ -1025,6 +1028,20 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         at,
         summary,
         kind: "management",
+        ...(options.purseId ? { purseId: options.purseId } : {}),
+        ...(options.dmOnly ? { dmOnly: true } : {}),
+        ...(options.factionId ? { factionId: options.factionId } : {}),
+      }),
+    );
+  } else if (favorKinds.has(cmd.kind)) {
+    // Spending Favor: players ask for their own characters; the DM approves (spends once, never
+    // below 0), declines or records a purchase. One history event on the character's purse.
+    applyFavorCommand(t, seat, cmd as FavorCommand, at, (summary, options) =>
+      journal.events.push({
+        id: cmd.id + "-event-" + journal.events.length,
+        at,
+        summary,
+        kind: options.purseId ? "request" : "management",
         ...(options.purseId ? { purseId: options.purseId } : {}),
         ...(options.dmOnly ? { dmOnly: true } : {}),
         ...(options.factionId ? { factionId: options.factionId } : {}),
