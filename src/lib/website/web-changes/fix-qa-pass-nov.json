@@ -2,7 +2,7 @@
   "title": "Faster public pages and small fixes",
   "summary": "Website pages such as Welcome, Help and Privacy now appear straight away, and a handful of small problems found while testing are fixed.",
   "items": [
-    "Welcome, Features, Help, Privacy, Updates and the other public pages show their content immediately instead of \"Checking campaign access…\" first.",
+    "Welcome, Features, Help, Privacy, Updates and the other public pages show their content immediately instead of a campaign access check message first.",
     "Every item in the Catalog shows its icon; a few (such as rubies, harps, keys and cloaks of invisibility) used to show a broken image.",
     "Players' Settings page is now titled Settings, since it holds sound, roll mode and backups.",
     "The \"Moving to the new website address\" section in Settings matches the sections around it.",

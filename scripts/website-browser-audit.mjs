@@ -31,7 +31,8 @@ try {
     ["donate", "Support Lootsplitter"],
   ]) {
     const html = await (await fetch(`${origin}/${path}`, { headers: { accept: "text/html" } })).text();
-    assert.ok(!html.includes("Checking campaign access"), `${path} server HTML waits for the account check`);
+    // The gate's placeholder (a status <main>), not the words: the Updates page may quote them.
+    assert.ok(!/role="status"[^>]*>\s*Checking campaign access/.test(html), `${path} server HTML waits for the account check`);
     assert.ok(html.includes(heading), `${path} server HTML lacks its heading`);
   }
   // Phones (320, 390), tablet (768) and desktop: no horizontal page scroll anywhere.
