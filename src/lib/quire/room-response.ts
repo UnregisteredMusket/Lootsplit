@@ -53,7 +53,9 @@ export function readUnchangedRoom(value: unknown, expected: {
       !count(value.revision) || !optionalText(value.userId) || !optionalText(value.sessionId) ||
       value.userId !== expected.userId || value.sessionId !== expected.sessionId ||
       typeof value.encounterActive !== "boolean" ||
-      Object.keys(value).some(k => !["unchanged","protocol","code","seatId","userId","sessionId","revision","encounterActive"].includes(k)))
+      // 3D dice: a DM seat that asked (`watchRolls`) also gets the room's latest roll number.
+      (value.rollSeq !== undefined && !count(value.rollSeq)) ||
+      Object.keys(value).some(k => !["unchanged","protocol","code","seatId","userId","sessionId","revision","encounterActive","rollSeq"].includes(k)))
     throw Error(incompleteResponse);
   return value as RoomUnchanged;
 }

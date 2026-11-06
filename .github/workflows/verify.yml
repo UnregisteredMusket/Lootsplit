@@ -288,6 +288,9 @@ jobs:
       - name: dev-dice-3d
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-dice-3d 240 node scripts/dice-3d-browser-audit.mjs
+      - name: dev-dice-3d-table
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-dice-3d-table 240 node scripts/dice-3d-table-browser-audit.mjs
       - name: dev-preview-as-player
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs
