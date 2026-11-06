@@ -3,6 +3,7 @@
     "src/components/account/account-improvements.css": 7,
     "src/components/account/owner-monitor.css": 44,
     "src/components/characters/character-improvements.css": 1,
+    "src/components/dice-roll-3d.tsx": 21,
     "src/components/encounters/encounter-improvements.css": 2,
     "src/components/fairness-ledger.css": 6,
     "src/components/help-content.css": 6,

@@ -27,6 +27,7 @@ const featureAudits = {
   factions: "scripts/factions-browser-audit.mjs",
   "favor-market": "scripts/favor-market-browser-audit.mjs",
   "quest-renown": "scripts/quest-renown-browser-audit.mjs",
+  "dice-3d": "scripts/dice-3d-browser-audit.mjs",
   "preview-as-player": "scripts/preview-as-player-browser-audit.mjs",
   "visibility-center": "scripts/visibility-center-browser-audit.mjs",
   "ledger-export": "scripts/ledger-export-browser-audit.mjs",

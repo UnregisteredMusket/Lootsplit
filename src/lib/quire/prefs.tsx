@@ -17,6 +17,10 @@ export type AppPrefs = {
   ambienceEnabled: boolean;
   ambienceVolume: number;
   rollMode: "manual" | "virtual";
+  /** Throw 3D dice on screen for in-app rolls (owner request 2026-11-06). Device setting. */
+  diceAnimation: boolean;
+  /** The 3D dice colour, one of DICE_COLORS' ids (components/dice-roll-3d.tsx). */
+  diceColor: string;
   showDollars: boolean;
   /**
    * True once this device chose "Show dollars" itself. Until then the seat decides (design
@@ -52,6 +56,8 @@ export const DEFAULT_PREFS: AppPrefs = {
   ambienceEnabled: false,
   ambienceVolume: 0.15,
   rollMode: "virtual",
+  diceAnimation: true,
+  diceColor: "ivory",
   showDollars: true,
   dollarsChosen: false,
   confirmRemoves: false,
@@ -102,6 +108,11 @@ export function normalizePrefs(input: Partial<AppPrefs> | null | undefined): App
     ambienceEnabled: flag(input?.ambienceEnabled, false),
     ambienceVolume: num(input?.ambienceVolume, 0, 1, 0.15),
     rollMode: input?.rollMode === "manual" ? "manual" : "virtual",
+    diceAnimation: flag(input?.diceAnimation, DEFAULT_PREFS.diceAnimation),
+    diceColor:
+      typeof input?.diceColor === "string" && /^[a-z]{1,20}$/.test(input.diceColor)
+        ? input.diceColor
+        : DEFAULT_PREFS.diceColor,
     showDollars: flag(input?.showDollars, DEFAULT_PREFS.showDollars),
     dollarsChosen: dollarsChoiceFrom(input),
     confirmRemoves: flag(input?.confirmRemoves, DEFAULT_PREFS.confirmRemoves),

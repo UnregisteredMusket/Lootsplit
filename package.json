@@ -47,6 +47,7 @@
     "mutation": "node scripts/mutation.mjs"
   },
   "dependencies": {
+    "@3d-dice/dice-box-threejs": "0.0.12",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.2",
     "@capacitor/filesystem": "^8.1.3",

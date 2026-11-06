@@ -13,6 +13,20 @@ export type Resource = {
 
 export const resources: Resource[] = [
   {
+    name: "3D dice: dice-box-threejs, three.js and cannon-es",
+    description:
+      "The 3D dice thrown for character rolls use @3d-dice/dice-box-threejs by Frank Ali (based on Major's 3D Dice by MajorVictory, itself based on Teall's online 3D dice roller), rendered with three.js and simulated with cannon-es. Dice are forced to land on the result Lootsplitter already recorded. Only the code is used: the dice colours are Lootsplitter's own, and no third-party textures or sounds are bundled.",
+    license:
+      "dice-box-threejs MIT; Major's 3D Dice released into the public domain (Unlicense); three.js MIT; cannon-es MIT.",
+    links: [
+      { label: "dice-box-threejs", url: "https://github.com/3d-dice/dice-box-threejs" },
+      { label: "Major's 3D Dice", url: "https://github.com/MajorVictory/3DDiceRoller" },
+      { label: "Teall's 3D dice roller", url: "http://www.teall.info/2014/01/online-3d-dice-roller.html" },
+      { label: "three.js", url: "https://github.com/mrdoob/three.js" },
+      { label: "cannon-es", url: "https://github.com/pmndrs/cannon-es" },
+    ],
+  },
+  {
     name: "Android home-screen widget platform references",
     kind: "reference",
     description:

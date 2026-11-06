@@ -1,0 +1,10 @@
+{
+  "title": "3D dice for character rolls",
+  "summary": "Rolling from a character sheet now throws 3D dice on your screen. They always land on the result Lootsplitter recorded, so the dice and the roll log never disagree.",
+  "items": [
+    "Fifth-edition dice: d4, d6, d8, d10, d12, d20 and percentile (a tens die and a units die). Advantage and disadvantage throw two d20s and show which one counts.",
+    "Works for quick rolls and the dice tray, in shared campaigns and offline.",
+    "Settings → Roll mode: turn Show 3D dice off, or pick a dice colour. The dice stay off when your device asks for reduced motion.",
+    "The written result and roll log are unchanged; Close dice or Escape clears the dice."
+  ]
+}
