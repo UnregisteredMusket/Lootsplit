@@ -19,6 +19,7 @@ import {
 } from "./account-fixtures.mjs";
 import { continueIntoApp, prepareDmFixture, afterJoining } from "../title-screen-navigation.mjs";
 import { answerThemedDialog, autoAnswerThemedDialogs } from "../themed-dialogs.mjs";
+import { getWithReset } from "./request-retry.mjs";
 
 test("network-boundary", async ({ devices, baseURL: origin }) => {
   let connections = 0;
@@ -1048,7 +1049,7 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   const visit = (p, path) => navigateAccountScenario(p, origin, path);
   await phone.setViewportSize({ width: 390, height: 844 });
   const members = async () => {
-    const response = await desktop.context().request.get(`${origin}/api/account/library`);
+    const response = await getWithReset(desktop.context().request, `${origin}/api/account/library`);
     expect(response.ok()).toBeTruthy();
     return (await response.json()).members;
   };
@@ -1569,7 +1570,7 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   await page.waitForURL((url) => url.pathname === "/");
   await expect(page.getByRole("heading", { name: "Desk", exact: true, level: 1 })).toBeVisible();
   await expect(page.locator(".loot-opening")).toHaveCount(0);
-  const libraryResponse = await page.context().request.get(origin + "/api/account/library");
+  const libraryResponse = await getWithReset(page.context().request, origin + "/api/account/library");
   expect(libraryResponse.ok()).toBeTruthy();
   const library = await libraryResponse.json();
   const restored = library.members.find((m) => m.has_recovery);
@@ -1662,7 +1663,7 @@ test("backup-limit", async ({ devices, baseURL: origin }, testInfo) => {
   await answerThemedDialog(page);
   await expect(page.getByRole("status").filter({ hasText: "It replaced" })).toBeVisible();
   await expect(restoreButtons).toHaveCount(3);
-  const library = await (await page.context().request.get(origin + "/api/account/library")).json();
+  const library = await (await getWithReset(page.context().request, origin + "/api/account/library")).json();
   assert.equal(library.backups.length, 3);
   assert.equal(new Set(library.backups.map((b) => b.campaign_key)).size, 1, "one campaign");
   await page.setViewportSize({ width: 320, height: 900 });

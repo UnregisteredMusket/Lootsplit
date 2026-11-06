@@ -1,0 +1,7 @@
+{
+  "title": "Review Inbox stays put on small phones",
+  "summary": "Approving or denying a request in the Review Inbox no longer scrolls the page on narrow screens.",
+  "items": [
+    "After a decision, the next request is still selected, but the page only scrolls if that request is completely off screen, and then only far enough to show it."
+  ]
+}

@@ -2,6 +2,7 @@ import { test as base, expect } from "playwright/test";
 import { randomUUID } from "node:crypto";
 import { openApplication, prepareDmFixture } from "../title-screen-navigation.mjs";
 import { accountScenarios, externalAuditRequests } from "../account-scenarios.mjs";
+import { getWithReset } from "./request-retry.mjs";
 
 export { expect };
 // Account recovery uses devices whose optional Help offer was already answered.
@@ -280,7 +281,7 @@ export async function saveCurrentMembership(page, origin, visitFn = visit) {
   await expect(
     page.getByRole("status").filter({ hasText: "This membership is saved" }),
   ).toBeVisible();
-  const library = await page.context().request.get(`${origin}/api/account/library`);
+  const library = await getWithReset(page.context().request, `${origin}/api/account/library`);
   expect(library.ok()).toBeTruthy();
   return (await library.json()).members;
 }

@@ -62,15 +62,31 @@ export function restoreFile(snapshot, filename, expected = migrationIdentity()) 
 /** Exports the production database through the D1 polling API. Large exports can take several minutes, so the
  * loop waits up to `deadlineMs` (default 12 minutes, inside the workflow's 20-minute job limit) and reports a
  * timeout or Cloudflare-side failure by stage and status only; the signed snapshot URL is never logged. */
+/** fetch rejects with TypeError on a network failure and TimeoutError when AbortSignal.timeout fires. */
+const TRANSIENT_FETCH_ERRORS = new Set(["TimeoutError", "TypeError"]);
+const STATUS_ATTEMPTS = 3;
 export async function exportD1({ accountId, token, fetcher = fetch, deadlineMs = 12 * 60_000, pollMs = 2000, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
   assert.match(accountId || "", /^[a-f0-9]{32}$/);
   assert.ok(token, "Missing export token");
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${productionDatabase}/export`;
   const started = now();
   let bookmark, lastStatus = "not started", polls = 0;
+  const poll = () => fetcher(endpoint, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ output_format: "polling", current_bookmark: bookmark }), signal: AbortSignal.timeout(30000) });
   while (now() - started < deadlineMs) {
     polls++;
-    const response = await fetcher(endpoint, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ output_format: "polling", current_bookmark: bookmark }), signal: AbortSignal.timeout(30000) });
+    let response;
+    // A status check (bookmark known) only reads the running export, so a dropped connection or a
+    // slow answer is retried, up to STATUS_ATTEMPTS in all and never past the deadline. The first
+    // request starts the export and is not repeated.
+    for (let attempt = 1; ; attempt++) {
+      try { response = await poll(); break; } catch (error) {
+        const transient = bookmark !== undefined && TRANSIENT_FETCH_ERRORS.has(error?.name);
+        if (!transient) throw error;
+        if (attempt >= STATUS_ATTEMPTS || now() - started >= deadlineMs)
+          throw new SafeBackupError(`D1 export status check failed ${attempt} time(s) (${error.name})`);
+        await sleep(pollMs);
+      }
+    }
     if (!response.ok) throw new SafeBackupError(`D1 export HTTP ${response.status}`);
     const body = await response.json();
     if (!(body.success && body.result?.success)) throw new SafeBackupError("D1 export was refused by Cloudflare");
@@ -143,8 +159,16 @@ async function main() {
     console.log(`Restore ${id} is authorized for the verified primary fence. Import into a NEW Turso database.`);
   } else throw new Error("Use export, restore <encrypted-file> <new-db-file>, or authorize <restored-db-file>");
 }
+/** An error's class name for logs, limited to identifier characters. */
+export function safeErrorName(error) {
+  const name = typeof error?.name === "string" ? error.name : typeof error;
+  return /^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(name) ? name : "Error";
+}
 if (process.argv[1]?.endsWith("/standby-backup.mjs")) main().catch((error) => {
   // Never print SDK/API errors that could contain SQL, signed URLs or credentials.
-  console.error(`Backup/recovery failed at ${recoveryStage}${error instanceof SafeBackupError ? `: ${error.message}` : ""}. No live database was overwritten.`);
+  // Other errors show only their class name (TypeError, AssertionError…): enough to tell a network
+  // failure from a validation failure without printing a message that could hold a URL or secret.
+  const reason = error instanceof SafeBackupError ? `: ${error.message}` : ` (${safeErrorName(error)})`;
+  console.error(`Backup/recovery failed at ${recoveryStage}${reason}. No live database was overwritten.`);
   process.exitCode = 1;
 });
