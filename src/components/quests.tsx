@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Bell, EyeOff, Lock, Map as MapIcon, Pin, Plus, X } from "lucide-react";
 import { AppLink } from "@/components/app-link";
+import { PlayerQuestRenown, QuestGiverFaction, QuestRenownEditor, QuestRenownOffer } from "@/components/quest-renown";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { Button, Field, Modal, Switch, TextArea, TextInput, Select } from "@/components/ui";
 import { useEconomy, useCommandId } from "@/lib/quire/economy-context";
@@ -251,6 +252,7 @@ function PlayerQuestDetail({ q, t, updated, following, onFollow }: { q: Quest; t
           </AppLink>
         </div>
       )}
+      <QuestGiverFaction quest={q} />
       {q.summary && <p className="quest-summary">{q.summary}</p>}
       <div className="quest-actions">
         {q.status === "active" && (
@@ -302,6 +304,11 @@ function PlayerQuestDetail({ q, t, updated, following, onFollow }: { q: Quest; t
           <small>Your DM pays rewards when the quest is done.</small>
         </section>
       )}
+      {q.renownRewards?.length ? (
+        <section className="quest-reward" aria-label="Renown">
+          <PlayerQuestRenown quest={q} purseIds={seat.purseIds} />
+        </section>
+      ) : null}
       <Chronicle q={q} t={t} />
       <MyNotes q={q} />
     </article>
@@ -669,6 +676,8 @@ function QuestEditor({ t, quest, onSaved, onCancel, onDeleted, giverNpcId }: { t
               </>
             )}
           </section>
+          {quest && <QuestRenownOffer quest={quest} />}
+          {quest && <QuestRenownEditor quest={quest} />}
           <section className="quest-box dm-notes">
             <p className="quest-lock">
               <Lock size={14} aria-hidden="true" /> DM notes · never sent to players
@@ -920,6 +929,11 @@ function CloseSheet({ quest, close }: { quest: Quest; close: () => void }) {
           Closing pays nothing. Pay the reward with <AppLink href="/party?action=add">Add loot</AppLink> or an encounter award, then link the receipt.
         </p>
       )}
+      {!reopening && status === "completed" && quest.renownRewards?.length && quest.renownAppliedAt === undefined ? (
+        <p className="quest-muted" data-testid="quest-close-renown">
+          Completing applies this quest's {quest.renownRewards.length === 1 ? "renown reward" : `${quest.renownRewards.length} renown rewards`} now, with the Favor the gains earn.
+        </p>
+      ) : null}
       <div className="quest-sheet-footer">
         <Button variant="secondary" onClick={close}>Cancel</Button>
         <Button
@@ -1069,10 +1083,12 @@ function PlayerPreview({ quest }: { quest: Quest }) {
               </li>
             ))}
           </ul>
+          <QuestGiverFaction quest={q} />
           {q.rewardText && <p>Reward: {q.rewardText}</p>}
           {q.rewardLinks.map((l) => (
             <Chip key={`${l.kind}:${l.id}`} tone="done">Linked: {l.label ?? "Receipt"}</Chip>
           ))}
+          <PlayerQuestRenown quest={q} purseIds={[current]} />
           <Chronicle q={q} t={t} />
         </>
       )}

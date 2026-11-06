@@ -38,6 +38,7 @@
   "node scripts/recovery-step.mjs dev-event-modifiers 240 node scripts/event-modifiers-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-factions 240 node scripts/factions-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-favor-market 240 node scripts/favor-market-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-quest-renown 240 node scripts/quest-renown-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-visibility-center 240 node scripts/visibility-center-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-ledger-export 240 node scripts/ledger-export-browser-audit.mjs",
