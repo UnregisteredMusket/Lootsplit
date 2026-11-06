@@ -122,7 +122,7 @@ export function ItemDetailsFields({
               hint={`0 to ${uses.max}.`}
               commit={(text) => {
                 // Checked against the largest allowed value, not the maximum this moment: when the
-                // maximum's change lands after this one (dev-award-item-details on #445, 2026-11-06:
+                // maximum's change lands after this one (dev-award-item-details on PR 445, 2026-11-06:
                 // "5" uses left was dropped while the maximum still read 1, then followed it to 7),
                 // the maximum's change keeps it. The form refuses uses left above the maximum.
                 const current = whole(text, 0, MAX_USES);
