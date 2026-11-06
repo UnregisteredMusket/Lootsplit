@@ -296,7 +296,7 @@ export async function roomReportStatements(db, room, encoded, writeId) {
     // Measured in UTF-8 bytes (D1's row limit); a larger delta is stored as a full snapshot,
     // which is split into parts when it needs to be.
     const deltaBytes = delta ? encoder.encode(delta).length : Infinity;
-    if (deltaBytes <= REPORT_INLINE_BYTES && deltaBytes <= REPORT_REBASE_FRACTION * encoder.encode(doc.body).length)
+    if (delta && deltaBytes <= REPORT_INLINE_BYTES && deltaBytes <= REPORT_REBASE_FRACTION * encoder.encode(doc.body).length)
       docs.push({ reference: doc.reference, body: delta });
     else {
       docs.push(doc);
