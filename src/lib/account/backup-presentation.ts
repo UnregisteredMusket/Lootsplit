@@ -117,6 +117,16 @@ export function pendingCommandDescription(value: unknown): string {
       return `Renown change for ${c.characters.length} character${c.characters.length === 1 ? "" : "s"} · faction ${c.factionId}`;
     case "faction-favor-grant":
       return `Favor change for ${c.characters.length} character${c.characters.length === 1 ? "" : "s"} · faction ${c.factionId}`;
+    case "favor-entry":
+      return `${c.entry ? "Save" : "Remove"} favor market entry${c.entry ? `: ${c.entry.name}` : ""} · faction ${c.factionId}`;
+    case "favor-request":
+      return `Ask for a favor (${c.cost} Favor) · faction ${c.factionId}`;
+    case "favor-withdraw":
+      return `Withdraw a favor request · faction ${c.factionId}`;
+    case "favor-decision":
+      return `${c.approve ? "Approve" : "Decline"} a favor request · faction ${c.factionId}`;
+    case "favor-purchase":
+      return `Record a favor purchase (${c.cost} Favor) · faction ${c.factionId}`;
     case "sale-split":
       return `Sell ${c.lots.length} item${c.lots.length === 1 ? "" : "s"} and split ${formatCopper(c.expect.proceeds)} among ${c.recipientIds.length} · from ${c.fundId}`;
     case "post":

@@ -9,6 +9,7 @@ import { shopVisible, validateWorld } from "./world.ts";
 import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
 import { lineEvents, saleEvents } from "./market-events.ts";
 import { factionEffects } from "./factions.ts";
+import { favorKinds } from "./favor-market.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
@@ -2992,6 +2993,10 @@ export async function executeLocalCommand(
     // reach the DM's campaign. The DM marks uses on their device (or the party plays shared).
     if (seat.role !== "dm" && (command.kind === "item-use" || command.kind === "item-recharge"))
       throw Error("Item uses are tracked on the DM's device or in a shared room. Ask the DM to mark the use.");
+    // The favor market: a player link holds a copy of part of the party, so a request there would
+    // never reach the DM. The DM records it on their device (or the party plays shared).
+    if (seat.role !== "dm" && favorKinds.has(command.kind))
+      throw Error("Favor requests go to the DM's device or a shared room. Ask the DM to record it.");
     const next = applyCommand(source, seat, command, {
       source: "local",
       random: randomTradeRoll,

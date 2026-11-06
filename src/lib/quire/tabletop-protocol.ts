@@ -208,8 +208,17 @@ export const AWARD_DETAILS_PROTOCOL = 28;
  * the updated website.
  */
 export const FACTIONS_PROTOCOL = 29;
+/**
+ * Protocol 30 (2026-11-05, the favor market; favor-market.ts): players may send `favor-request`
+ * and `favor-withdraw`, and the DM `favor-entry`, `favor-decision` and `favor-purchase`. The new
+ * fields live on faction records (`favorMarket`, `favorRequests`), which protocol 29 parses with
+ * unknown keys stripped and whose stored copy the server keeps, so every protocol receives the
+ * table unchanged. Only drafts with the new commands (strict command schema) ask protocol 29 and
+ * older to finish on the updated website.
+ */
+export const FAVOR_MARKET_PROTOCOL = 30;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = FACTIONS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = FAVOR_MARKET_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1342,12 +1351,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= FACTIONS_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= FAVOR_MARKET_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 30: the favor market.
+      if (typeof c.kind === "string" && c.kind.startsWith("favor-")) return true;
+      if (protocol && protocol >= FACTIONS_PROTOCOL) return false;
       // Protocol 29: factions, renown and favor.
       if (typeof c.kind === "string" && c.kind.startsWith("faction-")) return true;
       if (protocol && protocol >= AWARD_DETAILS_PROTOCOL) return false;
@@ -1472,6 +1484,8 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     throw Error(
       "This session has unfinished map actions from an updated Lootsplitter client. Finish or resolve those actions on the updated website before resuming this older app. Your saved campaign and pending work are retained.",
     );
+  // Protocol 29 reads every table field the favor market adds (stripped, kept by the server).
+  if (protocol && protocol >= FACTIONS_PROTOCOL) return withImageReferences(value);
   if (protocol && protocol >= IMAGE_REFERENCE_PROTOCOL) {
     const referenced = withImageReferences(value);
     return { ...referenced, table: tableForProtocol(referenced.table, protocol) };

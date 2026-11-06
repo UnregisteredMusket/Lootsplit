@@ -3,12 +3,12 @@
  * Quests. The DM creates factions (tiers, prices, the shops and places they control), reveals or
  * hides them, changes renown for the party or one character, and grants Favor. Players see the
  * visible factions with their own renown, tier and Favor and the party's attitude. Every change is
- * one DM-only `faction-*` command; nothing here moves coins or items.
+ * one DM-only `faction-*` command; nothing here moves coins or items. Each faction's favor market
+ * (favor-market.tsx) sits in its card.
  */
 import { useMemo, useState, type FormEvent } from "react";
-import { useEconomy, useCommandId } from "@/lib/quire/economy-context";
+import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
-import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { locationLabel, readMarketLocations } from "@/lib/quire/shop-locations";
 import {
@@ -29,6 +29,8 @@ import {
 import type { CommandInput } from "@/lib/quire/commands";
 import type { Purse } from "@/lib/quire/types";
 import { FactionMeter } from "./faction-meter";
+import { Status, useFactionCommand } from "./faction-command";
+import { FavorMarketManager, PlayerFavorMarket } from "./favor-market";
 import { Badge, Button, Field, Fold, Select, TextArea, TextInput } from "./ui";
 import "./factions.css";
 
@@ -45,42 +47,6 @@ function useFactions() {
     const table = { purses, journal };
     return { factions, market, shops, purses, table };
   }, [journal, purses, shops]);
-}
-
-/** One faction command with a reused ID per action; returns the notice or throws the reason. */
-function useFactionCommand(key: string) {
-  const { commandOutcome } = useEconomy();
-  const action = useCommandId(key);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [notice, setNotice] = useState("");
-  async function send(command: CommandInput, done: string) {
-    if (busy) return false;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const outcome = await commandOutcome({ ...command, id: action.commandId } as Parameters<typeof commandOutcome>[0]);
-      action.renew();
-      setNotice(mutationNotice(outcome, done));
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Nothing was saved.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-  return { send, busy, error, notice };
-}
-
-function Status({ error, notice }: { error: string; notice: string }) {
-  return (
-    <>
-      {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
-    </>
-  );
 }
 
 /** The shops whose prices a faction sets (directly or through a place), by name. */
@@ -138,6 +104,7 @@ function PlayerFactions() {
                 {where.length > 1 ? " (some shops may differ)" : ""}. Why this price? shows it.
               </p>
             ) : null}
+            <PlayerFavorMarket faction={f} characters={mine} />
           </section>
         );
       })}
@@ -476,6 +443,7 @@ function FactionCard({ faction }: { faction: Faction }) {
         </div>
         <RenownForm faction={faction} party={party} characters={characters} />
       </Fold>
+      <FavorMarketManager faction={faction} />
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
           variant="secondary"
