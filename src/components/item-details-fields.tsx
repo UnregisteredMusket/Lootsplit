@@ -121,8 +121,11 @@ export function ItemDetailsFields({
               shown={String(uses.current)}
               hint={`0 to ${uses.max}.`}
               commit={(text) => {
-                const now = latest.current.uses ?? uses;
-                const current = whole(text, 0, now.max);
+                // Checked against the largest allowed value, not the maximum this moment: when the
+                // maximum's change lands after this one (dev-award-item-details on #445, 2026-11-06:
+                // "5" uses left was dropped while the maximum still read 1, then followed it to 7),
+                // the maximum's change keeps it. The form refuses uses left above the maximum.
+                const current = whole(text, 0, MAX_USES);
                 if (current !== null) set(({ uses: n = uses }) => ({ uses: { ...n, current } }));
                 return current !== null;
               }}
