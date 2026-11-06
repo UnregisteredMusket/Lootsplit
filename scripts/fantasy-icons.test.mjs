@@ -16,6 +16,10 @@ test("all pinned SRD records and generic categories resolve to local assets", ()
       assert.ok(existsSync(new URL("../public/icons/game-icons/" + icon, import.meta.url)), icon);
   for (const icon of Object.values(catalog.ui))
     assert.ok(existsSync(new URL("../public/icons/game-icons/" + icon, import.meta.url)), icon);
+  // Name rules (e.g. "bag of holding") point at shipped files too, or /catalog shows 404s.
+  for (const [kind, rules] of Object.entries(catalog.rules))
+    for (const [name, icon] of rules)
+      assert.ok(existsSync(new URL("../public/icons/game-icons/" + icon, import.meta.url)), `${kind}: ${name} → ${icon}`);
 });
 test("source identity wins over renamed labels; older spell URLs and editions still work", () => {
   const spec = catalog.records["spells:srd_fireball"];

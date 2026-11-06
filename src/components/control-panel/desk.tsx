@@ -15,7 +15,12 @@ import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/c
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import { sessionSummary } from "@/lib/quire/journal";
-import { accountRequest } from "@/lib/account/client";
+import { signedInAccountRequest } from "@/lib/account/client";
+import {
+  savingMembership,
+  serverSavingMembership,
+  subscribeMembershipSave,
+} from "@/lib/account/membership-save";
 import { LedgerArt } from "@/components/ledger-art";
 import { Guide } from "@/components/guide";
 import { Fold } from "@/components/ui";
@@ -47,6 +52,12 @@ function DmDeskContents() {
     profiles = useSheetReadouts();
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns),
     room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  // A room just created is still being saved to My account; its account reads wait for that.
+  const membershipSaving = useSyncExternalStore(
+    subscribeMembershipSave,
+    savingMembership,
+    serverSavingMembership,
+  );
   const search = useRouterState({ select: (s) => s.location.searchStr });
   const savedShortcuts = new URLSearchParams(search).get("customize") === "1";
   const [encounter, setEncounter] = useState<{
@@ -69,7 +80,7 @@ function DmDeskContents() {
     setEncounter(null);
     setLootReviews(null);
     setEncounterState("Loading encounter…");
-    const load = room.joined ? accountRequest : localEncounterRequest;
+    const load = room.joined ? signedInAccountRequest : localEncounterRequest;
     load<{ encounters: { id: string; code: string; name: string; status: string }[] }>(
       "encounters",
       undefined,
@@ -103,8 +114,8 @@ function DmDeskContents() {
     setImportError(false);
     setSharedRolls([]);
     setRollState(room.joined ? "Loading campaign rolls…" : "");
-    if (room.joined) {
-      void accountRequest<{ requests: { status: string }[] }>(
+    if (room.joined && !membershipSaving) {
+      void signedInAccountRequest<{ requests: { status: string }[] }>(
         "sheets/imports",
         { code: room.code },
         c.signal,
@@ -116,7 +127,7 @@ function DmDeskContents() {
         .catch(() => {
           if (!c.signal.aborted) setImportError(true);
         });
-      void accountRequest<{ rolls: Roll[] }>("sheets/log", { code: room.code }, c.signal)
+      void signedInAccountRequest<{ rolls: Roll[] }>("sheets/log", { code: room.code }, c.signal)
         .then((r) => {
           if (!c.signal.aborted) {
             setSharedRolls(r.rolls);
@@ -129,7 +140,7 @@ function DmDeskContents() {
         });
     }
     return () => c.abort();
-  }, [contextKey, room.revision, room.joined, room.code, refresh]);
+  }, [contextKey, room.revision, room.joined, room.code, refresh, membershipSaving]);
   const party = purses.filter((p) => p.kind === "character" && inParty({ purses, journal }, p)),
     session = journal.sessions.find((x) => !x.endedAt),
     // "Session N" counts recorded sessions; the next one is N + 1 until it starts.

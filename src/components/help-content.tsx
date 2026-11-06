@@ -28,9 +28,13 @@ export function HelpContent({
   // In the app the guide follows the seat; the public Help page defaults to the DM guide, and
   // `?guide=player|dm` (or a link to a player-only topic) picks one (W-3).
   const [embeddedChoice, setEmbeddedChoice] = useState<HelpGuide | null>(null);
+  // The public Help page is in the server HTML, which has no URL hash: a guide picked by the hash
+  // applies once the page is interactive, so the first render matches the server's.
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => setInteractive(true), []);
   const guide: HelpGuide | null = embedded
     ? (embeddedChoice ?? (known ? (seat.role === "player" ? "player" : "dm") : null))
-    : (searchGuide ?? guideForHash(hash, GUIDE_SOURCES) ?? "dm");
+    : (searchGuide ?? (interactive ? guideForHash(hash, GUIDE_SOURCES) : null) ?? "dm");
   function choose(next: HelpGuide) {
     if (next === guide) return;
     if (embedded) setEmbeddedChoice(next);
@@ -45,8 +49,6 @@ export function HelpContent({
   }
   const source = GUIDE_SOURCES[guide ?? "dm"];
   const [query, setQuery] = useState("");
-  const [interactive, setInteractive] = useState(false);
-  useEffect(() => setInteractive(true), []);
   const inputId = useId();
   const prefix = embedded ? "guide-" : "";
   useEffect(() => {

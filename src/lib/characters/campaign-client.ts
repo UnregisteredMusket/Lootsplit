@@ -1,5 +1,5 @@
 import { canReadCharacter } from "../quire/character-position";
-import { accountRequest } from "../account/client";
+import { accountRequest, signedInAccountRequest } from "../account/client";
 import { characterSheet } from "./campaign-sheet.mjs";
 import { economySnapshot, saveCampaignCharacter } from "../quire/economy";
 import { getSeat } from "../quire/table";
@@ -58,7 +58,12 @@ export async function characterRequest<T>(
       (path === "sheets/assign" && !payload.id.startsWith("party:")) ||
       (getCloudTable().joined && !payload.id.startsWith("party:")))
   )
-    return accountRequest<T>(path, payload, signal);
+    // The account character list needs a session; signed-out guests skip it (no 401).
+    return (path === "sheets" && payload === undefined ? signedInAccountRequest : accountRequest)<T>(
+      path,
+      payload,
+      signal,
+    );
   const table = await economySnapshot();
   if (scope) assertMutationScope(scope);
   const seat = getSeat();

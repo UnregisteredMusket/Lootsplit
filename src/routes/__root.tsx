@@ -126,7 +126,8 @@ function RootDocument() {
         ) : (
           <OpeningGate publicPage={publicPage || accountPage || notFound} settle={accountPage}>
             <AuthProvider>
-              <CampaignGate>
+              {/* A document opened on a public page draws it at once, without campaign providers. */}
+              <CampaignGate publicPage={<Outlet />}>
                 <LibraryProvider>
                   <PrefsProvider>
                     <MenuAudioBridge />

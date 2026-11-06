@@ -33,6 +33,31 @@ export function accountRequest<T>(path: string, body?: unknown, signal?: AbortSi
   }
   return accountRequestCore<T>(path, body, signal);
 }
+/**
+ * Whether the campaign gate found an account session on this page (or an offline owner).
+ * Signed-out guests have none, so account-only reads are not sent for them.
+ */
+export function accountSessionKnown() {
+  try {
+    return !!sessionStorage.getItem("lootsplit.verified-account");
+  } catch {
+    return false;
+  }
+}
+/**
+ * An account read that only a signed-in visitor can make (their encounters, sheets, library).
+ * Signed-out guests get the same "not signed in" error the server would send, without the
+ * request, so their console shows no 401s (QA pass 2026-11) and each screen keeps its message.
+ */
+export function signedInAccountRequest<T>(
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!accountSessionKnown())
+    return Promise.reject(Object.assign(new Error("Sign in to your account first."), { status: 401 }));
+  return accountRequest<T>(path, body, signal);
+}
 async function accountRequestCore<T>(
   path: string,
   body?: unknown,

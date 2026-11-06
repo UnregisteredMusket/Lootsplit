@@ -1,6 +1,11 @@
 import { SearchSelect } from "./search-select";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { accountRequest } from "@/lib/account/client";
+import {
+  savingMembership,
+  serverSavingMembership,
+  subscribeMembershipSave,
+} from "@/lib/account/membership-save";
 import { Link } from "@tanstack/react-router";
 export function PlayerCharacterImport({ code }: { code: string }) {
   const [data, setData] = useState<{
@@ -17,7 +22,15 @@ export function PlayerCharacterImport({ code }: { code: string }) {
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const key = useRef(crypto.randomUUID());
+  // A room being created and saved to My account has no membership yet; read once it is saved.
+  const membershipSaving = useSyncExternalStore(
+    subscribeMembershipSave,
+    savingMembership,
+    serverSavingMembership,
+  );
   useEffect(() => {
+    // No room yet (the DM's Start a room panel): there is no campaign to import into.
+    if (membershipSaving || !code) return;
     const c = new AbortController();
     async function load() {
       const session = await accountRequest<{ user?: unknown } | null>(
@@ -41,7 +54,7 @@ export function PlayerCharacterImport({ code }: { code: string }) {
       if (!c.signal.aborted) setError(e.message);
     });
     return () => c.abort();
-  }, [code, refresh]);
+  }, [code, refresh, membershipSaving]);
   if (!data && !error) return null;
   const choices = data?.characters.filter((c) => !c.campaign_code) || [];
   const targets = data?.campaigns.find((c) => c.code === code)?.purses || [];

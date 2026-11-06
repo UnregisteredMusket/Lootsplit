@@ -12,6 +12,7 @@ import {
   type AccountLibrary,
 } from "@/lib/account/client";
 import { linkCurrentCampaign } from "@/lib/account/transfers";
+import { whileSavingMembership } from "@/lib/account/membership-save";
 import {
   captureDeviceBackup,
   chooseTableMode,
@@ -465,12 +466,18 @@ export function CloudTable() {
                 }
                 onClick={() =>
                   run(async () => {
-                    await chooseTableMode(hostMode);
-                    if (hostAccount) await saveCreatedMembership();
-                    else
+                    // Account reads that need the saved membership wait for it (QA pass 2026-11).
+                    if (hostAccount)
+                      await whileSavingMembership(async () => {
+                        await chooseTableMode(hostMode);
+                        await saveCreatedMembership();
+                      });
+                    else {
+                      await chooseTableMode(hostMode);
                       toast.success(
                         "Room ready. Invite your players. Save its membership in My account to resume on another device.",
                       );
+                    }
                     setHosting(false);
                   })
                 }
