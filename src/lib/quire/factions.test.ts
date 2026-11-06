@@ -589,3 +589,14 @@ test("old saves: a stored faction from this version reads back, and unknown late
   assert.deepEqual(readFactions((journal as { factions?: unknown }).factions).map((f: Faction) => f.name), ["The Black Hand", "Harbour Guild", "The Pale Court"]);
   assert.deepEqual(readJournal({}).events, []);
 });
+
+test("every server path that projects an archived session passes today's hidden factions (privacy review of #438)", () => {
+  // A faction hidden after a session was archived must stay hidden in account exports and
+  // archived-map lookups too, not only in the room view (projectArchivedReport).
+  for (const file of ["cloudflare/campaign-records.mjs", "cloudflare/account-map-assets.mjs"]) {
+    const source = readFileSync(new URL(`../../../${file}`, import.meta.url), "utf8");
+    const calls = source.match(/projectRecord\(readArchivedSnapshot\([^;]*;/g) ?? [];
+    assert.ok(calls.length > 0, `${file} projects archived sessions`);
+    for (const call of calls) assert.match(call, /hiddenFactions/, `${file}: ${call}`);
+  }
+});

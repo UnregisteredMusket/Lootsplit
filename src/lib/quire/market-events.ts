@@ -265,9 +265,13 @@ function findAdjustment(journal: NonNullable<JournalLike>, shopId: string, key: 
   return (mine.find((a) => key !== undefined && a.category === key) ?? mine.find((a) => a.category === undefined))?.rate;
 }
 
-/** An older app (protocol < 26) shows prices without market events; it is never charged them. */
+/**
+ * An older app (protocol < 26) shows prices without market events; it is never charged them.
+ * The wording matches the faction refusal (factions.ts) and names no cause, so an older app can't
+ * tell a hidden market event or a hidden faction from any other price change (review of #438).
+ */
 export const OLD_CLIENT_EVENT_PRICE =
-  "A market event changes this price, and this older Lootsplitter app can't show it. Finish this on the updated website; nothing was charged or paid.";
+  "This price has changed, and this older Lootsplitter app can't show the new one. Finish this on the updated website; nothing was charged or paid.";
 
 /**
  * The product of the events' multipliers, kept within ×0.1–×10 (`eventRate`). No events: exactly
