@@ -14,7 +14,7 @@ const { openRoom, joinRoom, submitCommands, choosePace } = await import("../src/
 const { readRoom } = await import("../src/lib/quire/room-store.server.ts");
 const { tradeFixture } = await import("../src/lib/quire/test-fixtures/trade-economy.ts");
 const { encodeReportDelta, decodeReportDelta, reportDeltaMarker } = await import("../cloudflare/report-delta.mjs");
-const { ARCHIVED_BYTES_SQL, setReportDeltasForTests, REPORT_DELTA_WRITES, readRoomReportSnapshots, roomReportStatements, REPORT_INLINE_BYTES } = await import("../cloudflare/room-reports.mjs");
+const { ARCHIVED_BYTES_SQL, setReportDeltasForTests, REPORT_DELTA_WRITES, readRoomReportSnapshots, roomReportStatements, REPORT_INLINE_BYTES, REPORT_REBASE_FRACTION } = await import("../cloudflare/room-reports.mjs");
 // This release reads deltas; writing them is the next release (REPORT_DELTA_WRITES). Tests that
 // need delta rows turn writing on for themselves.
 test.after(() => setReportDeltasForTests(REPORT_DELTA_WRITES));
@@ -150,6 +150,36 @@ test("a delta over the row limit in UTF-8 bytes is stored as a full snapshot in 
     assert.equal((await readRoomReportSnapshots(db, "CJKROOM1", [sha(text)])).get(sha(text)), text);
     const parts = await db.prepare("SELECT body FROM campaign_room_report_parts WHERE code=?").bind("CJKROOM1").all();
     assert.ok(parts.results.every((part) => Buffer.byteLength(part.body) <= 1_000_000));
+  } finally {
+    setReportDeltasForTests(REPORT_DELTA_WRITES);
+  }
+});
+
+test("a session whose delta would pass the re-base share is stored in full and becomes the next base", async () => {
+  setReportDeltasForTests(true);
+  try {
+    await bareRoom("REBASE01");
+    // Like a real campaign: a fixed world plus a session list every archive carries in full.
+    const world = Array.from({ length: 300 }, (_, i) => ({ id: "w" + i, t: "lore ".repeat(20) }));
+    const snapshot = (n) => JSON.stringify({ world, sessions: Array.from({ length: n }, (_, i) => ({ id: "s" + i, text: "recap ".repeat(400) })) });
+    const texts = Array.from({ length: 12 }, (_, i) => snapshot(i + 1));
+    for (const text of texts) await store("REBASE01", [text]);
+    const stored = await rows("REBASE01");
+    const kinds = stored.map((row) => reportDeltaMarker(row.body));
+    assert.ok(kinds.filter((m) => !m).length >= 2, "a later full snapshot re-bases the chain");
+    for (const [i, row] of stored.entries()) {
+      const marker = kinds[i];
+      if (marker) {
+        assert.ok(Buffer.byteLength(row.body) <= REPORT_REBASE_FRACTION * Buffer.byteLength(texts[i]), `delta ${i} within the share`);
+        const base = stored.find((r) => r.reference === marker.base);
+        assert.equal(reportDeltaMarker(base.body), null, "every base is a full row");
+        // Against the latest full snapshot before it, never an older one.
+        const lastFull = stored.slice(0, i).filter((r) => !reportDeltaMarker(r.body)).at(-1);
+        assert.equal(marker.base, lastFull.reference);
+      }
+    }
+    const read = await readRoomReportSnapshots(db, "REBASE01", texts.map(sha));
+    for (const text of texts) assert.equal(read.get(sha(text)), text, "every session reads back exactly");
   } finally {
     setReportDeltasForTests(REPORT_DELTA_WRITES);
   }

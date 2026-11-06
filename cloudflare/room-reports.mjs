@@ -27,6 +27,15 @@ const REFERENCE = /^session-report:[a-f0-9]{64}$/;
  */
 export const REPORT_PARTS_KEY = "$reportParts";
 export const REPORT_INLINE_BYTES = 1_500_000;
+/**
+ * A new archived session is stored in full, and becomes the base for the next ones, once its delta
+ * would exceed this share of its own snapshot. Snapshots carry the campaign's growing session list
+ * and journal, so a delta against an ever older base keeps re-storing everything written since that
+ * base: in the footprint reference campaign every delta against session 1 grew by about 1.9 KB a
+ * session (14.5 KB to 110 KB) and a year averaged 61.8 KB per session. Re-basing at 35% stores
+ * about half (30.7 KB). A storage choice only: readers already decode any delta against a full row.
+ */
+export const REPORT_REBASE_FRACTION = 0.35;
 export const REPORT_PART_BYTES = 1_000_000;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -286,7 +295,9 @@ export async function roomReportStatements(db, room, encoded, writeId) {
     const delta = base && base.reference !== doc.reference ? encodeReportDelta(doc.body, doc.reference, base.text, base.reference) : null;
     // Measured in UTF-8 bytes (D1's row limit); a larger delta is stored as a full snapshot,
     // which is split into parts when it needs to be.
-    if (delta && encoder.encode(delta).length <= REPORT_INLINE_BYTES) docs.push({ reference: doc.reference, body: delta });
+    const deltaBytes = delta ? encoder.encode(delta).length : Infinity;
+    if (delta && deltaBytes <= REPORT_INLINE_BYTES && deltaBytes <= REPORT_REBASE_FRACTION * encoder.encode(doc.body).length)
+      docs.push({ reference: doc.reference, body: delta });
     else {
       docs.push(doc);
       base = { reference: doc.reference, text: doc.body };
