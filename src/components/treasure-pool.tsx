@@ -8,6 +8,7 @@ import { historyIncomplete, loadAllHistory } from "@/lib/quire/room-history";
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AppLink } from "@/components/app-link";
+import { showDice } from "@/lib/dice/dice-events";
 import { Button } from "@/components/ui";
 import { toast } from "sonner";
 import { requestConfirm } from "@/lib/quire/confirm-store";
@@ -768,6 +769,25 @@ export function LootClaimsReview() {
   const action = useCommandId(
     `${method}|${rolls}|${expect}|${JSON.stringify(input.lots)}|${JSON.stringify(entered)}|${favouring ? favourBasis : ""}`,
   );
+  const receipt = done ? (t.journal?.events ?? []).find((e) => e.lootResolution?.id === done) : undefined;
+  // The DM's own screen throws the d100s of the first lot that needed dice (never the TV display).
+  const resolution = receipt?.lootResolution;
+  useEffect(() => {
+    if (!resolution || resolution.rolls === "manual") return;
+    const lot = resolution.lots.find((l) => l.rolls.length > 0);
+    if (!lot) return;
+    const dice = lot.rolls.map((r) => r.d100.at(-1)!);
+    showDice({
+      id: `loot-${resolution.id}`,
+      formula: `${dice.length}d100`,
+      dice,
+      mode: "highest",
+      modifier: 0,
+      total: Math.max(...dice),
+      source: resolution.rolls,
+      label: `${lot.name}: highest d100${resolution.lots.filter((l) => l.rolls.length).length > 1 ? " (first item)" : ""}`,
+    });
+  }, [resolution]);
   if (seat.role !== "dm" || !t.ready) return null;
   const rolling = method === "random" && plan?.lots.some((l) => l.needsRolls);
   const unmarkedNames = plan
@@ -809,7 +829,6 @@ export function LootClaimsReview() {
       setBusy(false);
     }
   }
-  const receipt = done ? (t.journal?.events ?? []).find((e) => e.lootResolution?.id === done) : undefined;
   return (
     <details className="loot-pool-fold" open={lots.length > 0 || !!receipt} id="treasure-pool-claims">
       <summary>

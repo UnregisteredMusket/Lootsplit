@@ -77,10 +77,19 @@ export function diceThrow(roll: RecordedRoll): DiceThrow | null {
   if (roll.dice.some((v) => !Number.isInteger(v) || v < 1 || v > sides)) return null;
   const twoForOne = roll.mode === "advantage" || roll.mode === "disadvantage";
   if (twoForOne && (sides !== 20 || roll.dice.length !== 2)) return null;
+  // "highest": several separate dice where the highest one counts (treasure pool d100s).
+  const highest = roll.mode === "highest";
+  if (highest && roll.total !== Math.max(...roll.dice)) return null;
   const keptIndex = twoForOne
     ? roll.dice.indexOf(roll.mode === "advantage" ? Math.max(...roll.dice) : Math.min(...roll.dice))
-    : -1;
-  const results = roll.dice.map((value, i) => ({ sides, value, kept: !twoForOne || i === keptIndex }));
+    : highest
+      ? roll.dice.indexOf(Math.max(...roll.dice))
+      : -1;
+  const results = roll.dice.map((value, i) => ({
+    sides,
+    value,
+    kept: (!twoForOne && !highest) || i === keptIndex,
+  }));
   let thrown: ThrownDie[];
   let notation: string;
   if (sides === 100) {
@@ -111,6 +120,15 @@ export function diceCaption(roll: RecordedRoll, t: DiceThrow): string {
     .map((r) => (r.kept ? String(r.value) : `(${r.value})`))
     .join(" + ");
   const mod = t.modifier ? ` ${t.modifier > 0 ? "+" : "−"} ${Math.abs(t.modifier)}` : "";
-  const mode = roll.mode === "advantage" ? " · advantage" : roll.mode === "disadvantage" ? " · disadvantage" : "";
+  const mode =
+    roll.mode === "advantage"
+      ? " · advantage"
+      : roll.mode === "disadvantage"
+        ? " · disadvantage"
+        : roll.mode === "highest"
+          ? " · highest wins"
+          : "";
+  if (roll.mode === "highest")
+    return `${label ? label + ": " : ""}${t.total} (${t.results.map((r) => (r.kept ? String(r.value) : `(${r.value})`)).join(", ")}${mode})`;
   return `${label ? label + ": " : ""}${t.total} (${dice}${mod}${mode})`;
 }

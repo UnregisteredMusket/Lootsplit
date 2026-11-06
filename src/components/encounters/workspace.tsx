@@ -1,3 +1,4 @@
+import { showDice } from "@/lib/dice/dice-events";
 import { PlayerDisplayButton } from "../player-display-controller";
 import { resultToast } from "@/lib/quire/result-toast";
 import { inParty } from "@/lib/quire/character-position";
@@ -137,9 +138,13 @@ type Roll = {
   formula: string;
   source: string;
   total: number;
+  dice?: number[];
+  mode?: string;
+  modifier?: number;
   selected?: number;
   tableId?: string;
   resultName?: string;
+  requestKey?: string;
 };
 const message = (e: unknown) => (e instanceof Error ? e.message : "Unable to complete request.");
 const defaults: Filters = {
@@ -870,6 +875,18 @@ function EncounterEditor({
       if (!pending) return;
       const r = await encounterRequest<Roll>(pending.path, pending.body);
       pendingRoll.current = null;
+      // The DM's own screen throws the dice; the TV display never shows the DM's rolls.
+      if (r.source !== "manual" && r.dice?.length)
+        showDice({
+          id: `encounter-${String(pending.body.requestKey)}`,
+          formula: r.formula,
+          dice: r.dice,
+          mode: r.mode ?? "normal",
+          modifier: r.modifier ?? 0,
+          total: r.total,
+          source: r.source,
+          label: r.resultName ? `${r.label}: ${r.resultName}` : r.label,
+        });
       const history = await encounterRequest<{ rolls: Roll[]; more: boolean }>("encounters/log", {
         id,
       });

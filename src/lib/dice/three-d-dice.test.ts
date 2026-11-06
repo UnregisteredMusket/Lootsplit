@@ -67,3 +67,13 @@ test("every real roll of an animated size maps to a throw that shows exactly its
       assert.equal(kept.reduce((a, b) => a + b, 0) + roll.modifier, roll.total);
     }
 });
+
+test("treasure pool d100s: separate dice where the highest wins", () => {
+  const roll = { formula: "3d100", dice: [42, 97, 5], mode: "highest", modifier: 0, total: 97, label: "Ruby: highest d100" };
+  const t = diceThrow(roll)!;
+  assert.equal(t.notation, "3d100+3d10@40,90,100,2,7,5");
+  assert.deepEqual(t.results.map((r) => r.kept), [false, true, false]);
+  assert.equal(diceCaption(roll, t), "Ruby: highest d100: 97 ((42), 97, (5) · highest wins)");
+  // A total that is not the highest die is not thrown.
+  assert.equal(diceThrow({ ...roll, total: 144 }), null);
+});
