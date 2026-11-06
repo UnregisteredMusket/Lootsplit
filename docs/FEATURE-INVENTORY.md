@@ -201,6 +201,13 @@
 - **Level-up prompt.** Computed, never stored: `levelUpTarget` (SRD 5.2.1 thresholds, or the milestone level). The sheet shows **Ready to level up** to the controlling player and the DM (`LevelUpNotice` in `src/components/xp-level-up.tsx`); **Set level to N** only changes the draft, saved with the sheet. Character details show XP and the next level's threshold; Party → Characters shows each character's XP and the ready mark.
 - **Older clients (protocol < 21).** Views strip `xp`/`milestoneLevel` (also edit baselines, change reports and archived snapshots); their sheet edits and whole-purse writes keep the stored values (`keepAdvancement`, `keepPurseAdvancement`); drafts with awards or XP fields ask them to finish on the updated website.
 
+# Coin parity — November 6, 2026 (economy parity review)
+
+- **Credits keep the coin mix.** Every shared-engine credit (Give recipient, shop sale and loan approval, through `coins()` in `commands.ts`) adds coins on top of those held with `creditCoins`, as `post` and coin splits already did; platinum and electrum are never converted. Debits keep exact change.
+- **Device loan approval** runs the shared `decision` command (same coins, "Finance: Loan approved" line keyed by the command ID, 1,000,000,000,000 cp limit, finance loan record). The device keeps its "Loan of … approved/denied." DM note, and a second press on a decided loan is still a quiet no-op.
+- **Device DM posting** applies the shared `post` bounds (500-character note, a credit never past 1,000,000,000,000 cp); an older save above the limit can still be spent down. **Device coin edit** refuses coins that changed since the edit opened ("These coins changed…"), as `set-coins` does.
+- **Gifts of part of a charged stack** (player-link pending gifts) move full items and leave the partly used one with the giver, as the shared Give does (`movedUses`). Older pending gifts import as recorded.
+
 # Make change — November 3, 2026 (prompt 2, phase 4)
 
 - **Make change.** Party → Wallets, transfers & property → Manage funds has a **Make change** form (`MakeChange` in `src/routes/party.tsx`): a coin count, a From coin (with how many the purse holds) and a For coin, book rates and a preview. The new `coin-exchange` command (`commands.ts`, helpers `exchangeCoins`/`sameCoins`/`exchangeSummary` in `money.ts`) carries the purse's coins `before` and `after`; the server refuses a stale `before`, any change of worth in copper, and a no-op. Whole coins only: coins too few for a whole larger coin stay.

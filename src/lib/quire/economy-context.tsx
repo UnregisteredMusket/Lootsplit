@@ -1047,7 +1047,11 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             )
           : attempt(async () => {
               dmOnly();
-              await setCoins(purseId, coins, undefined, options);
+              // The coins the DM edited from, as the shared `set-coins` command checks.
+              await setCoins(purseId, coins, undefined, {
+                ...options,
+                before: purses.find((p) => p.id === purseId)?.coins ?? coins,
+              });
             }, "Coin updated."),
       makeChange: async (purseId, before, after, options = {}) => {
         try {
