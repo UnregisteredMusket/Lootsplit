@@ -30,6 +30,10 @@ const rollSchema = z.object({
   formula: z.string(),
   source: z.string(),
   total: z.number(),
+  // Kept for the 3D dice (2026-11-06); older rolls have only the total.
+  dice: z.array(z.number().int()).max(100).optional(),
+  mode: z.string().max(20).optional(),
+  modifier: z.number().int().optional(),
   selected: z.number().optional(),
   tableId: z.string().optional(),
   resultName: z.string().optional(),
@@ -249,7 +253,9 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
               label: b.label || "Encounter roll",
               formula,
               source: b.manual ? "manual" : "app",
-              total: b.manual ? b.total! : throwDice(formula).total,
+              ...(b.manual
+                ? { total: b.total! }
+                : (({ dice, mode, modifier, total }) => ({ dice, mode, modifier, total }))(throwDice(formula))),
             };
           }
           result = rollSchema.parse({

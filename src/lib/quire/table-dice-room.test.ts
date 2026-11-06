@@ -57,3 +57,32 @@ test("only a DM reads new rolls, only this room's, oldest first, at most ten", a
   await assert.rejects(roomRollsSince({ code: dm.code, token: player.token, after: 0 }), /Only the DM/);
   await assert.rejects(roomRollsSince({ code: dm.code, token: "not-a-seat", after: 0 }), /Only the DM/);
 });
+
+test("account characters' rolls are read too, and the cursor always moves past what was read", async () => {
+  const dm = await openRoom({ name: "DM", table: tradeFixture() });
+  const insert = (id: string, characterId: string, at: number) =>
+    db
+      .prepare("INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) VALUES(?,?,?,?,?,?,?)")
+      .bind(
+        id,
+        "account-user",
+        characterId,
+        dm.code,
+        `key-${id}`,
+        JSON.stringify({ id, characterId, character: "Arden", actor: "Account name", label: "Check", formula: "1d20", dice: [12], mode: "normal", modifier: 0, total: 12, source: "server" }),
+        at,
+      )
+      .run();
+  await db
+    .prepare("INSERT OR IGNORE INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES (?,?,?,0,0,0)")
+    .bind("account-user", "Account name", "player@example.com")
+    .run();
+  await insert("acct-roll-1", "profile-arden", Date.now());
+  await insert("camp-roll-1", `campaign:${dm.code}:a`, Date.now());
+  const read = await roomRollsSince({ code: dm.code, token: dm.token, after: 0 });
+  assert.deepEqual(read.rolls.map((r) => r.roll.characterId), ["profile-arden", "a"]);
+  assert.ok(read.rollSeq > 0, "the cursor moves past account rolls");
+  assert.equal(JSON.stringify(read).includes("Account name"), false, "no account names");
+  const again = await roomRollsSince({ code: dm.code, token: dm.token, after: read.rollSeq });
+  assert.deepEqual(again.rolls, []);
+});

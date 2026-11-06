@@ -561,15 +561,24 @@ export async function roomRollsSince(input: {
   const after = Number.isSafeInteger(input.after) && input.after > 0 ? input.after : 0;
   const rows = await db
     .prepare(
-      "SELECT seq,body,created_at FROM play_rolls WHERE code=? AND seq>? AND character_id LIKE 'party:%' ORDER BY seq LIMIT 10",
+      "SELECT seq,character_id,body,created_at FROM play_rolls WHERE code=? AND seq>? ORDER BY seq LIMIT 10",
     )
     .bind(access.code, after)
-    .all<{ seq: number; body: string; created_at: number }>();
+    .all<{ seq: number; character_id: string; body: string; created_at: number }>();
+  // Rolls are stored under three ids (see rollCharacterIds in character-play.mjs): `party:<purse>`
+  // (guest seats), `campaign:<code>:<purse>`, or an account character's id (its purse's
+  // `profileId`, which the DM's screen maps back to the purse).
+  const purseOf = (column: string) =>
+    column.startsWith("party:")
+      ? column.slice(6)
+      : column.startsWith(`campaign:${access.code}:`)
+        ? column.slice(`campaign:${access.code}:`.length)
+        : column;
   const rolls = rows.results.map((r) => {
     const b = JSON.parse(r.body);
     const roll: TableRoll = {
       id: String(b.id ?? ""),
-      characterId: String(b.characterId ?? ""),
+      characterId: purseOf(String(r.character_id ?? "")),
       character: String(b.character ?? ""),
       label: String(b.label ?? ""),
       formula: String(b.formula ?? ""),
@@ -582,6 +591,7 @@ export async function roomRollsSince(input: {
     };
     return { seq: Number(r.seq), roll };
   });
+  // The cursor moves past every row read, so the next poll never asks for the same rows again.
   return { rolls, rollSeq: rolls.length ? rolls[rolls.length - 1]!.seq : after };
 }
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { showDice } from "@/lib/dice/dice-events";
 import { useSeat } from "@/lib/quire/seat";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { readWorld, type Npc } from "@/lib/quire/world-schema";
@@ -203,9 +204,30 @@ function valuation(t: CloudTable, a: BarterAttempt) {
   );
 }
 
+/** Barter checks the DM asked for on this screen, thrown as 3D dice once the room records them (never on the TV). */
+const requestedRolls = new Set<string>();
+
 function NpcBarterQueue({ table }: { table: CloudTable }) {
   const world = readWorld(table.journal?.world),
     state = readNpcBarter(world);
+  useEffect(() => {
+    for (const a of state.attempts) {
+      if (!requestedRolls.has(a.id) || !a.roll) continue;
+      requestedRolls.delete(a.id);
+      const bonus = a.quote.bonus;
+      showDice({
+        id: `npc-barter-${a.id}`,
+        formula: `1d20${bonus ? (bonus > 0 ? "+" : "") + bonus : ""}`,
+        dice: a.roll.dice,
+        mode: a.roll.dice.length === 2 ? a.quote.advantage : "normal",
+        modifier: bonus,
+        total: a.roll.total,
+        source: a.roll.source,
+        character: characterName(table, a.purseId),
+        label: `Persuasion vs DC ${a.quote.dc}`,
+      });
+    }
+  }, [state.attempts, table]);
   const waiting = state.attempts.filter((a) => a.status === "queued" || a.status === "confirm");
   return (
     <div className="npc-barter-queue">
@@ -242,6 +264,7 @@ function QueueItem({ table, attempt: a, npc }: { table: CloudTable; attempt: Bar
     setBusy(true);
     setError("");
     try {
+      if (body.action === "roll") requestedRolls.add(a.id);
       await commandOutcome({
         ...body,
         kind: "npc-barter-resolve",
@@ -251,6 +274,7 @@ function QueueItem({ table, attempt: a, npc }: { table: CloudTable; attempt: Bar
       } as never);
       action.renew();
     } catch (e) {
+      requestedRolls.delete(a.id);
       setError(e instanceof Error ? e.message : "The action failed.");
     } finally {
       setBusy(false);

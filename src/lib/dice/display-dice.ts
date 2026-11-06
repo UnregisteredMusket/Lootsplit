@@ -13,9 +13,14 @@ type Table = Pick<CloudTable, "purses" | "journal">;
 
 export const DISPLAY_DICE_KIND = "lootsplit.dice";
 
+/** The purse a room roll belongs to: its purse id, or an account character's `profileId`. */
+export function purseForRoll(t: Pick<CloudTable, "purses">, characterId: string) {
+  return t.purses.find((p) => p.id === characterId) ?? t.purses.find((p) => p.profileId === characterId);
+}
+
 export function displayShowsRoll(t: Table, characterId: string | undefined): boolean {
   if (!characterId) return false;
-  const p = t.purses.find((purse) => purse.id === characterId);
+  const p = purseForRoll(t, characterId);
   if (!p || p.kind !== "character") return false;
   const s = characterPosition(t, p);
   if (!s.visible || !s.inParty || s.downtime) return false;
