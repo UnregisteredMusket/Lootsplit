@@ -553,6 +553,7 @@ export async function roomRollsSince(input: {
 }): Promise<{ rolls: { seq: number; roll: TableRoll }[]; rollSeq: number }> {
   const access = await readRoomAccess(input.code);
   if (!access) throw Error("No table uses that code.");
+  if (access.closed) throw Error("This room is closed.");
   const seat = access.seats.find((s) => s.token === input.token);
   if (!seat || seat.role !== "dm") throw Error("Only the DM can follow the table's rolls.");
   const db = database();

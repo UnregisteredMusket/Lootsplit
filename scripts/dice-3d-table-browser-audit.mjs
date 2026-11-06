@@ -2,8 +2,8 @@
 // roll). A disposable live room on the development server: the DM opens the optional TV / player
 // display, a player joins and rolls from their sheet. The player's own screen, the DM's screen
 // and the TV display each throw dice whose caption shows the player's recorded total; the TV copy
-// names no seat. Then the DM rolls a visible party character: the DM and the TV throw it, the
-// player's screen does not. Never targets a real campaign.
+// names no seat; each roll is thrown once and reopening the campaign replays nothing. Never
+// targets a real campaign.
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";

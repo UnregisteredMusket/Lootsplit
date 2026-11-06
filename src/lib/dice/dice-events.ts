@@ -7,17 +7,19 @@
 import type { RecordedRoll } from "./three-d-dice.ts";
 
 export type DiceRoll = RecordedRoll & { id?: string; characterId?: string };
-type Listener = (roll: DiceRoll) => void;
+/** Where a thrown roll came from: this screen's own roll, or another seat's roll from the room. */
+export type DiceOrigin = "own" | "table";
+type Listener = (roll: DiceRoll, origin: DiceOrigin) => void;
 const listeners = new Set<Listener>();
 const shown: string[] = [];
 
-export function showDice(roll: DiceRoll): void {
+export function showDice(roll: DiceRoll, origin: DiceOrigin = "own"): void {
   if (roll.id) {
     if (shown.includes(roll.id)) return;
     shown.push(roll.id);
     if (shown.length > 200) shown.shift();
   }
-  for (const listener of listeners) listener(roll);
+  for (const listener of listeners) listener(roll, origin);
 }
 
 export function onDice(listener: Listener): () => void {

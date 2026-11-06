@@ -239,7 +239,7 @@ function DisplaySession({ dm }: { dm: boolean }) {
   useEffect(() => {
     if (channel.current && frame.current) channel.current.postMessage(frame.current);
   }, [table.journal, table.purses, detail, settings, artwork]);
-  // 3D dice (owner choice 2026-11-06): every roll this window throws also goes to a connected
+  // 3D dice (owner choice 2026-11-06): players' rolls this window throws also go to a connected
   // display, if it is a party character's roll the whole table may see (display-dice.ts).
   // A blanked display stays blank: no dice while the DM has it paused.
   const tableRef = useRef(table),
@@ -248,7 +248,9 @@ function DisplaySession({ dm }: { dm: boolean }) {
   pausedRef.current = settings.paused;
   useEffect(() => {
     if (!enabled) return;
-    return onDice((roll) => {
+    return onDice((roll, origin) => {
+      // Players' rolls only: the DM's own rolls may be secret checks (privacy review 2026-11-06).
+      if (origin !== "table") return;
       if (!channel.current || pausedRef.current || Date.now() - lastSeen.current > 6000) return;
       if (!displayShowsRoll(tableRef.current, roll.characterId)) return;
       channel.current.postMessage({ kind: DISPLAY_DICE_KIND, roll: diceForDisplay(roll) });

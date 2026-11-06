@@ -47,7 +47,7 @@ export async function noteRollSeq(
     if (room !== seat.code) return;
     last = Math.max(last, result.rollSeq);
     const newest = result.rolls.at(-1)?.roll;
-    if (newest && newest.at >= since) showDice(newest as DiceRoll);
+    if (newest && newest.at >= since) showDice(newest as DiceRoll, "table");
   } catch {
     // Dice are a courtesy: a failed read leaves the roll logs as the record.
   } finally {

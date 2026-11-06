@@ -6,15 +6,20 @@ import { noteRollSeq, resetTableDice } from "./table-dice.ts";
 
 const base = { formula: "1d20+2", dice: [11], mode: "normal", modifier: 2, total: 13 };
 
-test("a roll with an id is thrown once per page", () => {
+test("a roll with an id is thrown once per page, with where it came from", () => {
   const seen: unknown[] = [];
-  const stop = onDice((r) => seen.push(r));
+  const origins: string[] = [];
+  const stop = onDice((r, origin) => {
+    seen.push(r);
+    origins.push(origin);
+  });
   showDice({ ...base, id: "room:a:once-1" });
   showDice({ ...base, id: "room:a:once-1" });
   showDice({ ...base });
-  showDice({ ...base });
+  showDice({ ...base, id: "room:a:table-1" }, "table");
   stop();
   assert.equal(seen.length, 3);
+  assert.deepEqual(origins, ["own", "own", "table"]);
 });
 
 test("the display copy carries no seat or account names", () => {
@@ -30,11 +35,14 @@ test("the TV display throws only visible party characters' rolls", () => {
     { id: "npc", name: "Guide", kind: "character", control: "npc", coins: {} },
     { id: "hidden", name: "Hidden", kind: "character", coins: {} },
     { id: "party", name: "Party", kind: "party", coins: {} },
+    { id: "resting", name: "Resting", kind: "character", coins: {} },
+    { id: "veiled", name: "Veiled", kind: "character", coins: {} },
   ];
   const journal = {
     world: {
-      npcs: [],
+      npcs: [{ id: "veiled", visible: false }],
       characterPositions: [
+        { purseId: "resting", inParty: true, locationId: null, visible: true, sheetVisible: true, downtime: { finishMinute: 99 } },
         { purseId: "hidden", inParty: true, locationId: null, visible: false, sheetVisible: true },
         { purseId: "npc", inParty: true, locationId: null, visible: true, sheetVisible: false },
       ],
@@ -46,6 +54,8 @@ test("the TV display throws only visible party characters' rolls", () => {
   assert.equal(displayShowsRoll(t, "hidden"), false, "a hidden character");
   assert.equal(displayShowsRoll(t, "npc"), false, "an NPC whose sheet the party cannot see");
   assert.equal(displayShowsRoll(t, "party"), false);
+  assert.equal(displayShowsRoll(t, "resting"), false, "a character on downtime");
+  assert.equal(displayShowsRoll(t, "veiled"), false, "an NPC record the DM hid");
   assert.equal(displayShowsRoll(t, undefined), false);
   assert.equal(displayShowsRoll(t, "missing"), false);
 });
