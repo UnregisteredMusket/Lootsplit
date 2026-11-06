@@ -1,0 +1,11 @@
+{
+  "title": "Coins keep their kind when money arrives",
+  "summary": "Receiving money no longer changes a character's platinum and electrum into gold, silver and copper, and offline campaigns now follow the same coin rules as shared rooms.",
+  "items": [
+    "Transfers, shop sales and approved loans add the new coins on top of the coins already in the purse, as DM payments already did. The total value is unchanged; only the coin mix is kept.",
+    "On a device campaign, approving a loan records the same coins and Activity line as a shared room (\"Finance: Loan approved\"), still leaves the approval note in messages, and is refused past the maximum coin balance.",
+    "On a device campaign, a DM payment is held to the same limits as a shared room: a note of at most 500 characters, and no purse above the maximum coin balance.",
+    "On a device campaign, editing a purse's coins is refused if they changed after you opened the edit, so an older edit cannot overwrite a newer one.",
+    "Giving part of a stack of items with charges gives full items and keeps the partly used one with the giver, the same as a shared-room transfer."
+  ]
+}

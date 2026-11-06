@@ -1,6 +1,7 @@
 import { formatCopper } from "./money.ts";
 import { quireDb } from "./db.ts";
 import { holdingSchema } from "./validation.ts";
+import { movedUses } from "./item-uses.ts";
 import type { Holding } from "./types.ts";
 
 export type GiftHolding = {
@@ -134,8 +135,10 @@ const giftHoldingSchema = holdingSchema
   .partial({ notes: true });
 
 // Carry all supported item metadata, matching shared transfers, without copying ownership IDs.
+// Charges: as the shared give (`movedUses`), a partly used current item stays with the giver
+// while any of the stack stays; the gifted items start full. A whole stack keeps its uses.
 export function itemForGift(holding: Holding, quantity: number): GiftHolding {
-  return giftHoldingSchema.parse({ ...holding, quantity });
+  return giftHoldingSchema.parse({ ...holding, quantity, ...movedUses(holding, holding.quantity - quantity) });
 }
 
 function normalizeHolding(value: unknown): GiftHolding | null {

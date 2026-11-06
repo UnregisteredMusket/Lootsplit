@@ -477,7 +477,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const total = toCopper(p.coins) + delta;
     if (!Number.isSafeInteger(total) || total < 0 || total > 1e12)
       throw new Error("Insufficient funds or invalid amount.");
-    p.coins = delta < 0 ? spendCoins(p.coins, -delta)! : fromCopper(total);
+    // A credit adds coins on top of those held (as `post` and coin splits do); it never
+    // changes the purse's platinum or electrum into other coins.
+    p.coins = delta < 0 ? spendCoins(p.coins, -delta)! : creditCoins(p.coins, delta);
   };
   const log = (
     purseId: string,

@@ -97,6 +97,17 @@ try {
   await dm.waitForTimeout(5000);
   assert.equal(await dm.locator('.dice-roll-overlay[data-open="true"]').count(), 0, "not thrown twice");
 
+  // The DM's own roll (owner, 2026-11-06: "DM rolls should not show on the TV") is thrown on the
+  // DM's screen only. Encounter, barter and treasure-pool rolls use the same "own" path.
+  await navigateApplication(dm, origin + "/characters");
+  await dm.locator(".quick-roll button").first().waitFor();
+  const tvOpen = tv.locator('.dice-roll-overlay[data-open="true"]');
+  await dm.locator(".quick-roll button").first().click();
+  await settled(dm).waitFor();
+  await tv.waitForTimeout(4000);
+  assert.equal(await tvOpen.count(), 0, "the DM's own roll never reaches the TV display");
+  await dm.keyboard.press("Escape");
+
   // Reopening the campaign never replays earlier rolls.
   await dm.waitForTimeout(6000);
   await reloadApplication(dm);
@@ -104,7 +115,7 @@ try {
   assert.equal(await dm.locator('.dice-roll-overlay[data-open="true"]').count(), 0, "no replay on reopening");
 
   assert.deepEqual(errors, []);
-  console.log("PASS: a player's roll is thrown on the player's, the DM's and the TV display's screens with the recorded total; the TV copy names no seat; each roll is thrown once.");
+  console.log("PASS: a player's roll is thrown on the player's, the DM's and the TV display's screens with the recorded total; the TV copy names no seat; each roll is thrown once; the DM's own roll stays off the TV.");
 } catch (error) {
   for (const [i, c] of browser.contexts().entries())
     for (const [j, pg] of c.pages().entries()) await pg.screenshot({ path: `${out}/failure-${i}-${j}.png` }).catch(() => {});

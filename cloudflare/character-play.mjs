@@ -653,6 +653,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     }
     const roll = {
       id: crypto.randomUUID(),
+      // A DM's roll is kept off the TV display's 3D dice (owner, 2026-11-06).
+      ...(member?.seat.role === "dm" ? { byDm: true } : {}),
       characterId: r.id,
       character: s.name,
       actor: member?.seat.name || s.name,
