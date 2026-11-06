@@ -86,7 +86,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Settings → What players can see (also Settings & Management → Players & permissions, the Features list, or “What players can see” in the command palette, Ctrl/⌘ K) lists every setting that decides what players see, grouped by area: People & characters, Shops & market, Maps & tabletop, Quests & journal, Items and Reference lookup. Each line shows its current state.",
           "Simple switches work in place: the black market, black-market markup (descriptions or percentages), party companion NPC funds, character tokens following players' map view, browsing other shared maps during an active scene, the optional TV display, and player reference lookup (on/off and during encounters). Each sends the same change as its original control, which stays where it was; if the setting changed meanwhile, the change is refused so you can look again.",
-          "Things hidden one record at a time show a count and a link to where you edit them: hidden characters and NPCs, private NPC sheets, hidden party groups, black-market vendors, shop purses kept from players, hidden trade exchanges, private maps, maps with fog, DM-only markers, tokens, pins, scene links and area templates, portrait pins, quests not revealed yet, hidden objectives, DM-only chronicle lines and journal entries, and unidentified items. The counts are shown only to you; players never see this page.",
+          "Things hidden one record at a time show a count and a link to where you edit them: hidden characters and NPCs, private NPC sheets, hidden party groups, black-market vendors, shop purses kept from players, hidden trade exchanges, private maps, maps with fog, DM-only markers, tokens, pins, scene links and area templates, portrait pins, quests not revealed yet, hidden objectives, DM-only chronicle lines and journal entries, factions hidden from players, and unidentified items. The counts are shown only to you; players never see this page.",
           "Preview as a player starts the read-only player preview for any player character straight from the page.",
         ],
         links: [
@@ -260,6 +260,18 @@ export const HELP_GROUPS: HelpGroup[] = [
           ["People & NPCs", "/features/npcs"],
           ["Maps", "/maps"],
         ],
+      },
+      {
+        id: "factions",
+        title: "Factions: renown, Favor and faction prices",
+        audience: "DM",
+        paragraphs: [
+          "Factions (Sessions & records → Factions) are the guilds, cults, houses and gangs that judge the party. Add a faction with a name, a description players read once you reveal it, a DM-only note, and what it controls: shops, and places (every shop in a place and its areas). A new faction stays hidden from players until you choose Reveal to players; Hide from players takes it back. Delete keeps it, its standing and its history under Deleted factions, where Restore brings it back; a deleted faction no longer changes prices.",
+          "Each character has renown with each faction, from −1000 to 1000, shown on a Fallout-style meter of tiers: Vilified, Hated, Disliked, Neutral, Liked, Admired and Idolized by default. Edit renames the tiers and moves where each starts. The party's attitude is the median renown of the characters travelling with the party (characters out of the party or hidden, NPCs and funds don't count; with an even number, the two middle scores are averaged and rounded toward 0).",
+          "Prices: each tier has a price change, by default +50%, +25%, +10%, 0, −5%, −10% and −20%, and a shop can have its own prices per tier. The party's tier sets what every controlled shop charges (−10% is 10% cheaper) and, the other way round, what it pays for items sold to it (a 10% cheaper shop pays about 11% more). Two factions on one shop both apply. Each faction is its own line in Why this price? and Why this payout?, rounded once with market events, the markup and the black-market premium; stored shop prices are never rewritten. A hidden faction still changes prices: players see its line only as Local standing.",
+          "Standing lists each character's renown and Favor. Change renown for the whole party in one step or for one character, always with a reason; each renown gained earns Favor at the faction's rate (100 per 100 by default; set it per faction), and losing renown never removes Favor. Favor only grants or removes Favor directly; it never goes below 0. Every change is one line per character in Activity, with the amount and reason; the player of that character reads their own line when the faction is visible. Players see visible factions only, with their own characters' renown and Favor and the party's attitude as a tier (never the median score, which could give away another character's renown); never another character's standing, your notes or hidden factions. Hiding a faction again also withholds its earlier renown and Favor lines from players. Spending Favor comes in a later update. Older app versions don't show factions and can't buy or sell where a faction changes the price; they are asked to finish on the website or an updated app.",
+        ],
+        links: [["Factions", "/features/factions"], ["What players can see", "/features/visibility"]],
       },
     ],
   },

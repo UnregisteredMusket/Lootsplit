@@ -17,6 +17,7 @@ import { markupDisplay } from "./market-markup.ts";
 import { hasMerchantPurse } from "./merchant.ts";
 import { isUnidentified } from "./item-identity.ts";
 import { readQuests } from "./quests-schema.ts";
+import { readFactions } from "./factions.ts";
 import { referencePolicy, type ReferencePolicy } from "./reference-access.ts";
 import { tabletopSessionSchema } from "./tabletop-schema.ts";
 import { readWorld } from "./world-schema.ts";
@@ -397,6 +398,19 @@ export function visibilityCenter(table: VisibilityTable): VisibilityArea[] {
           count: (journal?.entries ?? []).filter((e) => e.visibility === "dm").length,
           href: "/features/journal",
           where: "Journal › entry › Visibility",
+        },
+        {
+          id: "hidden-factions",
+          label: "Factions hidden from players (they still change prices)",
+          count: (() => {
+            try {
+              return readFactions((journal as { factions?: unknown } | undefined)?.factions).filter((f) => f.hidden && !f.deleted).length;
+            } catch {
+              return 0;
+            }
+          })(),
+          href: "/features/factions",
+          where: "Factions › Reveal to players",
         },
       ],
       rules: [],

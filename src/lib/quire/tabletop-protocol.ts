@@ -197,8 +197,19 @@ export const LOOT_RETURN_PROTOCOL = 27;
  * award or a holding `patch`, which older clients read.
  */
 export const AWARD_DETAILS_PROTOCOL = 28;
+/**
+ * Protocol 29 (2026-11-05, factions, renown and favor): the DM may send `faction-save`,
+ * `faction-visibility`, `faction-delete`, `faction-renown` and `faction-favor-grant`, and the
+ * journal may carry `factions` (and, on a player's copy, `factionAdjustments`; factions.ts). The
+ * top-level journal schema is not strict, so every protocol receives the table unchanged (older
+ * clients drop the key and price without faction standing, so the server refuses their purchases,
+ * sales and deliveries whose price a faction changes: `factionsUnsupported`); their whole-journal
+ * writes keep the stored factions (journal.ts). Drafts with the new commands ask them to finish on
+ * the updated website.
+ */
+export const FACTIONS_PROTOCOL = 29;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = AWARD_DETAILS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = FACTIONS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1331,12 +1342,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= AWARD_DETAILS_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= FACTIONS_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 29: factions, renown and favor.
+      if (typeof c.kind === "string" && c.kind.startsWith("faction-")) return true;
+      if (protocol && protocol >= AWARD_DETAILS_PROTOCOL) return false;
       // Protocol 28: an NPC inventory lot with charges, attunement or a presented record.
       if (c.kind === "npc-item" && hasItemDetails(c.item)) return true;
       if (protocol && protocol >= LOOT_RETURN_PROTOCOL) return false;

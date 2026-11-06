@@ -33,6 +33,7 @@ import { LocalAudioPanel } from "@/components/local-audio-panel";
 import { DowntimeActivities } from "@/components/downtime-activities";
 import { DowntimeJourneys } from "@/components/map-journeys";
 import { QuestsScreen } from "@/components/quests";
+import { FactionsScreen } from "@/components/factions";
 import { ReviewInbox } from "@/components/review-inbox";
 import { FeatureHeader } from "@/components/feature-header";
 import { VisibilityCenter } from "@/components/visibility-center";
@@ -48,6 +49,7 @@ const FEATURE_EYEBROWS: Record<Feature, string> = {
   shops: "Shops & trade",
   npcs: "World",
   quests: "World",
+  factions: "World",
   journal: "World",
   time: "Time & downtime",
   downtime: "Time & downtime",
@@ -195,6 +197,7 @@ function FeaturePage() {
               </>
             )}
             {feature === "quests" && <QuestsScreen key={quest ?? ""} initialQuest={quest} />}
+            {feature === "factions" && <FactionsScreen />}
             {feature === "reports" && (
               <>
                 <CampaignReports />

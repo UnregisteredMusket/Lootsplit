@@ -22,9 +22,11 @@ export function shopAsking(
   copper: number,
   /** Named market events' combined rate (market-events.ts `eventRate`); 1 leaves it unchanged. */
   eventRate = 1,
+  /** Factions' combined buying rate (factions.ts `factionBuyRate`); 1 leaves it unchanged. */
+  factionRate = 1,
 ) {
   const asking = Math.round(
-    copper * eventRate * shop.sellRate * (shop.blackMarket ? (shop.blackMarketPremium ?? 1.5) : 1),
+    copper * eventRate * factionRate * shop.sellRate * (shop.blackMarket ? (shop.blackMarketPremium ?? 1.5) : 1),
   );
   if (!Number.isSafeInteger(asking) || asking < 0 || asking > 1e12)
     throw Error("The asking price exceeds the supported coin limit.");

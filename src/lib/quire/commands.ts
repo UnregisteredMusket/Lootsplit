@@ -51,6 +51,7 @@ import { POOL_GUARD } from "./custody.ts";
 import { applyAttunementCommand, attunedBefore, attunementFromNotes, attunementCommands, attunementKinds, settleAttunement, type AttunementCommand } from "./attunement.ts";
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
 import { applyMarketEventCommand, lineEvents, OLD_CLIENT_EVENT_PRICE, saleEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
+import { applyFactionCommand, factionCommands, factionEffects, factionKinds, OLD_CLIENT_FACTION_PRICE, type FactionCommand } from "./factions.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -365,6 +366,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...itemUseCommands,
   // Named market events (market-events.ts; tabletop protocol 26): the DM's timed price multipliers.
   ...marketEventCommands,
+  // Factions, Renown and Favor (factions.ts; tabletop protocol 29): DM-only.
+  ...factionCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export type CommandInput = Command extends infer C
@@ -566,16 +569,21 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyShipCommand(t, seat, cmd as ShipCommand, at);
   } else if (cmd.kind.startsWith("estate-")) {
     finance();
-    if (execution.marketEventsUnsupported && cmd.kind === "estate-delivery") {
-      // An older app quoted the supplier's price without market events (estate.ts `delivery`).
+    if ((execution.marketEventsUnsupported || execution.factionsUnsupported) && cmd.kind === "estate-delivery") {
+      // An older app quoted the supplier's price without market events or factions (estate.ts `delivery`).
       const line = t.stock.find((x) => x.id === cmd.stockId),
         vendor = line && t.shops.find((x) => x.id === line.shopId),
         payer = t.purses.find((p) => p.id === cmd.purseId);
       if (line && vendor && payer) {
         const events = lineEvents(journal, vendor, line),
+          factions = factionEffects(journal, t.purses, vendor),
           cha = charismaFor(payer, t.sheets);
-        if (events.length && shopBuyBreakdown(vendor, line.copper, cha, 1, { events }).unit !== shopBuyBreakdown(vendor, line.copper, cha).unit)
+        const unit = shopBuyBreakdown(vendor, line.copper, cha, 1, { events, factions }).unit;
+        if (execution.marketEventsUnsupported && events.length && unit !== shopBuyBreakdown(vendor, line.copper, cha, 1, { factions }).unit)
           throw Error(OLD_CLIENT_EVENT_PRICE);
+        const seen = execution.marketEventsUnsupported ? [] : events;
+        if (execution.factionsUnsupported && factions.length && unit !== shopBuyBreakdown(vendor, line.copper, cha, 1, { events: seen }).unit)
+          throw Error(OLD_CLIENT_FACTION_PRICE);
       }
     }
     applyEstateCommand(t, seat, cmd as import("./estate-schema.ts").EstateCommand, at);
@@ -1009,6 +1017,19 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (sameCoins(cmd.before, cmd.after)) throw Error("Choose coins to exchange.");
     p.coins = { cp: cmd.after.cp, sp: cmd.after.sp, ep: cmd.after.ep, gp: cmd.after.gp, pp: cmd.after.pp };
     event(`${p.name} made change: ${exchangeSummary(cmd.before, cmd.after)}`, "management", p.id);
+  } else if (factionKinds.has(cmd.kind)) {
+    // DM only; definitions are revision-checked; one history event per character changed.
+    applyFactionCommand(t, seat, cmd as FactionCommand, (summary, options) =>
+      journal.events.push({
+        id: cmd.id + "-event-" + journal.events.length,
+        at,
+        summary,
+        kind: "management",
+        ...(options.purseId ? { purseId: options.purseId } : {}),
+        ...(options.dmOnly ? { dmOnly: true } : {}),
+        ...(options.factionId ? { factionId: options.factionId } : {}),
+      }),
+    );
   } else if (marketEventKinds.has(cmd.kind)) {
     // DM only; stale-checked; one DM-only journal event (upcoming events are not spoiled).
     applyMarketEventCommand(t, cmd as MarketEventCommand, dm, (summary) =>
@@ -1204,10 +1225,18 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
     // Named market events apply at read time, exactly as the shop's Why this price? shows them.
     const events = lineEvents(journal, shop, s);
-    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events }).total;
+    // Factions controlling the shop, by the party's tier (factions.ts), in the same pipeline.
+    const factions = factionEffects(journal, t.purses, shop);
+    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events, factions }).total;
     // An older app showed the price without them: refused rather than charged a price it never saw.
-    if (execution.marketEventsUnsupported && events.length && cost !== shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity).total)
+    if (execution.marketEventsUnsupported && events.length && cost !== shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { factions }).total)
       throw Error(OLD_CLIENT_EVENT_PRICE);
+    if (
+      execution.factionsUnsupported &&
+      factions.length &&
+      cost !== shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events: execution.marketEventsUnsupported ? [] : events }).total
+    )
+      throw Error(OLD_CLIENT_FACTION_PRICE);
     coins(cmd.purseId, -cost);
     creditMerchant(shop, cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
@@ -1315,9 +1344,16 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // today's market events for that category, exactly as the shop's Why this payout? shows.
     const shown = presentedHolding(h);
     const events = saleEvents(journal, s, h);
-    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events }).total;
-    if (execution.marketEventsUnsupported && events.length && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h).total)
+    const factions = factionEffects(journal, t.purses, s);
+    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events, factions }).total;
+    if (execution.marketEventsUnsupported && events.length && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { factions }).total)
       throw Error(OLD_CLIENT_EVENT_PRICE);
+    if (
+      execution.factionsUnsupported &&
+      factions.length &&
+      paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events: execution.marketEventsUnsupported ? [] : events }).total
+    )
+      throw Error(OLD_CLIENT_FACTION_PRICE);
     // Merchant purse: the shop pays from it, or the whole sale is refused.
     merchantPays(s, paid);
     coins(h.purseId, paid);
@@ -1500,6 +1536,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       })
     )
       throw Error(OLD_CLIENT_EVENT_PRICE);
+    // An older app (protocol < 29) planned it without factions: refused with a reason, never paid.
+    if (execution.factionsUnsupported && plan.proceeds !== cmd.expect.proceeds && factionEffects(journal, t.purses, shop).length > 0)
+      throw Error(OLD_CLIENT_FACTION_PRICE);
     if (
       plan.proceeds !== cmd.expect.proceeds ||
       plan.split.share !== cmd.expect.share ||

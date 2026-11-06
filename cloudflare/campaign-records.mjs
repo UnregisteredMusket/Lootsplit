@@ -21,6 +21,7 @@ import { hydrateRoomResources } from "./room-resources.mjs";
 import { readMemberRooms } from "./room-storage.mjs";
 import { readArchivedSnapshot } from "../src/lib/quire/journal.ts";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
+import { hiddenFactionIds } from "../src/lib/quire/factions.ts";
 import { CURRENT_TABLETOP_PROTOCOL, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 const IMAGE_REFERENCE = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
@@ -79,7 +80,8 @@ export async function campaignRecordsStream(db, user, protocol = Infinity) {
         await hydrateRoomResources(db, m.code, one);
         if (!seat || seat.status === "banned") continue;
         if (report.seatIds && !report.seatIds.includes(seat.id)) continue;
-        listed.push({ code: m.code, campaign: m.name, seat, report });
+        // Factions hidden today stay hidden in older sessions too (privacy review of #438).
+        listed.push({ code: m.code, campaign: m.name, seat, report, hiddenFactions: hiddenFactionIds(room.table ?? {}) });
       }
     }
   /** One entry: the session read from its rows, hydrated, projected for the seat and serialized. */
@@ -88,7 +90,9 @@ export async function campaignRecordsStream(db, user, protocol = Infinity) {
     const hydrated = (await hydrateRoomImages(db, item.code, { journal: { reports: [r] } })).journal.reports[0];
     let snapshot, error;
     try {
-      snapshot = projectRecord(readArchivedSnapshot(hydrated.snapshot), seat);
+      snapshot = projectRecord(readArchivedSnapshot(hydrated.snapshot), seat, {
+        hiddenFactions: item.hiddenFactions,
+      });
     } catch {
       error = UNREADABLE;
     }

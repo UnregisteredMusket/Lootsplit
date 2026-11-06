@@ -62,7 +62,7 @@ export function SellAndSplit({
   const [error, setError] = useState("");
   const problem = (id: string) => {
     const h = items.find((x) => x.id === id);
-    return h && shop ? saleProblem(h, shop, actor, economy.journal) : "Choose a shop.";
+    return h && shop ? saleProblem(h, shop, actor, economy.journal, economy.purses) : "Choose a shop.";
   };
   const lots = items
     .filter((h) => chosen[h.id] && !problem(h.id))
@@ -225,7 +225,7 @@ export function SellAndSplit({
         {items.map((h) => {
           const why = problem(h.id);
           const qty = chosen[h.id] ?? 0;
-          const pays = shop ? unitSalePrice(h, shop, economy.journal) : 0;
+          const pays = shop ? unitSalePrice(h, shop, economy.journal, economy.purses) : 0;
           return (
             <div className={`coin-split-check${why ? " is-disabled" : ""}`} key={h.id}>
               <input
@@ -271,7 +271,7 @@ export function SellAndSplit({
       </fieldset>
       <div className="coin-split-preview-head sale-split-proceeds" aria-live="polite">
         <strong>Proceeds</strong>
-        <span className="tabular-nums">{formatCopper(lots.reduce((sum, l) => sum + (shop ? unitSalePrice(items.find((h) => h.id === l.holdingId)!, shop, economy.journal) * l.quantity : 0), 0))}</span>
+        <span className="tabular-nums">{formatCopper(lots.reduce((sum, l) => sum + (shop ? unitSalePrice(items.find((h) => h.id === l.holdingId)!, shop, economy.journal, economy.purses) * l.quantity : 0), 0))}</span>
       </div>
       <SplitRecipientPicker
         table={table}

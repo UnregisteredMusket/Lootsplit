@@ -14,6 +14,8 @@ export const featureScreens = {
   journal: { title: "Journal", dm: false },
   /** Owner decision D1: "Quests" for the DM, "Quest log" for players. */
   quests: { title: "Quests", playerTitle: "Quest log", dm: false },
+  /** Factions, renown and favor (factions.ts): the DM's factions; players see the visible ones. */
+  factions: { title: "Factions", dm: false },
   /** Glossary: "Shop schedules" (was "Shop Management"; shops themselves are run from Market). */
   shops: { title: "Shop schedules", dm: true },
   music: { title: "Music & Ambience", dm: true },
@@ -38,7 +40,7 @@ export function safeReturn(value: unknown): string {
   const url = new URL(value, "https://lootsplit.invalid");
   if (url.origin !== "https://lootsplit.invalid") return "/?view=home";
   if (
-    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|features|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|quests|shops|music|npcs|trading|time|visibility))?$/.test(
+    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|features|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|quests|factions|shops|music|npcs|trading|time|visibility))?$/.test(
       url.pathname,
     )
   )

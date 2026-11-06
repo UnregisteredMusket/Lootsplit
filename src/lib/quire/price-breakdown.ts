@@ -7,7 +7,9 @@
  * Rounding is unchanged: a shop's asking price rounds once (list × market events × markup ×
  * black-market premium), Charisma then rounds once, and the quantity multiplies the whole-copper
  * unit price. Named market events (market-events.ts) are listed one factor each, by name; a secret
- * one is DM-only, so players see it folded into "Other adjustments".
+ * one is DM-only, so players see it folded into "Other adjustments". Factions (factions.ts) follow
+ * the events, one line each ("The Black Hand: Admired −10%"); a hidden faction reaches a player's
+ * copy only as "Local standing".
  */
 import { charismaOffPercent, formatCopper, groupThousands, priceAfterCharisma } from "./money.ts";
 import { shopAsking } from "./vendors.ts";
@@ -17,6 +19,15 @@ import { offListPercent, onBuyList, stockCategory } from "./merchant.ts";
 import { forSale } from "./item-identity.ts";
 import { blackMarketPremium, markupTier, type MarkupDisplay } from "./market-markup.ts";
 import { eventRate, MAX_EVENT_RATE, MIN_EVENT_RATE, unlimitedEventRate, type MarketEventEffect } from "./market-events.ts";
+import {
+  factionBuyRate,
+  factionSaleRate,
+  MAX_FACTION_RATE,
+  MIN_FACTION_RATE,
+  percentText,
+  unlimitedFactionRate,
+  type FactionEffect,
+} from "./factions.ts";
 import type { CharacterSheet } from "./sheet.ts";
 import type { ItemCategory, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
 
@@ -178,6 +189,56 @@ function eventFactors(factors: PriceFactor[], copper: number, events: readonly M
   return { exact, shown };
 }
 
+/**
+ * Factions, one factor each after the events (buying: (100 + percent) / 100; selling: the
+ * inverse). A hidden faction names itself to the DM and shows players "Local standing"; on a
+ * player's copy, factions they may not see come as one "Local standing" line (its `total`).
+ */
+function factionFactors(
+  factors: PriceFactor[],
+  start: { exact: number; shown: number },
+  effects: readonly FactionEffect[],
+  direction: "buy" | "sell",
+) {
+  if (!effects.length) return start;
+  const rate = direction === "buy" ? factionBuyRate(effects) : factionSaleRate(effects);
+  let exact = start.exact,
+    shown = start.shown;
+  const total = effects.some((e) => e.total !== undefined);
+  for (const e of effects) {
+    if (e.total !== undefined) continue;
+    const factor = direction === "buy" ? (100 + e.percent) / 100 : 100 / (100 + e.percent);
+    exact *= factor;
+    const now = Math.round(exact);
+    const label = `${e.name}: ${e.tier} ${percentText(direction === "buy" ? e.percent : pct(factor))}`;
+    factors.push({
+      key: `faction-${e.id}`,
+      label: e.hidden ? `${label} (hidden: players see Local standing)` : label,
+      percent: pct(factor),
+      copper: now - shown,
+      ...(e.hidden ? { player: { label: "Local standing" } } : {}),
+    });
+    shown = now;
+  }
+  const unlimited = direction === "buy" ? unlimitedFactionRate(effects) : 1 / unlimitedFactionRate(effects);
+  if (total || rate !== unlimited) {
+    exact = start.exact * rate;
+    const now = Math.round(exact);
+    factors.push(
+      total
+        ? { key: "faction-local", label: "Local standing", copper: now - shown }
+        : {
+            key: "faction-limit",
+            label: `Faction standing limited to ×${MIN_FACTION_RATE}–×${MAX_FACTION_RATE}`,
+            copper: now - shown,
+            ...(effects.some((e) => e.hidden) ? { player: { label: "Local standing" } } : {}),
+          },
+    );
+    shown = now;
+  }
+  return { exact, shown };
+}
+
 /** Buying from a shop's stock: the `buy` command's price. */
 export function shopBuyBreakdown(
   shop: Pick<Shop, "sellRate" | "blackMarket" | "blackMarketPremium">,
@@ -191,14 +252,17 @@ export function shopBuyBreakdown(
     markup?: MarkupDisplay;
     /** Today's active market events for this line (market-events.ts `lineEvents`). */
     events?: readonly MarketEventEffect[];
+    /** Factions controlling this shop (factions.ts `factionEffects`). */
+    factions?: readonly FactionEffect[];
   } = {},
 ): PriceBreakdown {
   const events = options.events ?? [];
   const rate = eventRate(events);
-  const asking = shopAsking(shop, copper, rate);
+  const factions = options.factions ?? [];
+  const asking = shopAsking(shop, copper, rate, factionBuyRate(factions));
   const unit = priceAfterCharisma(asking, cha);
   const factors: PriceFactor[] = [];
-  const { exact, shown } = eventFactors(factors, copper, events, rate);
+  const { exact, shown } = factionFactors(factors, eventFactors(factors, copper, events, rate), factions, "buy");
   const marked = shop.sellRate === 1 ? shown : Math.round(exact * shop.sellRate);
   if (shop.sellRate !== 1)
     factors.push({ key: "markup", label: `Shop sells at ${Math.round(shop.sellRate * 1000) / 10}%`, percent: pct(shop.sellRate), copper: marked - shown });
@@ -246,6 +310,8 @@ export function shopSellBreakdown(
   options: {
     /** Today's active market events for this item (market-events.ts `saleEvents`). */
     events?: readonly MarketEventEffect[];
+    /** Factions controlling this shop (factions.ts `factionEffects`): sales pay the inverse rate. */
+    factions?: readonly FactionEffect[];
   } = {},
 ): PriceBreakdown {
   // Item identification: an unidentified item is priced at its presented value and category, so
@@ -257,9 +323,10 @@ export function shopSellBreakdown(
   // Named market events multiply the value with the buy rate, rounded once (as buying does).
   const events = options.events ?? [];
   const rate = eventRate(events);
-  const rated = Math.max(0, Math.round(unitCopper * rate * shop.buyRate));
+  const factions = options.factions ?? [];
+  const rated = Math.max(0, Math.round(unitCopper * rate * factionSaleRate(factions) * shop.buyRate));
   const factors: PriceFactor[] = [];
-  const { shown } = eventFactors(factors, unitCopper, events, rate);
+  const { shown } = factionFactors(factors, eventFactors(factors, unitCopper, events, rate), factions, "sell");
   if (rated !== shown)
     factors.push(
       shop.buyRate === 1

@@ -2,6 +2,7 @@ import { ownedMapAsset, storedMapAsset } from "../src/lib/quire/map-assets.serve
 import { mapAssetRequestSchema, mapMediaReference } from "../src/lib/quire/map-assets-schema.ts";
 import { canonicalJson } from "../src/lib/quire/canonical-json.ts";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
+import { hiddenFactionIds } from "../src/lib/quire/factions.ts";
 import { readArchivedSnapshot } from "../src/lib/quire/journal.ts";
 import { hydrateRoomImages } from "./room-images.mjs";
 import { readMemberRooms } from "./room-storage.mjs";
@@ -65,7 +66,9 @@ export async function accountMapAsset(db, userId, body) {
         report.id === body.record.id && (!report.seatIds || report.seatIds.includes(seat.id)),
     );
     if (!report) throw Object.assign(Error("This archive is unavailable."), { status: 404 });
-    const table = projectRecord(readArchivedSnapshot(report.snapshot), seat);
+    const table = projectRecord(readArchivedSnapshot(report.snapshot), seat, {
+      hiddenFactions: hiddenFactionIds(room.table),
+    });
     const reference = backupMapReferences(table).find(
       (reference) => reference.id === request.assetId,
     );

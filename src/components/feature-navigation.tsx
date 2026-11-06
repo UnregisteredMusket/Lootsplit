@@ -47,9 +47,9 @@ export function FeatureCards({
       <section className="feature-cards dm-tool-groups" aria-label="Campaign features">
         <h2>Campaign tools</h2>
         <FeatureLink feature="music">Music & Ambience</FeatureLink>
-        <Fold title="Sessions & records" hint="Journal, quests, reports, downtime, training and reviews." defaultOpen>
+        <Fold title="Sessions & records" hint="Journal, quests, factions, reports, downtime, training and reviews." defaultOpen>
           <div className="dm-tool-links">
-            {(["journal", "quests", "reports", "downtime", "time", "review"] as Feature[]).map((id) => (
+            {(["journal", "quests", "factions", "reports", "downtime", "time", "review"] as Feature[]).map((id) => (
               <FeatureLink key={id} feature={id}>
                 {id === "reports" ? "Reports" : featureScreens[id].title}
               </FeatureLink>
@@ -88,6 +88,8 @@ export function FeatureCards({
                         ? `${journal.entries?.length || 0} visible entries`
                         : id === "quests"
                           ? `${questsOf({ journal }).filter((q) => q.status === "active" && !q.archived).length} active quests`
+                        : id === "factions"
+                          ? "Renown, Favor and faction prices"
                         : id === "finances"
                           ? `Outstanding debt ${formatCopper(f.loans.reduce((s, l) => s + l.principal + l.interest, 0))}`
                           : id === "financial"
