@@ -3,6 +3,7 @@
 // new holding carries all three, the events a player could read name it as presented, and the form
 // has no sideways scrolling at 1280, 390 and 320 px. Never targets a real campaign.
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
@@ -56,8 +57,19 @@ try {
     await dialog.getByLabel("Holding name", { exact: true }).fill(TRUE_NAME);
     await dialog.getByLabel("Holding value", { exact: true }).fill("500 gp");
     await dialog.getByRole("switch", { name: "Track uses" }).click();
-    await dialog.getByLabel(`Maximum uses for ${TRUE_NAME}`).fill("7");
-    await dialog.getByLabel(`Uses left for ${TRUE_NAME}`).fill("5");
+    // Either order gives the same item: uses left is kept when the maximum changes after it
+    // (the order main verify once hit by timing on 2026-11-06), so the phone width enters it first.
+    const maximum = () => dialog.getByLabel(`Maximum uses for ${TRUE_NAME}`).fill("7");
+    const left = () => dialog.getByLabel(`Uses left for ${TRUE_NAME}`).fill("5");
+    if (width === 390) {
+      await left();
+      await maximum();
+    } else {
+      await maximum();
+      await left();
+    }
+    await expect(dialog.getByLabel(`Uses left for ${TRUE_NAME}`)).toHaveValue("5");
+    await expect(dialog.getByLabel(`Maximum uses for ${TRUE_NAME}`)).toHaveValue("7");
     await dialog.getByRole("group", { name: `When the last use of ${TRUE_NAME} is spent` }).getByRole("button", { name: "Keep it at 0" }).click();
     await dialog.getByRole("switch", { name: "Requires attunement" }).click();
     await dialog.getByLabel(`Attunement requirement for ${TRUE_NAME}`).fill("Requires attunement: by a wizard");
