@@ -137,7 +137,15 @@ export function accountAuth(env) {
     },
     account: { accountLinking: { enabled: false } },
     session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
-    advanced: { cookiePrefix: "lootsplit", ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
+    advanced: {
+      cookiePrefix: "lootsplit",
+      ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+      // Better Auth 1.7 introspects the database before every auth request and refuses all of
+      // them on a mismatch. Its Kysely introspection sees no columns on D1, so it reported every
+      // column of the tables 0003_accounts.sql creates as missing and every sign-up returned 500.
+      // The schema is owned by our additive migrations and covered by scripts/accounts.test.mjs.
+      database: { validateSchema: false },
+    },
     rateLimit: { enabled: true, storage: "database", window: 60, max: 40 },
     plugins: [bearer({ requireSignature: true })],
     databaseHooks: {
