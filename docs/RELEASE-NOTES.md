@@ -1,3 +1,37 @@
+# Lootsplitter 1.17.0
+
+Android version code **25**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.16.0 build commit `093eafa` (tabletop protocol 28; 1.16.0 used protocol 19). No native Android code changed since 1.16.0.
+
+## Added
+
+- **Sell and split** (#408) and **Make change** (#407): sell party-fund or treasure-pool items at one shop and split the proceeds in one atomic command; exchange coins inside one purse as a logged command.
+- **Item charges, attunement and identification** (#416, #419, #421): Use and Recharge on items with uses, per-character attunement with the DM's limit, and unidentified items whose true details stay DM-only until revealed. The DM can set all three when an item is awarded or added (#431).
+- **XP and milestones** (#414): DM awards and a level-up prompt; **encounter XP** (#434) is suggested from the defeated enemies, split with the XP-award rule and given once.
+- **Market events** (#433): named, timed price multipliers for shops or item categories; hidden events change prices without telling players why.
+- **Why this price?** (#422) price breakdowns and the negotiator on every trade; **merchant purses** (#423) with purchase limits and an off-list buy rate.
+- **Black-market markup labels** (#427): players see Fair Deal … Highway Robbery, or the percentage by the DM's setting.
+- **For the DM:** Economy health (#430, DM-only faucets, sinks and net worth), What players can see (#428, every player-visibility setting on one page), Preview as player (#420, read-only), Return to party (#432, a departed character's items and coins back to the party), session recap (#417) and ledger CSV export (#413).
+
+## Improved
+
+- **DM coin edits and postings apply once** in shared rooms (#409); a coin edit made on stale numbers is refused.
+
+## Fixed
+
+- Sheet saves return the new revision, so a second save never needs a refresh (#410).
+- End & start next starts the next session again (#418).
+- Online backups with map tokens and zones restore again (#415).
+
+## Not in this release
+
+- `@capacitor/haptics` (native vibration through Capacitor) is still waiting: the build sandbox could not reach the npm registry. The map wheel keeps using `navigator.vibrate` with `android.permission.VIBRATE` (1.16.0).
+
+## After updating
+
+Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. 1.16.0 installs (protocol 19) keep working with the website; drafts they cannot read are refused with a request to finish on the updated website.
+
+---
+
 # Lootsplitter 1.16.0
 
 Android version code **24**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.15.0 build commit `a050af2` (tabletop protocol 19, unchanged).

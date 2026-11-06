@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.17.0",
+    "date": "2026-11-05",
+    "summary": "The app catches up with the website's loot, trade and economy features since 1.16.0: sell and split, charges, attunement, identification, XP, market events, price breakdowns, merchant purses and the DM's economy and visibility pages.",
+    "features": [
+      "Sell and split: sell party-fund or treasure-pool items at one shop and split the coins in one step. Make change swaps coins inside a purse.",
+      "Items can have charges (Use and Recharge), need attunement (with the DM's attunement limit) or be unidentified until the DM reveals them. The DM can set these when awarding or adding an item.",
+      "XP and milestones: the DM awards XP or milestones, with a level-up prompt. After an encounter the app suggests XP from the enemies and splits it once.",
+      "Market events: the DM can run named, timed price changes at shops, such as a festival sale or a war shortage.",
+      "Why this price?: every trade can show how its price was worked out, and shops can have their own purse, purchase limits and a rate for buying items they don't list.",
+      "For the DM: Economy health shows where money enters and leaves the campaign, What players can see gathers every player-visibility setting on one page, Preview as player shows one player's screens read-only, and Return to party brings a departed character's items and coins back to the party.",
+      "Session recap: a per-session summary the DM can share with the party. The ledger can be exported as a CSV file.",
+      "Players see a black-market vendor's markup as a description (Fair Deal to Highway Robbery), or as a percentage if the DM chooses."
+    ],
+    "improvements": [
+      "DM coin edits and postings in shared rooms apply once even if the connection retries, and a coin edit made on out-of-date numbers is refused instead of overwriting newer coins."
+    ],
+    "fixes": [
+      "Saving a sheet twice in a row no longer asks for a refresh.",
+      "End & start next starts the next session again.",
+      "Online backups that contain map tokens and zones restore again."
+    ]
+  },
+  {
     "version": "1.16.0",
     "date": "2026-10-30",
     "summary": "The owner's Field monitor widget waits longer for a reading, the map's press-and-hold wheel vibrates in the app, and the fixes since 1.15.0 for Open5e search and party chat are included.",
