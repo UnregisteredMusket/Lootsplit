@@ -24,6 +24,15 @@ test("unchanged responses are scoped to the exact accepted identity and never co
     protocol: value.protocol, encounterActive: false }, guest), incomplete);
 });
 
+test("an unchanged response may carry the DM's latest roll number, and only as a count", () => {
+  const scope = { code: "ROOM", seatId: "seat", revision: 4, userId: "owner", sessionId: "session" };
+  const value = { ...scope, unchanged: true, protocol: "lootsplit.room.unchanged.v1", encounterActive: false };
+  assert.equal(readUnchangedRoom({ ...value, rollSeq: 0 }, scope).rollSeq, 0);
+  assert.equal(readUnchangedRoom({ ...value, rollSeq: 812 }, scope).rollSeq, 812);
+  for (const rollSeq of [-1, 1.5, "812", null, {}])
+    assert.throws(() => readUnchangedRoom({ ...value, rollSeq }, scope), incomplete);
+});
+
 function response(): RoomView {
   return {
     userId: "synthetic-owner",

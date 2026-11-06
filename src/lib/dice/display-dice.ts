@@ -1,0 +1,21 @@
+/**
+ * Which rolls the TV display throws (owner choice 2026-11-06: the roller, the DM and the TV
+ * display see a roll). The display is a screen the whole table watches, so it throws a roll only
+ * for a visible character travelling with the party, never for a character elsewhere, a hidden
+ * one, or an NPC whose sheet the party cannot see. The DM's own screen still throws every roll.
+ */
+import { characterPosition } from "../quire/character-position.ts";
+import type { CloudTable } from "../quire/cloud.ts";
+
+type Table = Pick<CloudTable, "purses" | "journal">;
+
+export const DISPLAY_DICE_KIND = "lootsplit.dice";
+
+export function displayShowsRoll(t: Table, characterId: string | undefined): boolean {
+  if (!characterId) return false;
+  const p = t.purses.find((purse) => purse.id === characterId);
+  if (!p || p.kind !== "character") return false;
+  const s = characterPosition(t, p);
+  if (!s.visible || !s.inParty) return false;
+  return p.control !== "npc" || s.sheetVisible;
+}

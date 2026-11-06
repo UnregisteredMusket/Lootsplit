@@ -106,6 +106,18 @@ export const pollCloudTable = createServerFn({ method: "POST" })
     return "table" in result ? roomResponse(result, data) : result;
   });
 
+/** New character rolls in the room for the DM's 3D dice (DM seats only; cloud.server.ts). */
+export const readRoomRolls = createServerFn({ method: "POST" })
+  .validator((input: { tabletopProtocol?: number; code: string; token: string; after: number }) => input)
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { roomRollsSince } = await import("./cloud.server.ts");
+    return roomRollsSince(data);
+  });
+
 /**
  * Sections of the seat's projected view by hash (tabletop protocol 11): what a room view's
  * manifest lists and the client does not hold yet. Authorized like a room read; only hashes of the

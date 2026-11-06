@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import type DiceBoxType from "@3d-dice/dice-box-threejs";
 import { onDice } from "@/lib/dice/dice-events";
+import { DEFAULT_PREFS } from "@/lib/quire/prefs";
 import { diceCaption, diceThrow, shownValues, type DiceThrow, type RecordedRoll } from "@/lib/dice/three-d-dice";
 import { usePrefs } from "@/lib/quire/prefs";
 
@@ -42,8 +43,22 @@ function reducedMotion(): boolean {
   }
 }
 
+/** The app's dice host: follows the device's 3D dice settings. */
 export function DiceRollHost() {
   const { prefs } = usePrefs();
+  return <DiceStage enabled={prefs.diceAnimation} colorId={prefs.diceColor} />;
+}
+
+/**
+ * The TV display's dice host (its route mounts no settings provider): the DM's window sends the
+ * rolls; the display throws them in the default colour, and still not under reduced motion.
+ */
+export function DisplayDiceHost() {
+  return <DiceStage enabled colorId={DEFAULT_PREFS.diceColor} />;
+}
+
+function DiceStage({ enabled: on, colorId }: { enabled: boolean; colorId: string }) {
+  const prefs = { diceAnimation: on, diceColor: colorId };
   const box = useRef<DiceBoxType | null>(null);
   const boxReady = useRef<Promise<DiceBoxType> | null>(null);
   const color = useRef(prefs.diceColor);

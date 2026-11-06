@@ -15,6 +15,7 @@
  * is replaced when the tab uses another seat or campaign, emptied on account changes, and pruned
  * to the sections of the latest view, so it never holds more than one view's sections.
  */
+import { noteRollSeq, tableDiceWanted } from "../dice/table-dice.ts";
 import {
   closeCloudTable as closeServer,
   joinCloudTable as joinServer,
@@ -59,7 +60,18 @@ if (typeof window !== "undefined")
   window.addEventListener("lootsplit-account-changed", () => clearViewSectionCache());
 
 export const pullCloudTable = sync.roomRead(pullServer);
-export const pollCloudTable = sync.roomRead(pollServer);
+const pollRoomServer = sync.roomRead(pollServer);
+/**
+ * The conditional room poll. With 3D dice on, it also asks for the room's latest roll number
+ * (the server answers DM seats only) and passes it to table-dice.ts, which throws players' rolls
+ * on the DM's screen as they arrive (owner choice 2026-11-06).
+ */
+export const pollCloudTable: typeof pollRoomServer = async (args) => {
+  const watch = tableDiceWanted();
+  const result = await pollRoomServer(watch ? { ...args, data: { ...args.data, watchRolls: true } } : args);
+  if (watch && result && "unchanged" in result) void noteRollSeq(args.data, result.rollSeq);
+  return result;
+};
 export const setCloudPace = refusedInPreview(sync.roomWrite(paceServer));
 export const skipCloudTurn = refusedInPreview(sync.roomWrite(skipServer));
 export const submitCloudCommands = refusedInPreview(sync.roomWrite(submitServer));

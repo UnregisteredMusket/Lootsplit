@@ -8,6 +8,9 @@ import {
   type PlayerDisplayFrame,
 } from "@/lib/quire/player-display";
 import "./player-display.css";
+import { DisplayDiceHost } from "./dice-roll-3d";
+import { showDice, type DiceRoll } from "@/lib/dice/dice-events";
+import { DISPLAY_DICE_KIND } from "@/lib/dice/display-dice";
 
 /** This route intentionally mounts no account, campaign, economy, audio or notification providers. */
 export function PlayerDisplay() {
@@ -36,6 +39,12 @@ export function PlayerDisplay() {
     channel.onmessage = (event) => {
       if (event.data === "alive") {
         lastFrame.current = Date.now();
+        return;
+      }
+      // 3D dice from the DM's window (owner choice 2026-11-06); the DM's window already chose
+      // which rolls the table may see (display-dice.ts).
+      if (event.data?.kind === DISPLAY_DICE_KIND && event.data.roll) {
+        showDice(event.data.roll as DiceRoll);
         return;
       }
       const next = playerDisplaySchema.safeParse(event.data);
@@ -86,6 +95,7 @@ export function PlayerDisplay() {
   const visible = frame && !frame.paused;
   return (
     <main className="player-display" onPointerMove={() => setControls(true)}>
+      <DisplayDiceHost />
       {controls && (
         <div className="player-display-tools">
           <strong>Lootsplitter · Player display</strong>

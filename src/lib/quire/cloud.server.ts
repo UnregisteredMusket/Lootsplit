@@ -458,6 +458,11 @@ export type RoomPollInput = {
   token: string;
   knownRevision?: number;
   knownSeatId?: string;
+  /**
+   * 3D dice for the DM (owner choice 2026-11-06): a DM seat asks for the room's latest roll
+   * number on unchanged polls, to throw players' rolls as they arrive. Player seats never get it.
+   */
+  watchRolls?: boolean;
 };
 export type RoomUnchanged = {
   unchanged: true;
@@ -468,7 +473,19 @@ export type RoomUnchanged = {
   sessionId?: string;
   revision: number;
   encounterActive: boolean;
+  /** The room's latest character roll number, for a DM seat that asked (`watchRolls`). */
+  rollSeq?: number;
 };
+/** The room's latest character roll number (indexed: play_rolls(code,seq)); 0 without rolls. */
+async function latestRollSeq(code: string): Promise<number | undefined> {
+  const db = database();
+  if (!db) return undefined;
+  const row = await db
+    .prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM play_rolls WHERE code=?")
+    .bind(code)
+    .first<{ seq: number }>();
+  return Number(row?.seq ?? 0);
+}
 export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnchanged> {
   const timer = syncTimer("poll");
   try {
@@ -482,7 +499,10 @@ export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnc
       input.knownRevision === access.revision &&
       input.knownSeatId === seat.id
     ) {
-      const encounterActive = await timer.measure("encounter", () => activeEncounter(access.code));
+      const [encounterActive, rollSeq] = await Promise.all([
+        timer.measure("encounter", () => activeEncounter(access.code)),
+        input.watchRolls && seat.role === "dm" ? latestRollSeq(access.code) : undefined,
+      ]);
       timer.finish("unchanged");
       return {
         unchanged: true,
@@ -493,6 +513,7 @@ export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnc
         sessionId: access.sessionId,
         revision: access.revision,
         encounterActive,
+        ...(rollSeq === undefined ? {} : { rollSeq }),
       };
     }
     // Initial/changed reads retain the complete legacy projection and migration behavior.
@@ -503,6 +524,64 @@ export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnc
     timer.finish("failed");
     throw error;
   }
+}
+
+/** A recorded character roll as the DM's 3D dice need it (no seat or account names). */
+export type TableRoll = {
+  id: string;
+  characterId: string;
+  character: string;
+  label: string;
+  formula: string;
+  dice: number[];
+  mode: string;
+  modifier: number;
+  total: number;
+  source: string;
+  /** When the room recorded it (ms). */
+  at: number;
+};
+/**
+ * Character rolls made in the room after `after` (a roll number from `rollSeq`), oldest first, at
+ * most 10, for the DM's 3D dice (owner choice 2026-11-06: the roller, the DM and the TV display see
+ * a roll). DM seats only; every roll of the room is already readable by the DM in the roll logs.
+ */
+export async function roomRollsSince(input: {
+  code: string;
+  token: string;
+  after: number;
+}): Promise<{ rolls: { seq: number; roll: TableRoll }[]; rollSeq: number }> {
+  const access = await readRoomAccess(input.code);
+  if (!access) throw Error("No table uses that code.");
+  const seat = access.seats.find((s) => s.token === input.token);
+  if (!seat || seat.role !== "dm") throw Error("Only the DM can follow the table's rolls.");
+  const db = database();
+  if (!db) return { rolls: [], rollSeq: 0 };
+  const after = Number.isSafeInteger(input.after) && input.after > 0 ? input.after : 0;
+  const rows = await db
+    .prepare(
+      "SELECT seq,body,created_at FROM play_rolls WHERE code=? AND seq>? AND character_id LIKE 'party:%' ORDER BY seq LIMIT 10",
+    )
+    .bind(access.code, after)
+    .all<{ seq: number; body: string; created_at: number }>();
+  const rolls = rows.results.map((r) => {
+    const b = JSON.parse(r.body);
+    const roll: TableRoll = {
+      id: String(b.id ?? ""),
+      characterId: String(b.characterId ?? ""),
+      character: String(b.character ?? ""),
+      label: String(b.label ?? ""),
+      formula: String(b.formula ?? ""),
+      dice: Array.isArray(b.dice) ? b.dice.map(Number) : [],
+      mode: String(b.mode ?? "normal"),
+      modifier: Number(b.modifier ?? 0),
+      total: Number(b.total ?? 0),
+      source: String(b.source ?? "server"),
+      at: Number(r.created_at),
+    };
+    return { seq: Number(r.seq), roll };
+  });
+  return { rolls, rollSeq: rolls.length ? rolls[rolls.length - 1]!.seq : after };
 }
 
 export async function publishTurn(_input: {
