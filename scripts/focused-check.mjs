@@ -26,6 +26,7 @@ const featureAudits = {
   "event-modifiers": "scripts/event-modifiers-browser-audit.mjs",
   factions: "scripts/factions-browser-audit.mjs",
   "favor-market": "scripts/favor-market-browser-audit.mjs",
+  "quest-renown": "scripts/quest-renown-browser-audit.mjs",
   "preview-as-player": "scripts/preview-as-player-browser-audit.mjs",
   "visibility-center": "scripts/visibility-center-browser-audit.mjs",
   "ledger-export": "scripts/ledger-export-browser-audit.mjs",

@@ -153,6 +153,7 @@ export function pendingCommandDescription(value: unknown): string {
     case "quest-link-reward":
     case "quest-archive":
     case "quest-delete":
+    case "quest-renown":
       return `Quest change (${c.kind.slice(6).replaceAll("-", " ")}) · text kept in recovery export`;
     case "journal-note":
       return `Journal entry · ${c.visibility} visibility · text kept in recovery export`;

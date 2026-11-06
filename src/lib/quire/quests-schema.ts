@@ -22,6 +22,10 @@ export const MAX_QUEST_REWARD_LINKS = 20;
 export const MAX_QUEST_LOCATIONS = 10;
 export const MAX_QUEST_MARKERS = 10;
 export const MAX_QUEST_AREAS = 30;
+/** Renown rewards on one quest (factions PR C). */
+export const MAX_QUEST_RENOWN_REWARDS = 10;
+/** The same bound as one `faction-renown` change (factions.ts `MAX_RENOWN_DELTA`). */
+const MAX_QUEST_RENOWN_DELTA = 2000;
 
 export const questStatuses = ["active", "completed", "failed"] as const;
 export type QuestStatus = (typeof questStatuses)[number];
@@ -85,6 +89,29 @@ export const questRewardLinkSchema = z.object({
 });
 export type QuestRewardLink = z.infer<typeof questRewardLinkSchema>;
 
+/** Who a renown reward reaches: the party when the quest is completed, or named characters. */
+export const questRenownTargetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("party") }).strict(),
+  z.object({ kind: z.literal("characters"), purseIds: z.array(id).min(1).max(20) }).strict(),
+]);
+/**
+ * A renown change applied automatically, in the same command, when the quest is completed
+ * (owner decision 2026-11-05 22:35 ET), with the Favor a gain earns (factions.ts).
+ */
+export const questRenownRewardSchema = z
+  .object({
+    factionId: z.string().regex(/^[A-Za-z0-9_-]{1,150}$/),
+    delta: z
+      .number()
+      .int()
+      .min(-MAX_QUEST_RENOWN_DELTA)
+      .max(MAX_QUEST_RENOWN_DELTA)
+      .refine((n) => n !== 0, "Choose a change other than 0."),
+    target: questRenownTargetSchema,
+  })
+  .strict();
+export type QuestRenownReward = z.infer<typeof questRenownRewardSchema>;
+
 export const questLogKinds = ["entry", "revealed", "objective", "status"] as const;
 export const questLogEntrySchema = z.object({
   id,
@@ -116,6 +143,14 @@ export const questSchema = z.object({
   /** The promised reward, in words. Paying happens elsewhere. */
   rewardText: z.string().max(300).optional(),
   rewardLinks: z.array(questRewardLinkSchema).max(MAX_QUEST_REWARD_LINKS).default([]),
+  /** The faction that gave the quest (factions PR C); DM only while that faction is hidden. */
+  giverFactionId: z.string().regex(/^[A-Za-z0-9_-]{1,150}$/).optional(),
+  /** Renown applied on completion. Locked once applied (`renownAppliedAt`). */
+  renownRewards: z.array(questRenownRewardSchema).max(MAX_QUEST_RENOWN_REWARDS).optional(),
+  /** When completion applied `renownRewards`; reopening never undoes them, re-completing never repeats them. */
+  renownAppliedAt: at.optional(),
+  /** Indexes into `renownRewards` that completion skipped (faction deleted, or nobody to reach). */
+  renownSkipped: z.array(z.number().int().nonnegative()).max(MAX_QUEST_RENOWN_REWARDS).optional(),
   /** The chronicle. Never pruned; a full log refuses new lines. */
   log: z.array(questLogEntrySchema).max(MAX_QUEST_LOG).default([]),
   /** Never sent to players. */
@@ -239,6 +274,19 @@ export const questCommands = [
     })
     .strict(),
   z.object({ id, kind: z.literal("quest-archive"), ...expected, archived: z.boolean() }).strict(),
+  /**
+   * Factions PR C (tabletop protocol 31): the quest's giver faction and its renown rewards. The
+   * rewards change only until the quest is completed.
+   */
+  z
+    .object({
+      id,
+      kind: z.literal("quest-renown"),
+      ...expected,
+      giverFactionId: z.string().regex(/^[A-Za-z0-9_-]{1,150}$/).nullable(),
+      rewards: z.array(questRenownRewardSchema).max(MAX_QUEST_RENOWN_REWARDS),
+    })
+    .strict(),
   /** Only a never-revealed draft can be deleted; a revealed quest is archived instead. */
   z.object({ id, kind: z.literal("quest-delete"), ...expected }).strict(),
 ] as const;

@@ -358,6 +358,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
           "Follow this quest pins it to the top of your quest log and your Home, with Show on map and Open quest. Following and the Updated marks are kept on this device only. When the DM shares a new quest with you or updates one you can see, a New quest or Quest updated notice says what changed. Talk opens the person who gave it, if they are nearby.",
           "Show on map opens the map's Quests panel on that quest: accent diamonds mark the places and pins the quest points to, and a dashed circle marks a general area to search (the DM may not have centred it on the target). Show all, Only followed or None chooses which quests the map shows; tap a diamond or an area's label to open its quest. You only see what your DM shared and what is not hidden on the map.",
           "My notes are private journal entries only you can read; the DM cannot see them. Rewards are paid by the DM when the quest is done; a linked receipt shows what was paid.",
+          "Some quests show Renown: the change in standing with a faction you know that completing the quest brings, for the party or for you. It is applied automatically when the DM marks the quest completed, with the Favor it earns, and appears in your activity. A quest may also say which faction it is for.",
         ],
         links: [["Quest log", "/features/quests"]],
       },

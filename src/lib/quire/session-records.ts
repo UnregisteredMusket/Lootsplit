@@ -229,6 +229,7 @@ export function projectRecord(
     );
     const questPlaces = projectQuests(table, t.journal, seat, {
       tabletopProjected: options.tabletopProjected,
+      ...(options.hiddenFactions ? { hiddenFactions: options.hiddenFactions } : {}),
       ...(options.questReceipt ? { receipt: options.questReceipt } : {}),
       readableNpcs,
       // A hidden group's place, unless the seat's own group or the party is there too.

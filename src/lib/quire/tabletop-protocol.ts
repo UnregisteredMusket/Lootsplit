@@ -217,8 +217,17 @@ export const FACTIONS_PROTOCOL = 29;
  * older to finish on the updated website.
  */
 export const FAVOR_MARKET_PROTOCOL = 30;
+/**
+ * Protocol 31 (2026-11-05, quests and renown; quests.ts): the DM may send `quest-renown` (a quest's
+ * giver faction and renown rewards), and quests may carry `giverFactionId`, `renownRewards` and
+ * `renownAppliedAt`. Stored quests are parsed with unknown keys stripped and the server keeps its
+ * copy, so every protocol receives the table unchanged; completing a quest applies its rewards on
+ * the server whichever app sends `quest-close`. Only drafts with `quest-renown` (strict command
+ * schema) ask protocol 30 and older to finish on the updated website.
+ */
+export const QUEST_RENOWN_PROTOCOL = 31;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = FAVOR_MARKET_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = QUEST_RENOWN_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1351,12 +1360,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= FAVOR_MARKET_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= QUEST_RENOWN_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 31: a quest's giver faction and renown rewards.
+      if (c.kind === "quest-renown") return true;
+      if (protocol && protocol >= FAVOR_MARKET_PROTOCOL) return false;
       // Protocol 30: the favor market.
       if (typeof c.kind === "string" && c.kind.startsWith("favor-")) return true;
       if (protocol && protocol >= FACTIONS_PROTOCOL) return false;

@@ -282,6 +282,9 @@ jobs:
       - name: dev-favor-market
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-favor-market 240 node scripts/favor-market-browser-audit.mjs
+      - name: dev-quest-renown
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-quest-renown 240 node scripts/quest-renown-browser-audit.mjs
       - name: dev-preview-as-player
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs

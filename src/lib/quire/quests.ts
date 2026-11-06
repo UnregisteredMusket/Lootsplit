@@ -3,6 +3,14 @@
  * and, through executeLocalCommand, the device. Every command is DM only, checks the quest's
  * revision and writes one DM-only Activity event. Quests never move coins or items.
  *
+ * Renown rewards (factions PR C; owner decision 2026-11-05 22:35 ET): a quest may carry
+ * `renownRewards` (faction, change, the party or named characters) and a `giverFactionId`, set by
+ * `quest-renown` until the quest is completed. Completing it applies them automatically in the
+ * same `quest-close` command, all or nothing, through the factions engine (so a gain earns Favor
+ * and each character gets the normal renown history line, the quest named as the reason).
+ * Reopening never undoes them and completing again never repeats them (`renownAppliedAt`), as
+ * with other quest rewards. A quest without them leaves renown to the DM (the screen offers it).
+ *
  * Players receive a projection (`projectQuests`, called from `projectRecord`, which also covers
  * archived session reports): only quests revealed to them, without DM notes, hidden objectives,
  * DM-only chronicle lines, revision internals, links to NPCs they cannot read, places of hidden
@@ -16,6 +24,7 @@ import { formatCopper } from "./money.ts";
 import { readMarketLocations } from "./shop-locations.ts";
 import { mapAccessible, mapPointVisibleTo } from "./tabletop.ts";
 import type { Purse } from "./types.ts";
+import { applyFactionCommand, factionCharacter, factionParty, readFactions, type Faction } from "./factions.ts";
 import {
   MAX_QUEST_LOG,
   MAX_QUEST_REWARD_LINKS,
@@ -26,6 +35,7 @@ import {
   type QuestCommand,
   type QuestDraft,
   type QuestLogEntry,
+  type QuestRenownReward,
   type QuestRewardLink,
   type Quests,
 } from "./quests-schema.ts";
@@ -197,6 +207,73 @@ function audienceText(t: CloudTable, audience: QuestAudience) {
   if (audience.kind === "none") return "nobody (draft)";
   if (audience.kind === "party") return "the party";
   return audience.purseIds.map((id) => t.purses.find((p) => p.id === id)?.name ?? "a character").join(", ");
+}
+
+function safeFactions(t: Pick<CloudTable, "journal">): Faction[] {
+  try {
+    return readFactions((t.journal as { factions?: unknown } | undefined)?.factions);
+  } catch {
+    return [];
+  }
+}
+/** The characters a renown reward reaches now: the party's current characters, or the named ones. */
+export function questRenownCharacters(t: Pick<CloudTable, "purses" | "journal">, reward: Pick<QuestRenownReward, "target">): Purse[] {
+  if (reward.target.kind === "party") return factionParty(t);
+  const named = new Set(reward.target.purseIds);
+  return t.purses.filter((p) => named.has(p.id) && factionCharacter(t, p));
+}
+function assertRenownRewards(t: CloudTable, giverFactionId: string | null, rewards: QuestRenownReward[]) {
+  const factions = safeFactions(t);
+  const live = (id: string) => factions.some((f) => f.id === id && !f.deleted);
+  if (giverFactionId && !live(giverFactionId)) throw Error("Choose an existing faction as the quest giver.");
+  for (const r of rewards) {
+    if (!live(r.factionId)) throw Error("Choose existing factions for the renown rewards.");
+    if (r.target.kind === "characters") {
+      if (new Set(r.target.purseIds).size !== r.target.purseIds.length) throw Error("Each character can be listed once.");
+      for (const id of r.target.purseIds)
+        if (!factionCharacter(t, t.purses.find((p) => p.id === id))) throw Error("Choose player characters for renown rewards.");
+    }
+  }
+}
+/**
+ * Completion: every configured reward through `applyFactionCommand` (the same rules and history as
+ * a DM's renown change). Any refusal refuses the whole quest-close; a reward whose faction was
+ * deleted since, or that reaches nobody now, is skipped with a DM-only note.
+ */
+function applyRenownRewards(t: CloudTable, seat: CloudSeat, quest: Quest, cmdId: string, at: number, note: (text: string) => void): number[] {
+  const journal = t.journal!;
+  const skipped: number[] = [];
+  (quest.renownRewards ?? []).forEach((reward, i) => {
+    const faction = safeFactions(t).find((f) => f.id === reward.factionId);
+    const characters = questRenownCharacters(t, reward);
+    if (!faction || faction.deleted || !characters.length) {
+      skipped.push(i);
+      note(`Quest renown reward skipped (${!faction || faction.deleted ? "its faction was deleted" : "it reaches nobody now"}): ${quest.title}`);
+      return;
+    }
+    // Each rewarded character's player reads the line, so the quest is named only when all of
+    // them can read the quest (privacy review: a secret quest's title never reaches the others).
+    const readable = characters.every((p) => questReadable(t, quest, { role: "player", purseIds: [p.id] }));
+    const reason = readable ? `Quest: ${quest.title}`.slice(0, 200) : "Quest reward";
+    if (!readable) note(`Quest renown reward applied as "Quest reward" (not every rewarded character knows the quest): ${quest.title}`);
+    const id = `${cmdId}-renown-${i}`;
+    applyFactionCommand(
+      t,
+      seat,
+      { id, kind: "faction-renown", factionId: faction.id, characters: characters.map((p) => ({ characterId: p.id, delta: reward.delta })), reason },
+      (summary, options) =>
+        journal.events.push({
+          id: `${id}-event-${journal.events.length}`,
+          at,
+          summary,
+          kind: "management",
+          ...(options.purseId ? { purseId: options.purseId } : {}),
+          ...(options.dmOnly ? { dmOnly: true } : {}),
+          ...(options.factionId ? { factionId: options.factionId } : {}),
+        }),
+    );
+  });
+  return skipped;
 }
 
 export function applyQuestCommand(t: CloudTable, seat: CloudSeat, cmd: QuestCommand, at: number) {
@@ -376,6 +453,12 @@ export function applyQuestCommand(t: CloudTable, seat: CloudSeat, cmd: QuestComm
     else quest.closedAt = at;
     const words = cmd.status === "completed" ? "Completed" : cmd.status === "failed" ? "Failed" : "Reopened";
     addLog(quest, { text: cmd.text || `${words}.`, shared: true, kind: "status" });
+    // Renown rewards: applied once, on the first completion, in this same command.
+    if (cmd.status === "completed" && quest.renownRewards?.length && quest.renownAppliedAt === undefined) {
+      const skipped = applyRenownRewards(t, seat, quest, cmd.id, at, activity);
+      quest.renownAppliedAt = at;
+      if (skipped.length) quest.renownSkipped = skipped;
+    }
     const shared = revealed(quest);
     if (shared && cmd.message) notify(t, quest, cmd.id, at, cmd.text || words);
     finish(`Quest ${words.toLowerCase()}: ${quest.title}`, shared);
@@ -401,6 +484,26 @@ export function applyQuestCommand(t: CloudTable, seat: CloudSeat, cmd: QuestComm
     finish(`Quest reward linked: ${quest.title} · ${label}`, false);
     return;
   }
+  if (cmd.kind === "quest-renown") {
+    const same =
+      JSON.stringify(quest.renownRewards ?? []) === JSON.stringify(cmd.rewards) && (quest.giverFactionId ?? null) === cmd.giverFactionId;
+    if (same) return;
+    const rewardsChanged = JSON.stringify(quest.renownRewards ?? []) !== JSON.stringify(cmd.rewards);
+    if (rewardsChanged && quest.renownAppliedAt !== undefined)
+      throw Error("This quest's renown rewards were applied when it was completed. Change renown on Factions instead.");
+    if (rewardsChanged && quest.status === "completed")
+      throw Error("This quest is completed. Change renown on Factions instead.");
+    assertRenownRewards(t, cmd.giverFactionId, rewardsChanged ? cmd.rewards : []);
+    if (cmd.giverFactionId) quest.giverFactionId = cmd.giverFactionId;
+    else delete quest.giverFactionId;
+    if (rewardsChanged) {
+      if (cmd.rewards.length) quest.renownRewards = cmd.rewards;
+      else delete quest.renownRewards;
+    }
+    // Not counted as a player-visible update: what players see depends on the factions.
+    finish(`Quest renown rewards saved: ${quest.title}`, false);
+    return;
+  }
   if (cmd.kind === "quest-archive") {
     if (!!quest.archived === cmd.archived) return;
     if (cmd.archived) quest.archived = true;
@@ -422,6 +525,8 @@ export type QuestProjectionContext = {
   readableNpcs: Set<string>;
   /** Places of hidden groups this seat is not in. */
   hiddenPlaces: Set<string>;
+  /** Factions hidden now (an archived session is projected with today's hidden factions too). */
+  hiddenFactions?: ReadonlySet<string>;
   /**
    * The maps were already projected for this seat (a joined player's device): the server applied
    * fog and vision, so the redacted geometry must not be used to judge sight again.
@@ -474,6 +579,16 @@ export function projectQuests(
     return readable.length ? [{ kind: link.kind, id: link.id, label: receiptLabel(link.kind, readable) }] : [];
   };
   const place = (id: string | undefined) => !!id && !context.hiddenPlaces.has(id);
+  // Renown rewards and the giver faction: only visible factions, and only rewards reaching this seat.
+  const factions = safeFactions(table);
+  const factionShown = (id: string) =>
+    factions.some((f) => f.id === id && !f.hidden && !f.deleted) && !context.hiddenFactions?.has(id);
+  const projectRenown = (r: QuestRenownReward): QuestRenownReward[] => {
+    if (!factionShown(r.factionId)) return [];
+    if (r.target.kind === "party") return party ? [r] : [];
+    const mine = r.target.purseIds.filter((id) => own.has(id));
+    return mine.length ? [{ ...r, target: { kind: "characters", purseIds: mine } }] : [];
+  };
   const visibleOn = new Map<string, (p: { x: number; y: number }) => boolean>();
   const pointVisible = (map: NonNullable<Journal["world"]>["maps"][number]) => {
     if (!visibleOn.has(map.id)) visibleOn.set(map.id, mapPointVisibleTo(table, map, seat));
@@ -532,6 +647,16 @@ export function projectQuests(
       };
       // Permission chaining: a giver the seat cannot read is dropped, never named.
       if (!q.giverNpcId || !context.readableNpcs.has(q.giverNpcId)) delete projected.giverNpcId;
+      if (!q.giverFactionId || !factionShown(q.giverFactionId)) delete projected.giverFactionId;
+      // A reward completion skipped is not shown as applied.
+      const skipped = new Set(q.renownSkipped ?? []);
+      const renown = (q.renownRewards ?? []).filter((_, i) => !skipped.has(i)).flatMap(projectRenown);
+      delete projected.renownSkipped;
+      if (renown.length) projected.renownRewards = renown;
+      else {
+        delete projected.renownRewards;
+        delete projected.renownAppliedAt;
+      }
       delete projected.dmNotes;
       delete projected.editedAt;
       if (projected.audience.kind === "characters" && !projected.audience.purseIds.length)
