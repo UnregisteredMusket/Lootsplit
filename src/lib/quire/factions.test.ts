@@ -354,7 +354,7 @@ test("projection: only visible factions, only the seat's own standing, the party
   }
   const hand = mine[0]!;
   assert.deepEqual(hand.standing.aria, [400, 400]);
-  assert.deepEqual(hand.party, { tier: "admired", renown: 300 });
+  assert.deepEqual(hand.party, { tier: "admired" }, "the tier, never the median score");
   // Prices only for the party's tier; controls only for what the seat can see.
   assert.deepEqual(hand.priceByTier, { admired: -10 });
   assert.deepEqual(mine[1]!.controls.shopIds.sort(), ["drink", "smith"]);
@@ -383,6 +383,28 @@ test("projection: only visible factions, only the seat's own standing, the party
   const out = (purseId: string) => ({ purseId, inParty: false, locationId: null, visible: true, sheetVisible: true });
   const pair = { ...t, journal: readJournal({ ...t.journal, world: { characterPositions: [out("cora"), out("gone")] } }) };
   assert.deepEqual(factionsOf(projectRecord(pair, ariaSeat))[0]!.party, { tier: "admired" }, "Aria 400, Bram 300: 350, no score");
+  // Hidden again after players saw it: its earlier lines are withheld, here and in archives.
+  const rehidden = run(t, { id: "h1", kind: "faction-visibility", factionId: "black-hand", revision: 1, hidden: true });
+  const rehiddenView = projectRecord(rehidden, ariaSeat);
+  assert.ok(!JSON.stringify(rehiddenView).includes("Black Hand"));
+  const kept = structuredClone(t);
+  archiveSession(kept, "s-old", "Old session", 1);
+  const hiddenNow = run(kept, { id: "h2", kind: "faction-visibility", factionId: "black-hand", revision: 1, hidden: true });
+  assert.ok(!projectRecord(hiddenNow, ariaSeat).journal!.reports![0]!.snapshot.includes("Black Hand"));
+  assert.ok(projectRecord(kept, ariaSeat).journal!.reports![0]!.snapshot.includes("Black Hand"), "visible: Aria reads her own line");
+  // An older client's whole-journal write keeps the faction tag on the stored line.
+  const untagged = { ...t.journal!, events: t.journal!.events.map(({ factionId: _f, ...e }) => e) };
+  assert.ok(preserveJournalMetadata(untagged, t.journal!).events.filter((e) => e.factionId === "black-hand").length >= 4);
+  // A seat without a character (a guest without a seat) gets no faction, yet the same prices.
+  const guest = projectRecord(t, { ...ariaSeat, purseIds: [] });
+  assert.equal(factionsOf(guest).length, 0);
+  assert.ok(!JSON.stringify(guest.journal).includes("Black Hand"));
+  for (const shop of guest.shops)
+    assert.equal(
+      factionBuyRate(factionEffects(guest.journal, guest.purses, shop)),
+      factionBuyRate(factionEffects(t.journal, t.purses, t.shops.find((x) => x.id === shop.id)!)),
+      shop.id,
+    );
   // A hidden faction that changes no visible price leaves no trace.
   const neutral = run(t, renown("n1", "court", [["aria", 400], ["bram", 400], ["cora", 400]]));
   assert.equal("factionAdjustments" in projectRecord(neutral, ariaSeat).journal!, false);
@@ -491,7 +513,7 @@ test("shared rooms: players refused on the server, a retry applies once, the pla
   const view = (await roomState(AT)).table;
   const hand = factionsOf(view)[0]!;
   assert.deepEqual(hand.standing, { aria: [400, 400] });
-  assert.deepEqual(hand.party, { tier: "admired", renown: 300 });
+  assert.deepEqual(hand.party, { tier: "admired" });
   const ale = view.stock.find((s) => s.id === "ale")!;
   const quoted = shopBuyBreakdown(drink, ale.copper, null, 2, { factions: factionEffects(view.journal, view.purses, drink) }).total;
   assert.equal(quoted, 1800);

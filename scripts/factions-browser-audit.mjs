@@ -142,7 +142,7 @@ try {
     assert.equal(await mine.count(), 1, `${width}: only the visible faction`);
     const own = mine.getByTestId("faction-own-meter");
     await own.getByText("Admired, 300 · 300 Favor").waitFor();
-    await mine.getByTestId("faction-party-meter").getByText("Admired, 300").waitFor();
+    await mine.getByTestId("faction-party-meter").getByText("Admired", { exact: true }).waitFor();
     const text = await page.locator("main").innerText();
     for (const secret of ["Pale", "Bram", "Cora"]) assert.ok(!text.includes(secret), `${width}: the player's Factions screen shows ${secret}`);
     assert.equal(await sideways(page), false, `${width}: the player's factions page scrolls sideways`);

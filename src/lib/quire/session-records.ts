@@ -26,7 +26,7 @@ import { readFinance } from "./finance.ts";
 import { projectMerchantPurse } from "./merchant.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 import { projectMarketEvents } from "./market-events.ts";
-import { projectFactions } from "./factions.ts";
+import { hiddenFactionIds, projectFactions } from "./factions.ts";
 import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
 import { propertyAvailableToGroups } from "./property.ts";
 import { projectPartyGroups } from "./party-groups-project.ts";
@@ -51,6 +51,8 @@ export function projectRecord(
     tabletopProjected?: boolean;
     /** Quest reward receipts resolved over the whole campaign (quests.ts `QuestProjectionContext`). */
     questReceipt?: QuestProjectionContext["receipt"];
+    /** Factions hidden now (an archived session is read with today's hidden factions too). */
+    hiddenFactions?: ReadonlySet<string>;
   } = {},
 ): CloudTable {
   const t = structuredClone(table);
@@ -393,10 +395,13 @@ export function projectRecord(
     // Factions (factions.ts): visible ones only, with this seat's own characters' standing and the
     // party's tier; prices only for that tier and the visible shops. Hidden factions are never
     // sent: visible shops they change get one combined rate (`factionAdjustments`).
-    projectFactions(table, t.journal, seat, {
-      shops: t.shops,
-      locationIds: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
-    });
+    projectFactions(
+      table,
+      t.journal,
+      seat,
+      { shops: t.shops, locationIds: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)) },
+      options.hiddenFactions,
+    );
     // Journeys: status, progress and terrain; private routes and fogged waypoints are cut here.
     projectJourneys(
       table,
@@ -569,9 +574,13 @@ export function projectRecord(
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
     // Treasure-pool events follow the pool's party rule (projectLoot); others keep theirs.
     const lootEvent = projectLoot(table, t, seat);
+    // A renown or Favor line of a faction hidden now (perhaps hidden again after players saw it)
+    // is withheld with its faction (factions.ts).
+    const secretFactions = new Set([...hiddenFactionIds(table), ...(options.hiddenFactions ?? [])]);
     t.journal.events = t.journal.events
       .flatMap((e) => {
         if (e.dmOnly) return [];
+        if (e.factionId && secretFactions.has(e.factionId)) return [];
         const loot = lootEvent(e);
         if (loot !== undefined) return loot ? [loot] : [];
         return (
@@ -632,6 +641,7 @@ export function projectArchivedReport(
     const projected = projectRecord(raw, seat, {
       ownedDevice,
       tabletopProjected: options.tabletopProjected,
+      hiddenFactions: hiddenFactionIds(table),
     });
     return {
       ...r,

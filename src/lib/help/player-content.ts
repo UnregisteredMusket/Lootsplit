@@ -366,7 +366,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Factions, renown and Favor",
         paragraphs: [
           "Factions (Features → Factions) lists the guilds, cults and houses your DM has revealed. For each, a meter shows your character's renown, from Vilified through Neutral to Idolized, and your Favor, which you earn as your renown rises. Losing renown never takes Favor away. You never see another character's renown or Favor.",
-          "Party's attitude is the middle score of the characters travelling with the party, and its tier sets prices at the shops the faction controls: good standing makes goods cheaper and sales better. Why this price? and Why this payout? show each faction's effect by name; Local standing is the effect of a faction you don't know about yet. With fewer than three characters in the party you see only the party's tier, not its score.",
+          "Party's attitude is the middle score of the characters travelling with the party, and its tier sets prices at the shops the faction controls: good standing makes goods cheaper and sales better. Why this price? and Why this payout? show each faction's effect by name; Local standing is the effect of a faction you don't know about yet. You see the party's tier, not its exact score, so nobody can work out another character's renown.",
         ],
         links: [["Factions", "/features/factions"]],
       },

@@ -1027,6 +1027,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         kind: "management",
         ...(options.purseId ? { purseId: options.purseId } : {}),
         ...(options.dmOnly ? { dmOnly: true } : {}),
+        ...(options.factionId ? { factionId: options.factionId } : {}),
       }),
     );
   } else if (marketEventKinds.has(cmd.kind)) {

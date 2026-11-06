@@ -25,9 +25,9 @@
  *   joins market events in the same once-rounded pipeline (vendors.ts `shopAsking`,
  *   price-breakdown.ts), and each faction is its own labelled line in Why this price?.
  * - Players (`projectFactions`, called from `projectRecord`) get only visible factions; for each,
- *   only their own characters' standing and the party's tier (with the median score when the party
- *   has three or more current characters, so a two-character party's median never gives away the
- *   other character's score). Hidden factions still change prices: for each visible shop they
+ *   only their own characters' standing and the party median's tier (never the median score: in
+ *   an odd-sized party it is one character's exact renown, and in a party of two it gives the other
+ *   score away). Renown and Favor lines of a faction hidden now are withheld too. Hidden factions still change prices: for each visible shop they
  *   change, `journal.factionAdjustments` carries the server's combined rate, shown as "Local
  *   standing", so the price a player sees always equals the charge.
  */
@@ -130,8 +130,8 @@ export const factionSchema = z.object({
   /** The definition's revision (faction-save, visibility, delete); standing changes don't bump it. */
   revision: z.number().int().nonnegative(),
   /**
-   * A player's copy only (projectFactions): the party's tier, and the median renown when the
-   * party has three or more current characters. Never stored in a campaign.
+   * A player's copy only (projectFactions): the party median's tier. `renown` is accepted for
+   * copies made by a later version but never sent. Never stored in a campaign.
    */
   party: z.object({ tier: tierId, renown: renown.optional() }).strict().optional(),
 });
@@ -378,9 +378,15 @@ export function factionSaleRate(effects: readonly Pick<FactionEffect, "percent" 
   return 1 / factionBuyRate(effects);
 }
 
+/** IDs of factions players may not see now (hidden or deleted-while-hidden). */
+export function hiddenFactionIds(t: { journal?: unknown }): Set<string> {
+  const journal = t.journal as JournalLike;
+  return new Set(safeFactions(journal).filter((f) => f.hidden).map((f) => f.id));
+}
+
 /** An older app (protocol < 29) shows prices without factions; it is never charged them. */
 export const OLD_CLIENT_FACTION_PRICE =
-  "A faction's standing changes this price, and this older Lootsplitter app can't show it. Finish this on the updated website; nothing was charged or paid.";
+  "This price has changed, and this older Lootsplitter app can't show the new one. Finish this on the updated website; nothing was charged or paid.";
 
 /** "+10%" or "−5%". */
 export function percentText(percent: number): string {
@@ -416,7 +422,7 @@ export function applyFactionCommand(
   t: FactionTable,
   seat: Pick<CloudSeat, "role">,
   cmd: FactionCommand,
-  log: (summary: string, options: { purseId?: string; dmOnly?: boolean }) => void,
+  log: (summary: string, options: { purseId?: string; dmOnly?: boolean; factionId?: string }) => void,
 ): void {
   if (seat.role !== "dm") throw Error("Only the DM can change factions.");
   const journal = t.journal as { factions?: Faction[] } & NonNullable<CloudTable["journal"]>;
@@ -509,7 +515,7 @@ export function applyFactionCommand(
       cmd.kind === "faction-renown"
         ? `${step.p.name}: renown with ${current.name} ${signedNumber(step.renown - step.before.renown)} (now ${plainNumber(step.renown)}, ${tier})${step.earned ? ` · +${step.earned} Favor` : ""} · ${cmd.reason}`
         : `${step.p.name}: Favor with ${current.name} ${signedNumber(step.favor - step.before.favor)} (now ${step.favor}) · ${cmd.reason}`;
-    log(summary.slice(0, 500), { purseId: step.p.id, ...(dmOnly ? { dmOnly: true } : {}) });
+    log(summary.slice(0, 500), { purseId: step.p.id, factionId: current.id, ...(dmOnly ? { dmOnly: true } : {}) });
   }
   save();
 }
@@ -521,7 +527,7 @@ const signedNumber = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n)}`;
  * factions and controls are decided there) and writes into the projected `journal`:
  * - only visible, undeleted factions, without the DM's note;
  * - `standing` holds only the seat's own characters;
- * - `party` carries the party's tier (and the median score with three or more current characters);
+ * - `party` carries the party median's tier (not the score);
  * - prices only for the party's tier, and controls only for shops and locations the seat can see;
  * - `factionAdjustments` gives, per visible shop where a hidden faction changes the rate, the
  *   server's combined rate, so the player's price equals the charge.
@@ -532,6 +538,8 @@ export function projectFactions(
   journal: NonNullable<CloudTable["journal"]>,
   seat: Pick<CloudSeat, "purseIds">,
   visible: { shops: Pick<Shop, "id" | "locationId">[]; locationIds: Set<string> },
+  /** Factions hidden now (an archived session is projected with today's hidden factions). */
+  hiddenNow: ReadonlySet<string> = new Set(),
 ): void {
   const target = journal as { factions?: Faction[]; factionAdjustments?: FactionAdjustment[] };
   const source = table.journal as JournalLike;
@@ -544,9 +552,11 @@ export function projectFactions(
   const market = readMarketLocations(source.market);
   const own = new Set(seat.purseIds);
   const alreadyProjected = all.every((f) => f.party);
-  const shown = all.filter((f) => !f.hidden && !f.deleted);
+  // A seat without a character (a guest holding no seat) gets no faction at all; prices still
+  // match the charge through the combined rate below.
+  const shown = own.size ? all.filter((f) => !f.hidden && !f.deleted && !hiddenNow.has(f.id)) : [];
   const factions = shown.map((f): Faction => {
-    const { tier, renown, size } = partyAttitude(table, f);
+    const { tier } = partyAttitude(table, f);
     const shops = visible.shops.filter((s) => factionControlsShop(f, s, market)).map((s) => s.id);
     const overrides = Object.fromEntries(
       shops.flatMap((shopId) => {
@@ -565,11 +575,9 @@ export function projectFactions(
       ...(Object.keys(overrides).length ? { shopPriceByTier: overrides } : {}),
       standing: Object.fromEntries(Object.entries(f.standing).filter(([characterId]) => own.has(characterId))),
       revision: 0,
-      party: f.party ?? {
-        tier: tier.id,
-        // A party of one or two would give away the other character's score with the median.
-        ...(size >= 3 && renown !== undefined ? { renown } : {}),
-      },
+      // The party's tier only: the median score itself is one character's exact renown in an
+      // odd-sized party (and gives the other's away in a party of two), so it stays with the DM.
+      party: f.party ? { tier: f.party.tier } : { tier: tier.id },
     };
     return projected;
   });
@@ -581,7 +589,7 @@ export function projectFactions(
     } catch {
       /* An unreadable copy prices without them. */
     }
-  } else if (all.some((f) => f.hidden && !f.deleted)) {
+  } else if (shown.length !== all.filter((f) => !f.deleted).length) {
     const projectedJournal = { factions, market: source.market };
     for (const shop of visible.shops) {
       const full = factionBuyRate(factionEffects(source, table.purses, shop));

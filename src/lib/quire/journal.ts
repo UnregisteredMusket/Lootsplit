@@ -188,6 +188,8 @@ const journalFields = z.object({
         lootFavour: lootFavourSchema.optional(),
         /** Item identification: an unidentified item that left the inventory (DM-only event). */
         identityEnded: identityEndedSchema.optional(),
+        /** Factions (factions.ts): the faction a renown or Favor line is about (players lose it while hidden). */
+        factionId: id.optional(),
         change: z
           .object({
             entity: z.enum(["stock", "realm", "shop", "holding", "account"]),
@@ -369,6 +371,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     ]),
   );
   const privateEvents = new Set(current.events.filter((e) => e.dmOnly).map((e) => e.id));
+  // Older clients drop an event's faction tag; the stored one keeps it hidden with its faction.
+  const factionOf = new Map(current.events.flatMap((e) => (e.factionId ? [[e.id, e.factionId] as const] : [])));
   const entries = new Map((current.entries || []).map((entry) => [entry.id, entry]));
   for (const entry of next.entries || []) {
     const old = entries.get(entry.id);
@@ -526,6 +530,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
         ...(change ? { change } : {}),
         ...(split ? { split } : {}),
         ...(privateEvents.has(event.id) ? { dmOnly: true } : {}),
+        ...(factionOf.has(event.id) ? { factionId: factionOf.get(event.id)! } : {}),
       };
     }),
   });

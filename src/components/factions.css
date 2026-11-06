@@ -18,18 +18,18 @@
   height: 0.75rem;
   border-radius: 2px;
   overflow: hidden;
-  background: var(--color-subtle, #222);
+  background: var(--color-subtle);
 }
 .faction-meter-band {
   height: 100%;
-  border-right: 1px solid var(--color-bg, #111);
+  border-right: 1px solid var(--color-bg);
   background: color-mix(in srgb, currentColor 14%, transparent);
 }
 .faction-meter-band:last-child {
   border-right: 0;
 }
 .faction-meter-band[data-current="true"] {
-  background: color-mix(in srgb, var(--color-accent, #c9a227) 70%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 70%, transparent);
 }
 .faction-meter-mark {
   position: absolute;
@@ -37,7 +37,7 @@
   bottom: -1px;
   width: 3px;
   margin-left: -1px;
-  background: var(--color-fg, #fff);
+  background: var(--color-fg);
 }
 .faction-meter-ends {
   display: flex;
