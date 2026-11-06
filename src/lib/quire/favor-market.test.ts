@@ -236,6 +236,14 @@ test("permissions: players only ask for their own characters, on visible faction
   // NPCs can't buy; the DM may sell a hidden entry directly.
   assert.throws(() => run(t, { id: "x7", kind: "favor-purchase", factionId: "hand", entryId: "safe", characterId: "npc", cost: 3 }), /player character/);
   run(t, { id: "x8", kind: "favor-purchase", factionId: "court", entryId: "mask", characterId: "aria", cost: 2 });
+  // A full request ledger: the DM is told the count, a player only that it is full.
+  const full = structuredClone(t);
+  const stored = (full.journal as { factions: { id: string; favorRequests?: unknown[] }[] }).factions.find((f) => f.id === "hand")!;
+  stored.favorRequests = Array.from({ length: 300 }, (_, i) => ({
+    id: `old-${i}`, entryId: "safe", characterId: "bram", name: "Safe house", kind: "service", cost: 3, at: 1, status: "declined",
+  }));
+  assert.throws(() => as(ariaSeat, full, ask("x11", "hand", "safe", "aria", 3)), (e: Error) => e.message === "This faction's request ledger is full. Ask the DM; nothing was spent.");
+  assert.throws(() => run(full, { id: "x12", kind: "favor-purchase", factionId: "hand", entryId: "safe", characterId: "aria", cost: 3 }), /300 favor requests/);
   // A deleted faction's market is closed until restored.
   const gone = run(t, { id: "x9", kind: "faction-delete", factionId: "hand", revision: 5, deleted: true });
   assert.throws(() => run(gone, { id: "x10", kind: "favor-purchase", factionId: "hand", entryId: "safe", characterId: "aria", cost: 3 }), /Restore/);

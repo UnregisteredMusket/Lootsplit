@@ -177,7 +177,12 @@ export function applyFavorCommand(
   };
   const room = () => {
     if (requests.length >= MAX_FAVOR_REQUESTS)
-      throw Error(`${f.name} has ${MAX_FAVOR_REQUESTS} favor requests on record. They are kept as history; ask the DM to start a new faction ledger.`);
+      // Counts every character's requests, so a player is not told how many there are (privacy review).
+      throw Error(
+        dm
+          ? `${f.name} has ${MAX_FAVOR_REQUESTS} favor requests on record, kept as history. Add a new faction for further favors.`
+          : "This faction's request ledger is full. Ask the DM; nothing was spent.",
+      );
   };
   const store = () => {
     f.favorRequests = requests;
