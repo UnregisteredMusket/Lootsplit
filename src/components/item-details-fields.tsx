@@ -8,7 +8,7 @@
  * check (`itemDetailsProblem`) refuses. Text fields commit when they hold a valid value and fall
  * back to the last valid one when left.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Field, Segmented, Switch, TextInput } from "./ui";
 import { MAX_USES } from "@/lib/quire/item-uses";
 import { formatCopper, parsePrice } from "@/lib/quire/money";
@@ -70,9 +70,17 @@ export function ItemDetailsFields({
   /** False where the form already offers "Award unidentified" (the encounter loot row). */
   identification?: boolean;
 }) {
-  const set = (patch: Partial<ItemDetails>) => {
-    const next: ItemDetails = { ...value, ...patch };
+  // Each change builds on the newest details, not the ones this render saw: a field that saves on
+  // blur and the click that blurred it can both change the item before React renders again (main
+  // verify 2026-11-06: "Keep it at 0" put back the uses left that the blur had just saved).
+  const latest = useRef(value);
+  latest.current = value;
+  const set = (change: Partial<ItemDetails> | ((now: ItemDetails) => Partial<ItemDetails>)) => {
+    const now = latest.current;
+    const patch = typeof change === "function" ? change(now) : change;
+    const next: ItemDetails = { ...now, ...patch };
     for (const key of Object.keys(patch) as (keyof ItemDetails)[]) if (patch[key] === undefined) delete next[key];
+    latest.current = next;
     onChange(next);
   };
   const uses = value.uses;
@@ -99,7 +107,10 @@ export function ItemDetailsFields({
               commit={(text) => {
                 const max = whole(text, 1, MAX_USES);
                 // Starting full is the usual case: uses left follows the maximum until changed.
-                if (max !== null) set({ uses: { ...uses, max, current: uses.current === uses.max ? max : Math.min(uses.current, max) } });
+                if (max !== null)
+                  set(({ uses: now = uses }) => ({
+                    uses: { ...now, max, current: now.current === now.max ? max : Math.min(now.current, max) },
+                  }));
                 return max !== null;
               }}
             />
@@ -110,8 +121,9 @@ export function ItemDetailsFields({
               shown={String(uses.current)}
               hint={`0 to ${uses.max}.`}
               commit={(text) => {
-                const current = whole(text, 0, uses.max);
-                if (current !== null) set({ uses: { ...uses, current } });
+                const now = latest.current.uses ?? uses;
+                const current = whole(text, 0, now.max);
+                if (current !== null) set(({ uses: n = uses }) => ({ uses: { ...n, current } }));
                 return current !== null;
               }}
             />
@@ -119,7 +131,7 @@ export function ItemDetailsFields({
           <Segmented
             label={`When the last use of ${name} is spent`}
             value={uses.whenEmpty}
-            onChange={(whenEmpty) => set({ uses: { ...uses, whenEmpty } })}
+            onChange={(whenEmpty) => set(({ uses: now = uses }) => ({ uses: { ...now, whenEmpty } }))}
             options={[
               { value: "remove", label: "Remove the item" },
               { value: "keep", label: "Keep it at 0" },
@@ -164,7 +176,7 @@ export function ItemDetailsFields({
                 shown={u.name}
                 commit={(text) => {
                   const ok = text.trim().length > 0;
-                  if (ok) set({ unidentified: { ...u, name: text.trim() } });
+                  if (ok) set(({ unidentified: now = u }) => ({ unidentified: { ...now, name: text.trim() } }));
                   return ok;
                 }}
               />
@@ -176,8 +188,11 @@ export function ItemDetailsFields({
                   maxLength={4000}
                   value={u.description ?? ""}
                   onChange={(e) => {
-                    const { description: _d, ...rest } = u;
-                    set({ unidentified: e.target.value ? { ...rest, description: e.target.value } : rest });
+                    const text = e.target.value;
+                    set(({ unidentified: now = u }) => {
+                      const { description: _d, ...rest } = now;
+                      return { unidentified: text ? { ...rest, description: text } : rest };
+                    });
                   }}
                 />
               </label>
@@ -187,13 +202,16 @@ export function ItemDetailsFields({
                 hint="Each, for example 25 gp. Empty: unknown value (it can't be sold)."
                 shown={u.value === undefined ? "" : formatCopper(u.value)}
                 commit={(text) => {
-                  const { value: _v, ...rest } = u;
+                  const without = ({ unidentified: now = u }: ItemDetails) => {
+                    const { value: _v, ...rest } = now;
+                    return rest;
+                  };
                   if (!text.trim()) {
-                    set({ unidentified: rest });
+                    set((now) => ({ unidentified: without(now) }));
                     return true;
                   }
                   const copper = parsePrice(text);
-                  if (copper !== null) set({ unidentified: { ...rest, value: copper } });
+                  if (copper !== null) set((now) => ({ unidentified: { ...without(now), value: copper } }));
                   return copper !== null;
                 }}
               />
