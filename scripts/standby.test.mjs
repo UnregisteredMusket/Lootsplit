@@ -12,7 +12,7 @@ import { validateActivation } from "../standby/state.mjs";
 import { recoveryGuard } from "../cloudflare/recovery-guard.mjs";
 import { handleAccounts } from "../cloudflare/accounts.mjs";
 import { migrationIdentity } from "./standby-artifact.mjs";
-import { seal, unseal, makeSnapshot, restoreFile, authorizeRestore, exportD1, SafeBackupError } from "./standby-backup.mjs";
+import { seal, unseal, makeSnapshot, restoreFile, authorizeRestore, exportD1, SafeBackupError, safeErrorName } from "./standby-backup.mjs";
 
 const schema = () => migrationIdentity().migrations.map((name) => readFileSync(`cloudflare/migrations/${name}`, "utf8")).join("\n") +
   "\nCREATE TABLE d1_migrations(name TEXT PRIMARY KEY);\n" + migrationIdentity().migrations.map((name) => `INSERT INTO d1_migrations VALUES('${name}');`).join("\n");
@@ -149,4 +149,57 @@ test("a slow export keeps polling past three minutes and a timeout names its sta
   clock = 0; polls = 0;
   await assert.rejects(exportD1({ accountId: "a".repeat(32), token: "t", deadlineMs: 60_000, ...slow }), (error) =>
     error instanceof SafeBackupError && /still active after 60 s/.test(error.message) && !/storage\.example/.test(error.message));
+});
+
+test("a dropped or slow status check is retried up to three times inside the deadline; the start request is not", async () => {
+  const active = () => Response.json({ success: true, result: { success: true, status: "active", at_bookmark: "b" } });
+  const complete = () => Response.json({ success: true, result: { success: true, status: "complete", result: { signed_url: "https://storage.example/secret" } } });
+  const timeout = () => Object.assign(new Error("signal timed out"), { name: "TimeoutError" });
+  let clock = 0;
+  const timing = { now: () => clock, sleep: async (ms) => { clock += ms; } };
+  // Start, then two failed checks, then a good one.
+  let calls = 0;
+  const sql = await exportD1({ accountId: "a".repeat(32), token: "t", ...timing, fetcher: async (url) => {
+    if (url instanceof URL) return new Response("retried SQL");
+    calls++;
+    if (calls === 1) return active();
+    if (calls === 2) throw new TypeError("fetch failed");
+    if (calls === 3) throw timeout();
+    return complete();
+  } });
+  assert.equal(sql, "retried SQL"); assert.equal(calls, 4);
+  // Three failures in a row stop with a named, URL-free reason.
+  calls = 0; clock = 0;
+  await assert.rejects(exportD1({ accountId: "a".repeat(32), token: "t", ...timing, fetcher: async () => {
+    calls++;
+    if (calls === 1) return active();
+    throw timeout();
+  } }), (error) => error instanceof SafeBackupError && error.message === "D1 export status check failed 3 time(s) (TimeoutError)");
+  assert.equal(calls, 4);
+  // Never past the deadline.
+  calls = 0; clock = 0;
+  await assert.rejects(exportD1({ accountId: "a".repeat(32), token: "t", deadlineMs: 3000, ...timing, fetcher: async () => {
+    calls++;
+    if (calls === 1) return active();
+    throw new TypeError("fetch failed");
+  } }), (error) => error instanceof SafeBackupError && /failed 2 time\(s\) \(TypeError\)/.test(error.message));
+  assert.equal(calls, 3, "the third attempt would start after the deadline");
+  // The request that starts the export is not repeated; other errors pass through unchanged.
+  calls = 0;
+  await assert.rejects(exportD1({ accountId: "a".repeat(32), token: "t", ...timing, fetcher: async () => { calls++; throw new TypeError("fetch failed"); } }), TypeError);
+  assert.equal(calls, 1);
+  calls = 0;
+  await assert.rejects(exportD1({ accountId: "a".repeat(32), token: "t", ...timing, fetcher: async () => {
+    calls++;
+    if (calls === 1) return active();
+    throw new RangeError("unexpected");
+  } }), RangeError);
+  assert.equal(calls, 2);
+});
+
+test("failure output names only the error class", () => {
+  assert.equal(safeErrorName(new TypeError("https://storage.example/secret?token=x")), "TypeError");
+  assert.equal(safeErrorName(Object.assign(new Error("x"), { name: "https://storage.example/secret" })), "Error");
+  assert.equal(safeErrorName("oops"), "string");
+  assert.equal(safeErrorName(undefined), "undefined");
 });

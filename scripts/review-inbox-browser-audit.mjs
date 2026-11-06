@@ -279,6 +279,12 @@ try {
     await page.keyboard.press("d");
     await expect(hire.locator(".review-stub")).toContainText("Denied");
     await expect(cards).toHaveCount(7); // the stub stays in place
+    // Focus moves on to the next pending card (one animation frame later); measure after that
+    // move, which must not scroll the page when the next card is already partly on screen.
+    await page.waitForFunction(() => {
+      const a = document.activeElement;
+      return !!a?.matches?.("#review-inbox [data-review-card]") && !a.hasAttribute("data-decided");
+    });
     assert.ok(Math.abs((await page.evaluate(() => scrollY)) - before) < 120, "the page does not jump");
     assert.equal((await books(page)).journal.propertyOperations.staff[0].status, "denied");
 

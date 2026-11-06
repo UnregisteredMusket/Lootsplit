@@ -118,8 +118,10 @@ export function ReviewCard({
         outcome: kind,
         pending: typeof result === "object" && result?.status === "pending",
       });
-      // Approve and next: keep the DM's place in the queue.
-      if (next) requestAnimationFrame(() => next.isConnected && next.focus());
+      // Approve and next: keep the DM's place in the queue. Focus moves to the next card without
+      // scrolling, so the page does not jump when the next card is only partly on screen (narrow
+      // phones); it scrolls just enough to show the card only when the card is entirely off screen.
+      if (next) requestAnimationFrame(() => focusInPlace(next));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Not recorded. Nothing changed.");
     } finally {
@@ -308,6 +310,13 @@ export function ReviewCard({
 }
 
 /** The next (or previous) card in the same list, for J / K and approve-and-next. */
+function focusInPlace(card: HTMLElement) {
+  if (!card.isConnected) return;
+  card.focus({ preventScroll: true });
+  const box = card.getBoundingClientRect();
+  if (box.bottom <= 0 || box.top >= window.innerHeight) card.scrollIntoView({ block: "nearest" });
+}
+
 function nextCard(from: HTMLElement | null, step: 1 | -1): HTMLElement | null {
   if (!from) return null;
   const scope = from.closest("[data-review-queue]") ?? document;
