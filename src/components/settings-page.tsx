@@ -80,8 +80,8 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
 
   if (seat.role === "player") return (
     <SettingsFrame financial={financial}>
-      <h1 className="font-display text-4xl tracking-tight">Device backups</h1>
-      <p className="mt-2 text-sm text-muted">Keep a copy of the campaign data available on this device. Full campaign restoration is a DM action in Local Mode.</p>
+      <h1 className="font-display text-4xl tracking-tight">Settings</h1>
+      <p className="mt-2 text-sm text-muted">Manage sound, roll mode, device backups and diagnostics. Device backups keep a copy of the campaign data available on this device; full campaign restoration is a DM action in Local Mode.</p>
       <Fold title="Sound effects"><SoundSettings /></Fold>
       <Fold anchorId="gameplay" title="Roll mode" defaultOpen><RollModeSetting /></Fold>
       {ready ? <><MigrationReadiness /><div id="backups"><SaveFolder /></div></> : <p>Loading…</p>}

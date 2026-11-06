@@ -30,7 +30,7 @@ import { AppLink } from "@/components/app-link";
 import { journalEntryHref } from "@/lib/quire/journal-navigation";
 import { z } from "zod";
 import { Shield } from "lucide-react";
-import { accountRequest } from "@/lib/account/client";
+import { signedInAccountRequest } from "@/lib/account/client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { downloadJson, getSeat } from "@/lib/quire/table";
 import { formatCoins, formatCopper, fromCopper } from "@/lib/quire/money";
@@ -240,7 +240,8 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
     let onlineFailed = false;
     Promise.all([
       local,
-      accountRequest<Library>("encounters", undefined, c.signal).catch((e: unknown) => {
+      // Signed-out guests skip the read (no 401 in their console) and see the same notice.
+      signedInAccountRequest<Library>("encounters", undefined, c.signal).catch((e: unknown) => {
         // Keep the device fallback, but say that online encounters are missing.
         if (!c.signal.aborted && (e as { name?: string } | null)?.name !== "AbortError")
           onlineFailed = true;

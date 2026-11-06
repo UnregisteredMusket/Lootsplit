@@ -525,7 +525,8 @@ function FactionsManager() {
       ) : (
         <p className="text-sm text-faint">No factions yet.</p>
       )}
-      <section aria-labelledby="add-faction-title">
+      {/* The same card frame as the section folds on sibling feature screens (QA pass 2026-11). */}
+      <section aria-labelledby="add-faction-title" className="disclosure-section px-4 py-3">
         <h2 id="add-faction-title" className="text-sm font-medium">
           Add a faction
         </h2>

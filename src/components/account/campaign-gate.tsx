@@ -20,23 +20,25 @@ import {
 } from "@/lib/quire/cloud-client";
 import { Button } from "@/components/ui";
 import { useUnmatchedRoute } from "@/lib/website/not-found-route";
+import { drawsBeforeAccountCheck, isGatePublicPath } from "@/lib/website/public-gate";
 import { DeviceRecovery } from "./device-recovery";
 import { roomLifecycleLabels } from "@/lib/quire/room-state";
 
-const publicPaths = new Set([
-  "/welcome",
-  "/features",
-  "/downloads",
-  "/updates",
-  "/help",
-  "/resources",
-  "/donate",
-  "/privacy",
-  "/community",
-  "/account",
-]);
-/** Resolve identity before providers open any campaign storage. Never erase legacy saves. */
-export function CampaignGate({ children }: { children: ReactNode }) {
+/**
+ * Resolve identity before providers open any campaign storage. Never erase legacy saves.
+ * `publicPage` is the page alone, without the campaign providers. A document opened on a public
+ * website page or the not-found page shows it at once (and in server HTML) instead of waiting for
+ * the account check, and keeps it until the visitor moves to another page: swapping it for
+ * `children` in place would draw the page a second time, closing an open menu and repeating its
+ * reads. From the next page on, `children` (providers and page) render exactly as before.
+ */
+export function CampaignGate({
+  children,
+  publicPage,
+}: {
+  children: ReactNode;
+  publicPage?: ReactNode;
+}) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const search = useRouterState({ select: (s) => s.location.searchStr });
   // The website's not-found page needs no campaign access (W-1).
@@ -58,6 +60,11 @@ export function CampaignGate({ children }: { children: ReactNode }) {
       window.removeEventListener("lootsplit-account-changed", refresh);
     };
   }, []);
+  // The address this document opened on, while it is drawn without the campaign providers.
+  const [barePath, setBarePath] = useState<string | null>(() =>
+    publicPage && drawsBeforeAccountCheck(path, notFound) ? path : null,
+  );
+  if (barePath !== null && barePath !== path) setBarePath(null);
   const [library, setLibrary] = useState<AccountLibrary | null>(null);
   const [ready, setReady] = useState(false);
   const [allowed, setAllowed] = useState(false);
@@ -113,6 +120,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
     };
   }, [identityEpoch]);
   const invitation = path === "/share" && !!new URLSearchParams(search).get("join");
+  if (barePath !== null && barePath === path) return publicPage;
   if (!ready)
     return (
       <main className="mx-auto max-w-xl p-6" role="status">
@@ -120,8 +128,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
       </main>
     );
   if (
-    publicPaths.has(path) ||
-    path.startsWith("/community/") ||
+    isGatePublicPath(path) ||
     notFound ||
     allowed ||
     !!sessionStorage.getItem("lootsplit.player.reconnect.v1") ||

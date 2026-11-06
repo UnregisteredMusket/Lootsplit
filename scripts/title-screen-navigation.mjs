@@ -28,9 +28,17 @@ const publicPaths = new Set([
 ]);
 /** Website pages (no title screen, no DM fixture): the listed pages plus community profiles. */
 const isPublicPath = (path) => publicPaths.has(path) || path.startsWith("/community/");
+/** Public pages arrive drawn in the server HTML (QA pass 2026-11), so their heading is visible
+ * before React takes over. Wait until it has, or an early click lands on inert markup. */
+export async function waitForHydration(page) {
+  await page.waitForFunction(() => {
+    const heading = document.querySelector("h1");
+    return !!heading && Object.keys(heading).some((key) => key.startsWith("__reactFiber"));
+  });
+}
 export async function continueIntoApp(page) {
   const path = new URL(page.url()).pathname.replace(/\/$/, "") || "/";
-  if (isPublicPath(path)) return;
+  if (isPublicPath(path)) return waitForHydration(page);
   const title = page.getByRole("button", { name: TITLE_SCREEN });
   await page.waitForFunction(() =>
     document.querySelector(".loot-opening") ||

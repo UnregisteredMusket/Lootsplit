@@ -11,7 +11,7 @@ import { diceForDisplay, onDice } from "@/lib/dice/dice-events";
 import { DISPLAY_DICE_KIND, displayShowsRoll } from "@/lib/dice/display-dice";
 import { encounterDetailPoller } from "@/lib/encounters/detail-poller";
 import { localEncounterRequest } from "@/lib/encounters/local";
-import { accountRequest } from "@/lib/account/client";
+import { signedInAccountRequest } from "@/lib/account/client";
 import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
 import {
   defaultDisplaySettings,
@@ -150,7 +150,7 @@ function DisplaySession({ dm }: { dm: boolean }) {
     let onlineFailed = false;
     Promise.all([
       localEncounterRequest<Library>("encounters"),
-      accountRequest<Library>("encounters").catch((e: unknown): Library => {
+      signedInAccountRequest<Library>("encounters").catch((e: unknown): Library => {
         // Keep the device fallback, but say that online encounters are missing.
         if ((e as { name?: string } | null)?.name !== "AbortError") onlineFailed = true;
         return { encounters: [] };

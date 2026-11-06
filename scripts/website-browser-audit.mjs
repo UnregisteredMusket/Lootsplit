@@ -1,4 +1,4 @@
-import { openApplication, continueIntoApp, NOT_FOUND_AUDIT_PATH } from "./title-screen-navigation.mjs";
+import { openApplication, continueIntoApp, waitForHydration, NOT_FOUND_AUDIT_PATH } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -19,6 +19,21 @@ const failures = [];
 const abortedShots = new Set();
 const externalFailures = [];
 try {
+  // Public pages are drawn in the server HTML, not "Checking campaign access…" while the
+  // account check runs (QA pass 2026-11). My account still waits for it, so it is not listed.
+  for (const [path, heading] of [
+    ["welcome", "Split the loot."],
+    ["features", "Features"],
+    ["help", "A little help, adventurer."],
+    ["privacy", "Privacy at Lootsplitter"],
+    ["updates", "Changelog"],
+    ["resources", "Resources &amp; credits"],
+    ["donate", "Support Lootsplitter"],
+  ]) {
+    const html = await (await fetch(`${origin}/${path}`, { headers: { accept: "text/html" } })).text();
+    assert.ok(!html.includes("Checking campaign access"), `${path} server HTML waits for the account check`);
+    assert.ok(html.includes(heading), `${path} server HTML lacks its heading`);
+  }
   // Phones (320, 390), tablet (768) and desktop: no horizontal page scroll anywhere.
   const widths = [1280, 768, 390, 320];
   for (const width of widths) {
@@ -321,7 +336,8 @@ try {
         assert.equal(await page.locator('#maps-panel [data-feature="Fog, walls and vision"]').evaluate((d) => d.open), true);
         // Deep links from the home page open their area.
         await page.goto(`${origin}/features#downtime`, { waitUntil: "networkidle" });
-        assert.equal(await page.getByRole("tab", { name: "Downtime", exact: true }).getAttribute("aria-selected"), "true");
+        await waitForHydration(page);
+        await page.getByRole("tab", { name: "Downtime", exact: true, selected: true }).waitFor();
         const images = await page.locator("main img[src^='/product/']").evaluateAll((nodes) =>
           nodes.map((img) => ({ alt: img.alt, width: img.getAttribute("width"), loading: img.loading })),
         );
@@ -398,6 +414,7 @@ try {
           return el && !el.hidden && (!el.querySelector("details.ls-fold") || el.querySelector("details.ls-fold").open);
         }, `android-${versions[2] ?? oldest}`);
         await page.goto(`${origin}/updates`, { waitUntil: "networkidle" });
+        await waitForHydration(page);
       }
       if (path === "downloads") {
         // Technical details are folded for players (W8); the summary opens them.
@@ -433,6 +450,7 @@ try {
     const missing = await page.goto(`${origin}${NOT_FOUND_AUDIT_PATH}`, { waitUntil: "networkidle" });
     assert.equal(missing.status(), 404);
     await page.getByRole("heading", { level: 1, name: "This page wandered off", exact: true }).waitFor();
+    await waitForHydration(page);
     assert.equal(await page.title(), "Page not found · Lootsplitter");
     assert.equal(await page.locator(".loot-opening").count(), 0, "404 shows no title screen");
     assert.equal(await page.getByText("Create an account or sign in", { exact: false }).count(), 0);

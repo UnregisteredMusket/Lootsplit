@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Link } from "@tanstack/react-router";
+import { Disclosure } from "@/components/disclosure";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useLibrary } from "@/lib/quire/library";
 import { useSeat } from "@/lib/quire/seat";
@@ -25,8 +26,8 @@ export function MigrationReadiness() {
     typeof localStorage === "undefined" ? undefined : localStorage,
     campaigns,
   ).filter((campaign) => campaign.id !== activeId && campaign.pending !== 0);
-  return <details className="review-inbox" id="migration-readiness">
-    <summary>Moving to the new website address ({host})</summary>
+  // The same section disclosure as the Settings folds beside it (QA pass 2026-11).
+  return <Disclosure id="migration-readiness" summary={<>Moving to the new website address ({host})</>} bodyClassName="space-y-2">
     <p>{onOldAddress ? <>Lootsplitter now lives at <a href={website}>{host}</a>. You are on the old address, which keeps working for at least 12 months. Accounts and shared campaigns are on the same server: sign in again at {host} to see them. Anything stored only in this browser stays here until you move it with a backup.</> : <>Lootsplitter&apos;s website address is {host}. The old address keeps working for at least 12 months, and the Android app needs no change.</>} This check does not submit turns, transfer files, or change campaigns.</p>
     <p role="status">{room.joined ? room.pending ? `${room.pending} pending changes: finish or deliberately discard them before switching addresses.` : room.status === "synced" ? "This session has synchronized. A server save does not include every device-local file." : "Wait for a confirmed connection before relying on the server save." : "This campaign is on this device. Keep an exported backup before changing addresses."}</p>
     {others.length ? <ul aria-label="Other campaigns with unfinished work">
@@ -43,5 +44,5 @@ export function MigrationReadiness() {
       <li>Installed Android versions, home-screen widgets and existing invitations keep working; the Android app needs no change.</li>
     </ol>
     <Link to="/account">Account campaigns & cloud backups</Link>
-  </details>;
+  </Disclosure>;
 }

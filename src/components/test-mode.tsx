@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { accountRequest, type AccountLibrary, type AccountMembership } from "@/lib/account/client";
+import { accountRequest, signedInAccountRequest, type AccountLibrary, type AccountMembership } from "@/lib/account/client";
 import {
   getCloudTable,
   getServerCloudTable,
@@ -25,7 +25,8 @@ export function TestModeSettings({ inMenu = false }: { inMenu?: boolean }) {
     [busy, setBusy] = useState(false);
   useEffect(() => {
     const c = new AbortController();
-    accountRequest<AccountLibrary>("library", undefined, c.signal)
+    // Only the signed-in owner sees Test mode; guests skip the read.
+    signedInAccountRequest<AccountLibrary>("library", undefined, c.signal)
       .then((r) => setOwner(r.user.role === "owner"))
       .catch(() => {});
     return () => c.abort();
