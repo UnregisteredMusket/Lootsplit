@@ -247,9 +247,15 @@ try {
     );
     await navigateApplication(page, origin + "/features/downtime");
     await expect.poll(async () => (await journal(page)).downtimeActivities.requests.length).toBe(1);
+    currentPage = page;
     const decision = formFor(page, "Record training decision");
-    await decision.getByRole("button", { name: "Record training decision", exact: true }).click();
-    await expect(decision.getByRole("alert")).toContainText("DM confirmation");
+    const record = decision.getByRole("button", { name: "Record training decision", exact: true });
+    await expect(record).toBeEnabled();
+    await record.click();
+    // The refusal comes back from the shared room; the packaged Worker can take longer than the
+    // default 5 s right after the player's request lands (seen twice on main), so allow the same
+    // 20 s window as every other submission in this audit.
+    await expect(decision.getByRole("alert")).toContainText("DM confirmation", { timeout: 20000 });
     await decision
       .getByLabel("Training review note", { exact: true })
       .fill(
