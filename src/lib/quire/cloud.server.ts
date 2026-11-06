@@ -188,6 +188,8 @@ async function characterRollOnce(input: {
         await manualCharacterRolls(room.code),
       ),
       id: receipt,
+      // The DM's own rolls never reach the TV display, even when the room reports them first.
+      ...(seat.role === "dm" ? { byDm: true } : {}),
     };
     await db
       .prepare(
@@ -574,7 +576,10 @@ export async function roomRollsSince(input: {
       : column.startsWith(`campaign:${access.code}:`)
         ? column.slice(`campaign:${access.code}:`.length)
         : column;
-  const rolls = rows.results.map((r) => {
+  const read = rows.results.at(-1)?.seq;
+  // The DM's own rolls are thrown by the DM's screen itself and never on the TV display.
+  const players = rows.results.filter((r) => JSON.parse(r.body)?.byDm !== true);
+  const rolls = players.map((r) => {
     const b = JSON.parse(r.body);
     const roll: TableRoll = {
       id: String(b.id ?? ""),
@@ -592,7 +597,7 @@ export async function roomRollsSince(input: {
     return { seq: Number(r.seq), roll };
   });
   // The cursor moves past every row read, so the next poll never asks for the same rows again.
-  return { rolls, rollSeq: rolls.length ? rolls[rolls.length - 1]!.seq : after };
+  return { rolls, rollSeq: read === undefined ? after : Number(read) };
 }
 
 export async function publishTurn(_input: {

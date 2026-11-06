@@ -86,3 +86,18 @@ test("account characters' rolls are read too, and the cursor always moves past w
   const again = await roomRollsSince({ code: dm.code, token: dm.token, after: read.rollSeq });
   assert.deepEqual(again.rolls, []);
 });
+
+test("the DM's own rolls are never returned (they stay off the TV), but the cursor moves past them", async () => {
+  const dm = await openRoom({ name: "DM", table: tradeFixture() });
+  const player = await joinRoom({ code: dm.code, purseId: "a", name: "Arden's player" });
+  await roll(dm.code, dm.token, "a", "dm-secret-roll-01");
+  await roll(dm.code, player.token, "a", "player-roll-00001");
+  const read = await roomRollsSince({ code: dm.code, token: dm.token, after: 0 });
+  assert.equal(read.rolls.length, 1, "only the player's roll");
+  const again = await roomRollsSince({ code: dm.code, token: dm.token, after: 0 });
+  assert.equal(again.rollSeq, read.rollSeq);
+  await roll(dm.code, dm.token, "a", "dm-secret-roll-02");
+  const onlyDm = await roomRollsSince({ code: dm.code, token: dm.token, after: read.rollSeq });
+  assert.deepEqual(onlyDm.rolls, []);
+  assert.ok(onlyDm.rollSeq > read.rollSeq, "the cursor still moves past the DM's roll");
+});
