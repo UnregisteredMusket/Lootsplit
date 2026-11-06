@@ -37,6 +37,8 @@ MCP servers are pinned to exact versions; `scripts/agent-guard.test.mjs` refuses
 
 Production D1 stays read-only through any of these: the guard and CLAUDE.md apply whichever tool issues the query.
 
+**Adding an npm package without registry access.** Claude's cloud sandbox cannot reach npm, so it cannot update `package-lock.json`. `.github/workflows/npm-add.yml` (Add npm packages) adds exact versions (`name@x.y.z`, up to 10) to a `feature/`, `fix/` or `dev/` branch, never main, with `--ignore-scripts`, and pushes `package.json` and `package-lock.json` to that branch. It only runs when started by hand, and starting it needs the owner's OK each time. The job token's push starts no other workflow, so push the branch once more afterwards to run verification.
+
 ## Testing and profiling tools
 
 | Tool | How to run | What it does |

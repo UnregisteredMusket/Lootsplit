@@ -1,0 +1,81 @@
+name: Add npm packages
+# Claude's development sandbox cannot reach the npm registry, so it cannot update package-lock.json
+# when a feature needs a new package (owner decision 2026-11-06: 3D dice use normal npm
+# dependencies). This job adds exact package versions to a feature branch and pushes the updated
+# package.json and package-lock.json there. It only runs when started by hand, which needs the
+# owner's OK each time (project rules), never on main, and runs no package install scripts.
+# A push made with the job token does not start other workflows: the branch's next push from a
+# developer runs verification as usual.
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Feature branch to update (feature/…, fix/… or dev/…; never main)"
+        required: true
+        type: string
+      packages:
+        description: "Space-separated exact versions, such as three@0.143.0 cannon-es@0.20.0"
+        required: true
+        type: string
+      dev:
+        description: "Add as devDependencies"
+        required: false
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: npm-add-${{ github.event.inputs.branch }}
+  cancel-in-progress: false
+jobs:
+  add:
+    name: Add npm packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check the branch and package names
+        env:
+          BRANCH: ${{ inputs.branch }}
+          PACKAGES: ${{ inputs.packages }}
+        run: |
+          set -euo pipefail
+          [[ "$BRANCH" =~ ^(feature|fix|dev)/[A-Za-z0-9._/-]{1,80}$ ]] || { echo "::error::Branch must be feature/, fix/ or dev/."; exit 1; }
+          read -ra specs <<< "$PACKAGES"
+          (( ${#specs[@]} >= 1 && ${#specs[@]} <= 10 )) || { echo "::error::Give 1 to 10 packages."; exit 1; }
+          for p in "${specs[@]}"; do
+            [[ "$p" =~ ^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*@[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::$p is not name@x.y.z"; exit 1; }
+          done
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Add the packages (no install scripts)
+        env:
+          PACKAGES: ${{ inputs.packages }}
+          DEV: ${{ inputs.dev }}
+        run: |
+          set -euo pipefail
+          read -ra specs <<< "$PACKAGES"
+          flags=(--save-exact --ignore-scripts --no-audit --no-fund)
+          [[ "$DEV" == "true" ]] && flags+=(--save-dev)
+          npm install "${flags[@]}" "${specs[@]}"
+          git diff --stat -- package.json package-lock.json
+      - name: Commit and push to the branch
+        env:
+          BRANCH: ${{ inputs.branch }}
+          PACKAGES: ${{ inputs.packages }}
+          TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package.json package-lock.json; then echo "Nothing changed."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "Add npm packages: $PACKAGES"
+          git push "https://x-access-token:${TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
