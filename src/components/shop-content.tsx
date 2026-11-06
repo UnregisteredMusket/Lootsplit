@@ -48,6 +48,7 @@ import {
 } from "@/lib/quire/price-breakdown";
 import { shopAsking } from "@/lib/quire/vendors";
 import { eventRate, lineEvents, saleEvents } from "@/lib/quire/market-events";
+import { factionBuyRate, factionEffects } from "@/lib/quire/factions";
 import { blackMarketPremium, markupDisplay, shopMarkupNote } from "@/lib/quire/market-markup";
 import { PriceWhy } from "@/components/price-why";
 import { useDollarText, useShowDollars } from "@/lib/quire/prefs";
@@ -517,13 +518,16 @@ function StockRow({
   const charisma = negotiator?.cha ?? null;
   // Named market events active today (market-events.ts), exactly as the `buy` command applies them.
   const events = lineEvents(journal, shop, line);
+  // Factions controlling this shop, by the party's tier (factions.ts), as the `buy` command applies them.
+  const factions = factionEffects(journal, purses, shop);
   const breakdown = shopBuyBreakdown(shop, line.copper, charisma, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, {
     negotiator,
     markup: markupDisplay(journal),
     events,
+    factions,
     ...(dm ? { listDerivation: listPriceDerivation(shop, line, realm) } : {}),
   });
-  const asking = shopAsking(shop, line.copper, eventRate(events));
+  const asking = shopAsking(shop, line.copper, eventRate(events), factionBuyRate(factions));
   const percent = charisma === null ? 0 : charismaOffPercent(charisma);
   const unit = breakdown.unit;
   const price = unit * asked;
@@ -765,7 +769,7 @@ function MerchantTerms({ shop, dm }: { shop: Shop; dm: boolean }) {
 }
 
 function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingId?: string }) {
-  const { holdings, sell, shops, journal } = useEconomy();
+  const { holdings, sell, shops, journal, purses } = useEconomy();
   const closed = shops.find((s) => s.id === shopId)?.closed;
   const turnLocked = turnIsLocked();
   const seat = useSeat();
@@ -810,6 +814,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
       holding && shop
         ? shopSellBreakdown(shop, holding.unitCopper, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, holding, {
             events: saleEvents(journal, shop, holding),
+            factions: factionEffects(journal, purses, shop),
           })
         : null,
     unitOffer = sale ? sale.unit : 0,

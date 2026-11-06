@@ -1,0 +1,72 @@
+/* Factions, renown and favor (factions.tsx, faction-meter.tsx). */
+.faction-meter {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.faction-meter-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.faction-meter-bar {
+  position: relative;
+  display: flex;
+  height: 0.75rem;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--color-subtle, #222);
+}
+.faction-meter-band {
+  height: 100%;
+  border-right: 1px solid var(--color-bg, #111);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.faction-meter-band:last-child {
+  border-right: 0;
+}
+.faction-meter-band[data-current="true"] {
+  background: color-mix(in srgb, var(--color-accent, #c9a227) 70%, transparent);
+}
+.faction-meter-mark {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 3px;
+  margin-left: -1px;
+  background: var(--color-fg, #fff);
+}
+.faction-meter-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+.faction-card,
+.faction-form,
+.faction-form fieldset {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.faction-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+.faction-tiers {
+  display: grid;
+  gap: 0.5rem;
+}
+.faction-tier-row {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+}
+.faction-checks {
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
