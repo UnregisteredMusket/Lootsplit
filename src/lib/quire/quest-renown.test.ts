@@ -176,6 +176,20 @@ test("completion applies every reward in the same command, with Favor and histor
   const doneDeleted = run(deleted, close("c6", "completed", 2));
   assert.deepEqual(standing(doneDeleted, "hand").aria, [100, 50]);
   assert.ok(doneDeleted.journal!.events.some((e) => e.dmOnly && /skipped \(its faction was deleted\)/.test(e.summary)));
+  // A reward that reaches nobody now is skipped and never shown as applied.
+  const npc = structuredClone(t);
+  npc.purses.find((p) => p.id === "bram")!.control = "npc";
+  const doneNpc = run(npc, close("c8", "completed", 2));
+  assert.deepEqual(quest(doneNpc).renownSkipped, [2]);
+  assert.ok(!(quest(projectRecord(doneNpc, bramSeat))?.renownRewards ?? []).some((r) => r.delta === -20));
+  // Privacy review: the quest is named in renown lines only when every rewarded character knows
+  // it; a secret quest's party reward says "Quest reward".
+  const secret = run(t, { id: "a1", kind: "quest-reveal", questId: "q1", revision: 2, audience: { kind: "characters", purseIds: ["aria"] } }, close("c9", "completed", 3));
+  const bramLines = projectRecord(secret, bramSeat).journal!.events.map((e) => e.summary).join("\n");
+  assert.ok(bramLines.includes("renown with The Black Hand +100") && bramLines.includes("· Quest reward"));
+  assert.ok(!bramLines.includes("Return the ledger"), "Bram never learns the secret quest's title");
+  const ariaOnly = secret.journal!.events.find((e) => e.id.startsWith("c9-renown-1") && e.purseId === "aria")!;
+  assert.match(ariaOnly.summary, /Quest: Return the ledger/, "a reward only for characters who know the quest names it");
   // Quests without rewards change no renown on completion (the screen offers a change instead).
   const plain = run(t, rewards(null, [], 2), close("c7", "completed", 3));
   assert.equal(factionsOf(plain).find((f) => f.id === "hand")!.standing.aria, undefined);

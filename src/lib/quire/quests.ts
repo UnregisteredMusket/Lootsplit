@@ -240,16 +240,22 @@ function assertRenownRewards(t: CloudTable, giverFactionId: string | null, rewar
  * a DM's renown change). Any refusal refuses the whole quest-close; a reward whose faction was
  * deleted since, or that reaches nobody now, is skipped with a DM-only note.
  */
-function applyRenownRewards(t: CloudTable, seat: CloudSeat, quest: Quest, cmdId: string, at: number, note: (text: string) => void) {
+function applyRenownRewards(t: CloudTable, seat: CloudSeat, quest: Quest, cmdId: string, at: number, note: (text: string) => void): number[] {
   const journal = t.journal!;
-  const reason = `Quest: ${quest.title}`.slice(0, 200);
+  const skipped: number[] = [];
   (quest.renownRewards ?? []).forEach((reward, i) => {
     const faction = safeFactions(t).find((f) => f.id === reward.factionId);
     const characters = questRenownCharacters(t, reward);
     if (!faction || faction.deleted || !characters.length) {
+      skipped.push(i);
       note(`Quest renown reward skipped (${!faction || faction.deleted ? "its faction was deleted" : "it reaches nobody now"}): ${quest.title}`);
       return;
     }
+    // Each rewarded character's player reads the line, so the quest is named only when all of
+    // them can read the quest (privacy review: a secret quest's title never reaches the others).
+    const readable = characters.every((p) => questReadable(t, quest, { role: "player", purseIds: [p.id] }));
+    const reason = readable ? `Quest: ${quest.title}`.slice(0, 200) : "Quest reward";
+    if (!readable) note(`Quest renown reward applied as "Quest reward" (not every rewarded character knows the quest): ${quest.title}`);
     const id = `${cmdId}-renown-${i}`;
     applyFactionCommand(
       t,
@@ -267,6 +273,7 @@ function applyRenownRewards(t: CloudTable, seat: CloudSeat, quest: Quest, cmdId:
         }),
     );
   });
+  return skipped;
 }
 
 export function applyQuestCommand(t: CloudTable, seat: CloudSeat, cmd: QuestCommand, at: number) {
@@ -448,8 +455,9 @@ export function applyQuestCommand(t: CloudTable, seat: CloudSeat, cmd: QuestComm
     addLog(quest, { text: cmd.text || `${words}.`, shared: true, kind: "status" });
     // Renown rewards: applied once, on the first completion, in this same command.
     if (cmd.status === "completed" && quest.renownRewards?.length && quest.renownAppliedAt === undefined) {
-      applyRenownRewards(t, seat, quest, cmd.id, at, activity);
+      const skipped = applyRenownRewards(t, seat, quest, cmd.id, at, activity);
       quest.renownAppliedAt = at;
+      if (skipped.length) quest.renownSkipped = skipped;
     }
     const shared = revealed(quest);
     if (shared && cmd.message) notify(t, quest, cmd.id, at, cmd.text || words);
@@ -640,7 +648,10 @@ export function projectQuests(
       // Permission chaining: a giver the seat cannot read is dropped, never named.
       if (!q.giverNpcId || !context.readableNpcs.has(q.giverNpcId)) delete projected.giverNpcId;
       if (!q.giverFactionId || !factionShown(q.giverFactionId)) delete projected.giverFactionId;
-      const renown = (q.renownRewards ?? []).flatMap(projectRenown);
+      // A reward completion skipped is not shown as applied.
+      const skipped = new Set(q.renownSkipped ?? []);
+      const renown = (q.renownRewards ?? []).filter((_, i) => !skipped.has(i)).flatMap(projectRenown);
+      delete projected.renownSkipped;
       if (renown.length) projected.renownRewards = renown;
       else {
         delete projected.renownRewards;

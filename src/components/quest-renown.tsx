@@ -101,7 +101,10 @@ export function QuestRenownEditor({ quest }: { quest: Quest }) {
           {(quest.renownRewards ?? []).length ? (
             <ul className="grid gap-1 text-sm" data-testid="quest-renown-applied">
               {quest.renownRewards!.map((r, i) => (
-                <li key={i}>{rewardText(r, factions, names)}</li>
+                <li key={i}>
+                  {rewardText(r, factions, names)}
+                  {quest.renownSkipped?.includes(i) ? " (skipped: its faction was deleted or it reached nobody)" : ""}
+                </li>
               ))}
             </ul>
           ) : (

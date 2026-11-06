@@ -149,6 +149,8 @@ export const questSchema = z.object({
   renownRewards: z.array(questRenownRewardSchema).max(MAX_QUEST_RENOWN_REWARDS).optional(),
   /** When completion applied `renownRewards`; reopening never undoes them, re-completing never repeats them. */
   renownAppliedAt: at.optional(),
+  /** Indexes into `renownRewards` that completion skipped (faction deleted, or nobody to reach). */
+  renownSkipped: z.array(z.number().int().nonnegative()).max(MAX_QUEST_RENOWN_REWARDS).optional(),
   /** The chronicle. Never pruned; a full log refuses new lines. */
   log: z.array(questLogEntrySchema).max(MAX_QUEST_LOG).default([]),
   /** Never sent to players. */
