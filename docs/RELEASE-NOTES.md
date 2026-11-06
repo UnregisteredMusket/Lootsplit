@@ -30,6 +30,16 @@ Android version code **25**, same package and permanent signing certificate. Ins
 
 Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. 1.16.0 installs (protocol 19) keep working with the website; drafts they cannot read are refused with a request to finish on the updated website.
 
+## Release verification
+
+Published November 5, 2026 by `android-release.yml` (run 42157779696), started automatically by the version bump merged to main `caeb0e4` (#436). The first attempt's verification hit a dev-server connection reset in one account audit, and main's own verification of `caeb0e4` failed on the item-details form race (fixed in #440) and the known `worker-downtime` flake; both passed on re-running only the failed jobs, and the release then passed the preservation checks, the widget checks and the signed-APK upgrade gate.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `9080f9eed4ee8a0e953a5c185e2b3c174ddc08af5fce81de3645e79a9f8e3590` (33,127,584 bytes), matching SHA256SUMS.txt.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.16.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.17.0 and versionCode 25.
+- The bundled web client contains Return to party, Economy health, market events and the black-market markup labels.
+
 ---
 
 # Lootsplitter 1.16.0
