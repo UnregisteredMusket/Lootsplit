@@ -1,10 +1,10 @@
 {
-  "measuredOn": "2026-11-01",
-  "reason": "First baseline when the footprint rules were adopted (owner decision 2026-11-01).",
+  "measuredOn": "2026-11-06",
+  "reason": "Archived sessions re-base once a delta would pass 35% of its snapshot (room-reports.mjs REPORT_REBASE_FRACTION): archive per session 61805 -> 30726 bytes. The other values are unchanged from the 2026-11-01 baseline (current main measures within 0.1% of them).",
   "values": {
     "liveStoredBytes": 151633,
     "dmViewBytes": 155494,
     "playerViewBytes": 116887,
-    "archiveBytesPerSession": 61805
+    "archiveBytesPerSession": 30726
   }
 }

@@ -66,11 +66,19 @@ A pull request that adds or changes stored data, or server work on a request pat
 
 ## The reference campaign today
 
-Baseline 2026-11-01 (`scripts/footprint-baseline.json`): stored live campaign 151,633 bytes, DM view
-155,494 bytes, player view 116,887 bytes, archive 61,805 bytes per session. Run it with
-`node --experimental-strip-types scripts/footprint-fixture.mjs` (about 8 seconds). Adding about 120
-bytes to every item grows the live campaign by 21%, which the test refuses. Each archived session
-stores about 62 KB although it adds only 24 ledger lines and 2 notes: worth investigating.
+Baseline 2026-11-06 (`scripts/footprint-baseline.json`): stored live campaign 151,633 bytes, DM view
+155,494 bytes, player view 116,887 bytes, archive 30,726 bytes per session (61,805 before re-basing,
+below). Run it with `node --experimental-strip-types scripts/footprint-fixture.mjs` (about 8 seconds).
+Adding about 120 bytes to every item grows the live campaign by 21%, which the test refuses.
+
+Why an archived session cost 62 KB (investigated 2026-11-06): every archived snapshot carries the
+campaign's whole session list and journal, which grow each session, and every delta was taken
+against the room's first full snapshot, so each one re-stored everything written since then (14.5 KB
+for session 2, 110 KB by session 52). New sessions now re-base, storing a full snapshot, once a
+delta would pass 35% of its snapshot (`REPORT_REBASE_FRACTION`, `cloudflare/room-reports.mjs`):
+30.7 KB per session. The session's own new data is about 14.5 KB. Deltas chained to the previous
+session would reach about 18 KB but need a reader release before any writer stores them
+(`report-delta.mjs` release order); not done.
 
 ## Improvements worth making (optional, in order)
 
