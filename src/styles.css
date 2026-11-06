@@ -5227,3 +5227,16 @@ button.map-claim-chip { min-height:44px; cursor:pointer; font-weight:600; }
 .map-select-box { position:absolute; z-index:5; border:2px dashed var(--color-select); background:color-mix(in srgb, var(--color-select) 12%, transparent); border-radius:4px; pointer-events:none; }
 .map-token-foot.fogged { background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-fg) 18%, transparent) 0 4px, transparent 4px 9px); }
 @media (max-width:650px) { .map-group-dock { bottom:calc(84px + env(safe-area-inset-bottom)); } .map-group-dock.raised { z-index:45; bottom:auto; top:calc(124px + env(safe-area-inset-top)); } .map-group-action { min-width:54px; } .map-placing-hint { white-space:normal; } }
+
+/* 3D dice (components/dice-roll-3d.tsx). The box keeps its full size while closed so the dice
+   library can measure it; only the caption takes clicks, so the page stays usable underneath. */
+.dice-roll-overlay { position:fixed; inset:0; z-index:60; pointer-events:none; visibility:hidden; }
+.dice-roll-overlay[data-open="true"] { visibility:visible; background:radial-gradient(ellipse at center, rgb(0 0 0 / .28), rgb(0 0 0 / .12) 70%); }
+.dice-roll-box { position:absolute; inset:0; }
+.dice-roll-box canvas { width:100% !important; height:100% !important; }
+.dice-roll-caption { position:absolute; left:50%; top:calc(5rem + env(safe-area-inset-top)); transform:translateX(-50%); width:max-content; display:flex; align-items:center; gap:.75rem; max-width:calc(100vw - 2rem); padding:.6rem .9rem; border:1px solid var(--color-border); border-radius:.75rem; background:var(--color-elevated); color:var(--color-fg); font-family:var(--font-display); font-size:1.05rem; box-shadow:0 8px 28px rgb(0 0 0 / .35); pointer-events:auto; }
+.dice-roll-overlay[data-settled="false"] .dice-roll-caption span { color:var(--color-muted); }
+.dice-roll-caption span { min-width:0; overflow-wrap:break-word; }
+@media (max-width: 520px) { .dice-roll-caption { top:calc(4.25rem + env(safe-area-inset-top)); width:calc(100vw - 2rem); justify-content:space-between; font-size:1rem; } }
+.dice-roll-caption button { flex:none; font-family:var(--font-sans); font-size:.85rem; }
+@media (prefers-reduced-motion: reduce) { .dice-roll-overlay { display:none; } }

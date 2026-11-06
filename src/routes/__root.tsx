@@ -1,3 +1,4 @@
+import { DiceRollHost } from "@/components/dice-roll-3d";
 import { PlayerDisplayProvider } from "@/components/player-display-controller";
 import { CampaignGate } from "@/components/account/campaign-gate";
 import { MobileOwnerWidgetBridge } from "@/components/account/mobile-owner-widget";
@@ -129,6 +130,8 @@ function RootDocument() {
                 <LibraryProvider>
                   <PrefsProvider>
                     <MenuAudioBridge />
+                    {/* 3D dice for in-app rolls (owner request 2026-11-06). */}
+                    <DiceRollHost />
                     <EconomyProvider>
                       <PlayerDisplayProvider>
                         <AppNotifications />

@@ -1,3 +1,4 @@
+import { showDice } from "@/lib/dice/dice-events";
 import { canReadCharacter } from "@/lib/quire/character-position";
 import { CharacterTabs } from "./workspace-tabs";
 import "./character-improvements.css";
@@ -2520,6 +2521,7 @@ function QuickRoll({
           : `${r.total} · ${r.dice.join(", ")} ${signed(r.modifier)} · ${r.mode}`,
       );
       retry.current = { signature: "", key: "" };
+      showDice(r);
       onRoll(`${label.replace(/\s[+−-]\d+$/, "")} ${r.total}`);
     } catch (e) {
       setResult(errorText(e));
@@ -2618,6 +2620,7 @@ function DiceTray({
         `${r.label}: ${r.total} · ${r.source === "manual" ? "Manual result" : `${r.source === "device" ? "Device" : "Server"} roll [${r.dice.join(", ")}] ${signed(r.modifier)}`}`,
       );
       retry.current = { signature: "", key: "" };
+      showDice(r);
       onRoll(`${r.label} ${r.total}`);
     } catch (e) {
       setResult(errorText(e));
