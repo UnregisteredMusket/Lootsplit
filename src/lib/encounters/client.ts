@@ -11,6 +11,6 @@ export async function encounterRequest<T>(
     target?.id?.startsWith("local-") || target?.code === "device"
       ? await localEncounterRequest<T>(path, body)
       : await accountRequest<T>(path, body, signal);
-  if (/^encounters\/(create|save|start|conclude|roll|award)$/.test(path)) announceWorkspaceChange();
+  if (/^encounters\/(create|save|start|conclude|roll|award|award-xp)$/.test(path)) announceWorkspaceChange();
   return result;
 }

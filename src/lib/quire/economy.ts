@@ -7,6 +7,7 @@ import { serviceOrderOpen } from "./services-schema.ts";
 import { projectRecord } from "./session-records.ts";
 import { shopVisible, validateWorld } from "./world.ts";
 import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
+import { lineEvents, saleEvents } from "./market-events.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
@@ -44,6 +45,8 @@ import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { POOL_GUARD } from "./custody.ts";
 import { attunementFromNotes, attunementKinds, attunementProblem } from "./attunement.ts";
 import { usesProblem } from "./item-uses.ts";
+import { itemDetailsProblem } from "./item-details.ts";
+import { isUnidentified, presentedHolding } from "./item-identity.ts";
 import { assertPoolable } from "./loot-claims.ts";
 import {
   coinsSchema,
@@ -885,6 +888,13 @@ export async function saveHolding(input: Holding): Promise<void> {
     throw new Error("Enter a valid quantity and value.");
   const usesError = usesProblem(holding);
   if (usesError) throw new Error(usesError);
+  // Item identification: the same rule as the room's row validation (validation.ts).
+  if (holding.unidentified !== undefined) {
+    if (holding.kind !== "item" || holding.deed || holding.property || holding.service)
+      throw new Error("Only an item can be unidentified.");
+    if (!isUnidentified(holding))
+      throw new Error(itemDetailsProblem("item", { unidentified: holding.unidentified }) ?? "Enter the name players see.");
+  }
   const db = await quireDb();
   await atomic(["holdings", "meta", "purses"], async (tx) => {
     const old = await request<Holding | undefined>(tx.objectStore("holdings").get(holding.id));
@@ -951,11 +961,15 @@ export async function saveHolding(input: Holding): Promise<void> {
       journal,
     });
     tx.objectStore("holdings").put(holding);
+    // Item identification: this event reaches players who can read the holder (a shared room
+    // receives it in the same patch), so it names an unidentified item as presented. The DM's
+    // record of the true item is a DM-only event, as `item-unidentify` writes.
+    const told = presentedHolding(holding);
     await audit(
       tx,
       pooledNow
-        ? `Put in the treasure pool: ${holding.name} × ${holding.quantity}`
-        : `Recorded holding: ${holding.name} ×${holding.quantity}`,
+        ? `Put in the treasure pool: ${told.name} × ${holding.quantity}`
+        : `Recorded holding: ${told.name} ×${holding.quantity}`,
       "management",
       holding.purseId,
       undefined,
@@ -963,7 +977,7 @@ export async function saveHolding(input: Holding): Promise<void> {
         ? {
             lootPool: {
               holdingId: holding.id,
-              name: holding.name.slice(0, 200),
+              name: told.name.slice(0, 200),
               quantity: holding.quantity,
               pooled: true,
               source: holding.pool!.source,
@@ -971,8 +985,17 @@ export async function saveHolding(input: Holding): Promise<void> {
           }
         : undefined,
     );
+    if (!old && isUnidentified(holding))
+      await audit(
+        tx,
+        `Added unidentified: ${holding.name} (players see ${holding.unidentified.name})`.slice(0, 500),
+        "management",
+        holding.purseId,
+        undefined,
+        { dmOnly: true },
+      );
     if (old?.attuned && !holding.attuned)
-      await audit(tx, `Attunement ended: ${old.name} left the character`, "management", old.purseId);
+      await audit(tx, `Attunement ended: ${presentedHolding(old).name} left the character`, "management", old.purseId);
   });
 }
 
@@ -1352,7 +1375,8 @@ export async function buyFromShop(
     if (stock.quantity !== null && stock.quantity < quantity)
       throw new Error("The shop does not have that many.");
     const score = await charismaOf(purse, tx);
-    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity).total;
+    // The same market events the shared `buy` command applies (market-events.ts).
+    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity, { events: lineEvents(journal, shop, stock) }).total;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
     // Each purchase is a separate lot. A matching name does not identify the
@@ -1493,7 +1517,8 @@ export async function sellToShop(
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
-    const paid = shopSellBreakdown(shop, holding.unitCopper, quantity, holding).total;
+    // The same market events the shared `sell` command applies (market-events.ts).
+    const paid = shopSellBreakdown(shop, holding.unitCopper, quantity, holding, { events: saleEvents(journal, shop, holding) }).total;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");
     // Merchant purse: paid from it or the sale is refused, as in the shared command.
     const merchant = structuredClone(shop);
@@ -2874,7 +2899,7 @@ async function audit(
   kind: "prices" | "management",
   purseId?: string,
   change?: Journal["events"][number]["change"],
-  extra?: Pick<Journal["events"][number], "lootPool">,
+  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly">,
 ) {
   const store = tx.objectStore("meta");
   const row = await request<{ value: unknown } | undefined>(store.get("journal"));

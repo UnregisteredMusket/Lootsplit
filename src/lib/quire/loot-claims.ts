@@ -14,7 +14,8 @@ import { isNpc, partyFunds, designatedPartyFund, recipientProblem } from "./coin
 import { formatCopper } from "./money.ts";
 import { knownUnitCopper, presentedHolding, redactIdentity, identitySecrets, type Unidentified } from "./item-identity.ts";
 import { POOL_GUARD } from "./custody.ts";
-import { movedUses } from "./item-uses.ts";
+import { movedUses, type HoldingUses } from "./item-uses.ts";
+import { itemDetailsFor } from "./item-details.ts";
 import { fairnessStandings } from "./loot-fairness.ts";
 import {
   lootClaimsSchema,
@@ -108,7 +109,7 @@ export function lotClaims(t: LootTable, holdingId: string, state = readLootClaim
 }
 
 /** FNV-1a (two 32-bit lanes): a short, deterministic fingerprint shared by client and server. */
-function hash(text: string): string {
+export function hash(text: string): string {
   let a = 0x811c9dc5,
     b = 0x01000193 ^ 0x5bd1e995;
   for (let i = 0; i < text.length; i++) {
@@ -760,6 +761,9 @@ export type EncounterPoolItem = {
   pool?: boolean;
   /** Awarded unidentified (item identification): what the party is told instead. */
   unidentified?: Unidentified;
+  /** Award item details (item-details.ts): the new holding's charges and attunement requirement. */
+  uses?: HoldingUses;
+  requiresAttunement?: string;
 };
 /**
  * The pooled part of an encounter award, for both award paths (cloudflare/encounters.mjs and
@@ -803,7 +807,8 @@ export function encounterPoolRows(
       unitCopper: item.unitCopper,
       notes: item.notes,
       pool: { at, source: "encounter", encounterId, receiptId },
-      ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
+      // Charges, attunement and the presented record, in this same write (item-details.ts).
+      ...itemDetailsFor(item),
     });
     ledger.push({
       id,

@@ -89,6 +89,8 @@ export function pendingCommandDescription(value: unknown): string {
       return `${c.pooled ? "Put in" : "Take out of"} the treasure pool · item ${c.holdingId}`;
     case "loot-resolve":
       return `Resolve ${c.lots.length} treasure-pool item${c.lots.length === 1 ? "" : "s"} (${c.method})`;
+    case "loot-return":
+      return `Return ${c.items.length} item${c.items.length === 1 ? "" : "s"} and ${formatCopper(c.copper)} to ${c.to.pool ? "the treasure pool" : "a party fund"} · character ${c.purseId}`;
     case "xp-award":
       return `Award ${c.amount} ${c.unit === "xp" ? "XP" : c.amount === 1 ? "milestone" : "milestones"} · ${c.purseIds.length} character${c.purseIds.length === 1 ? "" : "s"}`;
     case "coin-exchange":
@@ -101,6 +103,10 @@ export function pendingCommandDescription(value: unknown): string {
       return `Use one charge · item ${c.holdingId}`;
     case "item-recharge":
       return `Recharge to ${c.current} uses · item ${c.holdingId}`;
+    case "market-event":
+      return `${c.before ? "Edit" : "Add"} market event: ${c.after.name}`;
+    case "market-event-end":
+      return `End market event: ${c.before.name}`;
     case "sale-split":
       return `Sell ${c.lots.length} item${c.lots.length === 1 ? "" : "s"} and split ${formatCopper(c.expect.proceeds)} among ${c.recipientIds.length} · from ${c.fundId}`;
     case "post":

@@ -200,6 +200,11 @@ export type TradeExecution = {
   /** Zones: the client predates zone requests (protocol < 18), so it can't ask the party. */
   zoneRequestsUnsupported?: boolean;
   /**
+   * Market events: the client predates them (protocol < 26), so it shows prices without them. A
+   * purchase, sale or delivery whose price an active event changes is refused (market-events.ts).
+   */
+  marketEventsUnsupported?: boolean;
+  /**
    * Merchant purses hidden from the seat (merchant.ts): shortfalls are collected here and the
    * batch refuses them only after every other command validated, so another failure in the same
    * batch can never reveal whether a sale fit the purse. Set by `applyCommandBatch`.

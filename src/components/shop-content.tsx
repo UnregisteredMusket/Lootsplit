@@ -47,6 +47,7 @@ import {
   type Negotiator,
 } from "@/lib/quire/price-breakdown";
 import { shopAsking } from "@/lib/quire/vendors";
+import { eventRate, lineEvents, saleEvents } from "@/lib/quire/market-events";
 import { blackMarketPremium, markupDisplay, shopMarkupNote } from "@/lib/quire/market-markup";
 import { PriceWhy } from "@/components/price-why";
 import { useDollarText, useShowDollars } from "@/lib/quire/prefs";
@@ -514,12 +515,15 @@ function StockRow({
   );
   // The `buy` command's own price: list × markup (× black-market premium), then Charisma.
   const charisma = negotiator?.cha ?? null;
+  // Named market events active today (market-events.ts), exactly as the `buy` command applies them.
+  const events = lineEvents(journal, shop, line);
   const breakdown = shopBuyBreakdown(shop, line.copper, charisma, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, {
     negotiator,
     markup: markupDisplay(journal),
+    events,
     ...(dm ? { listDerivation: listPriceDerivation(shop, line, realm) } : {}),
   });
-  const asking = shopAsking(shop, line.copper);
+  const asking = shopAsking(shop, line.copper, eventRate(events));
   const percent = charisma === null ? 0 : charismaOffPercent(charisma);
   const unit = breakdown.unit;
   const price = unit * asked;
@@ -761,7 +765,7 @@ function MerchantTerms({ shop, dm }: { shop: Shop; dm: boolean }) {
 }
 
 function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingId?: string }) {
-  const { holdings, sell, shops } = useEconomy();
+  const { holdings, sell, shops, journal } = useEconomy();
   const closed = shops.find((s) => s.id === shopId)?.closed;
   const turnLocked = turnIsLocked();
   const seat = useSeat();
@@ -800,8 +804,14 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
     }
   }
   const asked = Number(qty),
-    // Item identification: shopSellBreakdown prices an unidentified item as presented.
-    sale = holding && shop ? shopSellBreakdown(shop, holding.unitCopper, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, holding) : null,
+    // Item identification: shopSellBreakdown prices an unidentified item as presented; today's
+    // market events for its category apply exactly as the `sell` command applies them.
+    sale =
+      holding && shop
+        ? shopSellBreakdown(shop, holding.unitCopper, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, holding, {
+            events: saleEvents(journal, shop, holding),
+          })
+        : null,
     unitOffer = sale ? sale.unit : 0,
     payout = unitOffer * asked;
   // Merchant purse: the refusal shows before confirming (the amount only where this seat may read it).

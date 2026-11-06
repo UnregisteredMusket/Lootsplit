@@ -2,8 +2,8 @@
  * Sell and split (future-development prompt 2, phase 4; mockup approved by the owner on
  * 2026-11-03). One pure planner, used by the shared `sale-split` command (commands.ts, also run
  * offline through executeLocalCommand) and by the dialog's preview: price the chosen party-fund
- * items at one open shop exactly as Sell to shop does (value × buy rate, rounded to whole copper
- * per unit), then plan an even split of the proceeds with the coin-split planner. Nothing is sold
+ * items at one open shop exactly as Sell to shop does (value × today's market events × buy rate,
+ * rounded to whole copper per unit), then plan an even split of the proceeds with the coin-split planner. Nothing is sold
  * unless the split is also valid, so a sale is never left unsplit.
  */
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
@@ -11,6 +11,7 @@ import { assertCarried } from "./custody.ts";
 import { assertMerchantSale, merchantShortfall, revealPurse } from "./merchant.ts";
 import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
 import { shopSellBreakdown } from "./price-breakdown.ts";
+import { saleEvents } from "./market-events.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -51,15 +52,25 @@ export type SaleSplitPlan = {
  * the off-list rate and purchase limit. The shop's purse is checked for the whole sale. An
  * unidentified item is priced at its presented value and category, never its true ones.
  */
-export function unitSalePrice(h: Pick<Holding, "unitCopper" | "category" | "unidentified">, shop: Shop): number {
-  return shopSellBreakdown(shop, h.unitCopper, 1, h).unit;
+export function unitSalePrice(
+  h: Pick<Holding, "unitCopper" | "category" | "unidentified">,
+  shop: Shop,
+  /** The campaign journal: today's market events change the payout (market-events.ts). */
+  journal?: SaleSplitTable["journal"],
+): number {
+  return shopSellBreakdown(shop, h.unitCopper, 1, h, { events: saleEvents(journal, shop, h) }).unit;
 }
 
 /**
  * Why `h` cannot be sold from the fund at `shop` in a sell-and-split, or null when it can.
  * Pooled items are the DM's to sell (the treasure-pool rule, owner decision 2026-10-23).
  */
-export function saleProblem(h: Holding, shop: Shop, actor: "dm" | "player"): string | null {
+export function saleProblem(
+  h: Holding,
+  shop: Shop,
+  actor: "dm" | "player",
+  journal?: SaleSplitTable["journal"],
+): string | null {
   if (h.kind !== "item" || h.deed || h.property) return "Sell properties one at a time with Sell to shop.";
   if (h.pool && actor !== "dm")
     return "This item is in the treasure pool. Only the DM can sell it before it is resolved.";
@@ -70,7 +81,7 @@ export function saleProblem(h: Holding, shop: Shop, actor: "dm" | "player"): str
     return error instanceof Error ? error.message : "This item can't be sold here.";
   }
   if (h.equipped) return "Unequip this item before selling it.";
-  if (unitSalePrice(h, shop) < 1) return `${shop.name} pays nothing for this item.`;
+  if (unitSalePrice(h, shop, journal) < 1) return `${shop.name} pays nothing for this item.`;
   return null;
 }
 
@@ -103,9 +114,9 @@ export function planSaleSplit(
     if (!h || h.purseId !== fund.id) throw Error(`An item is no longer in ${fund.name}. Review the sale again.`);
     if (!Number.isSafeInteger(lot.quantity) || lot.quantity < 1) throw Error("Sell a whole number of each item.");
     if (lot.quantity > h.quantity) throw Error(`Only ${h.quantity} × ${h.name} ${h.quantity === 1 ? "is" : "are"} in ${fund.name}.`);
-    const problem = saleProblem(h, shop, options.actor);
+    const problem = saleProblem(h, shop, options.actor, t.journal);
     if (problem) throw Error(`${h.name}: ${problem}`);
-    const unitPaid = unitSalePrice(h, shop);
+    const unitPaid = unitSalePrice(h, shop, t.journal);
     lots.push({
       holdingId: h.id,
       name: h.name,

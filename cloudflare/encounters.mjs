@@ -9,6 +9,8 @@ import { parseDice, throwDice } from "../src/lib/characters/model.mjs";
 import { applyEncounterSplit } from "../src/lib/quire/coin-split.ts";
 import { encounterPoolRows } from "../src/lib/quire/loot-claims.ts";
 import { encounterCoinLine, encounterItemLine } from "../src/lib/quire/award-tag.ts";
+import { itemDetailsFor } from "../src/lib/quire/item-details.ts";
+import { applyEncounterXp, campaignXpMode } from "../src/lib/quire/encounter-xp.ts";
 import {
   readStoredRoom,
   readMemberRooms,
@@ -112,6 +114,66 @@ async function save(db, user, d, encounter, status = d.row.status) {
   if (!result.meta.changes)
     fail("Encounter or campaign changed. Export your draft, then reload before retrying.", 409);
   return { id: d.row.id };
+}
+/**
+ * "Award XP" on an awarded encounter (XP from encounters): an encounter awarded before this
+ * feature, or without XP, gets its XP once. The award receipt's `xp` is the exactly-once guard:
+ * it is set only while still empty, against the room version read, and the room write requires it.
+ */
+async function awardXpLater(db, user, d, e, body) {
+  const stored = await db
+    .prepare("SELECT receipt_id,body FROM dm_encounter_awards WHERE encounter_id=?")
+    .bind(d.row.id)
+    .first();
+  if (d.row.status !== "awarded" || !stored) fail("Transfer this encounter's loot first.", 409);
+  const prior = JSON.parse(stored.body);
+  if (prior.xp) return { award: prior, duplicate: true };
+  if (Object.values(d.room.drafts || {}).some((rows) => rows.length))
+    fail("Submit or discard pending campaign turns before awarding XP.", 409);
+  if (!d.room.live && d.room.seats[d.room.turn]?.id !== d.seat.id)
+    fail("Return the campaign turn to the DM before awarding XP.", 409);
+  const room = structuredClone(d.room),
+    at = Date.now(),
+    // Unique per request: the room write below requires this request's own receipt, so a
+    // concurrent Award XP that lost the race writes nothing (not even an identical campaign).
+    xpId = `${stored.receipt_id}-xp-${crypto.randomUUID()}`;
+  let xp;
+  try {
+    xp = applyEncounterXp(room.table, d.seat, body.xp, { id: xpId, at, reason: e.name }).receipt;
+  } catch (err) {
+    fail(err.message);
+  }
+  room.revision = d.revision + 1;
+  const award = { ...prior, xp };
+  const roomWrite = roomWriteStatements(db, room, {
+    expect: null,
+    extraWhere: "EXISTS(SELECT 1 FROM dm_encounter_awards WHERE encounter_id=? AND json_extract(body,'$.xp.id')=?)",
+    extraArgs: [d.row.id, xpId],
+  });
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE dm_encounter_awards SET body=? WHERE encounter_id=? AND receipt_id=? AND json_extract(body,'$.xp') IS NULL AND ${roomVersionSql(d.version).sql} AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
+      )
+      .bind(
+        JSON.stringify(award),
+        d.row.id,
+        stored.receipt_id,
+        ...roomVersionSql(d.version).args,
+        user,
+        d.row.code,
+        d.m.seat_id,
+        d.m.token,
+      ),
+    ...roomWrite.statements,
+  ]);
+  const after = await db
+    .prepare("SELECT body FROM dm_encounter_awards WHERE encounter_id=?")
+    .bind(d.row.id)
+    .first();
+  const saved = after ? JSON.parse(after.body) : null;
+  if (!saved?.xp) fail("The encounter or campaign changed. Reload and try again.", 409);
+  return { award: saved, duplicate: saved.xp.id !== xpId };
 }
 export { creatureIndex } from "../src/lib/encounters/index.mjs";
 import { creatureIndex } from "../src/lib/encounters/index.mjs";
@@ -227,6 +289,8 @@ export async function handleEncounters(db, user, path, body = {}) {
       readOnly: d.room.closed === true,
       purses: d.room.table.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
       splitTable: splitTable(d.room.table),
+      // XP from encounters: whether the party levels by milestones (computed from its sheets).
+      xpMode: d.personal ? "xp" : campaignXpMode(d.room.table),
       award: award ? JSON.parse(award.body) : null,
     };
   }
@@ -265,6 +329,7 @@ export async function handleEncounters(db, user, path, body = {}) {
       .first();
     if (old) return { award: JSON.parse(old.body), duplicate: true };
   }
+  if (path === "encounters/award-xp") return awardXpLater(db, user, d, e, body);
   if (d.row.revision !== body.revision)
     fail("Encounter changed on another device. Export your draft and reload.", 409);
   if (d.row.status === "awarded")
@@ -428,10 +493,21 @@ export async function handleEncounters(db, user, path, body = {}) {
         quantity: item.quantity,
         unitCopper: item.unitCopper,
         notes: item.notes,
-        ...(item.unidentified ? { unidentified: { ...item.unidentified } } : {}),
+        // Charges, attunement and the presented record, in this same write (item-details.ts).
+        ...itemDetailsFor(item),
       });
       try {
         room.table.ledger.push(encounterItemLine(receiptId, index, at, p.id, item, e.name, holdingId));
+      } catch (err) {
+        fail(err.message);
+      }
+    }
+    // XP from encounters: the same planner, sheet write and journal entry as xp-award, in this
+    // same atomic write; the receipt keeps it, so a retry or "Award XP" never gives it twice.
+    let xp = null;
+    if (body.xp !== undefined && body.xp !== null) {
+      try {
+        xp = applyEncounterXp(room.table, d.seat, body.xp, { id: `${receiptId}-xp`, at, reason: e.name }).receipt;
       } catch (err) {
         fail(err.message);
       }
@@ -447,6 +523,7 @@ export async function handleEncounters(db, user, path, body = {}) {
       coinPurseId: e.coinPurseId,
       ...(split ? split.receipt : {}),
       ...(pool ? { poolFundId: pool.fundId } : {}),
+      ...(xp ? { xp } : {}),
       items: e.loot,
       recipients: room.table.purses
         .filter(

@@ -18,6 +18,7 @@ import { validateEstate } from "./estate.ts";
 import { tradeEconomySchema } from "./trade-economy-schema.ts";
 import { validateTradeEconomy } from "./trade-economy.ts";
 import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
+import { marketAdjustmentsSchema, marketEventsSchema } from "./market-events.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { validatePropertyLocations, listingSchema } from "./property.ts";
 import type { CloudTable } from "./cloud.ts";
@@ -91,6 +92,13 @@ const journalFields = z.object({
    * only through the DM's `black-market-markup` command (tabletop protocol 25).
    */
   blackMarketMarkup: z.enum(["descriptions", "percentages"]).optional(),
+  /**
+   * Named market events (market-events.ts), ended ones kept as history. Changes only through the
+   * DM's `market-event` / `market-event-end` commands (tabletop protocol 26).
+   */
+  marketEvents: marketEventsSchema.optional(),
+  /** A player's copy only: combined rates where events they may not see apply (market-events.ts). */
+  marketAdjustments: marketAdjustmentsSchema.optional(),
   finance: financeSchema.optional(),
   reports: z
     .array(
@@ -326,6 +334,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   delete next.services;
   delete next.quests;
   delete next.blackMarketMarkup;
+  delete next.marketEvents;
+  delete next.marketAdjustments;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -485,6 +495,10 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     // Black-market markup display changes only through its command; older clients (protocol 24
     // and earlier) drop the unknown key, so their whole-journal writes keep the stored value.
     ...(current.blackMarketMarkup ? { blackMarketMarkup: current.blackMarketMarkup } : {}),
+    // Market events change only through their commands; older clients (protocol 25 and earlier)
+    // drop the unknown key, so their whole-journal writes keep the stored events.
+    ...(current.marketEvents ? { marketEvents: current.marketEvents } : {}),
+    ...(current.marketAdjustments ? { marketAdjustments: current.marketAdjustments } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);

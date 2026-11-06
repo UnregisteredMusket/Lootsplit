@@ -110,6 +110,7 @@ import { presentReceipt } from "./receipt.ts";
 import { DM_SEAT, buildBill, downloadJson, getSeat, readShare, setSeat } from "./table.ts";
 import type { RarityFlags, ShelfDraft } from "./compose.ts";
 import { DEFAULT_REALM } from "./scale.ts";
+import { itemDetailsFor } from "./item-details.ts";
 import type {
   CatalogItem,
   Coins,
@@ -196,7 +197,11 @@ type EconomyApi = {
     kind: Holding["kind"],
     quantity: number,
     unitCopper: number,
-    metadata?: Pick<Holding, "notes" | "category" | "requiresAttunement"> & { pool?: boolean },
+    /**
+     * Optional details set in the same save (item-details.ts): charges (`uses`), the attunement
+     * requirement and the presented record of an item added unidentified. Items only.
+     */
+    metadata?: Pick<Holding, "notes" | "category" | "requiresAttunement" | "uses" | "unidentified"> & { pool?: boolean },
   ) => Promise<void>;
   /** Resolves `true` when removed; `false` after a shown error. */
   deleteHolding: (id: string) => Promise<boolean>;
@@ -221,6 +226,11 @@ type EconomyApi = {
   ) => Promise<boolean>;
   lootResolve: (
     input: Omit<Extract<CommandRequest, { kind: "loot-resolve" }>, "kind" | "id">,
+    options?: CommandOptions,
+  ) => Promise<string | null>;
+  /** Return to party (DM, loot-return.ts): a departed character's items and coins. Null when accepted, else the refusal. */
+  lootReturn: (
+    input: Omit<Extract<CommandRequest, { kind: "loot-return" }>, "kind" | "id">,
     options?: CommandOptions,
   ) => Promise<string | null>;
   // Money and item actions take `{ commandId }`: one ID per user action, reused
@@ -947,9 +957,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               unitCopper,
               notes: metadata?.notes ?? "",
               ...(metadata?.category ? { category: metadata.category } : {}),
-              ...(metadata?.requiresAttunement && kind === "item"
-                ? { requiresAttunement: metadata.requiresAttunement }
-                : {}),
+              // Charges, attunement and the presented record go in the same save, so the item
+              // never exists without them (one holding row; one patch in a shared room).
+              ...(kind === "item" && metadata ? itemDetailsFor(metadata) : {}),
               ...(metadata?.pool ? { pool: { at: Date.now(), source: "add-loot" as const } } : {}),
             });
           },
@@ -984,6 +994,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           { kind: "loot-resolve", ...input, ...idOf(options) },
           "Treasure pool resolved. It appears once in Activity and the party chat.",
           true,
+        ),
+      lootReturn: (input, options = {}) =>
+        lootCommand(
+          { kind: "loot-return", ...input, ...idOf(options) },
+          input.to.pool ? "Returned to the party. The items are in the treasure pool, unclaimed." : "Returned to the party.",
+          input.copper > 0,
         ),
       deleteHolding: (id) =>
         attempt(async () => {

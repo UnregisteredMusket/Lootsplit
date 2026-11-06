@@ -12,6 +12,7 @@ import {
 import { characterLocation, inParty } from "./character-position.ts";
 import { shopVisible } from "./vendors.ts";
 import { charismaFor, shopBuyBreakdown } from "./price-breakdown.ts";
+import { lineEvents } from "./market-events.ts";
 import { actingGroups, partyPlaces } from "./party-groups.ts";
 import { exchangeQuoteKey, executeExchange, recordShopTrade } from "./trade-economy.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
@@ -605,7 +606,7 @@ function delivery(
   const payer = t.purses.find((p) => p.id === args.purseId);
   if (!payer) throw Error("The paying account no longer exists.");
   const cha = charismaFor(payer, t.sheets);
-  const unitCopper = shopBuyBreakdown(shop, line.copper, cha).unit,
+  const unitCopper = shopBuyBreakdown(shop, line.copper, cha, 1, { events: lineEvents(t.journal, shop, line) }).unit,
     cost = unitCopper * args.quantity + args.deliveryCopper;
   const approvedSupplier = s.suppliers.find(
     (x) =>
@@ -1426,7 +1427,7 @@ export function previewEstate(
       const vendor = working.shops.find((shop) => shop.id === line.shopId);
       if (!vendor) throw Error("The selected supply vendor is missing.");
       const cost =
-        shopBuyBreakdown(vendor, line.copper, cha, order.quantity).total +
+        shopBuyBreakdown(vendor, line.copper, cha, order.quantity, { events: lineEvents(working.journal, vendor, line) }).total +
         order.deliveryCopper;
       if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
         throw Error("The order exceeds its authorized spending budget.");

@@ -255,15 +255,27 @@ jobs:
       - name: dev-sell-and-split
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-sell-and-split 240 node scripts/sell-and-split-browser-audit.mjs
+      - name: dev-departed-holdings
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-departed-holdings 240 node scripts/departed-holdings-browser-audit.mjs
+      - name: dev-economy-health
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-economy-health 240 node scripts/economy-health-browser-audit.mjs
       - name: dev-item-identification
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-item-identification 240 node scripts/item-identification-browser-audit.mjs
+      - name: dev-award-item-details
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-award-item-details 240 node scripts/award-item-details-browser-audit.mjs
       - name: dev-merchant-purse
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-merchant-purse 240 node scripts/merchant-purse-browser-audit.mjs
       - name: dev-price-breakdown
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-price-breakdown 240 node scripts/price-breakdown-browser-audit.mjs
+      - name: dev-event-modifiers
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-event-modifiers 240 node scripts/event-modifiers-browser-audit.mjs
       - name: dev-preview-as-player
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-preview-as-player 240 node scripts/preview-as-player-browser-audit.mjs
@@ -279,6 +291,9 @@ jobs:
       - name: dev-xp-milestones
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-xp-milestones 240 node scripts/xp-milestones-browser-audit.mjs
+      - name: dev-encounter-xp
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-encounter-xp 240 node scripts/encounter-xp-browser-audit.mjs
       - name: dev-session-recap
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-session-recap 240 node scripts/session-recap-browser-audit.mjs
