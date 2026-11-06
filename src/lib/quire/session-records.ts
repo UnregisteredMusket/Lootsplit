@@ -379,6 +379,7 @@ export function projectRecord(
     if (table.journal?.marketEvents || table.journal?.marketAdjustments) {
       const projected = projectMarketEvents(table.journal, {
         shops: t.shops,
+        stock: t.stock,
         locationIds: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
       });
       delete t.journal.marketEvents;

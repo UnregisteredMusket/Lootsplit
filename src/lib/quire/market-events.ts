@@ -26,6 +26,7 @@
 import { z } from "zod";
 import { locationPath, readMarketLocations, type MarketLocations } from "./shop-locations.ts";
 import { forSale } from "./item-identity.ts";
+import { offListPercent } from "./merchant.ts";
 import type { Holding, ItemCategory, Shop, StockLine } from "./types.ts";
 
 /** Ended events stay as history; this caps the stored list (about 250 bytes each). */
@@ -235,9 +236,25 @@ function activeCovering(
     .map((e) => ({ id: e.id, name: e.name, permille: e.permille, ...(e.secret ? { secret: true as const } : {}) }));
 }
 
+/**
+ * Whether stored `marketAdjustments` may be priced with: only on a player's projected copy, whose
+ * events are all projected ones (`projectMarketEvents`: today's events with today as their only day
+ * and no DM note). A campaign with any real schedule (the DM's copy, the server's) ignores them,
+ * so adjustments that reached a whole campaign can never price it.
+ */
+function playerCopy(journal: NonNullable<JournalLike>, today: number): boolean {
+  let events: MarketEvent[];
+  try {
+    events = readMarketEvents(journal.marketEvents);
+  } catch {
+    return false;
+  }
+  return events.every((e) => e.startDay === today && e.endDay === today + 1 && e.note === undefined);
+}
+
 /** A player's copy: the shop's combined rate for this category (or its default entry) today. */
 function findAdjustment(journal: NonNullable<JournalLike>, shopId: string, key: MarketEvent["category"], today: number) {
-  if (!journal.marketAdjustments) return undefined;
+  if (!journal.marketAdjustments || !playerCopy(journal, today)) return undefined;
   let list: MarketAdjustment[];
   try {
     list = marketAdjustmentsSchema.parse(journal.marketAdjustments);
@@ -360,16 +377,41 @@ export function applyMarketEventCommand(
 }
 
 /**
+ * The category keys a shop's prices are looked up by (`categoryKey`; undefined: goods of no event
+ * category): its visible stock lines and what it buys (its buy list, or anything when it buys
+ * every category or takes off-list items; merchant.ts `onBuyList`, `offListPercent`).
+ */
+function shopCategoryKeys(
+  shop: Pick<Shop, "id" | "category" | "acceptAnyCategory" | "acceptedCategories" | "offListPercent">,
+  stock: readonly Pick<StockLine, "shopId" | "category">[],
+): Set<MarketEvent["category"]> {
+  const keys = new Set<MarketEvent["category"]>();
+  for (const line of stock) if (line.shopId === shop.id) keys.add(categoryKey(lineCategory(line, shop)));
+  if (shop.acceptAnyCategory || shop.category === "mixed" || offListPercent(shop) > 0) {
+    keys.add(undefined);
+    for (const category of EVENT_CATEGORIES) keys.add(category);
+  } else for (const category of shop.acceptedCategories || [shop.category]) keys.add(categoryKey(category));
+  return keys;
+}
+
+/**
  * A player's events (projectRecord): today's active events only, each with today as its only day
  * (upcoming and ended ones, and real schedules, stay with the DM). An open event whose place the
  * seat can see is sent by name without the DM's note. Secret events and ones whose location or
  * shop is hidden from the seat are never sent; where they take part in a visible shop's price,
  * `adjustments` carries that shop's combined rate (the server's `eventRate`, clamped) per
- * category, at most one entry per shop and category. A copy projected again keeps its own.
+ * category, at most one entry per shop and category. An entry is sent only for a category the
+ * shop has a visible line in (stock it sells, or goods it buys), and only where the rate differs
+ * from the open events' alone, so a hidden event that changes no price the player can see (×1.0,
+ * events that cancel out, or the ×10 clamp) leaves no trace. A copy projected again keeps its own.
  */
 export function projectMarketEvents(
   journal: JournalLike,
-  visible: { shops: Pick<Shop, "id" | "locationId">[]; locationIds: Set<string> },
+  visible: {
+    shops: Pick<Shop, "id" | "locationId" | "category" | "acceptAnyCategory" | "acceptedCategories" | "offListPercent">[];
+    stock: readonly Pick<StockLine, "shopId" | "category">[];
+    locationIds: Set<string>;
+  },
 ): { events: MarketEvent[]; adjustments: MarketAdjustment[] } | undefined {
   if (!journal?.marketEvents && !journal?.marketAdjustments) return undefined;
   let events: MarketEvent[];
@@ -388,28 +430,38 @@ export function projectMarketEvents(
       (e.scope.kind === "shop" && shopIds.has(e.scope.shopId)));
   const out = active.filter(shown).map(({ note: _note, ...open }) => ({ ...open, startDay: today, endDay: today + 1 }));
   // Already a player's copy (an archive or device copy projected again): keep its adjustments.
+  // Only a player's copy has its own (playerCopy); a campaign with real events ignores stored ones.
   let kept: MarketAdjustment[] = [];
   try {
-    kept = marketAdjustmentsSchema.parse(journal.marketAdjustments ?? []).filter((a) => shopIds.has(a.shopId));
+    if (playerCopy(journal, today))
+      kept = marketAdjustmentsSchema.parse(journal.marketAdjustments ?? []).filter((a) => shopIds.has(a.shopId));
   } catch {
     kept = [];
   }
   const hidden = active.filter((e) => !shown(e));
+  const open = active.filter(shown);
   const adjustments: MarketAdjustment[] = [...kept];
   if (hidden.length) {
     const market = readMarketLocations(journal.market);
     for (const shop of visible.shops) {
       const touches = hidden.filter((e) => eventCovers({ scope: e.scope }, shop, undefined, market));
       if (!touches.length || kept.some((a) => a.shopId === shop.id)) continue;
-      const rateFor = (category: MarketEvent["category"]) =>
-        eventRate(active.filter((e) => eventCovers(e, shop, category, market)));
+      // Only categories this shop has a visible line in; the others have no price to show.
+      const keys = shopCategoryKeys(shop, visible.stock);
+      const rateFor = (events: MarketEvent[], category: MarketEvent["category"]) =>
+        eventRate(events.filter((e) => eventCovers(e, shop, category, market)));
+      // The player's copy prices with the open events alone where no entry is sent: send one only
+      // where the hidden events change that rate (not at ×1.0, cancelling out, or under the clamp).
+      const changed = (category: MarketEvent["category"]) => rateFor(active, category) !== rateFor(open, category);
       // The shop's default: goods of no event category, and any category without its own entry.
-      const fallback = touches.some((e) => !e.category) ? rateFor(undefined) : undefined;
+      const fallback = keys.has(undefined) && changed(undefined) ? rateFor(active, undefined) : undefined;
       if (fallback !== undefined) adjustments.push({ shopId: shop.id, rate: fallback, day: today });
       for (const category of EVENT_CATEGORIES) {
-        const rate = rateFor(category);
-        const needed =
-          fallback !== undefined ? rate !== fallback : touches.some((e) => e.category === category);
+        if (!keys.has(category)) continue;
+        const rate = rateFor(active, category);
+        // With a default entry, a category the default would misprice needs its own (that
+        // reveals nothing the default doesn't); without one, only a changed rate does.
+        const needed = fallback !== undefined ? rate !== fallback : changed(category);
         if (needed) adjustments.push({ shopId: shop.id, category, rate, day: today });
       }
     }

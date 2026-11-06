@@ -137,6 +137,9 @@ export function readCloudTableForImport(value: unknown): CloudTable | null {
   if (!table) return null;
   assertCompleteHistory(table);
   try { table.journal = readValidatedJournal(table.journal); } catch { return null; }
+  // Market events: `marketAdjustments` belong only to a player's projected copy (market-events.ts).
+  // A room opened or a campaign imported from such a copy must not keep them as frozen prices.
+  if (table.journal) delete table.journal.marketAdjustments;
   return table;
 }
 /**

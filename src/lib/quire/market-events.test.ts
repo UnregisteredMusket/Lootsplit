@@ -11,7 +11,8 @@ import "fake-indexeddb/auto";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { openRoom, joinRoom, roomState, submitCommands, choosePace } from "./cloud.server.ts";
-import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
+import { emptyCloudTable, readCloudTableForImport, type CloudSeat, type CloudTable } from "./cloud.ts";
+import { offListPercent, onBuyList } from "./merchant.ts";
 import { applyCommand, type Command } from "./commands.ts";
 import { preserveJournalMetadata, readJournal } from "./journal.ts";
 import { applyCloudTable, buyFromShop, economySnapshot, executeLocalCommand, sellToShop } from "./economy.ts";
@@ -342,9 +343,10 @@ test("projection: players get today's open events without the note; secret and h
       assert.doesNotMatch(text, new RegExp(secret), secret);
     // Only the open blight, without its note and with today as its only day; no secret entries.
     assert.deepEqual(events.map((e) => [e.id, e.startDay, e.endDay, e.note, e.secret]), [["blight", 10, 11, undefined, undefined]]);
-    // The secret levy affects the two visible shops' provisions: one combined rate for each.
+    // The secret levy affects visible provisions: only the baker has a provisions line (the smith
+    // neither stocks nor buys provisions), so only the baker gets one combined rate.
     const adjustments = view.journal!.marketAdjustments!;
-    assert.deepEqual(adjustments.map((a) => [a.shopId, a.category, a.day]).sort(), [["baker", "provisions", 10], ["smith", "provisions", 10]]);
+    assert.deepEqual(adjustments.map((a) => [a.shopId, a.category, a.day]).sort(), [["baker", "provisions", 10]]);
     assert.deepEqual(readJournal(view.journal).marketAdjustments, adjustments, "the player's copy parses");
     // The player's own price for grain equals what the DM's campaign charges.
     const grain = view.stock.find((s) => s.id === "grain")!;
@@ -400,10 +402,11 @@ test("projection: many shops and many secret events fold into one rate per shop;
     assert.equal(shown.total, charged.total, s.id);
     assert.equal(sum(viewerBreakdown(shown, false)), shown.unit);
   }
-  // Sales too: every category the shop could be paid for.
+  // Sales too: every category the shop could be paid for (what it buys; it refuses the rest).
   for (const shop of view.shops)
     for (const category of [undefined, "provisions", "cloth", "jewels", "weapon"]) {
       const item = { category, unidentified: undefined };
+      if (!onBuyList(item, shop) && !offListPercent(shop)) continue;
       const charged = shopSellBreakdown(shop, 1000, 2, item, { events: saleEvents(t.journal, shop, item) }).total;
       assert.equal(shopSellBreakdown(shop, 1000, 2, item, { events: saleEvents(parsed, shop, item) }).total, charged, `${shop.id} ${category}`);
     }
@@ -583,4 +586,102 @@ test("selling: the payout takes today's events with the buy rate, rounded once, 
   const after = await economySnapshot();
   assert.equal(wallet(after, "aria") - start, 540);
   assert.equal(after.holdings.find((h) => h.id === "sack")!.quantity, 2);
+});
+
+// Re-review fixes (batch 2026-11-05): adjustments only where a visible price shows them, never as
+// a hint that a secret event exists, and never on the DM's or the server's copy.
+const secretOn = (id: string, permille: number, category?: MarketEvent["category"]): MarketEvent => ({
+  id, name: `Secret ${id}`, scope: { kind: "realm" }, permille, startDay: 0, endDay: 99, secret: true, ...(category ? { category } : {}),
+});
+/** Every visible line's player price equals the DM campaign's charge (buy and sell). */
+function assertSamePrices(t: CloudTable, view: CloudTable) {
+  const parsed = readJournal(view.journal);
+  for (const s of view.stock) {
+    const shop = t.shops.find((x) => x.id === s.shopId)!;
+    const server = t.stock.find((x) => x.id === s.id)!;
+    assert.equal(
+      shopBuyBreakdown(shop, s.copper, 12, 2, { events: lineEvents(parsed, shop, s) }).total,
+      shopBuyBreakdown(shop, server.copper, 12, 2, { events: lineEvents(t.journal, shop, server) }).total,
+      s.id,
+    );
+  }
+  for (const shop of view.shops)
+    for (const category of [undefined, ...["provisions", "cloth", "smith", "jewels", "general", "weapon"]]) {
+      const item = { category, unidentified: undefined };
+      if (!onBuyList(item, shop) && !offListPercent(shop)) continue;
+      assert.equal(
+        shopSellBreakdown(shop, 1000, 2, item, { events: saleEvents(parsed, shop, item) }).total,
+        shopSellBreakdown(shop, 1000, 2, item, { events: saleEvents(t.journal, shop, item) }).total,
+        `${shop.id} sells ${category}`,
+      );
+    }
+}
+
+test("projection: no adjustment for a category the shop has no visible line in", () => {
+  // No visible shop stocks or buys jewels: a secret jewels event leaves no trace.
+  const t = withEvents(campaign(10), secretOn("gems", 2500, "jewels"));
+  const view = projectRecord(t, ariaSeat);
+  assert.equal("marketAdjustments" in view.journal!, false);
+  assert.doesNotMatch(JSON.stringify(view.journal), /jewels|2\.5\b/);
+  assertSamePrices(t, view);
+  // A shop that buys jewels (its buy list, or off-list items) has a line it touches: one entry.
+  for (const extra of [{ acceptedCategories: ["provisions", "jewels"] }, { offListPercent: 50 }] as Partial<Shop>[]) {
+    const t2 = { ...t, shops: t.shops.map((s) => (s.id === "baker" ? { ...s, ...extra } : s)) };
+    const v2 = projectRecord(t2, ariaSeat);
+    const entries = v2.journal!.marketAdjustments!.filter((a) => a.category === "jewels" || a.category === undefined);
+    assert.ok(entries.length >= 1 && entries.every((a) => a.shopId === "baker"), JSON.stringify(extra));
+    assertSamePrices(t2, v2);
+  }
+  // A shop-wide secret event on the smith: only the smith goods it stocks and buys get an entry.
+  const t3 = withEvents(campaign(10), secretOn("smith-tax", 1300));
+  const smithOnly = projectRecord(t3, ariaSeat).journal!.marketAdjustments!.filter((a) => a.shopId === "smith");
+  assert.deepEqual(smithOnly.map((a) => a.category), ["smith"]);
+  assertSamePrices(t3, projectRecord(t3, ariaSeat));
+});
+
+test("projection: no adjustment where the rate equals the open events' alone", () => {
+  const cases: [string, MarketEvent[]][] = [
+    ["a hidden event at ×1.0", [secretOn("flat", 1000, "provisions")]],
+    ["hidden events that cancel out", [secretOn("up", 2000, "provisions"), secretOn("down", 500, "provisions")]],
+    ["the ×10 clamp absorbs it", [{ ...festival, id: "boom", name: "Boom", permille: 10000, category: "provisions", endDay: 99 }, secretOn("more", 2000, "provisions")]],
+    ["a hidden all-items event at ×1.0", [secretOn("flat-all", 1000)]],
+  ];
+  for (const [label, events] of cases) {
+    const t = withEvents(campaign(10), ...events);
+    const view = projectRecord(t, ariaSeat);
+    assert.equal("marketAdjustments" in view.journal!, false, label);
+    assert.doesNotMatch(JSON.stringify(view.journal), /Secret|Other adjustments/, label);
+    assertSamePrices(t, view);
+  }
+  // Control: a hidden event that does change the price still sends its combined rate.
+  const t = withEvents(campaign(10), secretOn("levy", 1200, "provisions"));
+  assert.deepEqual(projectRecord(t, ariaSeat).journal!.marketAdjustments, [{ shopId: "baker", category: "provisions", rate: 1.2, day: 10 }]);
+  assertSamePrices(t, projectRecord(t, ariaSeat));
+});
+
+test("hardening: stored adjustments never price the DM's or the server's copy; import strips them", async () => {
+  const t = withEvents(campaign(10), blight);
+  const grain = t.stock.find((s) => s.id === "grain")!;
+  const honest = shopBuyBreakdown(baker, 333, null, 1, { events: lineEvents(t.journal, baker, grain) }).total;
+  // A whole campaign that somehow carries adjustments (e.g. opened from a player's copy).
+  const tainted: CloudTable = {
+    ...t,
+    journal: { ...t.journal!, marketAdjustments: [{ shopId: "baker", category: "provisions", rate: 5, day: 10 }] },
+  };
+  assert.equal(lineEvents(tainted.journal, baker, grain).some((e) => e.id === OTHER_ADJUSTMENTS_ID), false);
+  assert.equal(shopBuyBreakdown(baker, 333, null, 1, { events: lineEvents(tainted.journal, baker, grain) }).total, honest);
+  const bought = applyCommand(tainted, ariaSeat, { id: "taint-buy", kind: "buy", stockId: "grain", purseId: "aria", quantity: 1 });
+  assert.equal(wallet(tainted, "aria") - wallet(bought, "aria"), honest);
+  // Projection decides from the real events, and never passes the stored ones on.
+  assert.equal("marketAdjustments" in projectRecord(tainted, ariaSeat).journal!, false);
+  // A player's projected copy still prices with its own (the existing projection tests).
+  const secret = withEvents(campaign(10), secretOn("levy", 1200, "provisions"));
+  const view = projectRecord(secret, ariaSeat);
+  assert.ok(lineEvents(view.journal, baker, grain).some((e) => e.id === OTHER_ADJUSTMENTS_ID));
+  // Opening a room or importing from a player's copy strips them, so no price is frozen.
+  assert.ok(view.journal!.marketAdjustments?.length);
+  assert.equal("marketAdjustments" in readCloudTableForImport(view)!.journal!, false);
+  const dm = await openRoom({ name: "From a player's copy", table: view });
+  const opened = (await roomState({ code: dm.code, token: dm.token })).table;
+  assert.equal("marketAdjustments" in opened.journal!, false);
 });
