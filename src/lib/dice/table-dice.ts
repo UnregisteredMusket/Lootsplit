@@ -14,7 +14,12 @@ const START_GRACE_MS = 5000;
 let room = "";
 let since = 0;
 let last: number | undefined;
-let reading = false;
+/** When the read in flight started (0 when none). A read that never answers stops blocking after READ_TIMEOUT_MS. */
+let readingSince = 0;
+const READ_TIMEOUT_MS = 10000;
+type RollReader = (args: {
+  data: { tabletopProtocol: number; code: string; token: string; after: number };
+}) => Promise<{ rolls: { seq: number; roll: DiceRoll & { at: number } }[]; rollSeq: number }>;
 
 /** The device's "Show 3D dice" setting, read without the settings provider (default on). */
 export function tableDiceWanted(): boolean {
@@ -30,6 +35,7 @@ export async function noteRollSeq(
   seat: { code: string; token: string },
   seq: number | undefined,
   now = Date.now(),
+  read: RollReader = readRoomRolls,
 ) {
   if (typeof seq !== "number") return;
   if (room !== seat.code) {
@@ -38,12 +44,18 @@ export async function noteRollSeq(
     // Look back over the last few rolls; only those recorded since watching began are thrown.
     last = Math.max(0, seq - 10);
   }
-  if (last === undefined || seq <= last || reading) return;
-  reading = true;
+  if (last === undefined || seq <= last) return;
+  // One read at a time; a read that hangs (a stalled request) must not stop every later roll.
+  if (readingSince && now - readingSince < READ_TIMEOUT_MS) return;
+  const started = (readingSince = now);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    const result = await readRoomRolls({
-      data: { tabletopProtocol: 31, code: seat.code, token: seat.token, after: last },
-    });
+    const result = await Promise.race([
+      read({ data: { tabletopProtocol: 31, code: seat.code, token: seat.token, after: last } }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(Error("timed out")), READ_TIMEOUT_MS);
+      }),
+    ]);
     if (room !== seat.code) return;
     last = Math.max(last, result.rollSeq);
     const newest = result.rolls.at(-1)?.roll;
@@ -51,7 +63,8 @@ export async function noteRollSeq(
   } catch {
     // Dice are a courtesy: a failed read leaves the roll logs as the record.
   } finally {
-    reading = false;
+    clearTimeout(timeout);
+    if (readingSince === started) readingSince = 0;
   }
 }
 
@@ -60,5 +73,5 @@ export function resetTableDice() {
   room = "";
   since = 0;
   last = undefined;
-  reading = false;
+  readingSince = 0;
 }

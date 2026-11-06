@@ -70,3 +70,32 @@ test("a room with no rolls yet reads nothing", async () => {
   stop();
   assert.equal(seen.length, 0);
 });
+
+test("a read that never answers stops blocking the next rolls after ten seconds", async () => {
+  resetTableDice();
+  const seen: unknown[] = [];
+  const stop = onDice((r) => seen.push(r));
+  const seat = { code: "ROOM2", token: "t" };
+  const t0 = 1_000_000;
+  const roll = (seq: number, at: number) => ({ seq, roll: { ...base, id: `ROOM2:a:${seq}`, characterId: "a", character: "A", label: "Check", source: "server", at } });
+  await noteRollSeq(seat, 0, t0, async () => ({ rolls: [], rollSeq: 0 }));
+  let reads = 0;
+  // The first read hangs; the poll that follows within ten seconds waits for it.
+  void noteRollSeq(seat, 1, t0 + 2000, () => {
+    reads++;
+    return new Promise(() => {});
+  });
+  await noteRollSeq(seat, 1, t0 + 4000, async () => {
+    reads++;
+    return { rolls: [roll(1, t0 + 1000)], rollSeq: 1 };
+  });
+  assert.equal(reads, 1);
+  // Ten seconds on, a new read goes ahead and throws the roll.
+  await noteRollSeq(seat, 1, t0 + 13000, async () => {
+    reads++;
+    return { rolls: [roll(1, t0 + 1000)], rollSeq: 1 };
+  });
+  stop();
+  assert.equal(reads, 2);
+  assert.equal(seen.length, 1);
+});
