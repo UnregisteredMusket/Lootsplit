@@ -507,12 +507,13 @@ export function applyFactionCommand(
     const tier = tierFor(current.tiers, step.renown).name;
     const summary =
       cmd.kind === "faction-renown"
-        ? `${step.p.name}: renown with ${current.name} ${signedNumber(step.renown - step.before.renown)} (now ${step.renown}, ${tier})${step.earned ? ` · +${step.earned} Favor` : ""} · ${cmd.reason}`
+        ? `${step.p.name}: renown with ${current.name} ${signedNumber(step.renown - step.before.renown)} (now ${plainNumber(step.renown)}, ${tier})${step.earned ? ` · +${step.earned} Favor` : ""} · ${cmd.reason}`
         : `${step.p.name}: Favor with ${current.name} ${signedNumber(step.favor - step.before.favor)} (now ${step.favor}) · ${cmd.reason}`;
     log(summary.slice(0, 500), { purseId: step.p.id, ...(dmOnly ? { dmOnly: true } : {}) });
   }
   save();
 }
+const plainNumber = (n: number) => (n < 0 ? `−${-n}` : String(n));
 const signedNumber = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n)}`;
 
 /**
