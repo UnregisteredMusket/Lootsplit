@@ -7,5 +7,6 @@
     "When a player heads into a neighbouring zone, your rule decides: block it, wait until the end of the session, or let the party vote.",
     "Party votes are anonymous, a tie keeps the party together, and you can approve or reject any vote.",
     "Places further away say how long the trip takes and offer to propose a journey."
-  ]
+  ],
+  "audience": "dm"
 }

@@ -6,5 +6,6 @@
     "The item is created with these details in one step, and pressing again after a dropped connection never adds it twice.",
     "Players see an item awarded unidentified only by the name, description and value the DM gave it, everywhere it appears.",
     "Items added without these details work exactly as before."
-  ]
+  ],
+  "audience": "dm"
 }

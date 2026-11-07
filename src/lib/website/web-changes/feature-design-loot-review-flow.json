@@ -1,5 +1,5 @@
 {
-  "title": "Faster loot awards",
+  "title": "Loot reviews on the Desk and a loot screen that fits a phone",
   "summary": "Encounters waiting for their loot now show on the Desk, and the loot review fits on a phone with the transfer button always in reach.",
   "items": [
     "The Desk shows \"Ready for loot review\" for each finished encounter, counts it in Pending reviews, and opens straight to its loot.",
@@ -8,5 +8,6 @@
     "Tick several items to assign them to someone or send them to the treasure pool at once.",
     "A bar at the bottom keeps the total, who gets what and Transfer loot once in view. Loot is still transferred only once.",
     "The last coin recipient you chose is offered on the next award in that campaign."
-  ]
+  ],
+  "audience": "dm"
 }

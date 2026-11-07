@@ -5,5 +5,6 @@
     "Ending a session archives its messages and ledger even when the session ran for a very long time. Before, a session whose records had grown past about 1.8 MB could not be ended.",
     "Ending a session is never refused for a campaign's total size. Past 5 MB with archived sessions, the DM sees a notice recommending Download a copy, which keeps the whole campaign; today's largest campaign is about half that.",
     "Behind the scenes, long ledgers and chats are now stored in fixed pages, so adding a line no longer rewrites the whole history. Nothing changes in how campaigns look or play."
-  ]
+  ],
+  "audience": "everyone"
 }

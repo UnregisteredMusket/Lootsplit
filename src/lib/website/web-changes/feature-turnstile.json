@@ -4,5 +4,6 @@
   "items": [
     "Cloudflare Turnstile runs on the website's sign-in, sign-up and recovery-key password reset forms. Most people never need to click anything.",
     "The Android app and the existing sign-in protections are unchanged."
-  ]
+  ],
+  "audience": "everyone"
 }

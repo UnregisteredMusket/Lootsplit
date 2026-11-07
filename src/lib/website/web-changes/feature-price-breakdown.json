@@ -6,5 +6,6 @@
     "The DM also sees the black-market premium and how the season and realm conditions build a list price; players see those only as Other adjustments.",
     "Shop rows now show the same price the purchase charges for characters whose Charisma is on their sheet.",
     "Prices themselves have not changed."
-  ]
+  ],
+  "audience": "everyone"
 }

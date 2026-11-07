@@ -8,5 +8,6 @@
     "On arrival the DM confirms Move party here, or Not yet to stay on the road.",
     "Players can send journey requests to the DM, who can approve them in one step from the Review Inbox.",
     "Players see the planned route where the map is visible to them, or a short text card when the map is private."
-  ]
+  ],
+  "audience": "everyone"
 }

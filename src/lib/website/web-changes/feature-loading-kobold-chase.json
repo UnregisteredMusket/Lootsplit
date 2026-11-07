@@ -7,5 +7,6 @@
     "The size in MB and the number of parts are still shown underneath, in smaller text.",
     "Keep waiting, Go back and Continue loading work as before, and the small progress pill now shows the percentage too.",
     "If your device asks for reduced motion, you see the still artwork instead."
-  ]
+  ],
+  "audience": "everyone"
 }

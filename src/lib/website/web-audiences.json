@@ -1,0 +1,7 @@
+[
+  { "key": "everyone", "label": "For everyone", "phrase": "for everyone" },
+  { "key": "dm", "label": "For Dungeon Masters", "phrase": "for Dungeon Masters" },
+  { "key": "players", "label": "For players", "phrase": "for players" },
+  { "key": "android", "label": "Android app", "phrase": "for the Android app" },
+  { "key": "behind-the-scenes", "label": "Behind the scenes", "phrase": "behind the scenes" }
+]

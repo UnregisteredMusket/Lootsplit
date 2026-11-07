@@ -6,5 +6,6 @@
     "Duplicate on a saved encounter makes a fresh draft with the same combatants and loot, reset to round 1.",
     "Duplicate NPC opens a new NPC form filled from the original; the copy starts with no coins or items.",
     "Review Inbox's type filter and the inventory's Holder, Category and Equipped filters are remembered for each campaign on this device."
-  ]
+  ],
+  "audience": "dm"
 }

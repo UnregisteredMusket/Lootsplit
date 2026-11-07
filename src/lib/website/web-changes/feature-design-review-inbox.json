@@ -7,5 +7,6 @@
     "A decided request stays in place as a short Approved or Denied note with a link to its record, so the page no longer jumps.",
     "Approve all payments under an amount you choose, after one confirmation; each payment is still approved and charged once.",
     "Keyboard: A approves, D denies, J and K move between requests. The Desk tab shows how many requests are waiting."
-  ]
+  ],
+  "audience": "dm"
 }

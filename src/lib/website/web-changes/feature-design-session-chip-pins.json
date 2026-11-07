@@ -7,5 +7,6 @@
     "Pin to Desk at the top of a feature screen adds it to your shortcuts, which then show as a Pinned row on the Desk.",
     "During an encounter, the Desk's party cards have − and + to adjust hit points by one.",
     "On phones, Help and the session chip sit at the top of Settings & Management on every screen."
-  ]
+  ],
+  "audience": "dm"
 }

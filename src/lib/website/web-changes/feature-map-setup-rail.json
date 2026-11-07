@@ -7,5 +7,6 @@
     "Entrances can pick their arrival view on the destination map: pan and zoom there, then choose Use this view.",
     "On phones the setup tools sit in a second bar under the title, and search becomes a magnifier icon. Players' phone layout is unchanged.",
     "Every form is still in Settings as before."
-  ]
+  ],
+  "audience": "dm"
 }

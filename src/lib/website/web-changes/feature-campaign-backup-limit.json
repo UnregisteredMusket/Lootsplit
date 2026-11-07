@@ -8,5 +8,6 @@
     "Deleting a shared campaign no longer fails just because its recovery copy needs space: it replaces that campaign's oldest online backup in the same way, after offering to download the campaign first.",
     "Download a copy is now a main button in Backups, every online backup has a labelled Download button, and each shared campaign you run has Download a copy in Campaigns. Settings → Device backups → Import reads these files.",
     "Backups shows when this device last downloaded the open campaign, as a gentle reminder to keep a fresh local copy."
-  ]
+  ],
+  "audience": "everyone"
 }

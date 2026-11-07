@@ -4,5 +4,6 @@
   "items": [
     "Downloads offers Android 1.12.0 with its checksum; install it over the existing app.",
     "This update brings party journeys across the map, temples, workshops and inns in NPC conversations, and the Community profile in My account."
-  ]
+  ],
+  "audience": "android"
 }

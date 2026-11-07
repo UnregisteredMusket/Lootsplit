@@ -7,5 +7,6 @@
     "Shops, services, nearby NPCs and property for sale follow each character's own group.",
     "The Groups panel moves a group at once, edits groups, hides a group's place from other players, and merges groups at the same place.",
     "Players see which group they're with and where the others are, and can ask the DM to move their group; the request waits in Review Inbox."
-  ]
+  ],
+  "audience": "dm"
 }

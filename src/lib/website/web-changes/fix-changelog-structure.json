@@ -1,0 +1,11 @@
+{
+  "title": "Changelog grouped by who each change is for",
+  "summary": "Each website release on the Changelog now lists its changes one by one, grouped for everyone, Dungeon Masters, players, the Android app and behind the scenes, with the first three shown and the rest a tap away.",
+  "items": [
+    "Every change has its own heading, summary and list, instead of one long run of text for the whole day.",
+    "A release with more than three changes shows three and folds the rest under \"N more changes in this release\".",
+    "The published source and the verification and live-check links are still on every release, folded into one \"How this was checked\" line.",
+    "Twelve older headlines that only said something got better now say what changed: \"Faster loot awards\" is now \"Loot reviews on the Desk and a loot screen that fits a phone\"."
+  ],
+  "audience": "everyone"
+}

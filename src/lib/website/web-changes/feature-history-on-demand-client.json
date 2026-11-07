@@ -6,5 +6,6 @@
     "Archived sessions in Journal and Reports show Load this session and open their full record when chosen.",
     "Totals that span the whole campaign say when they only cover what is loaded and offer Load all history. Fairness and favour-whoever-is-behind load what they need before comparing.",
     "Download a copy, online backups and returning to Local Mode load the whole campaign first, so this device keeps every entry; if that fails, nothing changes. Players only ever receive what their own view includes."
-  ]
+  ],
+  "audience": "everyone"
 }

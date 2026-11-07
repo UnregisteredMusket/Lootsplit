@@ -5,5 +5,6 @@
     "Book stalls for your horses and mules by the night, with feed if you like; the animals stay in your inventory.",
     "A coach booking sends a journey request to the DM with the fare shown.",
     "The fare is charged once when the DM approves departure, and the party travels over approved downtime."
-  ]
+  ],
+  "audience": "everyone"
 }

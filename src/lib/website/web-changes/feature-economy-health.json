@@ -7,5 +7,6 @@
     "Party net worth (coins and items, unidentified items at the value players are told) with a small chart across sessions.",
     "An advisory wealth-by-level note compares the party with the SRD starting gold by level, or with your own target.",
     "Nothing is stored and nothing changes. In shared campaigns it covers the history you have loaded and offers Load for earlier sessions. Players never see it."
-  ]
+  ],
+  "audience": "dm"
 }

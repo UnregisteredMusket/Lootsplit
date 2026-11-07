@@ -6,5 +6,6 @@
     "The top shows the status word, the ✕ critical, ! warning and i info counts (tap one for Diagnostics filtered to it), Needs attention, Recently resolved, a 24-hour traffic chart and plan-usage gauges; the full history stays below.",
     "Copy diagnostics on an expanded item copies a summary for a bug report, without email addresses, tokens or join codes.",
     "A failed refresh says \"Last refresh failed\" with the reason and a Retry button."
-  ]
+  ],
+  "audience": "behind-the-scenes"
 }

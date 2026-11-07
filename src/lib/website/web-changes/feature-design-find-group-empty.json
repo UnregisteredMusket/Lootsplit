@@ -4,5 +4,6 @@
   "items": [
     "With no profiles yet, the page says \"Be the first table listed\", lists what a profile shows and links to Set up my profile.",
     "The search filters appear once there are profiles to search."
-  ]
+  ],
+  "audience": "everyone"
 }

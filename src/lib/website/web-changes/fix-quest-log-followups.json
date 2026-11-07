@@ -6,5 +6,6 @@
     "Players get a New quest notice when the DM shares a quest with them after the app is open.",
     "Private quest notes are saved under your character who knows the quest.",
     "Removing a campaign from this device also clears its quest follow and updated marks."
-  ]
+  ],
+  "audience": "dm"
 }

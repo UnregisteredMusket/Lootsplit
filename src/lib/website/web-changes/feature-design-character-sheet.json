@@ -8,5 +8,6 @@
     "−1 HP and +1 HP beside your vitals save at once, and Last roll shows your latest result next to Jump to dice tray.",
     "Import into this character moved into Sheet tools.",
     "In a shared room, a character's roll log no longer says it is saved on this device."
-  ]
+  ],
+  "audience": "players"
 }

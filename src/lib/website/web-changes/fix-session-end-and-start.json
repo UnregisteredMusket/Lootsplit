@@ -3,5 +3,6 @@
   "summary": "Ending a session with “End & start next” (Journal, Desk or the session chip) now archives the old session and starts the new one in a single step. Before this fix the new session was not recorded, so the campaign was left with no session running.",
   "items": [
     "The “Ended session” and “Started session” entries both appear in Activity."
-  ]
+  ],
+  "audience": "dm"
 }

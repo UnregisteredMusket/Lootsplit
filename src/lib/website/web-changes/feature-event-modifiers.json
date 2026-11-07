@@ -6,5 +6,6 @@
     "Events change what shops charge and what they pay for those goods. Why this price? and Why this payout? name the event and show its effect, and the purchase or sale moves exactly that total.",
     "Players see the events in effect where they are under Market events; a DM can keep an event secret, so players see only “Other adjustments”.",
     "Ending an event keeps it in the campaign's history."
-  ]
+  ],
+  "audience": "dm"
 }

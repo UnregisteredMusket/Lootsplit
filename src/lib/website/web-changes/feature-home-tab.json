@@ -4,5 +4,6 @@
   "items": [
     "Home sits first in the website header and the phone menu, beside Features, Downloads, Help and Donate.",
     "\"Everything around the ledger\" on the home page shows a scroll bar so it's clear the row continues sideways."
-  ]
+  ],
+  "audience": "everyone"
 }

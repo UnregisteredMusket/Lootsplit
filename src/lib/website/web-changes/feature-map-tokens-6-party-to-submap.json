@@ -7,5 +7,6 @@
     "Add creatures here searches the SRD, adds the creatures to an encounter and places them hidden from players.",
     "Add characters here places any characters you tick, in the party's formation, with Undo.",
     "Start encounter here uses this map, and New encounter creates one on the spot."
-  ]
+  ],
+  "audience": "dm"
 }

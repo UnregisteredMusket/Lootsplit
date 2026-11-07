@@ -7,5 +7,6 @@
     "On a device campaign, a DM payment is held to the same limits as a shared room: a note of at most 500 characters, and no purse above the maximum coin balance.",
     "On a device campaign, editing a purse's coins is refused if they changed after you opened the edit, so an older edit cannot overwrite a newer one.",
     "Giving part of a stack of items with charges gives full items and keeps the partly used one with the giver, the same as a shared-room transfer."
-  ]
+  ],
+  "audience": "everyone"
 }

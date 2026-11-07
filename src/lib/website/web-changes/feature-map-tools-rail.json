@@ -7,5 +7,6 @@
     "New Layers panel: choose what shows on the map and turn the grid display on or off.",
     "New shortcuts: D draw, J plan a journey, E here, L layers, and I for the DM's encounter controls.",
     "Zoom is now a small pill in the bottom-right corner."
-  ]
+  ],
+  "audience": "everyone"
 }

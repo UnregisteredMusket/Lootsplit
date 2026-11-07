@@ -6,5 +6,6 @@
     "Actions such as Award loot, End session, Advance 8 h and New quest open the usual screen or form; nothing happens until you confirm there.",
     "Press ? for the shortcut list: / to search, and g then d, p, m, k or l to jump to the Desk, Party, Maps, Market or Library. Letter shortcuts never fire while you type.",
     "On phones and narrow windows the Tabs & windows button moves into Settings & Management → Appearance, leaving room for the campaign name and the new search button."
-  ]
+  ],
+  "audience": "everyone"
 }

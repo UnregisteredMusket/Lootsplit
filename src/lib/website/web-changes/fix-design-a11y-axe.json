@@ -7,5 +7,6 @@
     "Gains, losses and \"Open for trading\" use darker or lighter shades in every theme so they meet 4.5:1 contrast.",
     "The chat history and the shop's inventory totals can be reached and scrolled with the keyboard; new messages are announced.",
     "The fairness \"New\" badge is readable in the dark theme, and links inside sentences are underlined."
-  ]
+  ],
+  "audience": "everyone"
 }

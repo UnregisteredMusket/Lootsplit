@@ -5,5 +5,6 @@
     "Dungeon Masters see the encounter's round, turn order and hit points, and can step Previous turn or Next turn; the full tracker is one tap away.",
     "Players in a shared campaign see the round, whose turn it is, the combatants revealed on the map and their own character's hit points, and nothing the DM keeps hidden.",
     "Press I to open or close it."
-  ]
+  ],
+  "audience": "everyone"
 }

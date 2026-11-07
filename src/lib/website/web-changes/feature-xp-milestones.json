@@ -6,5 +6,6 @@
     "Each award appears once in the party's journal with who got what, and pressing again after a connection error never awards twice.",
     "A sheet shows “Ready to level up” when its XP reaches the next level (SRD 5.2.1 thresholds) or after a milestone. The level only changes when you save it on the sheet.",
     "An imported sheet's Experience points are the starting total."
-  ]
+  ],
+  "audience": "dm"
 }

@@ -6,5 +6,6 @@
     "NPC barter checks you ask the server to roll, and the treasure pool's d100s when you resolve an item, are thrown on your screen.",
     "The DM's rolls never reach the TV / player display, so secret checks stay secret.",
     "Players' rolls from account character sheets now reach the DM's screen and the TV display too."
-  ]
+  ],
+  "audience": "dm"
 }

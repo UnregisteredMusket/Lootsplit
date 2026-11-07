@@ -4,5 +4,6 @@
   "items": [
     "Your archived session reports no longer need every session of every campaign in server memory at once, so they keep loading for campaigns with many archived sessions.",
     "The reports you see, and who can see them, are exactly the same as before."
-  ]
+  ],
+  "audience": "behind-the-scenes"
 }

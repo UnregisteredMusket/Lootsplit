@@ -6,5 +6,6 @@
     "Tap a leg to insert a waypoint, tap a waypoint to remove it, or drag it. Type instead and the keyboard work too.",
     "DMs can set a scale bar on maps without a grid, and Measure uses it.",
     "Ship voyages can be drawn on gridded maps and sent straight into the ship's voyage request, with the typed tiles kept in sync."
-  ]
+  ],
+  "audience": "everyone"
 }

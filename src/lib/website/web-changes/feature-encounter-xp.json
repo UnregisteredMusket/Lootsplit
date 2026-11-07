@@ -8,5 +8,6 @@
     "Reason players see sets the note on the party journal entry. It starts as the encounter's name, so the DM can change it when the name is a spoiler; left empty, it says Encounter.",
     "Encounters awarded earlier can get their XP once from Award XP on the awarded encounter. A retry never gives XP twice, and if another tab or device got there first, the page says how much XP was already awarded.",
     "Levels still never change by themselves: each sheet shows Ready to level up."
-  ]
+  ],
+  "audience": "dm"
 }

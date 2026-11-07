@@ -1,10 +1,11 @@
 {
-  "title": "Clearer names for a few screens",
+  "title": "Desk, Shop schedules and Time & downtime: one name everywhere",
   "summary": "A few screens now use the same name everywhere: in the menus, page titles and Help.",
   "items": [
     "The DM's home screen is called the Desk on the page too (it used to say Campaign control).",
     "Shop Management is now Shop schedules: it sets opening days and restocks, while shops themselves are run from Market.",
     "Downtime is now Time & downtime, for DMs and players alike.",
     "Old links and bookmarks still open the same screens."
-  ]
+  ],
+  "audience": "everyone"
 }

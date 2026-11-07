@@ -5,5 +5,6 @@
     "Party → Preview as player (or the command palette) shows a player character's Home, Party & inventory, character sheet, Journal, Quests, Maps and Campaign chat as that player sees them.",
     "The preview is read-only: a banner reads “Previewing as <name> — read-only”, nothing can be changed, sent or saved, and Stop preview returns to the DM view at once.",
     "In shared campaigns the preview uses the same rules the server uses for that player, so what you see is what their device receives."
-  ]
+  ],
+  "audience": "dm"
 }

@@ -1,4 +1,4 @@
-import { collectEntries, readNotes, withoutBookkeeping } from "./web-changelog.mjs";
+import { collectEntries, forPage, readNotes } from "./web-changelog.mjs";
 
 /**
  * Compiles stamped website changelog entries into the build as __LOOTSPLIT_WEB_CHANGES__.
@@ -13,7 +13,7 @@ export function webChangelogPlugin() {
     async config() {
       const mode = process.env.LOOTSPLIT_WEB_CHANGELOG || "";
       readNotes(); // Invalid notes fail every build, not just main.
-      const entries = (await collectEntries({ mode })).map(withoutBookkeeping);
+      const entries = (await collectEntries({ mode })).map(forPage);
       if (mode) console.log(`Website changelog (${mode}): ${entries.length} stamped entries.`);
       return { define: { __LOOTSPLIT_WEB_CHANGES__: JSON.stringify(entries) } };
     },

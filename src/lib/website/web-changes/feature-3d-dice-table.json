@@ -6,5 +6,6 @@
     "A connected TV / player display throws players' rolls for visible characters travelling with the party, and nothing while the display is blanked. The DM's own rolls stay on the DM's screen.",
     "Players still see only their own rolls live.",
     "Turn 3D dice off in Settings → Roll mode."
-  ]
+  ],
+  "audience": "everyone"
 }

@@ -4,7 +4,7 @@
     "status": "published",
     "date": "2026-10-07",
     "commit": "fb776325721f940143bc0c1bd3aadb3e147aa95d",
-    "title": "Safer campaign access, recovery and shared actions",
+    "title": "Campaign actions recheck permissions; repairs to recovery, restores and purchases",
     "summary": "The website and backend received campaign integrity repairs after the Android 1.6.0 release. Installed APK clients retain their own bundled interface and local behavior.",
     "improvements": [
       "Campaign actions recheck current membership, restrictions and permissions when they commit.",
@@ -189,7 +189,7 @@
     "status": "published",
     "date": "2026-10-13",
     "commit": "862bda82be96153f31b39a1180ff6e8465aeab5d",
-    "title": "Clearer play screens and mobile picker fixes",
+    "title": "Player Home opens your sheet on phones, and property pickers scroll again",
     "summary": "Player Home, character sheets, recovery and downtime screens are clearer, and pickers scroll properly on phones.",
     "improvements": [
       "On a phone, Player Home opens your assigned sheet directly. Sheet export and reload are grouped under Sheet tools, next to a dice shortcut.",

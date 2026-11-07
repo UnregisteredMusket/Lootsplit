@@ -6,5 +6,6 @@
     "DMs can set the most a shop pays for one item, and let a shop buy items outside its usual categories at a lower rate.",
     "Players see only that a merchant can't afford something unless the DM chooses to show the purse.",
     "Shops without a purse work exactly as before."
-  ]
+  ],
+  "audience": "dm"
 }

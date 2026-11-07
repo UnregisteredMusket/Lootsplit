@@ -4,5 +4,6 @@
   "items": [
     "Changelog → Website and backend shows the releases from October 8 to October 23, grouped by day, each with its published source and its verification and live checks.",
     "From now on, every website or backend change adds a plain-language note that appears here when that release goes live."
-  ]
+  ],
+  "audience": "everyone"
 }
