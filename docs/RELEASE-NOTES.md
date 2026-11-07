@@ -27,6 +27,16 @@ Android version code **26**, same package and permanent signing certificate. Ins
 
 Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. Older installs keep working with the website; drafts they cannot read are refused with a request to finish on the updated website.
 
+## Release verification
+
+Published November 7, 2026 by `android-release.yml` (run 42368261722, attempt 3), started automatically by the version bump merged to main `99db029` (#457). Main's own verification of `99db029` failed twice in `dev-dice-3d-table` (the DM's screen missed a player's roll; intermittent, it passed on the release branch and the commit before; fix in progress) and once in `worker-downtime` (the DM's click never reached the server; under investigation); each passed on re-running only the failed jobs, and the release then passed the preservation checks, the widget checks and the signed-APK upgrade gate.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `d1baec565b6ccbf6b315282639a42a3354bf917ab287eb5e2290d9026613e713` (33,288,897 bytes), matching SHA256SUMS.txt.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.17.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.18.0 and versionCode 26.
+- The bundled web client contains the 3D dice host, the favor market, the treasure pool "highest wins" dice and the grouped changelog.
+
 ---
 
 # Lootsplitter 1.17.0
