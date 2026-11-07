@@ -4,7 +4,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import changelog from "@/lib/website/changelog.json";
 import { formatReleaseDate } from "@/lib/website/format";
 import release from "@/lib/website/release.json";
-import { publishedWebReleases, webReleases, type WebRelease } from "@/lib/website/web-releases";
+import {
+  groupWebChanges,
+  publishedWebReleases,
+  webReleases,
+  type WebChange,
+  type WebRelease,
+} from "@/lib/website/web-releases";
 import { PageHero } from "./parts";
 import { Website } from "./site";
 
@@ -145,7 +151,12 @@ function ReleaseShell({
       </article>
     );
   return (
-    <article className="ls-entry ls-release ls-anchor" id={id} hidden={hidden} aria-labelledby={titleId}>
+    <article
+      className="ls-entry ls-release ls-anchor"
+      id={id}
+      hidden={hidden}
+      aria-labelledby={titleId}
+    >
       <DateMargin date={date} label={label} />
       <div className={`ls-entry-body${card ? " ls-card ls-card-raised" : ""}`}>
         <div className="ls-entry-head">
@@ -169,7 +180,9 @@ function AndroidRelease({ entry, ...shape }: Shape & { entry: AndroidEntry }) {
       {...shape}
       date={entry.date}
       label="Android"
-      tag={<p className="ls-sc ls-latest">{latest ? "Latest Android release" : "Android release"}</p>}
+      tag={
+        <p className="ls-sc ls-latest">{latest ? "Latest Android release" : "Android release"}</p>
+      }
       title={`Version ${entry.version}`}
       summary={entry.summary}
       card={latest}
@@ -195,6 +208,74 @@ function AndroidRelease({ entry, ...shape }: Shape & { entry: AndroidEntry }) {
   );
 }
 
+/** How many of a release's changes are shown before the rest fold away. */
+const TOP_CHANGES = 3;
+
+/** Changes grouped by who they are for; each change is its own list item. */
+function ChangeGroups({
+  changes,
+  headingId,
+}: {
+  changes: readonly WebChange[];
+  headingId: string;
+}) {
+  return (
+    <>
+      {groupWebChanges(changes).map((group) => (
+        <section
+          className="ls-web-group"
+          key={group.key}
+          aria-labelledby={`${headingId}-${group.key}`}
+        >
+          <h3 className="ls-sc" id={`${headingId}-${group.key}`}>
+            {group.label}
+          </h3>
+          <ul className="ls-web-changes">
+            {group.changes.map((change, index) => (
+              <li key={`${index}-${change.title}`}>
+                <h4>{change.title}</h4>
+                <p>{change.summary}</p>
+                <ul className="ls-plain-list">
+                  {change.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
+  );
+}
+
+/** A release's changes: one note in full, or the first few by audience with the rest folded. */
+function WebChanges({ id, entry }: { id: string; entry: WebRelease }) {
+  const changes = entry.changes;
+  if (!changes?.length || changes.length === 1)
+    return (
+      <ul className="ls-plain-list">
+        {(changes?.[0]?.items ?? entry.improvements).map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    );
+  const rest = changes.slice(TOP_CHANGES);
+  return (
+    <>
+      <ChangeGroups changes={changes.slice(0, TOP_CHANGES)} headingId={`${id}-top`} />
+      {rest.length > 0 && (
+        <details className="ls-entry-details ls-web-more">
+          <summary>
+            {rest.length === 1 ? "1 more change" : `${rest.length} more changes`} in this release
+          </summary>
+          <ChangeGroups changes={rest} headingId={`${id}-more`} />
+        </details>
+      )}
+    </>
+  );
+}
+
 function WebReleaseEntry({ entry, ...shape }: Shape & { entry: WebRelease }) {
   return (
     <ReleaseShell
@@ -205,23 +286,23 @@ function WebReleaseEntry({ entry, ...shape }: Shape & { entry: WebRelease }) {
       title={entry.title}
       summary={entry.summary}
     >
-      <ul className="ls-plain-list">
-        {entry.improvements.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-      <p className="ls-fine">
-        Published source:{" "}
-        <a href={`https://github.com/UnregisteredMusket/Lootsplit/commit/${entry.commit}`}>
-          <code>{entry.commit.slice(0, 12)}</code>
-        </a>
-        {entry.evidence.map((item) => (
-          <span key={item.url}>
-            {" · "}
-            <a href={item.url}>{item.label}</a>
-          </span>
-        ))}
-      </p>
+      <WebChanges id={shape.id} entry={entry} />
+      {/* Provenance stays on the page, folded to one line per release. */}
+      <details className="ls-entry-details ls-checked">
+        <summary>How this was checked</summary>
+        <p className="ls-fine">
+          Published source:{" "}
+          <a href={`https://github.com/UnregisteredMusket/Lootsplit/commit/${entry.commit}`}>
+            <code>{entry.commit.slice(0, 12)}</code>
+          </a>
+          {entry.evidence.map((item) => (
+            <span key={item.url}>
+              {" · "}
+              <a href={item.url}>{item.label}</a>
+            </span>
+          ))}
+        </p>
+      </details>
     </ReleaseShell>
   );
 }
@@ -317,8 +398,8 @@ export function UpdatesPage() {
             </p>
             <p>
               <strong>Website and backend</strong> changes have their own history. These notes do
-              not change the Android download or promise that an installed APK contains newer
-              client features.
+              not change the Android download or promise that an installed APK contains newer client
+              features.
             </p>
           </div>
           <div className="ls-filters" role="group" aria-label="Show releases">

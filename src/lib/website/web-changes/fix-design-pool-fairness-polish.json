@@ -7,5 +7,6 @@
     "A treasure-pool item nobody has claimed shows \"No claims yet\" and how many can claim, instead of a list of \"Not yet\" rows.",
     "Claim all as Pass marks Pass on every item you haven't marked yet; the Need, Greed and Pass buttons stay in place while claims update.",
     "Fairness explains that no loot has been handed out yet instead of showing rows of 0 cp."
-  ]
+  ],
+  "audience": "everyone"
 }

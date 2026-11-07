@@ -7,5 +7,6 @@
     "Before an action, and when you return to the window, the room is only downloaded again if someone changed it.",
     "Chat notifications to other players are sent after your message is saved, so a slow notification service no longer holds up your table.",
     "During a server hiccup, a failed update check waits and tries again instead of downloading the whole room."
-  ]
+  ],
+  "audience": "behind-the-scenes"
 }

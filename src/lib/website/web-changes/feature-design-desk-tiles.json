@@ -7,5 +7,6 @@
     "The Session tile names the current session and has End & start next (or Start session) right at the top.",
     "A new campaign shows \"Set up your campaign\": add your party, a first place, a shop, a map and your players. Steps tick themselves, and the list can be hidden.",
     "Empty readouts point to a next step (\"Plan an encounter\") instead of listing zeros."
-  ]
+  ],
+  "audience": "dm"
 }

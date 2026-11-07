@@ -4,5 +4,6 @@
   "items": [
     "Each archived session is indexed when it is archived, so Undo and quest reward links read just the sessions they need instead of the whole campaign. This keeps them working in campaigns with many archived sessions.",
     "Results are exactly the same as before. Sessions archived before this update are indexed the first time a command reads them."
-  ]
+  ],
+  "audience": "behind-the-scenes"
 }

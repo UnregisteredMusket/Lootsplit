@@ -9,5 +9,6 @@
     "Everyone travelling with the party sees the party's totals; a player away from the party sees only their own.",
     "When resolving the treasure pool, the DM can choose Favour whoever is behind: Need still comes before Greed, a tied top roll goes to whoever has received least, and round-robin hands items to whoever is furthest behind. The receipt shows the totals used.",
     "New encounter awards now record each item's value on its ledger line, so it counts at the value the DM reviewed."
-  ]
+  ],
+  "audience": "everyone"
 }

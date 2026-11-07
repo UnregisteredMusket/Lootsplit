@@ -4,5 +4,6 @@
   "items": [
     "Shops & trade lists temple spellcasting, scribe and alchemist commissions, and inn stays.",
     "Downtime lists party journeys: plan a trip on the map and travel it with DM-approved downtime."
-  ]
+  ],
+  "audience": "everyone"
 }

@@ -5,5 +5,6 @@
     "In the quest editor the DM can name the faction a quest is for and add renown rewards for the whole party or one character. They apply once when the quest is completed, with the Favor the gains earn, and reopening the quest never undoes them.",
     "Completing a quest without renown rewards offers the DM a renown change for the party, filled in with the quest's faction. Nothing changes unless the DM applies it.",
     "Players see a quest's renown rewards for the factions they know, and only the ones that reach them."
-  ]
+  ],
+  "audience": "dm"
 }

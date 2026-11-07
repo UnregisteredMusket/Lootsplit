@@ -5,5 +5,6 @@
     "The two newest releases (and the latest Android download) are shown in full.",
     "Older releases show their date and summary line; open one to read every change.",
     "\"Jump to an Android version\" and a dated list of website releases open the release you pick, and links to a release still work."
-  ]
+  ],
+  "audience": "everyone"
 }

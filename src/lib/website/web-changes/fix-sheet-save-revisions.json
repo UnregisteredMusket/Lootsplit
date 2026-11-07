@@ -4,5 +4,6 @@
   "items": [
     "If a save goes through but the reply is lost and you press Save again, the second press reports the first save instead of a conflict.",
     "A real edit from another device is still refused, so nothing is overwritten."
-  ]
+  ],
+  "audience": "everyone"
 }

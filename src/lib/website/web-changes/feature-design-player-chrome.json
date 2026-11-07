@@ -6,5 +6,6 @@
     "The full status card comes back as soon as the connection drops or changes need attention.",
     "On phones, the scenery above each screen is a thin strip, so content starts higher.",
     "Player Home has a \"Since you were away\" card: unread messages, treasure-pool items waiting for your claim, the DM's answers to your requests and journeys, and updated quests."
-  ]
+  ],
+  "audience": "players"
 }

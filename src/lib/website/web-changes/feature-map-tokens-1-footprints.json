@@ -9,5 +9,6 @@
     "While dragging, a label shows the squares the token will cover and how far it moves.",
     "Moves that aren't snapped or leave the grid are refused rather than moved somewhere else.",
     "Older apps keep working: they see sized tokens at their centre and are asked to update before moving a Large or Gargantuan token on a snapped map."
-  ]
+  ],
+  "audience": "everyone"
 }

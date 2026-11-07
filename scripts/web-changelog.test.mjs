@@ -5,9 +5,11 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  AUDIENCES,
   HISTORY_FILE,
   OPT_OUT_LABEL,
   collectEntries,
+  forPage,
   historyProblems,
   isUserVisible,
   noteCommits,
@@ -15,6 +17,7 @@ import {
   pullRequestDecision,
   readNotes,
   stampNotes,
+  VAGUE_OPENERS,
   withoutBookkeeping,
 } from "./web-changelog.mjs";
 
@@ -114,7 +117,15 @@ test("notes are stamped with the first successful deploy that contains them, gro
   );
   const [day1, day2] = entries;
   assert.deepEqual(day1.improvements, ["One item.", "Two item."]);
-  assert.equal(day1.summary, "One summary. Two summary.");
+  // Several notes: a count line, not every summary run together into one block.
+  assert.equal(day1.summary, "2 changes for everyone.");
+  assert.deepEqual(
+    day1.changes.map((c) => [c.title, c.audience]),
+    [
+      ["One", "everyone"],
+      ["Two", "everyone"],
+    ],
+  );
   assert.deepEqual(day1.notes, ["n/one.json", "n/two.json"]);
   assert.deepEqual(
     day1.evidence.map((e) => e.url.replace("https://github.com/UnregisteredMusket/Lootsplit/", "")),
@@ -167,4 +178,79 @@ test("release mode reads note commits from git and refuses to stamp without hist
   } finally {
     if (saved !== undefined) process.env.GITHUB_RUN_ID = saved;
   }
+});
+
+test("headlines name the change: no vague comparative openers", () => {
+  for (const word of VAGUE_OPENERS) {
+    const title = `${word[0].toUpperCase()}${word.slice(1)} loot awards`;
+    assert.match(noteProblems(note(title)).join(), /name what changed/, title);
+    assert.match(noteProblems(note(word.toUpperCase())).join(), /name what changed/);
+  }
+  // Only the opening word counts, and only as a whole word.
+  assert.deepEqual(noteProblems(note("Loot reviews are faster on the Desk")), []);
+  assert.deepEqual(noteProblems(note("Betterment of the party fund")), []);
+  const [entry] = history;
+  assert.match(historyProblems([{ ...entry, title: "Safer campaign access" }]).join(), /"Safer"/);
+  // Length caps apply to every part of a note.
+  assert.match(noteProblems({ ...note("x"), summary: "s".repeat(301) }).join(), /limit 300/);
+  assert.match(noteProblems({ ...note("x"), items: ["i".repeat(301)] }).join(), /limit 300/);
+});
+
+test("the optional audience must be a known group; notes without it stay valid", () => {
+  for (const { key } of AUDIENCES)
+    assert.deepEqual(noteProblems({ ...note("x"), audience: key }), []);
+  assert.deepEqual(noteProblems(note("x")), []);
+  assert.match(noteProblems({ ...note("x"), audience: "DM" }).join(), /audience must be one of/);
+  assert.match(noteProblems({ ...note("x"), audience: null }).join(), /audience must be one of/);
+});
+
+test("a release groups its changes by audience and headlines only the first three", () => {
+  const notes = [
+    ["Behind", "behind-the-scenes"],
+    ["Dm one", "dm"],
+    ["Old note", undefined],
+    ["Player one", "players"],
+    ["Dm two", "dm"],
+    ["App", "android"],
+  ].map(([title, audience], i) => ({
+    path: `n/${i}.json`,
+    note: audience ? { ...note(title), audience } : note(title),
+    commit: `n${i}`,
+    pr: 500 + i,
+  }));
+  const [entry] = stampNotes({ notes, deploys, contains: () => true });
+  assert.deepEqual(
+    entry.changes.map((c) => c.title),
+    ["Old note", "Dm one", "Dm two", "Player one", "App", "Behind"],
+  );
+  assert.equal(entry.title, "Old note · Dm one · Dm two");
+  assert.doesNotMatch(entry.title, /more/);
+  assert.equal(
+    entry.summary,
+    "6 changes: 1 for everyone, 2 for Dungeon Masters, 1 for players, 1 for the Android app, " +
+      "1 behind the scenes.",
+  );
+  assert.deepEqual(
+    entry.improvements,
+    entry.changes.flatMap((c) => c.items),
+  );
+  assert.deepEqual(historyProblems([withoutBookkeeping(entry)]), []);
+  // Long titles: the headline stays within the history limit and drops titles, not words.
+  const long = ["a", "b", "c"].map((letter, i) => ({
+    path: `l/${i}.json`,
+    note: note(letter.repeat(70)),
+    commit: `l${i}`,
+  }));
+  const [longEntry] = stampNotes({ notes: long, deploys, contains: () => true });
+  assert.equal(longEntry.title, "a".repeat(70));
+  // The page build carries each item once: in `changes`, not again in `improvements`.
+  const page = forPage(entry);
+  assert.equal("improvements" in page, false);
+  assert.equal("notes" in page, false);
+  assert.deepEqual(page.changes, entry.changes);
+  const { changes: _changes, ...old } = withoutBookkeeping(entry);
+  assert.deepEqual(forPage(old).improvements, entry.improvements);
+  // A single note keeps its own summary.
+  const [single] = stampNotes({ notes: notes.slice(1, 2), deploys, contains: () => true });
+  assert.equal(single.summary, "Dm one summary.");
 });

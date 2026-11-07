@@ -6,5 +6,6 @@
     "A bank opens the loan request with the bank named; the DM starts from that bank's terms.",
     "Ask an agent for hired hands to propose a staff contract for one of the party's properties.",
     "Tailors make clothes over approved downtime; bring your own cloth to pay less."
-  ]
+  ],
+  "audience": "everyone"
 }

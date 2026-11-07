@@ -5,5 +5,6 @@
     "The DM turns on Track uses in an item's Edit and chooses what happens to the last use: remove the item (one of a stack, the next starts full) or keep it at 0 until recharged.",
     "Players can use their own character's items from the ⋯ menu; the DM can use any item and recharge it to any number up to the maximum.",
     "Each use and recharge appears once in activity and never moves money; pressing again after an error never spends twice."
-  ]
+  ],
+  "audience": "everyone"
 }

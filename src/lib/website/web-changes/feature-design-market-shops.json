@@ -8,5 +8,6 @@
     "DMs can pick \"Sell to a character\" once and sell each item with one tap.",
     "Shop editing has visible labels and one Save changes bar that reports each part.",
     "Modern dollar estimates are labelled \"≈ $… modern\". They are off by default for players and stay on for DMs. Show dollars still changes this on any device."
-  ]
+  ],
+  "audience": "everyone"
 }

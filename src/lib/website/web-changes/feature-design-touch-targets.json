@@ -5,5 +5,6 @@
     "Checkboxes are 24 px with a full-width 44 px row to tap, on Party, shop editing and elsewhere.",
     "Each Party character card has a Permissions… button that opens that character's individual field permissions in a sheet, instead of a long list on the card.",
     "The toast close button is larger, and small links such as ← Market, Open inventory & ledger and Remove account have a 24 px tap target."
-  ]
+  ],
+  "audience": "everyone"
 }

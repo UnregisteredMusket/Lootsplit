@@ -28,7 +28,7 @@ Run `npm run verify:quick`: unit tests, typecheck and lint.
 - No applied migration was edited (the guard hook blocks it). New schema is a new additive migration in this PR.
 - Money and inventory changes followed `/money-command`.
 - Any user-visible change has a help review (`src/lib/help/content.ts`, `player-content.ts`) and a `docs/FEATURE-INVENTORY.md` entry.
-- Any user-visible website or backend change (`src/`, `cloudflare/`, `public/`, `server/`, except tests and migrations) adds `src/lib/website/web-changes/<branch-name-with-dashes>.json` with `title`, `summary` and `items` in plain player language (no PR numbers, dates, commits or private details). It is published automatically when the release goes live (docs/CODING-MANUAL.md §7). For an invisible change, write `Web changelog: none — <reason>` in the PR description instead. The **Website changelog note** check enforces this.
+- Any user-visible website or backend change (`src/`, `cloudflare/`, `public/`, `server/`, except tests and migrations) adds `src/lib/website/web-changes/<branch-name-with-dashes>.json` with `title`, `summary`, `items` and optionally `audience` in plain player language; the title names the change (no Clearer/Safer/Faster… opener) (no PR numbers, dates, commits or private details). It is published automatically when the release goes live (docs/CODING-MANUAL.md §7). For an invisible change, write `Web changelog: none — <reason>` in the PR description instead. The **Website changelog note** check enforces this.
 - New third-party content is credited in `src/lib/website/resources.ts`.
 - Android changes follow the release rules: version bump, changelog, workflow-only publishing.
 

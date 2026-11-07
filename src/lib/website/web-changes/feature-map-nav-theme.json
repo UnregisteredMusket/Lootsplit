@@ -7,5 +7,6 @@
     "On Android, Back closes an open panel first, then goes up to the parent map, then closes the map.",
     "A map you open for the first time shows the whole map; phones zoom in only part way, centred on the party.",
     "The map title, buttons and zoom controls now use your theme's colours and the app's fonts in light and dark looks."
-  ]
+  ],
+  "audience": "everyone"
 }

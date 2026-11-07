@@ -4,5 +4,6 @@
   "items": [
     "My account opens directly from the website, with its own tab title.",
     "An unknown address shows \"This page wandered off\" with links to Home, Help and the app, instead of the sign-in screen."
-  ]
+  ],
+  "audience": "everyone"
 }

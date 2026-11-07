@@ -6,5 +6,6 @@
     "An NPC who runs more than one service shows a short numbered list to pick from; Never mind goes back.",
     "People & NPCs now shows the conversation for an NPC who offers services, even if they don't barter.",
     "Blacksmith commissions work exactly as before."
-  ]
+  ],
+  "audience": "everyone"
 }

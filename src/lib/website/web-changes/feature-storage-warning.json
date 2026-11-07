@@ -4,5 +4,6 @@
   "items": [
     "The check reads the database size from the hourly Cloudflare usage reading; it notes a review at 2.5 GB.",
     "A missing reading is listed as a coverage gap and never shown as zero. Monitoring history is kept in full."
-  ]
+  ],
+  "audience": "behind-the-scenes"
 }

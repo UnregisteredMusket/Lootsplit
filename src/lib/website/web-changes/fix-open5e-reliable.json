@@ -6,5 +6,6 @@
     "Recent searches are kept for a day and answered at once, and a saved copy is used for up to a week if Open5e is down.",
     "A slow answer is retried once; if Open5e still cannot answer, a short message explains it and a Retry button repeats the search.",
     "This also helps the installed Android app, which uses the same website search."
-  ]
+  ],
+  "audience": "everyone"
 }

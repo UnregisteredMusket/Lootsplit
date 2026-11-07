@@ -5,5 +5,6 @@
     "Diagnostics has All, Critical, Warning and Info buttons, each with its count.",
     "Links ending in #monitor-diagnostics-critical, -warning or -info open Diagnostics already filtered; the Android widget's ✕ ! i counts use them from Android 1.14.0.",
     "Older #monitor-diagnostics links still open the full list."
-  ]
+  ],
+  "audience": "behind-the-scenes"
 }

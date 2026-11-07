@@ -374,6 +374,12 @@ try {
             await webEntries.locator("a").filter({ hasText: new RegExp(`^${label}$`) }).count(),
             await webEntries.count(),
           );
+        // The provenance links fold to one "How this was checked" line per release.
+        assert.equal(await webEntries.locator("details.ls-checked").count(), await webEntries.count());
+        assert.equal(
+          await webEntries.first().locator("details.ls-checked").evaluate((d) => d.open),
+          false,
+        );
         await android.click();
         assert.equal(await android.getAttribute("aria-pressed"), "true");
         assert.equal(await all.getAttribute("aria-pressed"), "false");
@@ -398,7 +404,8 @@ try {
         assert.equal(await entriesAll.nth(1).locator("details.ls-fold").count(), 0, "second release in full");
         const older = folded.first();
         assert.equal(await older.locator("details.ls-fold").evaluate((d) => d.open), false);
-        await older.locator("summary").click();
+        // Web releases fold their provenance (and long releases their later changes) inside.
+        await older.locator("details.ls-fold > summary").click();
         assert.equal(await older.locator("details.ls-fold").evaluate((d) => d.open), true);
         assert.ok((await older.locator("li").count()) > 0);
         // The jump list links every Android version; opening an anchor expands its release.

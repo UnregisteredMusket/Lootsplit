@@ -7,5 +7,6 @@
     "Just turn it on leaves tokens where they are.",
     "Maps without a grid can get an automatic hidden grid in one tap from the Combat token tool, so you can place tokens anywhere and show the grid later.",
     "The map title now shows its place (for example the city it belongs to)."
-  ]
+  ],
+  "audience": "dm"
 }

@@ -5,5 +5,6 @@
     "Party → Wallets, transfers & property → Manage funds has a Make change form: choose how many coins, which coin to give and which to get, and check the preview first.",
     "Each exchange appears once in that purse's activity and never counts toward Fairness; pressing again after an error never exchanges twice.",
     "The DM's Convert to silver, gold and platinum buttons now record their exchange the same way, unless there are unsaved coin edits."
-  ]
+  ],
+  "audience": "everyone"
 }

@@ -7,5 +7,6 @@
     "The map's Quests tool lists the quests on that map with Show all, Only followed or None; pick one to highlight it and zoom to its pins and areas.",
     "Players see accent diamonds and dashed circles only for what the DM shared: areas for hidden objectives, or under fog, never reach them.",
     "Show on map in the quest log now opens the map on that quest, and Layers can hide quest markers or areas."
-  ]
+  ],
+  "audience": "everyone"
 }

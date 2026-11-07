@@ -5,5 +5,6 @@
     "Start a room and My account show how many online campaigns you host, for example \"1 of 2 online campaigns\".",
     "At the limit, close or delete one of your online campaigns to free a slot, or keep playing that campaign offline on your device.",
     "Nothing you already host is closed or removed, and account backups do not count toward the limit."
-  ]
+  ],
+  "audience": "everyone"
 }

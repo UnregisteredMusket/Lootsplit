@@ -3,5 +3,6 @@
   "summary": "If one request for players' rolls stalled, the Dungeon Master's screen stopped throwing players' 3D dice until the page was reloaded. It now recovers on its own within seconds.",
   "items": [
     "The TV / player display recovers the same way."
-  ]
+  ],
+  "audience": "dm"
 }

@@ -6,5 +6,6 @@
     "After the first load, players and the DM download only the parts of the campaign that changed, such as the newest chat lines.",
     "When a large campaign takes a while to load, a loading screen shows the progress. Keep waiting continues in the background; Go back pauses the download until you choose Continue loading.",
     "The fog-size warning and the Help guides state the new limit."
-  ]
+  ],
+  "audience": "everyone"
 }

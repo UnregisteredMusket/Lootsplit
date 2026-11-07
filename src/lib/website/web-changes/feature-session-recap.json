@@ -6,5 +6,6 @@
     "Players see a recap built only from what they can already see: never other players' purses or the DM's private records.",
     "The DM's draft for the players leaves out NPCs, hidden characters and DM-only records. Sharing posts it once as a party journal entry.",
     "Older sessions get a recap too, from their recorded entries, or show Nothing recorded."
-  ]
+  ],
+  "audience": "dm"
 }

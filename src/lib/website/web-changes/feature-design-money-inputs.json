@@ -6,5 +6,6 @@
     "Every one of those fields can also take coins such as 2 gp 5 sp through Enter gold, silver or other coins.",
     "Gold amounts of 1,000 or more read with separators, such as 15,727 gp.",
     "Copper is still the saved amount, so nothing about existing campaigns changes."
-  ]
+  ],
+  "audience": "everyone"
 }

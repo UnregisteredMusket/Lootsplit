@@ -9,5 +9,6 @@
     "In turn-based rooms players can move their own token outside their room turn; combat initiative still applies.",
     "A player without a token on the map can choose Place my token and tap a square.",
     "The server checks every move, so older apps follow the same turn rules."
-  ]
+  ],
+  "audience": "players"
 }

@@ -7,5 +7,6 @@
     "Right-click a token to open its sheet or tracker entry, move, hide, lock, resize, add to initiative, send it to another map or remove it. With several tokens selected the menu acts on all of them.",
     "Players get a short menu: ping, measure, place their token, and their own sheet.",
     "The menu works from the keyboard and with screen readers."
-  ]
+  ],
+  "audience": "everyone"
 }

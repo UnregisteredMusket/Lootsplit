@@ -8,5 +8,6 @@
     "Rewards are words plus links to receipts you already paid; writing or closing a quest never moves coins or items.",
     "Players: Home → Quest log shows Active, Done and Failed quests, a Follow pin with Show on map, private notes and a Quest updated notice.",
     "Quests also appear on the DM's Desk, on NPC cards and in the map's Here sheet as Quests here."
-  ]
+  ],
+  "audience": "everyone"
 }

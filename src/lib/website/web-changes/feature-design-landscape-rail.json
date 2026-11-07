@@ -5,5 +5,6 @@
     "In phone landscape the section tabs become a 56 px icon rail on the left, and the header slides away while you scroll down and comes back when you scroll up.",
     "The title screen says \"Tap to continue\" on touch screens and shows \"Continue · <campaign> · Session N\" for the campaign you last opened on this device.",
     "The Campaigns dialog lists your other campaigns by when you last opened them, with the time and session."
-  ]
+  ],
+  "audience": "everyone"
 }

@@ -4,5 +4,6 @@
   "items": [
     "Get the link, pick your character, play: each step is shown with a short explanation.",
     "The player guide is still one tap away for the details."
-  ]
+  ],
+  "audience": "players"
 }

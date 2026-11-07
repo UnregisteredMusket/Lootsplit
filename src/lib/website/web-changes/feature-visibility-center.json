@@ -7,5 +7,6 @@
     "Hidden NPCs, private maps, DM-only pins, hidden quest objectives, unidentified items and more show a count and a link to where you edit them.",
     "Start the read-only preview as any player character from the same page.",
     "Players never see this page or its counts."
-  ]
+  ],
+  "audience": "dm"
 }

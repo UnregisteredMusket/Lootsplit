@@ -8,5 +8,6 @@
     "Recovery, backup and file-sharing tools fold into one group until you have joined.",
     "After joining you land on Home with \"You're playing …\" and a Getting started strip: Sheet, Inventory & coins, Chat.",
     "On Campaign, players see which mode the DM runs the room in; the DM's mode switch and invite instructions stay on the DM's screen."
-  ]
+  ],
+  "audience": "players"
 }

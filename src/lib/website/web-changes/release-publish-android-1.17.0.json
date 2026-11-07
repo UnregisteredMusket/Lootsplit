@@ -4,5 +4,6 @@
   "items": [
     "Downloads offers Android 1.17.0 with its checksum; install it over the existing app. Saved campaigns, sign-in and placed widgets are kept.",
     "The app now includes sell and split, item charges, attunement and identification, XP and encounter XP, market events, price breakdowns, merchant purses and the DM's Economy health and What players can see pages."
-  ]
+  ],
+  "audience": "android"
 }

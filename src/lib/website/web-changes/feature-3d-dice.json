@@ -6,5 +6,6 @@
     "Works for quick rolls and the dice tray, in shared campaigns and offline.",
     "Settings → Roll mode: turn Show 3D dice off, or pick a dice colour. The dice stay off when your device asks for reduced motion.",
     "The written result and roll log are unchanged; Close dice or Escape clears the dice."
-  ]
+  ],
+  "audience": "players"
 }

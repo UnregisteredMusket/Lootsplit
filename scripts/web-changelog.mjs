@@ -1,7 +1,8 @@
 // Website and backend changelog: per-PR notes, stamped with the deploy that put them live.
 //
 // Every user-visible pull request adds one note, src/lib/website/web-changes/<branch>.json:
-//   { "title": "…", "summary": "One sentence.", "items": ["…", "…"] }
+//   { "title": "…", "summary": "One sentence.", "items": ["…", "…"], "audience": "dm" }
+// ("audience" is optional; see AUDIENCES.)
 // Notes carry no commit, date or run: nothing is known about the release while the PR is open.
 //
 // The main verification build (verify.yml, web-build step, LOOTSPLIT_WEB_CHANGELOG=release)
@@ -25,6 +26,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import audiences from "../src/lib/website/web-audiences.json" with { type: "json" };
 
 export const REPOSITORY = "UnregisteredMusket/Lootsplit";
 export const NOTES_DIR = "src/lib/website/web-changes";
@@ -66,21 +68,59 @@ function textProblems(where, text, max) {
   return problems;
 }
 
+// Who a note is for, in the order the Changelog groups them (shared with the page). A note
+// without "audience" is shown under DEFAULT_AUDIENCE, so notes written before the field
+// existed still render.
+export const AUDIENCES = audiences;
+export const DEFAULT_AUDIENCE = "everyone";
+const AUDIENCE_KEYS = AUDIENCES.map(({ key }) => key);
+
+// Writing rules (docs/CODING-MANUAL.md §7): a headline names the change, so it may not open
+// with a comparative that says only that something got better.
+export const VAGUE_OPENERS = [
+  "clearer",
+  "safer",
+  "faster",
+  "better",
+  "improved",
+  "smoother",
+  "easier",
+];
+const VAGUE_OPENER = new RegExp(`^\\W*(${VAGUE_OPENERS.join("|")})\\b`, "i");
+export const TITLE_MAX = 80;
+export const SUMMARY_MAX = 300;
+export const ITEM_MAX = 300;
+
+function headlineProblems(where, title) {
+  const opener = typeof title === "string" ? VAGUE_OPENER.exec(title) : null;
+  return opener
+    ? [
+        `${where} starts with "${opener[1]}"; name what changed instead ` +
+          `(for example "Loot reviews on the Desk", not "Faster loot awards")`,
+      ]
+    : [];
+}
+
 /** Problems with one pending note; an empty list means it is valid. */
 export function noteProblems(note, name = "note") {
   if (!note || typeof note !== "object" || Array.isArray(note))
     return [`${name} must be a JSON object`];
   const problems = [];
-  const extra = Object.keys(note).filter((key) => !["title", "summary", "items"].includes(key));
+  const extra = Object.keys(note).filter(
+    (key) => !["title", "summary", "items", "audience"].includes(key),
+  );
   if (extra.length) problems.push(`${name} has unknown fields: ${extra.join(", ")}`);
-  problems.push(...textProblems(`${name} title`, note.title, 80));
-  problems.push(...textProblems(`${name} summary`, note.summary, 300));
+  problems.push(...textProblems(`${name} title`, note.title, TITLE_MAX));
+  problems.push(...headlineProblems(`${name} title`, note.title));
+  problems.push(...textProblems(`${name} summary`, note.summary, SUMMARY_MAX));
   if (!Array.isArray(note.items) || note.items.length < 1 || note.items.length > 10)
     problems.push(`${name} items must list 1 to 10 changes`);
   else
     note.items.forEach((item, i) =>
-      problems.push(...textProblems(`${name} item ${i + 1}`, item, 300)),
+      problems.push(...textProblems(`${name} item ${i + 1}`, item, ITEM_MAX)),
     );
+  if ("audience" in note && !AUDIENCE_KEYS.includes(note.audience))
+    problems.push(`${name} audience must be one of: ${AUDIENCE_KEYS.join(", ")}`);
   return problems;
 }
 
@@ -102,9 +142,18 @@ export function historyProblems(entries) {
       problems.push(`${at} has an invalid date`);
     if (!/^[a-f0-9]{40}$/.test(entry.commit)) problems.push(`${at} needs a full deployed commit`);
     problems.push(...textProblems(`${at} title`, entry.title, 120));
+    problems.push(...headlineProblems(`${at} title`, entry.title));
     problems.push(...textProblems(`${at} summary`, entry.summary, 600));
     if (!Array.isArray(entry.improvements) || !entry.improvements.length)
       problems.push(`${at} needs improvements`);
+    if (entry.changes !== undefined) {
+      if (!Array.isArray(entry.changes) || !entry.changes.length)
+        problems.push(`${at} changes must be a non-empty list`);
+      else
+        entry.changes.forEach((change, i) =>
+          problems.push(...noteProblems(change, `${at} change ${i + 1}`)),
+        );
+    }
     for (const label of [
       "Release details",
       "Complete main verification",
@@ -207,9 +256,50 @@ function utcDay(iso) {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
+/** How many changes the Changelog shows for a release before folding the rest away. */
+export const TOP_CHANGES = 3;
+
+/** A day's headline: its first changes' titles (at most TOP_CHANGES, within 120 characters).
+ * The rest are counted in the summary line, not tacked on as "· N more". */
 function joinTitles(titles) {
-  if (titles.length <= 3) return titles.join(" · ");
-  return `${titles.slice(0, 3).join(" · ")} · ${titles.length - 3} more`;
+  let title = titles[0];
+  for (const next of titles.slice(1, TOP_CHANGES)) {
+    if (`${title} · ${next}`.length > 120) break;
+    title = `${title} · ${next}`;
+  }
+  return title;
+}
+
+const audienceOf = (note) =>
+  AUDIENCE_KEYS.includes(note.audience) ? note.audience : DEFAULT_AUDIENCE;
+
+/** A release's changes in Changelog order: by audience, then in their original order. */
+export function orderChanges(notes) {
+  return notes
+    .map((note, index) => ({ note, index }))
+    .sort(
+      (a, b) =>
+        AUDIENCE_KEYS.indexOf(audienceOf(a.note)) - AUDIENCE_KEYS.indexOf(audienceOf(b.note)) ||
+        a.index - b.index,
+    )
+    .map(({ note }) => ({
+      title: note.title,
+      summary: note.summary,
+      items: note.items,
+      audience: audienceOf(note),
+    }));
+}
+
+/** One line for a release of several changes: how many, and for whom. */
+function countSummary(changes) {
+  const parts = AUDIENCES.map(({ key, phrase }) => [
+    changes.filter((change) => change.audience === key).length,
+    phrase,
+  ])
+    .filter(([count]) => count)
+    .map(([count, phrase]) => `${count} ${phrase}`);
+  if (parts.length === 1) return `${changes.length} changes ${parts[0].replace(/^\d+ /, "")}.`;
+  return `${changes.length} changes: ${parts.join(", ")}.`;
 }
 
 /**
@@ -254,15 +344,17 @@ export function stampNotes({ notes, deploys, contains, current = null }) {
           : base
             ? `${GITHUB}/compare/${base.sha.slice(0, 12)}...${last.sha.slice(0, 12)}`
             : `${GITHUB}/commit/${last.sha}`;
-      const notesInGroup = group.items.map((item) => item.note);
+      const changes = orderChanges(group.items.map((item) => item.note));
       return {
         id: `${group.day}-web-${last.sha.slice(0, 8)}`,
         status: "published",
         date: group.day,
         commit: last.sha,
-        title: joinTitles(notesInGroup.map((note) => note.title)),
-        summary: notesInGroup.map((note) => note.summary).join(" "),
-        improvements: notesInGroup.flatMap((note) => note.items),
+        title: joinTitles(changes.map((change) => change.title)),
+        summary: changes.length === 1 ? changes[0].summary : countSummary(changes),
+        improvements: changes.flatMap((change) => change.items),
+        // Each note as its own block, grouped by audience, for the Changelog page.
+        changes,
         // Build-time bookkeeping (which note files made this entry); stripped before rendering.
         notes: group.items.map((item) => item.path),
         evidence: [
@@ -406,9 +498,16 @@ export async function collectEntries({ mode, root = "." }) {
   });
 }
 
-/** An entry as rendered: without the build-time list of note files. */
+/** An entry as stored in the history: without the build-time list of note files. */
 export function withoutBookkeeping({ notes: _notes, ...entry }) {
   return entry;
+}
+
+/** An entry as compiled into the page: `improvements` repeats every change's items, so it is
+ * left out when `changes` carries them (src/lib/website/web-releases.ts rebuilds it). */
+export function forPage(entry) {
+  const { improvements, ...rest } = withoutBookkeeping(entry);
+  return rest.changes?.length ? rest : { ...rest, improvements };
 }
 
 /** Move notes that are already live into the committed history and delete them. */

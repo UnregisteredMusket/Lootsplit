@@ -6,5 +6,6 @@
     "Raising renown earns Favor automatically, and the DM can grant Favor directly. Losing renown never takes Favor away.",
     "Why this price? and Why this payout? show each faction's effect by name, and the purchase or sale moves exactly that total.",
     "Players see only the factions the DM reveals, with their own renown and Favor and the party's attitude, never another character's standing. A hidden faction still changes prices and shows as \"Local standing\"."
-  ]
+  ],
+  "audience": "dm"
 }

@@ -6,5 +6,6 @@
     "Profiles are hidden until you choose who can see them: signed-in members, or everyone including search engines. Email addresses are never shown.",
     "Find a group lists profiles you can filter by role, what people are looking for, game, time zone and name.",
     "Signed-in members can report a profile, and site staff can hide one."
-  ]
+  ],
+  "audience": "everyone"
 }
