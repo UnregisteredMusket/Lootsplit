@@ -535,13 +535,23 @@ export async function collectEntries({ mode, root = "." }) {
     bySha.set(run.head_sha, deploy);
     candidates.push(deploy);
   }
+  // Every note is checked against every deploy, more than once (confirming deploys, then
+  // stamping), and each check is a git process: remember the answers. Without this the main
+  // build's stamping ran past the web-build time limit (2026-11-07, 168 notes x 100 releases).
+  const ancestry = new Map();
   const contains = (deploySha, noteCommit) => {
-    try {
-      git(["merge-base", "--is-ancestor", noteCommit, deploySha], root);
-      return true;
-    } catch {
-      return false;
+    const key = `${noteCommit} ${deploySha}`;
+    let known = ancestry.get(key);
+    if (known === undefined) {
+      try {
+        git(["merge-base", "--is-ancestor", noteCommit, deploySha], root);
+        known = true;
+      } catch {
+        known = false;
+      }
+      ancestry.set(key, known);
     }
+    return known;
   };
   // A successful release run may be superseded (nothing deployed): confirm from its jobs.
   const deploys = await confirmDeploys({
