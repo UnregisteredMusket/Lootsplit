@@ -462,7 +462,8 @@ export type RoomPollInput = {
   knownSeatId?: string;
   /**
    * 3D dice for the DM (owner choice 2026-11-06): a DM seat asks for the room's latest roll
-   * number on unchanged polls, to throw players' rolls as they arrive. Player seats never get it.
+   * number on every poll (unchanged and full replies), to throw players' rolls as they arrive.
+   * Player seats never get it.
    */
   watchRolls?: boolean;
 };
@@ -519,8 +520,15 @@ export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnc
       };
     }
     // Initial/changed reads retain the complete legacy projection and migration behavior.
-    const result = await roomState(input);
+    // A DM seat watching rolls gets the roll number here too: a room that keeps changing answers
+    // in full, and a roll made meanwhile must still reach the DM's screen (one indexed read).
+    const [result, rollSeq] = await Promise.all([
+      roomState(input),
+      input.watchRolls && seat.role === "dm" ? latestRollSeq(access.code) : undefined,
+    ]);
     timer.finish("full");
+    // Set on the view itself: a copy would drop its non-enumerable image and version keys.
+    if (rollSeq !== undefined) result.rollSeq = rollSeq;
     return result;
   } catch (error) {
     timer.finish("failed");
@@ -552,14 +560,14 @@ export async function roomRollsSince(input: {
   code: string;
   token: string;
   after: number;
-}): Promise<{ rolls: { seq: number; roll: TableRoll }[]; rollSeq: number }> {
+}): Promise<{ rolls: { seq: number; roll: TableRoll }[]; rollSeq: number; now: number }> {
   const access = await readRoomAccess(input.code);
   if (!access) throw Error("No table uses that code.");
   if (access.closed) throw Error("This room is closed.");
   const seat = access.seats.find((s) => s.token === input.token);
   if (!seat || seat.role !== "dm") throw Error("Only the DM can follow the table's rolls.");
   const db = database();
-  if (!db) return { rolls: [], rollSeq: 0 };
+  if (!db) return { rolls: [], rollSeq: 0, now: Date.now() };
   const after = Number.isSafeInteger(input.after) && input.after > 0 ? input.after : 0;
   const rows = await db
     .prepare(
@@ -597,7 +605,8 @@ export async function roomRollsSince(input: {
     return { seq: Number(r.seq), roll };
   });
   // The cursor moves past every row read, so the next poll never asks for the same rows again.
-  return { rolls, rollSeq: read === undefined ? after : Number(read) };
+  // `now` (the server's clock) lets a DM screen judge roll times without trusting its own clock.
+  return { rolls, rollSeq: read === undefined ? after : Number(read), now: Date.now() };
 }
 
 export async function publishTurn(_input: {
@@ -755,6 +764,8 @@ export type RoomView = {
   campaignName?: string;
   departed?: Array<{ id: string; name: string; status: string; invitation?: string }>;
   testMode?: boolean;
+  /** Full poll replies only: the room's latest character roll number, for a DM seat that asked (`watchRolls`). */
+  rollSeq?: number;
 };
 
 function requireInvitationSession(room: CloudRoom, sessionId?: string) {
