@@ -1,0 +1,11 @@
+{
+  "title": "Barter dice for players' offers, visibility pinning and gift limits",
+  "summary": "The DM now sees the dice the server throws for players' NPC barter offers, What players can see can be pinned to the Desk, and a few small gaps are closed.",
+  "items": [
+    "When a player sends an NPC an offer and the server rolls the check, the DM's screen throws the dice if Trading & Barter is open. Checks rolled earlier are not replayed, and the TV display never shows them.",
+    "What players can see has a Pin to Desk button like the other feature screens (DMs only).",
+    "Coins gifted in an imported activity report follow the same balance limit as every other payment: a report that would take a purse past it is refused whole, with nothing half-applied.",
+    "Website pages open at once with a trailing slash too, such as /welcome/."
+  ],
+  "audience": "everyone"
+}

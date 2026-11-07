@@ -23,13 +23,21 @@ export const GATE_PUBLIC_PATHS: ReadonlySet<string> = new Set([
 /** Public pages that read campaign providers, so they still wait for the account check. */
 const NEEDS_PROVIDERS: ReadonlySet<string> = new Set(["/account"]);
 
+/**
+ * One trailing slash is dropped (`/welcome/` is `/welcome`), as the root layout does. Matching
+ * stays exact otherwise: `/WELCOME`, `/welcome//`, `/welcome/x` and encoded paths are not public.
+ */
+function exactPath(path: string) {
+  return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
 /** Whether the gate lets this address through without campaign access. */
 export function isGatePublicPath(path: string) {
-  return GATE_PUBLIC_PATHS.has(path) || path.startsWith("/community/");
+  return GATE_PUBLIC_PATHS.has(exactPath(path)) || path.startsWith("/community/");
 }
 
 /** Whether this address can be drawn before the account check finishes (and on the server). */
 export function drawsBeforeAccountCheck(path: string, notFound: boolean) {
   if (notFound) return true;
-  return isGatePublicPath(path) && !NEEDS_PROVIDERS.has(path);
+  return isGatePublicPath(path) && !NEEDS_PROVIDERS.has(exactPath(path));
 }

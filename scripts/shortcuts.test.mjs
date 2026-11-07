@@ -56,4 +56,9 @@ test("Pin to Desk keeps six buttons, puts the pin first and unpins to a default"
   // Factions has a Pin to Desk button like its sibling World screens (QA pass 2026-11).
   assert.equal(pinShortcut(start, "factions", "dm")[0].destination, "factions");
   assert.ok(destinationsFor("dm").some((x) => x.id === "factions" && x.href === "/features/factions"));
+  // "What players can see" is pinnable too, for the DM only (it is a DM-only screen).
+  assert.equal(pinShortcut(start, "visibility", "dm")[0].destination, "visibility");
+  assert.ok(destinationsFor("dm").some((x) => x.id === "visibility" && x.href === "/features/visibility"));
+  assert.ok(!destinationsFor("player").some((x) => x.id === "visibility"));
+  assert.throws(() => pinShortcut(normalizeShortcuts(null, "player"), "visibility", "player"));
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { showDice } from "@/lib/dice/dice-events";
 import { useSeat } from "@/lib/quire/seat";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
@@ -24,6 +24,7 @@ import {
   type NpcBarterConfig,
 } from "@/lib/quire/npc-barter-schema";
 import type { CloudTable } from "@/lib/quire/cloud";
+import { barterRollsToThrow } from "@/lib/quire/npc-barter-dice";
 import type { Holding } from "@/lib/quire/types";
 import { Transcript, attemptLines, oddsText } from "./npc-conversation";
 import { CommandForm } from "./world-tools";
@@ -210,11 +211,18 @@ const requestedRolls = new Set<string>();
 function NpcBarterQueue({ table }: { table: CloudTable }) {
   const world = readWorld(table.journal?.world),
     state = readNpcBarter(world);
+  const { ready } = useEconomy();
+  // Rolled checks this screen has seen: null until the campaign has loaded, then the baseline
+  // that is never replayed. Server rolls for players' offers that appear later are thrown too.
+  const knownRolls = useRef<Set<string> | null>(null);
   useEffect(() => {
-    for (const a of state.attempts) {
-      if (!requestedRolls.has(a.id) || !a.roll) continue;
-      requestedRolls.delete(a.id);
+    if (!ready) return;
+    const next = barterRollsToThrow(state.attempts, knownRolls.current, requestedRolls);
+    knownRolls.current = next.known;
+    for (const a of next.throwNow) {
+      if (!a.roll) continue;
       const bonus = a.quote.bonus;
+      // The DM's own screen only (origin "own"): the TV display never shows the DM's rolls.
       showDice({
         id: `npc-barter-${a.id}`,
         formula: `1d20${bonus ? (bonus > 0 ? "+" : "") + bonus : ""}`,
@@ -227,7 +235,7 @@ function NpcBarterQueue({ table }: { table: CloudTable }) {
         label: `Persuasion vs DC ${a.quote.dc}`,
       });
     }
-  }, [state.attempts, table]);
+  }, [ready, state.attempts, table]);
   const waiting = state.attempts.filter((a) => a.status === "queued" || a.status === "confirm");
   return (
     <div className="npc-barter-queue">
