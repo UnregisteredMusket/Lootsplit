@@ -33,6 +33,26 @@ test("a DM's unchanged poll carries the room's latest roll number; a player's ne
   assert.equal("unchanged" in notAsked ? notAsked.rollSeq : "full", undefined, "only when asked");
 });
 
+test("a DM's full poll reply carries the roll number too, so a changing room never hides a roll", async () => {
+  // 2026-11-07: a player's action changes the room as they roll; the DM's next poll is a full
+  // reply, which used to carry no roll number, so the DM's screen could miss the roll.
+  const dm = await openRoom({ name: "DM", table: tradeFixture() });
+  const dmView = await pollRoom({ code: dm.code, token: dm.token });
+  assert.ok("table" in dmView);
+  const player = await joinRoom({ code: dm.code, purseId: "a", name: "Arden's player" });
+  await roll(dm.code, player.token, "a", "changed-room-0001");
+  const full = await pollRoom({ code: dm.code, token: dm.token, knownRevision: dmView.revision, knownSeatId: dmView.seatId, watchRolls: true });
+  assert.ok("table" in full, "the room changed: a full reply");
+  assert.ok(full.rollSeq! > 0, "with the latest roll number");
+  const latest = await roomRollsSince({ code: dm.code, token: dm.token, after: 0 });
+  assert.equal(full.rollSeq, latest.rollSeq);
+  assert.ok(Math.abs(latest.now - Date.now()) < 5000, "the read reports the server's clock");
+  const notAsked = await pollRoom({ code: dm.code, token: dm.token, knownRevision: dmView.revision, knownSeatId: dmView.seatId });
+  assert.ok("table" in notAsked && notAsked.rollSeq === undefined, "only when asked");
+  const playerFull = await pollRoom({ code: dm.code, token: player.token, watchRolls: true });
+  assert.ok("table" in playerFull && playerFull.rollSeq === undefined, "players never learn of other rolls");
+});
+
 test("only a DM reads new rolls, only this room's, oldest first, at most ten", async () => {
   const dm = await openRoom({ name: "DM", table: tradeFixture() });
   const player = await joinRoom({ code: dm.code, purseId: "a", name: "Arden's player" });

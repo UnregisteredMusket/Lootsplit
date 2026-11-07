@@ -1,0 +1,9 @@
+{
+  "title": "The DM's screen no longer misses players' 3D dice rolls",
+  "summary": "In shared campaigns, a player's roll now always reaches the Dungeon Master's 3D dice, even while the campaign is busy with other changes or the DM's device clock is off. Opening a campaign still never replays old rolls.",
+  "items": [
+    "A roll made while other players or the DM were changing the campaign could be skipped on the DM's screen and the TV / player display; it is now thrown within a couple of seconds.",
+    "A DM device whose clock runs fast or slow no longer drops new rolls or replays old ones."
+  ],
+  "audience": "dm"
+}

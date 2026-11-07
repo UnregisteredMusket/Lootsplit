@@ -15,7 +15,7 @@
  * is replaced when the tab uses another seat or campaign, emptied on account changes, and pruned
  * to the sections of the latest view, so it never holds more than one view's sections.
  */
-import { noteRollSeq, tableDiceWanted } from "../dice/table-dice.ts";
+import { noteRollSeq, replyRollSeq, tableDiceWanted, watchRoomRolls } from "../dice/table-dice.ts";
 import {
   closeCloudTable as closeServer,
   joinCloudTable as joinServer,
@@ -63,13 +63,16 @@ export const pullCloudTable = sync.roomRead(pullServer);
 const pollRoomServer = sync.roomRead(pollServer);
 /**
  * The conditional room poll. With 3D dice on, it also asks for the room's latest roll number
- * (the server answers DM seats only) and passes it to table-dice.ts, which throws players' rolls
- * on the DM's screen as they arrive (owner choice 2026-11-06).
+ * (the server answers DM seats only, on unchanged and full replies alike) and passes it to
+ * table-dice.ts, which throws players' rolls on the DM's screen as they arrive (owner choice
+ * 2026-11-06). Every reply is checked: a room that keeps changing (other seats' actions, the DM's
+ * own writes) answers in full, and those replies must not hide a roll.
  */
 export const pollCloudTable: typeof pollRoomServer = async (args) => {
   const watch = tableDiceWanted();
+  if (watch) watchRoomRolls(args.data.code);
   const result = await pollRoomServer(watch ? { ...args, data: { ...args.data, watchRolls: true } } : args);
-  if (watch && result && "unchanged" in result) void noteRollSeq(args.data, result.rollSeq);
+  if (watch) void noteRollSeq(args.data, replyRollSeq(result));
   return result;
 };
 export const setCloudPace = refusedInPreview(sync.roomWrite(paceServer));

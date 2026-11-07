@@ -68,3 +68,41 @@ test("actual resumeTable sets the player's seat before the room is published as 
   resumeTable();
   assert.deepEqual(events.slice(0, 2), ["seat:other", "publish:joined:other"]);
 });
+
+test("actual resumeTable publishes the saved play session before the first room response", () => {
+  // Feature screens are keyed by room code and session: a session that changes from "" to the
+  // room's ID when the first response lands remounts the screen and drops what the DM did on it.
+  const source = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
+  const body = source.slice(
+    source.indexOf("export function resumeTable()"),
+    source.indexOf("export function pendingActions()"),
+  );
+  const run = (saved: Record<string, unknown>) => {
+    const published: Record<string, unknown>[] = [];
+    new Function(
+      "context",
+      stripTypeScriptTypes(`
+        const {published,saved}=context;
+        const localStorage={};
+        let sessionKey="";
+        const key=()=>"campaign";
+        const stopPolling=()=>{};
+        const session=()=>saved;
+        const resumedPlayerSeat=()=>null;
+        const getSeat=()=>null;
+        const setSeat=()=>{};
+        const publish=(patch)=>published.push(patch);
+        const start=()=>{};
+        const serial=()=>Promise.resolve();
+        const refresh=()=>{};
+        const fail=()=>{};
+        ${body.replace("export function", "function")}
+      `) + "; return resumeTable;",
+    )({ published, saved })();
+    return published[0];
+  };
+  const dm = { code: "ROOM", seatId: "dm", token: "t", role: "dm", purseIds: [], pending: [] };
+  assert.equal(run({ ...dm, sessionId: "play-1" })?.sessionId, "play-1");
+  assert.equal(run({ ...dm, code: "ROOM" })?.code, "ROOM");
+  assert.equal(run(dm)?.sessionId, "", "an older saved session without one stays empty");
+});

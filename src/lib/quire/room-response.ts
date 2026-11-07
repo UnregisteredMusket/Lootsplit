@@ -83,6 +83,8 @@ export function readRoomResponse(value: unknown): { remote: RoomView; draft: Com
       !optionalBoolean(value.viewOnly) ||
       !optionalBoolean(value.testMode) ||
       !optionalBoolean(value.encounterActive) ||
+      // 3D dice: a full poll reply to a DM seat that asked (`watchRolls`) carries the room's latest roll number.
+      (value.rollSeq !== undefined && !count(value.rollSeq)) ||
       (value.departed !== undefined &&
         (!Array.isArray(value.departed) || !value.departed.every(departedSeat))) ||
       !text(value.draft) ||

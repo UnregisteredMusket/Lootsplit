@@ -247,6 +247,15 @@ try {
     );
     await navigateApplication(page, origin + "/features/downtime");
     await expect.poll(async () => (await journal(page)).downtimeActivities.requests.length).toBe(1);
+    // At 390 px there is no visible link to this screen, so the DM document is reloaded. Act only
+    // after the room has answered, as at the first visit above: until then the screen can still
+    // be replaced by the restored room, and what was clicked on the old one is lost.
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: /Room online.*Play active.*Saved to room/ })
+        .first(),
+    ).toBeVisible();
     currentPage = page;
     const decision = formFor(page, "Record training decision");
     const record = decision.getByRole("button", { name: "Record training decision", exact: true });

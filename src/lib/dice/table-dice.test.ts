@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { diceForDisplay, onDice, showDice } from "./dice-events.ts";
 import { displayShowsRoll } from "./display-dice.ts";
-import { noteRollSeq, resetTableDice } from "./table-dice.ts";
+import { noteRollSeq, replyRollSeq, resetTableDice, watchRoomRolls } from "./table-dice.ts";
 
 const base = { formula: "1d20+2", dice: [11], mode: "normal", modifier: 2, total: 13 };
 
@@ -97,5 +97,81 @@ test("a read that never answers stops blocking the next rolls after ten seconds"
   });
   stop();
   assert.equal(reads, 2);
+  assert.equal(seen.length, 1);
+});
+
+// The missed rolls of 2026-11-07 (dice-3d-table audit: the player's dice settled, the DM's never
+// did). Each case below failed before the fix.
+const tableRoll = (room: string, seq: number, at: number) => ({
+  seq,
+  roll: { ...base, id: `${room}:a:${seq}`, characterId: "a", character: "A", label: "Check", source: "server", at },
+});
+
+test("a full poll reply's roll number counts as much as an unchanged one's", () => {
+  assert.equal(replyRollSeq({ unchanged: true, revision: 4, rollSeq: 7 }), 7);
+  assert.equal(replyRollSeq({ code: "ROOM", revision: 5, table: {}, draft: "[]", rollSeq: 8 }), 8, "a full reply");
+  assert.equal(replyRollSeq({ code: "ROOM", revision: 5, table: {}, draft: "[]" }), undefined, "players and older servers");
+  for (const rollSeq of [-1, 1.5, "8", null]) assert.equal(replyRollSeq({ rollSeq }), undefined);
+  assert.equal(replyRollSeq(undefined), undefined);
+});
+
+test("a roll made before the DM's screen first hears back is thrown, however late that answer", async () => {
+  resetTableDice();
+  const seen: unknown[] = [];
+  const stop = onDice((r) => seen.push(r));
+  const seat = { code: "ROOM3", token: "t" };
+  const t0 = 2_000_000;
+  // The screen starts asking at t0; the room keeps answering in full (the DM's own writes, other
+  // seats' actions) until t0 + 9 s, by when the player's roll (t0 + 1 s) is 8 s old.
+  watchRoomRolls(seat.code, t0);
+  await noteRollSeq(seat, 1, t0 + 9000, async () => ({ rolls: [tableRoll("ROOM3", 1, t0 + 1000)], rollSeq: 1, now: t0 + 9000 }));
+  stop();
+  assert.equal(seen.length, 1);
+});
+
+test("a DM's device clock running fast still shows players' rolls", async () => {
+  resetTableDice();
+  const seen: unknown[] = [];
+  const stop = onDice((r) => seen.push(r));
+  const seat = { code: "ROOM4", token: "t" };
+  const device = 5_000_000;
+  const server = device - 60_000; // the device clock is a minute ahead of the server's
+  await noteRollSeq(seat, 0, device, async () => ({ rolls: [], rollSeq: 0, now: server }));
+  await noteRollSeq(seat, 1, device + 4000, async () => ({ rolls: [tableRoll("ROOM4", 1, server + 3000)], rollSeq: 1, now: server + 4000 }));
+  stop();
+  assert.equal(seen.length, 1);
+});
+
+test("a DM's device clock running slow never replays rolls made before the screen opened", async () => {
+  resetTableDice();
+  const seen: unknown[] = [];
+  const stop = onDice((r) => seen.push(r));
+  const seat = { code: "ROOM5", token: "t" };
+  const device = 5_000_000;
+  const server = device + 60_000; // the device clock is a minute behind the server's
+  // Opening the campaign: the last roll was made 30 s ago.
+  await noteRollSeq(seat, 3, device, async () => ({ rolls: [tableRoll("ROOM5", 3, server - 30_000)], rollSeq: 3, now: server }));
+  assert.equal(seen.length, 0, "an old roll is not replayed");
+  // A roll made afterwards is thrown.
+  await noteRollSeq(seat, 4, device + 2000, async () => ({ rolls: [tableRoll("ROOM5", 4, server + 1500)], rollSeq: 4, now: server + 2000 }));
+  stop();
+  assert.equal(seen.length, 1);
+});
+
+test("opening a campaign still throws a roll made just before, and only that once", async () => {
+  resetTableDice();
+  const seen: unknown[] = [];
+  const stop = onDice((r) => seen.push(r));
+  const seat = { code: "ROOM6", token: "t" };
+  const t0 = 7_000_000;
+  let reads = 0;
+  const read = async () => {
+    reads++;
+    return { rolls: [tableRoll("ROOM6", 2, t0 - 2000)], rollSeq: 2, now: t0 };
+  };
+  await noteRollSeq(seat, 2, t0, read);
+  await noteRollSeq(seat, 2, t0 + 2000, read);
+  stop();
+  assert.equal(reads, 1, "the cursor moved past it");
   assert.equal(seen.length, 1);
 });

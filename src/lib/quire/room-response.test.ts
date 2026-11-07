@@ -33,6 +33,14 @@ test("an unchanged response may carry the DM's latest roll number, and only as a
     assert.throws(() => readUnchangedRoom({ ...value, rollSeq }, scope), incomplete);
 });
 
+test("a full poll reply may carry the DM's latest roll number, and only as a count", () => {
+  assert.equal(readRoomResponse({ ...response(), rollSeq: 0 }).remote.rollSeq, 0);
+  assert.equal(readRoomResponse({ ...response(), rollSeq: 812 }).remote.rollSeq, 812);
+  assert.equal(readRoomResponse(response()).remote.rollSeq, undefined, "older servers and player seats send none");
+  for (const rollSeq of [-1, 1.5, "812", null, {}])
+    assert.throws(() => readRoomResponse({ ...response(), rollSeq }), incomplete);
+});
+
 function response(): RoomView {
   return {
     userId: "synthetic-owner",
