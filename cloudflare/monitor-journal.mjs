@@ -417,13 +417,16 @@ const parseWorkflowComponent = (component) => {
 };
 /**
  * The run that decides a workflow's status, from its runs newest first. Skipped runs decide
- * nothing; a cancelled run followed by a newer (not skipped) run of the same workflow and
- * branch was superseded. A cancelled newest run with no successor is still returned (needs attention).
+ * nothing, and neither does a superseded website release (`superseded: true`, set by
+ * owner-monitor.mjs from the run's jobs: its commit was no longer the head of main, so it
+ * deployed nothing and cannot clear or confirm anything). A cancelled run followed by a newer
+ * (not skipped) run of the same workflow and branch was superseded. A cancelled newest run with
+ * no successor is still returned (needs attention).
  */
 export function decisiveRun(runs) {
   let newer = false; // a newer run that actually ran (or is running) exists
   for (const run of runs) {
-    if (run.conclusion === "skipped") continue;
+    if (run.conclusion === "skipped" || run.superseded === true) continue;
     if (run.status === "completed" && !(run.conclusion === "cancelled" && newer)) return run;
     newer = true;
   }
@@ -436,6 +439,8 @@ export function decisiveRun(runs) {
  * nothing else will ever rerun them. Failed runs are not superseded and stay red. Owner-reviewed
  * rule (2026-10-25): `Deploy verified website` runs the same read-only live audits
  * (live-release-audit + website-browser-audit on every approved origin) after each deployment.
+ * A superseded release ran no live audit, so it never covers anything (`superseded: true` or
+ * `deployed: false`, set by owner-monitor.mjs).
  */
 export const MANUAL_COVERED_BY = new Map([
   ["Verify existing live website (read only)", "Deploy verified website"],
@@ -456,6 +461,8 @@ export function supersedingRun(run, runs, previous) {
     if (
       r.status === "completed" &&
       r.conclusion === "success" &&
+      r.superseded !== true &&
+      r.deployed !== false &&
       Number.isSafeInteger(r.updatedAt) &&
       r.updatedAt > run.updatedAt &&
       (!best || r.updatedAt > best.updatedAt)
@@ -1604,7 +1611,7 @@ async function collectOtherLogs(env, snapshot, now) {
           id: `workflow:${r.id}:${r.status}:${r.conclusion || ""}:${r.updatedAt}`,
           source: /recover|failure|backup/i.test(r.name) ? "recovery" : "workflows",
           observedAt: r.updatedAt,
-          summary: `${r.name}: ${r.conclusion || r.status}.`,
+          summary: `${r.name}: ${r.conclusion || r.status}${r.superseded === true ? " (superseded by a newer main commit; nothing deployed)" : ""}.`,
           workflow: r,
           evidence: [{ label: r.name, url: r.url }],
         })),

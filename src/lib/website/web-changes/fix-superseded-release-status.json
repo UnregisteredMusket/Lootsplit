@@ -1,0 +1,10 @@
+{
+  "title": "Skipped website releases are no longer reported as failures",
+  "summary": "When a newer update reaches the website before an older one finishes its checks, the older one now stops cleanly as superseded instead of being reported as a failed release. The newer update is still the one that goes live.",
+  "items": [
+    "A superseded update changes nothing on the website or in the database, exactly as before.",
+    "Release history and the changelog only count updates that actually went live and passed their live checks.",
+    "A release that really fails is still reported as a failure."
+  ],
+  "audience": "behind-the-scenes"
+}

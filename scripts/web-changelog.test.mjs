@@ -9,6 +9,7 @@ import {
   HISTORY_FILE,
   OPT_OUT_LABEL,
   collectEntries,
+  confirmDeploys,
   forPage,
   historyProblems,
   isUserVisible,
@@ -143,6 +144,62 @@ test("notes are stamped with the first successful deploy that contains them, gro
   );
   assert.deepEqual(Object.keys(withoutBookkeeping(day1)).includes("notes"), false);
   assert.deepEqual(historyProblems(entries.map(withoutBookkeeping)), []);
+});
+
+test("a superseded release (success, nothing deployed) never stamps a note live", async () => {
+  // b's only release run was superseded: main had advanced to c, whose release deployed both.
+  const candidates = deploys.map(({ deployRunId, ...d }) => ({
+    ...d,
+    runs: [{ id: deployRunId, attempt: 1 }],
+  }));
+  const outcomes = { 21: "deployed", 22: "superseded", 23: "deployed" };
+  const asked = [];
+  const notes = [
+    { path: "n/one.json", note: note("One"), commit: "n1", pr: 301 },
+    { path: "n/two.json", note: note("Two"), commit: "n2", pr: 302 },
+  ];
+  const contains = containsBy({ n1: 0, n2: 1 });
+  const confirmed = await confirmDeploys({
+    notes,
+    deploys: candidates,
+    contains,
+    outcome: async (run) => (asked.push(run.id), outcomes[run.id]),
+  });
+  assert.deepEqual(
+    confirmed.map((d) => [d.sha[0], d.deployRunId]),
+    [
+      ["a", 21],
+      ["c", 23],
+    ],
+  );
+  assert.deepEqual([...asked].sort(), [21, 22, 23], "only the deploys stamping reads are checked");
+  const entries = stampNotes({ notes, deploys: confirmed, contains });
+  const two = entries.find((e) => e.notes.includes("n/two.json"));
+  assert.equal(two.commit, "c".repeat(40), "Two went live with c, not with superseded b");
+  assert.equal(two.date, "2026-10-25");
+  assert.ok(two.evidence.some((e) => e.url.endsWith("/actions/runs/23")));
+  assert.ok(!JSON.stringify(entries).includes("/actions/runs/22"));
+  // A later run of the same commit that did deploy counts; an unknown outcome fails closed.
+  const rerun = [
+    {
+      ...candidates[1],
+      runs: [
+        { id: 22, attempt: 1 },
+        { id: 32, attempt: 1 },
+      ],
+    },
+  ];
+  const [b] = await confirmDeploys({
+    notes: [notes[0]],
+    deploys: rerun,
+    contains: () => true,
+    outcome: async (run) => (run.id === 32 ? "deployed" : "superseded"),
+  });
+  assert.equal(b.deployRunId, 32);
+  await assert.rejects(
+    confirmDeploys({ notes, deploys: candidates, contains, outcome: async () => null }),
+    /no recognisable deploy job/,
+  );
 });
 
 test("a single-PR group links its pull request; nothing is published without a deploy", () => {

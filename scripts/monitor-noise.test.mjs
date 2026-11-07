@@ -614,6 +614,50 @@ test("a remembered cancelled manual run older than the scan resolves and is list
   }
 });
 
+test("a superseded release decides nothing and never covers a cancelled manual live audit", async () => {
+  const superseded = (fields = {}) =>
+    run(DEPLOY, "main", "success", {
+      event: "workflow_run",
+      superseded: true,
+      deployed: false,
+      deployment: false,
+      ...fields,
+    });
+  const failed = run(DEPLOY, "main", "failure", { updatedAt: instant - 3 * HOUR });
+  assert.equal(
+    decisiveRun([superseded(), failed]),
+    failed,
+    "A superseded success cannot clear a failure",
+  );
+  assert.equal(decisiveRun([superseded()]), null);
+  const DB = localAccountDb();
+  try {
+    let result = await snap(DB, github({ runs: [superseded(), manual("cancelled"), failed] }));
+    assert.equal(find(result, DEPLOY_C).color, "red", "The older failed deploy still decides");
+    const live = find(result, LIVE_C);
+    assert.notEqual(live.state, "not-applicable", "A superseded release ran no live audit");
+    assert.equal(live.color, "yellow", "The cancelled manual audit still needs attention");
+  } finally {
+    DB.close();
+  }
+  const DB2 = localAccountDb();
+  try {
+    // Only superseded releases in the scan, after a healthy deploy: still healthy, said honestly.
+    const deployed = run(DEPLOY, "main", "success", {
+      updatedAt: instant - 3 * HOUR,
+      deployed: true,
+    });
+    await snap(DB2, github({ runs: [deployed] }), instant - 2 * HOUR);
+    const result = await snap(DB2, github({ runs: [superseded()] }));
+    const deploy = find(result, DEPLOY_C);
+    assert.equal(deploy.state, "healthy");
+    assert.match(deploy.symptom, /newer runs were skipped or superseded/);
+    assert.equal(deploy.lastRun.id, deployed.id);
+  } finally {
+    DB2.close();
+  }
+});
+
 test("real problems stay visible: failed or cancelled deploys, failed or non-manual live audits", async () => {
   const DB = localAccountDb();
   try {
