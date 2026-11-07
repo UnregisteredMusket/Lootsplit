@@ -145,7 +145,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance | open | 6 | 160s → 1168s | +1008s | +630% |
 | Development / gameplay / dev-finance | open | 8 | 17s → 92s | +75s | +441.18% |
-| Code checks and immutable builds / unit-tests | open | 14 | 11s → 170s | +159s | +1445.45% |
+| Code checks and immutable builds / unit-tests | open | 15 | 11s → 198s | +187s | +1700% |
 | Development / accounts / Start disposable development server | open | 2 | 6s → 13s | +7s | +116.67% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 5 | 21s → 421s | +400s | +1904.76% |
 | Development / accounts / dev-monitor | open | 7 | 3s → 13s | +10s | +333.33% |
@@ -927,6 +927,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / world / dev-party-split | open | 2 | 43s → 63s | +20s | +46.51% |
 | verify / Development / gameplay / dev-loot-claims | open | 2 | 36s → 54s | +18s | +50% |
 | verify / Development / economy / dev-trade-economy | open | 2 | 113s → 154s | +41s | +36.28% |
+| Accessibility (axe-core) / Start disposable development server | open | 2 | 8s → 12s | +4s | +50% |
 | Development / desktop / dev-map-tiles-1 | open | 2 | 66s → 100s | +34s | +51.52% |
 | Development / desktop / dev-map-tiles-1 | open | 2 | 74s → 104s | +30s | +40.54% |
 | Development / accounts / dev-human-check | open | 2 | 3s → 5s | +2s | +66.67% |
@@ -967,6 +968,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-07T15:21:59Z | step: Code checks and immutable builds / unit-tests | 170s → 198s | +28s | +16.47% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40942217474/job/123688255262) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42385705379/job/128442509328) |
+| 2026-11-07T14:55:04Z | step: Accessibility (axe-core) / Start disposable development server | 10s → 12s | +2s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223198337/job/121259017252) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42383760704/job/128436679083) |
+| 2026-11-07T14:14:01Z | step: Development / economy / dev-dice-3d-table | 68s → 91s | +23s | +33.82% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42294734298/job/128158877212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42380297900/job/128426344385) |
 | 2026-11-07T13:01:23Z | step: Code checks and immutable builds / web-build | 156s → 241s | +85s | +54.49% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42157779692/job/127695928232) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42372894462/job/128408766660) |
 | 2026-11-07T12:35:35Z | step: Development / gameplay / dev-award-item-details | 15s → 18s | +3s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42138703824/job/127633325059) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42372810642/job/128404261923) |
 | 2026-11-07T12:20:38Z | step: release-apk / Run npm run build:cloudflare | 9s → 12s | +3s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119804722928) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42368261722/job/128400802232) |
