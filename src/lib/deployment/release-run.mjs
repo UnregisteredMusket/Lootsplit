@@ -21,11 +21,16 @@ export const LIVE_RELEASE_STEP = "Record live deployment";
  * - "not-deployed": anything else (failed, cancelled or still running).
  * - null: the jobs do not describe a release run (unknown; callers fail closed).
  * Runs from before the superseded state existed have neither step; for them success meant deployed.
+ * @typedef {{ name?: string, conclusion?: string | null }} ReleaseStep
+ * @typedef {{ name?: string, conclusion?: string | null, steps?: ReleaseStep[] }} ReleaseJob
+ * @param {ReleaseJob[] | null | undefined} jobs
+ * @returns {"deployed" | "superseded" | "not-deployed" | null}
  */
 export function releaseRunOutcome(jobs) {
   if (!Array.isArray(jobs)) return null;
   const job = jobs.find((j) => j?.name === RELEASE_JOB);
   if (!job) return null;
+  /** @type {ReleaseStep[]} */
   const steps = Array.isArray(job.steps) ? job.steps : [];
   const marker = steps.find((s) => s?.name === LIVE_RELEASE_STEP);
   const check = steps.find((s) => s?.name === CURRENT_MAIN_STEP);
