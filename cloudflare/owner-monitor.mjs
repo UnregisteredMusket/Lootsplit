@@ -2,6 +2,7 @@ import { assertActive, roleOf } from "./members.mjs";
 import { serverMonitor } from "./monitoring.mjs";
 import { ownerAnalytics } from "./game-analytics.mjs";
 import { widgetSeverity } from "./monitor-model.mjs";
+import { RELEASE_WORKFLOW_PATH, releaseRunOutcome } from "../src/lib/deployment/release-run.mjs";
 
 const repository = "UnregisteredMusket/Lootsplit";
 const github = `https://api.github.com/repos/${repository}`;
@@ -63,7 +64,8 @@ const PROVIDER_CACHE_MS = 300000;
 // While a workflow is running, the Agent activity companion refreshes about once a minute.
 // A shorter provider cache keeps that meaningful. Each collection makes 3 GitHub requests, so at
 // most ~66 collections (~200 requests) per hour per isolate while active and 12 (36 requests)
-// otherwise, well within GitHub's 5,000 authenticated requests per hour.
+// otherwise, well within GitHub's 5,000 authenticated requests per hour. A newly completed
+// successful website release adds one jobs request, once per run attempt (RELEASE_OUTCOMES).
 export const ACTIVE_CACHE_MS = 55000;
 async function cached(env, key, operation, lifetime = () => PROVIDER_CACHE_MS) {
   let cache = caches.get(env.DB);
@@ -126,21 +128,23 @@ export function activityEvents(runs, openPulls, closedPulls, limit = ACTIVITY_EV
     const active = run.status !== "completed";
     const [kind, state, verb] = active
       ? ["run-started", "active", run.status === "in_progress" ? "running" : run.status]
-      : run.conclusion === "success"
-        ? ["run-succeeded", "ok", "passed"]
-        : run.conclusion === "neutral"
-          ? ["run-succeeded", "ok", "finished"]
-          : ["failure", "timed_out", "startup_failure"].includes(run.conclusion)
-            ? ["run-failed", "fail", run.conclusion === "timed_out" ? "timed out" : "failed"]
-            : run.conclusion === "cancelled"
-              ? ["run-cancelled", "attention", "cancelled"]
-              : [
-                  "run-attention",
-                  "attention",
-                  run.conclusion === "action_required"
-                    ? "needs approval"
-                    : (run.conclusion || "ended").replaceAll("_", " "),
-                ];
+      : run.superseded === true
+        ? ["run-superseded", "ok", "superseded by a newer commit, not deployed,"]
+        : run.conclusion === "success"
+          ? ["run-succeeded", "ok", "passed"]
+          : run.conclusion === "neutral"
+            ? ["run-succeeded", "ok", "finished"]
+            : ["failure", "timed_out", "startup_failure"].includes(run.conclusion)
+              ? ["run-failed", "fail", run.conclusion === "timed_out" ? "timed out" : "failed"]
+              : run.conclusion === "cancelled"
+                ? ["run-cancelled", "attention", "cancelled"]
+                : [
+                    "run-attention",
+                    "attention",
+                    run.conclusion === "action_required"
+                      ? "needs approval"
+                      : (run.conclusion || "ended").replaceAll("_", " "),
+                  ];
     const at = active ? run.startedAt || run.updatedAt : run.updatedAt || run.startedAt;
     if (!at) continue;
     runEvents.push({
@@ -201,6 +205,51 @@ export function activityEvents(runs, openPulls, closedPulls, limit = ACTIVITY_EV
   return kept.sort(newest);
 }
 
+/**
+ * A successful "Deploy verified website" run is not necessarily a deployment: a superseded release
+ * (its commit was no longer the head of main) ends success without deploying. Completed attempts
+ * never change, so each attempt's jobs are read once and remembered for the isolate's life.
+ */
+const RELEASE_OUTCOMES = new Map();
+const RELEASE_OUTCOME_LIMIT = 500;
+// New (not yet remembered) successful release attempts read per collection, in parallel.
+export const RELEASE_LOOKUP_LIMIT = 20;
+/**
+ * Classifies every successful release run in the scan: `deployed: true` on real deployments, and
+ * `superseded: true, deployed: false, deployment: false` on superseded ones, so no reader (latest
+ * deployment, Deploys tile, activity, workflow diagnostics, live-audit coverage) counts them as
+ * deployments. Failed, cancelled and running release runs keep their conclusion and need no
+ * lookup. An unreadable or unrecognised jobs list, or more new attempts than one collection reads,
+ * throws: the GitHub source is then unavailable (an explicit gap) instead of guessing; outcomes
+ * read before that are remembered, so the next collection continues.
+ */
+export async function markReleaseRuns(runs, lookup) {
+  const key = (run) => `${run.id}:${run.attempt || 1}`;
+  const releases = runs.filter(
+    (run) => run.deployment && run.status === "completed" && run.conclusion === "success",
+  );
+  const unknown = releases.filter((run) => !RELEASE_OUTCOMES.has(key(run)));
+  await Promise.all(
+    unknown.slice(0, RELEASE_LOOKUP_LIMIT).map(async (run) => {
+      const outcome = releaseRunOutcome(await lookup(run));
+      if (!outcome) throw new Error("Invalid release jobs");
+      if (RELEASE_OUTCOMES.size >= RELEASE_OUTCOME_LIMIT)
+        RELEASE_OUTCOMES.delete(RELEASE_OUTCOMES.keys().next().value);
+      RELEASE_OUTCOMES.set(key(run), outcome);
+    }),
+  );
+  if (unknown.length > RELEASE_LOOKUP_LIMIT) throw new Error("Release runs not classified yet");
+  for (const run of releases) {
+    const outcome = RELEASE_OUTCOMES.get(key(run));
+    run.deployed = outcome === "deployed";
+    if (outcome === "superseded") {
+      run.superseded = true;
+      run.deployment = false;
+    }
+  }
+  return runs;
+}
+
 export async function developmentActivity(env, fetcher = fetch) {
   if (env.OWNER_MONITOR_GITHUB !== "true") return disconnected();
   return cached(
@@ -247,10 +296,18 @@ export async function developmentActivity(env, fetcher = fetch) {
           event: label(run.event).slice(0, 40),
           commit: /^[a-f0-9]{40}$/.test(run.head_sha) ? run.head_sha : null,
           url: `https://github.com/${repository}/actions/runs/${run.id}`,
-          deployment: run.path === ".github/workflows/website-release.yml",
+          deployment: run.path === RELEASE_WORKFLOW_PATH,
           startedAt: Date.parse(run.run_started_at || run.created_at) || null,
           updatedAt: Date.parse(run.updated_at) || null,
         };
+      });
+      await markReleaseRuns(runs, async (run) => {
+        const data = await json(
+          fetcher,
+          `${github}/actions/runs/${run.id}/attempts/${run.attempt || 1}/jobs?per_page=30`,
+          { headers },
+        );
+        return Array.isArray(data?.jobs) ? data.jobs : null;
       });
       const open = pulls.map(pullRequest),
         recent = closed.map(pullRequest);
@@ -263,6 +320,7 @@ export async function developmentActivity(env, fetcher = fetch) {
         active,
         // Running development workflows (not scheduled housekeeping) drive the fast refresh.
         activeActivity: active.filter((run) => run.event !== "schedule").length,
+        // The newest release run that is (or may become) a deployment; superseded runs are not.
         latestDeployment: runs.find((run) => run.deployment) || null,
         // headRef lets diagnostics tell a branch with an open pull request from a finished one.
         openPulls: open.map(({ number, title, draft, url, headRef }) => ({
@@ -527,9 +585,11 @@ export function mainRuns(runs, limit = MAIN_RUN_LIMIT) {
     .slice(0, limit)
     .map((run) => ({
       name: short(label(run.name) || "Workflow", 40),
-      conclusion: label(run.conclusion).slice(0, 40) || null,
+      // A superseded release deployed nothing: widgets show it as skipped (–), not as passed.
+      conclusion: run.superseded === true ? "skipped" : label(run.conclusion).slice(0, 40) || null,
       at: run.updatedAt || run.startedAt || null,
       deployment: run.deployment === true,
+      ...(run.superseded === true ? { superseded: true } : {}),
     }));
 }
 /**

@@ -6,8 +6,10 @@
 // Notes carry no commit, date or run: nothing is known about the release while the PR is open.
 //
 // The main verification build (verify.yml, web-build step, LOOTSPLIT_WEB_CHANGELOG=release)
-// stamps them. For each note it finds the commit that added it, then the first successful
-// "Deploy verified website" run whose commit contains it, and groups notes by the UTC day of
+// stamps them. For each note it finds the commit that added it, then the first "Deploy verified
+// website" run that actually deployed a commit containing it (a successful run can be a
+// superseded release that deployed nothing; see src/lib/deployment/release-run.mjs and
+// confirmDeploys), and groups notes by the UTC day of
 // that deployed commit. Notes no successful deploy contains yet belong to the commit being
 // built, which is what the page describes if that artifact goes live. The stamped entries are
 // compiled into the artifact (Vite define), so the release job deploys them unchanged and
@@ -27,13 +29,14 @@ import {
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import audiences from "../src/lib/website/web-audiences.json" with { type: "json" };
+import { RELEASE_WORKFLOW_FILE, releaseRunOutcome } from "../src/lib/deployment/release-run.mjs";
 
 export const REPOSITORY = "UnregisteredMusket/Lootsplit";
 export const NOTES_DIR = "src/lib/website/web-changes";
 export const HISTORY_FILE = "src/lib/website/web-releases.json";
 export const OPT_OUT_LABEL = "no-web-changelog";
 const GITHUB = `https://github.com/${REPOSITORY}`;
-const RELEASE_WORKFLOW = "website-release.yml";
+const RELEASE_WORKFLOW = RELEASE_WORKFLOW_FILE;
 const VERIFY_WORKFLOW = "verify.yml";
 
 // Paths whose changes reach people using the website, the app it serves or the backend.
@@ -377,6 +380,50 @@ export function stampNotes({ notes, deploys, contains, current = null }) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * Keep only real deployments among the successful release runs `stampNotes` would use.
+ *
+ * deploys:  candidates, oldest first: [{ sha, date, verifyRunId, runs: [{ id, attempt }] }]
+ *           (every successful release run of that commit, oldest first)
+ * outcome:  async (run) => releaseRunOutcome of that run attempt's jobs
+ *
+ * Checks lazily, only the candidates stampNotes reads (the first deploy containing each note and
+ * the deploy before it, which bounds the "Release details" range), until those are all
+ * confirmed. A commit counts as deployed by its first run that deployed it (deployRunId); a
+ * commit whose runs were all superseded is dropped. An unknown outcome throws, like every other
+ * GitHub error in release mode: a note is never stamped live on a guess.
+ */
+export async function confirmDeploys({ notes, deploys, contains, outcome }) {
+  let list = [...deploys];
+  const checked = new Map(); // deploy object -> confirmed deploy or null
+  for (;;) {
+    const used = new Set();
+    for (const item of notes) {
+      const index = list.findIndex((d) => contains(d.sha, item.commit));
+      const at = index < 0 ? list.length : index; // the current build follows the last deploy
+      if (index >= 0) used.add(list[index]);
+      if (at > 0) used.add(list[at - 1]);
+    }
+    const pending = [...used].filter((d) => !checked.has(d));
+    if (!pending.length) return list.map((d) => checked.get(d) ?? d);
+    await Promise.all(
+      pending.map(async (deploy) => {
+        let confirmed = null;
+        for (const run of deploy.runs) {
+          const result = await outcome(run);
+          if (!result) throw new Error(`Release run ${run.id} has no recognisable deploy job`);
+          if (result === "deployed") {
+            confirmed = { ...deploy, deployRunId: run.id };
+            break;
+          }
+        }
+        checked.set(deploy, confirmed);
+      }),
+    );
+    list = list.filter((d) => !checked.has(d) || checked.get(d));
+  }
+}
+
 async function githubJson(path, { attempts = 3 } = {}) {
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   let lastError;
@@ -464,23 +511,29 @@ export async function collectEntries({ mode, root = "." }) {
   const verifyRun = new Map();
   for (const run of verifications.sort((a, b) => a.created_at.localeCompare(b.created_at)))
     if (!verifyRun.has(run.head_sha)) verifyRun.set(run.head_sha, run.id);
-  const seen = new Set();
-  const deploys = [];
+  const bySha = new Map();
+  const candidates = [];
   for (const run of releases.sort((a, b) => a.created_at.localeCompare(b.created_at))) {
-    if (seen.has(run.head_sha) || !verifyRun.has(run.head_sha)) continue;
+    if (!verifyRun.has(run.head_sha)) continue;
+    const known = bySha.get(run.head_sha);
+    if (known) {
+      known.runs.push({ id: run.id, attempt: run.run_attempt || 1 });
+      continue;
+    }
     let date;
     try {
       date = git(["show", "-s", "--format=%cI", run.head_sha], root);
     } catch {
       continue; // Not in this history (for example a commit later rewritten away).
     }
-    seen.add(run.head_sha);
-    deploys.push({
+    const deploy = {
       sha: run.head_sha,
       date,
       verifyRunId: verifyRun.get(run.head_sha),
-      deployRunId: run.id,
-    });
+      runs: [{ id: run.id, attempt: run.run_attempt || 1 }],
+    };
+    bySha.set(run.head_sha, deploy);
+    candidates.push(deploy);
   }
   const contains = (deploySha, noteCommit) => {
     try {
@@ -490,6 +543,16 @@ export async function collectEntries({ mode, root = "." }) {
       return false;
     }
   };
+  // A successful release run may be superseded (nothing deployed): confirm from its jobs.
+  const deploys = await confirmDeploys({
+    notes: located,
+    deploys: candidates,
+    contains,
+    outcome: async (run) =>
+      releaseRunOutcome(
+        (await githubJson(`actions/runs/${run.id}/attempts/${run.attempt}/jobs?per_page=30`)).jobs,
+      ),
+  });
   return stampNotes({
     notes: located,
     deploys,

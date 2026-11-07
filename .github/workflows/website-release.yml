@@ -57,9 +57,20 @@ jobs:
       - name: Validate the exact verified artifact
         run: node scripts/release-artifact.mjs verify
       - run: npx playwright install --with-deps chromium
+      # A release whose commit is no longer the head of main is superseded: it stops here, before
+      # migrations and deploy, exactly as before, but ends success instead of a false failure.
+      # Every production step below is guarded on this output; only a real deploy reaches
+      # "Record live deployment", which readers use to tell deployments apart
+      # (src/lib/deployment/release-run.mjs). Migrations and preflight still assert current main.
+      - name: Check the release commit is still the head of main
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-current.mjs
       # Additive-only SQL from the verified artifact; anything else, or a failed apply, stops the
       # release here and the current Worker keeps serving. Never apply migrations by hand.
       - name: Apply pending additive D1 migrations and read back the ledger
+        if: steps.current.outputs.superseded != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -67,6 +78,7 @@ jobs:
           CLOUDFLARE_D1_MIGRATION_TOKEN: ${{ secrets.CLOUDFLARE_D1_MIGRATION_TOKEN }}
         run: node scripts/recovery-step.mjs production-migrations 300 node scripts/production-migrations.mjs
       - name: Check current main, existing bindings and applied migrations; deploy without rebuild
+        if: steps.current.outputs.superseded != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -75,18 +87,21 @@ jobs:
           node scripts/recovery-step.mjs production-preflight 120 node scripts/production-preflight.mjs
           node scripts/recovery-step.mjs website-deploy 300 npx wrangler deploy --config dist/website-release/wrangler.toml --no-bundle --keep-vars --message "GitHub verified $RELEASE_SHA run ${{ github.event.workflow_run.id }}"
       - name: Verify deployed CPU and observability policy
+        if: steps.current.outputs.superseded != 'true'
         env:
           EXPECTED_RELEASE_SHA: ${{ env.RELEASE_SHA }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/runtime-policy.mjs
       - name: Record failure-email readiness without sending mail
+        if: steps.current.outputs.superseded != 'true'
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FAILURE_REPORT_EMAIL: ${{ secrets.FAILURE_REPORT_EMAIL }}
           FAILURE_REPORT_FROM: ${{ secrets.FAILURE_REPORT_FROM }}
         run: node scripts/failure-report.mjs --check-config
       - name: Verify deployed identity and read-only desktop/mobile website behavior
+        if: steps.current.outputs.superseded != 'true'
         env:
           EXPECTED_RELEASE_SHA: ${{ env.RELEASE_SHA }}
           AUDIT_ORIGIN: https://lootsplitter.com
@@ -96,11 +111,19 @@ jobs:
         run: |
           node scripts/recovery-step.mjs website-live-audit 180 node scripts/live-audit-origins.mjs scripts/live-release-audit.mjs
           node scripts/live-audit-origins.mjs scripts/website-browser-audit.mjs
+      # Runs only when this commit was deployed and every live audit passed. Its success is the
+      # deployment marker the web changelog and owner monitor read; never rename or unguard it
+      # without updating src/lib/deployment/release-run.mjs (scripts/release-run.test.mjs).
+      - name: Record live deployment
+        if: steps.current.outputs.superseded != 'true'
+        run: printf 'Deployed and live-audited: `%s`\n\n' "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
       - name: Record release result
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
+          SUPERSEDED: ${{ steps.current.outputs.superseded }}
         run: |
+          if [ "$SUPERSEDED" = "true" ]; then JOB_STATUS="superseded (main advanced; nothing migrated or deployed)"; fi
           printf 'Website commit: `%s`\n\nVerification run: %s\n\nResult: %s\n' "$RELEASE_SHA" '${{ github.event.workflow_run.html_url }}' "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()

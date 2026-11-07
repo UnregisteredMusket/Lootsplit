@@ -147,3 +147,95 @@ test("adjacent traffic windows use inclusive start and exclusive end without bou
   assert.equal(value.state, "ready");
   assert.equal(value.data.requests, 0);
 });
+
+test("a superseded website release is not reported as a deployment anywhere in the activity", async () => {
+  const { mainRuns } = await import("../cloudflare/owner-monitor.mjs");
+  const { CURRENT_MAIN_STEP, LIVE_RELEASE_STEP } =
+    await import("../src/lib/deployment/release-run.mjs");
+  const release = (id, sha, minutesAgo) => ({
+    id,
+    name: "Deploy verified website",
+    status: "completed",
+    conclusion: "success",
+    run_attempt: 1,
+    head_branch: "main",
+    head_sha: sha.repeat(40),
+    event: "workflow_run",
+    path: ".github/workflows/website-release.yml",
+    run_started_at: new Date(Date.now() - (minutesAgo + 5) * 60000).toISOString(),
+    updated_at: new Date(Date.now() - minutesAgo * 60000).toISOString(),
+  });
+  const jobs = (deployed) => ({
+    jobs: [
+      {
+        name: "deploy",
+        conclusion: "success",
+        steps: [
+          { name: CURRENT_MAIN_STEP, conclusion: "success" },
+          { name: LIVE_RELEASE_STEP, conclusion: deployed ? "success" : "skipped" },
+        ],
+      },
+    ],
+  });
+  const asked = [];
+  // Newest first: 9002 (commit b) superseded, 9001 (commit a) deployed.
+  const fetcher = async (url) => {
+    const lookup = /\/actions\/runs\/(\d+)\/attempts\/1\/jobs/.exec(url);
+    if (lookup) {
+      asked.push(Number(lookup[1]));
+      return Response.json(jobs(lookup[1] === "9001"));
+    }
+    if (url.includes("/actions/runs?"))
+      return Response.json({ workflow_runs: [release(9002, "b", 1), release(9001, "a", 10)] });
+    return Response.json([]);
+  };
+  const result = await developmentActivity(
+    { DB: { superseded: true }, OWNER_MONITOR_GITHUB: "true" },
+    fetcher,
+  );
+  assert.equal(result.state, "ready");
+  assert.deepEqual(asked.sort(), [9001, 9002]);
+  const [superseded, deployed] = result.data.runs;
+  assert.equal(superseded.superseded, true);
+  assert.equal(superseded.deployed, false);
+  assert.equal(superseded.deployment, false);
+  assert.equal(deployed.deployed, true);
+  assert.equal(result.data.latestDeployment.commit, "a".repeat(40));
+  const tiles = mainRuns(result.data.runs);
+  assert.deepEqual(
+    tiles.map((r) => [r.conclusion, r.deployment, r.superseded === true]),
+    [
+      ["skipped", false, true],
+      ["success", true, false],
+    ],
+  );
+  assert.deepEqual(
+    result.data.events.map((e) => [e.kind, e.text]),
+    [
+      [
+        "run-superseded",
+        "Deploy verified website superseded by a newer commit, not deployed, on main",
+      ],
+      ["run-succeeded", "Deploy verified website passed on main"],
+    ],
+  );
+  // Remembered per run attempt: a later collection reads no jobs again.
+  asked.length = 0;
+  const again = await developmentActivity(
+    { DB: { again: true }, OWNER_MONITOR_GITHUB: "true" },
+    fetcher,
+  );
+  assert.equal(again.data.runs[0].superseded, true);
+  assert.deepEqual(asked, []);
+  // Jobs that do not describe a release are an explicit gap, never a guessed deployment.
+  const unknown = await developmentActivity(
+    { DB: { unknown: true }, OWNER_MONITOR_GITHUB: "true" },
+    async (url) =>
+      url.includes("/jobs")
+        ? Response.json({ jobs: [] })
+        : url.includes("/actions/runs?")
+          ? Response.json({ workflow_runs: [release(9003, "c", 1)] })
+          : Response.json([]),
+  );
+  assert.equal(unknown.state, "unavailable");
+});
