@@ -1,5 +1,26 @@
 [
   {
+    "version": "1.18.0",
+    "date": "2026-11-07",
+    "summary": "The app gets 3D dice, factions and the fixes made since 1.17.0: renown, favor and quest rewards, dice for players and the DM, coin handling that matches the website, and plainer help text.",
+    "features": [
+      "3D dice: rolls from a character sheet throw dice that land on the recorded result, for d4 to d20, d100 and advantage. Each player can turn them off or pick a colour in Roll mode settings.",
+      "In a shared room the DM's screen and the TV display throw players' rolls. The DM's own rolls (encounters, loot tables, barter checks, treasure pool d100s) show only on the DM's screen.",
+      "Factions: each character has renown with each faction, with named tiers. Renown gains earn Favor to spend at a faction's favor market, and quests can carry renown rewards.",
+      "Factions can change prices at the shops and places they control, by tier."
+    ],
+    "improvements": [
+      "Coins match the website: giving, selling and loan approvals keep platinum and electrum, and a coin edit made on out-of-date numbers is refused.",
+      "Help and app text rewritten in plain language.",
+      "Item uses left are kept whichever field you fill in first."
+    ],
+    "fixes": [
+      "Gifting part of a stack moves full items; the partly used one stays with the giver.",
+      "Signed-out guests no longer see account requests fail in the background.",
+      "The DM's screen keeps showing players' dice after a slow or stalled connection."
+    ]
+  },
+  {
     "version": "1.17.0",
     "date": "2026-11-05",
     "summary": "The app catches up with the website's loot, trade and economy features since 1.16.0: sell and split, charges, attunement, identification, XP, market events, price breakdowns, merchant purses and the DM's economy and visibility pages.",
