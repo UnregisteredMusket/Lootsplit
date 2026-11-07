@@ -122,7 +122,7 @@ function LibraryHub() {
           <h1>Library</h1>
           <p>
             {dm
-              ? "Your references, close at hand."
+              ? "Rules references, your PDF books, handouts and the name generator."
               : "Search shared campaign records and read the available reference indices."}
           </p>
         </div>

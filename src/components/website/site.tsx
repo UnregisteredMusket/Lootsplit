@@ -318,8 +318,7 @@ export function WelcomePage() {
             </h2>
             <p className="ls-lead">
               Award the hoard after a fight, review it, and send it once to one purse or split the
-              coins evenly across the party. From the first copper piece to a dragon’s hoard, every
-              coin is recorded.
+              coins evenly across the party. Every coin is recorded, down to the copper.
             </p>
             <ul className="ls-ticks">
               <li>Five coin denominations with conversion, payments and transfers</li>
@@ -381,11 +380,10 @@ export function WelcomePage() {
           <div className="ls-stack ls-measure">
             <Kicker>Everything around the ledger</Kicker>
             <h2 id="areas" className="ls-display">
-              Your campaign has grown. <span className="ls-block">So has Lootsplitter.</span>
+              Eight parts of one campaign
             </h2>
             <p className="ls-lead">
-              Eight connected parts, one campaign. Purchases, voyages, property income and loot all
-              post to the same ledger.
+              Purchases, voyages, property income and loot all post to the same ledger.
             </p>
           </div>
           <AreasCarousel areas={areas} />
@@ -442,7 +440,7 @@ export function WelcomePage() {
           <p className="ls-fine ls-center">
             The DM can work offline on an owned device campaign; shared sessions need a
             connection.{" "}
-            <Link to="/help">Explore the application guide</Link>.
+            <Link to="/help">Read the Help guide</Link>.
           </p>
         </div>
       </section>
@@ -455,7 +453,7 @@ export function WelcomePage() {
           <div className="ls-cols2">
             <div className="ls-card">
               <Kicker>For Dungeon Masters</Kicker>
-              <h3>Run the world, not the spreadsheet</h3>
+              <h3>Shops, combat and approvals</h3>
               <ul className="ls-ticks">
                 <li>Review Inbox for payments, loans, imports and training</li>
                 <li>Shops, exchanges, black markets and blacksmith commissions</li>
@@ -504,7 +502,7 @@ export function WelcomePage() {
             <p className="ls-sc ls-entry-no">Behind the screen</p>
             <p className="ls-ledger-title">The DM keeps the keys</p>
             <p className="ls-ledger-note">
-              Access, permissions and anything that needs a ruling. Built for the table.
+              The DM controls access and permissions, and approves anything that needs a ruling.
             </p>
           </div>
         </div>
@@ -513,7 +511,7 @@ export function WelcomePage() {
       <section className="ls-ink ls-section" aria-labelledby="platforms">
         <div className="ls-wrap ls-stack ls-gap-lg">
           <div className="ls-stack ls-center">
-            <Kicker ornament>Your ledger, within reach</Kicker>
+            <Kicker ornament>Browser and Android</Kicker>
             <h2 id="platforms" className="ls-display">
               Start in the browser, <em>or take it with you.</em>
             </h2>
@@ -544,7 +542,7 @@ export function WelcomePage() {
           </div>
           <div className="ls-band">
             <div>
-              <Kicker>Your campaigns, close at hand</Kicker>
+              <Kicker>With an account</Kicker>
               <p>
                 Sign in to save memberships, reusable character profiles, and private cloud
                 backups when you choose. Guest play stays available.

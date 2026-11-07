@@ -96,14 +96,14 @@ export function AboutLootsplit() {
         </dd>
       </dl>
       <p>
-        Android browsers use the website. The installed Android app has its own bundled client; web
-        and backend updates do not replace that client. A client release label does not establish
-        matching features or a backend compatibility version.
+        Android browsers use the website. The installed Android app carries its own copy of the
+        app, so a website or backend update doesn't change it until you install the next APK. A
+        matching release label doesn't mean matching features or a compatible backend.
       </p>
       <p>
-        Owned DM Local play, Live, online Turn-based play and permitted between-session viewing
-        remain available. Shared sessions use the hosted service and its current permissions. Keep
-        exported backups outside application storage.
+        Local DM play, Live and Turn-based rooms and viewing between sessions all work here. Shared
+        sessions go through the hosted server and its permissions. Keep exported backups somewhere
+        outside the app's own storage.
       </p>
       <p className="ls-about-links">
         <Link to="/updates" hash="web-backend">

@@ -382,13 +382,13 @@ function Account() {
         <div className="portal-content">
           <div className="portal-title-row">
             <div>
-              <p className="portal-eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
-              <h1>{library ? "My account" : "Welcome to your next chapter."}</h1>
+              <p className="portal-eyebrow">CAMPAIGNS &amp; CHARACTERS</p>
+              <h1>{library ? "My account" : "Your Lootsplitter account"}</h1>
               <p className="portal-lead">
                 {library ? (
                   <>
                     Signed in as <strong data-testid="account-name">{library.user.name}</strong>.
-                    Your campaigns, recovery copies and characters, ready when you are.
+                    Your campaigns, recovery copies and characters.
                   </>
                 ) : (
                   "Sign in to return to your campaigns across devices. Guests join with a current invitation. Offline campaigns belong to their signed-in DM."
@@ -469,7 +469,7 @@ function Account() {
                 <section id="account-campaigns" className="portal-account-section">
                   <div className="portal-section-title">
                     <div>
-                      <p className="portal-eyebrow">PICK UP WHERE YOU LEFT OFF</p>
+                      <p className="portal-eyebrow">HOSTED AND JOINED</p>
                       <h2>My campaigns</h2>
                       {library.hosting &&
                         (runsCampaigns ||
@@ -871,7 +871,7 @@ function Account() {
                   </p>
                 </section>
                 <section id="account-reusable-profiles" className="portal-account-section">
-                  <p className="portal-eyebrow">FAMILIAR FACES, NEW ADVENTURES</p>
+                  <p className="portal-eyebrow">REUSABLE PROFILES</p>
                   <h2>My characters</h2>
                   <p className="portal-subtle">
                     Reusable names, portraits and notes. Adding a profile creates a new character
@@ -1146,7 +1146,7 @@ function Account() {
                 <section id="account-backups" className="portal-account-section">
                   <div className="portal-section-title">
                     <div>
-                      <p className="portal-eyebrow">SAVE A MOMENT IN THE STORY</p>
+                      <p className="portal-eyebrow">PRIVATE TO YOUR ACCOUNT</p>
                       <h2>Cloud backups</h2>
                     </div>
                     <div className="portal-actions">

@@ -120,8 +120,8 @@ export function DownloadsPage() {
               </div>
               <h2>Always current</h2>
               <p>
-                Use Lootsplitter on Windows, macOS, Linux, or your phone. Open the web app and keep
-                playing at its existing address.
+                Use Lootsplitter on Windows, macOS, Linux, or your phone. Open the web app at
+                lootsplitter.com.
               </p>
               <p className="ls-card-summary">
                 Always the deployed web version · Desktop & mobile browsers
@@ -129,7 +129,7 @@ export function DownloadsPage() {
               <AppLink className="ls-btn ls-btn-ink ls-self-start" href="/">
                 {OPEN_APP}
               </AppLink>
-              <p className="ls-fine">Works in any modern browser, with nothing to install.</p>
+              <p className="ls-fine">Runs in a current browser. There is no desktop installer.</p>
               <Link className="ls-text-link" to="/help" hash="desktop">
                 Using Lootsplitter on your PC <ArrowRight size={16} aria-hidden="true" />
               </Link>

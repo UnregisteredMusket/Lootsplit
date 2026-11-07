@@ -181,8 +181,8 @@ export function FeaturesPage() {
     <Website footer="ink">
       <PageHero kicker="The whole campaign" title="Features">
         <p className="ls-lead ls-measure">
-          It started with splitting loot. Now the ledger sits at the center of everything your
-          table tracks, from the first copper piece to a fleet of ships. Every feature is free.
+          It started with splitting loot. The same ledger now records shops, trade, property,
+          ships, travel and downtime. Every feature is free.
         </p>
         <p className="ls-fine">
           {totals.major} major features and {totals.minor} smaller ones in {FEATURE_AREAS.length}{" "}

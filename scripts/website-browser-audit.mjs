@@ -74,7 +74,7 @@ try {
       ["donate", "Support Lootsplitter"],
       ["privacy", "Privacy at Lootsplitter"],
       ["community", "Find your"],
-      ["account", "Welcome to your next chapter."],
+      ["account", "Your Lootsplitter account"],
     ]) {
       // The live /account page loads Cloudflare Turnstile, whose challenge traffic can keep the
       // network busy well past 20 s, so that page waits for load plus its heading instead of
@@ -465,7 +465,7 @@ try {
     await page.getByRole("heading", { level: 1 }).filter({ hasText: "Split the loot." }).waitFor();
     await page.evaluate(() => (window.websiteAuditMarker = "account"));
     await page.getByRole("navigation", { name: "Website footer" }).getByRole("link", { name: "My account", exact: true }).click();
-    await page.getByRole("heading", { level: 1 }).filter({ hasText: "Welcome to your next chapter." }).waitFor();
+    await page.getByRole("heading", { level: 1 }).filter({ hasText: "Your Lootsplitter account" }).waitFor();
     assert.equal(await page.evaluate(() => window.websiteAuditMarker), "account");
     assert.equal(await page.locator(".loot-opening").count(), 0, "My account link replayed the title screen");
     await page.getByRole("link", { name: "Downloads", exact: true }).first().click();
@@ -473,7 +473,7 @@ try {
     const download = page.getByRole("link", { name: "Download for Android", exact: true });
     assert.equal(await download.getAttribute("href"), "/download/android");
     await page.getByText("Why isn’t this on Google Play?", { exact: true }).waitFor();
-    await page.getByText("Works in any modern browser, with nothing to install.", { exact: true }).waitFor();
+    await page.getByText("Runs in a current browser. There is no desktop installer.", { exact: true }).waitFor();
     // The footer's release link opens the folded technical details.
     await page.locator(".ls-footer-identity").click();
     await page.waitForURL(/\/downloads#release-details$/);
