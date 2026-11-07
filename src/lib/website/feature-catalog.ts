@@ -325,7 +325,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
     id: "world",
     chip: "World",
     title: "NPCs, property & ships",
-    lead: "Build the campaign world and connect it to the economy.",
+    lead: "Places, NPCs with their own stock and coin, property with staff and rent, and ships with cargo.",
     shots: ["properties", "ships"],
     major: [
       {

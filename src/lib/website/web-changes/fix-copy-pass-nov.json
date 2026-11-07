@@ -1,0 +1,9 @@
+{
+  "title": "Help and website text rewritten in plain language",
+  "summary": "Help, the home page, Features, Downloads and the account page now say what each tool does without repeating that older tools still exist, and a few headings name what their section holds. No feature changed.",
+  "items": [
+    "Player and DM Help explain map tokens, encounter loot, barter, turns and recovery in plainer words, and Train this NPC now points you to trainers if you want an NPC to teach you.",
+    "The home page, Features and Downloads use headings that name their section, and the account page section labels say what is in them instead of slogans.",
+    "The Downloads page description no longer mentions home-screen widgets, which are for the site owner only."
+  ]
+}

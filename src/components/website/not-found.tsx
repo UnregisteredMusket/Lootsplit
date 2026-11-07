@@ -10,7 +10,7 @@ export function NotFoundPage() {
     <Website>
       <PageHero kicker="Page not found" title="This page wandered off">
         <p className="ls-lead ls-measure">
-          The link may be old or mistyped. Nothing in your campaigns has changed.
+          The link may be old or mistyped.
         </p>
         <nav aria-label="Where to go next" className="ls-actions ls-not-found-actions">
           <Link className="ls-btn ls-btn-gold" to="/welcome">

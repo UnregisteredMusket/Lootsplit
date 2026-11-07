@@ -110,7 +110,7 @@ export const PUBLIC_PAGE_META = Object.freeze({
   "/downloads": {
     title: "Download Lootsplitter for Android or play in your browser",
     description:
-      "Play in any browser with nothing to install, or get the free signed Android app with home-screen widgets. Latest version, checksum and install guide.",
+      "Play in your browser on a computer or phone, or install the free signed Android app. Latest version, checksum and install guide.",
   },
   "/updates": {
     title: "Changelog \u00b7 Lootsplitter",
