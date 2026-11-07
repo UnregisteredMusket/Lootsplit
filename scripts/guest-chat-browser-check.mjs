@@ -77,6 +77,9 @@ async function seed(page, table) {
 }
 const sessionOf = (page) =>
   page.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().sessionId);
+/** 0 until the room has answered this document (the window that lost drafts). */
+const roomAnsweredOf = (page) =>
+  page.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().lastSync);
 /** Reload with the room's first responses held back, so the composer is used
  * before the server confirms the room session (the window that lost drafts). */
 async function reloadWithSlowRoom(page, context) {
@@ -87,7 +90,10 @@ async function reloadWithSlowRoom(page, context) {
   await context.route("**/_serverFn/**", hold);
   await openApplication(page, origin + "/share?tab=chat");
   await expect(page.locator("#chat-message")).toBeEnabled();
-  assert.equal(await sessionOf(page), "", "The room session is not yet confirmed");
+  assert.equal(await roomAnsweredOf(page), 0, "The room has not answered yet");
+  // The saved play session is shown at once, so the room's first answer does not change the
+  // screen's identity and remount it (that lost drafts and form results).
+  assert.notEqual(await sessionOf(page), "", "The saved room session is restored before the room answers");
   return () => context.unroute("**/_serverFn/**", hold);
 }
 const chat = (page) => page.getByRole("region", { name: "Live party chat", exact: true });
@@ -186,7 +192,7 @@ try {
   await guest.page.locator("#chat-message").fill("Guest check early: typed while reconnecting.");
   await guest.page.locator("#chat-message").evaluate((box) => (box.dataset.typing = "kept"));
   await release();
-  await expect.poll(() => sessionOf(guest.page), { timeout: delivery }).not.toBe("");
+  await expect.poll(() => roomAnsweredOf(guest.page), { timeout: delivery }).not.toBe(0);
   await expect(guest.page.locator("#chat-message")).toHaveValue("Guest check early: typed while reconnecting.");
   // The player is still typing in the same box: confirming the session must not replace the
   // composer. It used to remount, dropping focus, so keystrokes in that moment were lost and
@@ -200,7 +206,7 @@ try {
   await dm.page.locator(".chat-composer").evaluate((f) => f.requestSubmit());
   await release();
   await expect(chat(dm.page).getByText("DM check early: sent while reconnecting.", { exact: true })).toBeVisible({ timeout: delivery });
-  await expect.poll(() => sessionOf(dm.page), { timeout: delivery }).not.toBe("");
+  await expect.poll(() => roomAnsweredOf(dm.page), { timeout: delivery }).not.toBe(0);
   await expect(chat(dm.page).getByText("Failed — not confirmed", { exact: true })).toHaveCount(0, { timeout: delivery });
   await expect(chat(guest.page).getByText("DM check early: sent while reconnecting.", { exact: true })).toBeVisible({ timeout: delivery });
   await expect(dm.page.getByRole("region", { name: "Unsent chat recovery", exact: true })).toHaveCount(0);
