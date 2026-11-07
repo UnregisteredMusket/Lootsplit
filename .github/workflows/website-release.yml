@@ -116,7 +116,8 @@ jobs:
       # without updating src/lib/deployment/release-run.mjs (scripts/release-run.test.mjs).
       - name: Record live deployment
         if: steps.current.outputs.superseded != 'true'
-        run: printf 'Deployed and live-audited: `%s`\n\n' "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          printf 'Deployed and live-audited: `%s`\n\n' "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
       - name: Record release result
         if: always()
         env:

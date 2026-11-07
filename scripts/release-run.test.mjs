@@ -77,6 +77,13 @@ test("only the live-release step proves a deployment; superseded and failed runs
 
 test("the workflow checks current main before every production step and marks real deploys last", () => {
   const workflow = readFileSync(RELEASE_WORKFLOW_PATH, "utf8");
+  // A plain (unquoted, non-block) scalar cannot contain ": " or " #"; GitHub rejects the whole
+  // file (a push shows a failed run with no jobs) and the release would never start.
+  for (const line of workflow.split("\n")) {
+    const plain = /^\s+(?:- )?(?:run|name|if): (?![|>"'])(.*)$/.exec(line)?.[1];
+    if (plain !== undefined)
+      assert.doesNotMatch(plain, /: | #/, `quote or use a block scalar: ${line.trim()}`);
+  }
   const jobs = workflow.slice(workflow.indexOf("\njobs:\n"));
   assert.match(jobs, new RegExp(`\\n  ${RELEASE_JOB}:\\n`));
   const steps = jobs.split("\n      - ").slice(1);
