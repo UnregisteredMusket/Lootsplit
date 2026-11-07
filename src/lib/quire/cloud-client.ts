@@ -1484,9 +1484,13 @@ export function resumeTable() {
   // composer and sheets do not treat the player as unassigned until the first response.
   const seat = resumedPlayerSeat(getSeat(), saved);
   if (seat) setSeat(seat);
+  // Publish the saved play session too. Feature screens are keyed by room code and session
+  // (features.$feature.tsx); leaving it "" until the first room response remounted the screen
+  // when that response arrived, throwing away a draft or a refusal the DM had just produced.
   publish({
     joined: true,
     code: saved.code,
+    sessionId: saved.sessionId || "",
     role: saved.role,
     seatId: saved.seatId,
     pending: saved.pending.length,

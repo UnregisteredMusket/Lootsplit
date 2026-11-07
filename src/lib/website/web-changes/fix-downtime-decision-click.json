@@ -1,0 +1,8 @@
+{
+  "title": "Reopened shared-campaign screens keep what you just did",
+  "summary": "After reopening or reloading a screen in a shared campaign, the screen no longer resets itself when the room first answers, so a decision you just recorded, its message, or a half-typed note is no longer wiped a moment later.",
+  "items": [
+    "Applies to every DM and player screen opened directly in a shared room, such as Time & downtime training reviews."
+  ],
+  "audience": "everyone"
+}
