@@ -14,7 +14,7 @@ import type { ChatNote } from "./chat.ts";
 import { mergeNoteLists, readNotes } from "./chat.ts";
 import { readGifts } from "./gift.ts";
 import { mergeLoanLists, readListings, readLoans, readSales, type Listing, type LoanAsk } from "./market.ts";
-import { fromCopper } from "./money.ts";
+import { fromCopper, toCopper } from "./money.ts";
 import { hasMerchantPurse, MAX_MERCHANT_PURSE } from "./merchant.ts";
 import { mergeSheets, readSheets, type CharacterSheet } from "./sheet.ts";
 import { lesserQuantity, type BillFile } from "./table.ts";
@@ -185,7 +185,8 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
   }
   const purses = table.purses.map((purse) => {
     const next = bill.purses.find((item) => item.id === purse.id);
-    return next && purseIds.has(purse.id) ? next : { ...purse, coins: { ...purse.coins } };
+    // Copies, so a refused gift below leaves the report and the table exactly as they were.
+    return next && purseIds.has(purse.id) ? { ...next, coins: { ...next.coins } } : { ...purse, coins: { ...purse.coins } };
   });
   // Item identification: a player's bill lists unidentified items as presented; the true item is
   // kept, with only its quantity, equipped state and weight taken from the bill (item-identity.ts).
@@ -355,8 +356,21 @@ function advance(room: CloudRoom): CloudRoom {
   return { ...room, revision: room.revision + 1, turn: nextTurn(room.turn, room.seats.length) };
 }
 
+/** The shared engine's balance limit (commands.ts `coins()`, coin-split.ts `creditCoins`). */
+const MAX_PURSE_COPPER = 1e12;
+
+/**
+ * Credits a gift from an imported report. Like the shared engine's credits, a gift that would take
+ * the purse past 1e12 copper (or isn't whole copper) is refused, and the caller's report import is
+ * refused whole: `applyBillToTable` works on copies, so nothing is half-applied.
+ */
 function addCoins(coins: Coins, copper: number): Coins {
-  const paid = fromCopper(Math.max(0, copper));
+  const total = toCopper(coins) + copper;
+  if (!Number.isSafeInteger(copper) || copper < 0 || !Number.isSafeInteger(total) || total > MAX_PURSE_COPPER)
+    throw Error(
+      "Conflict: a gift in this report would take a purse past the largest supported balance. No report changes were imported.",
+    );
+  const paid = fromCopper(copper);
   return {
     cp: coins.cp + paid.cp,
     sp: coins.sp + paid.sp,

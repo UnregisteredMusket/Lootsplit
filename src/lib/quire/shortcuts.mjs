@@ -29,7 +29,7 @@ export const shortcutDestinations = [
   { id: "roll", label: "Roll dice", href: "/characters#dice", icon: "dice" },
   // Pin to Desk (design Q8): every feature screen header can be pinned. Older clients that do not
   // know these IDs fall back to the default button for that slot, as for any unknown ID.
-  ...[["quests","Quests","scroll"],["factions","Factions","users"],["npcs","People & NPCs","users"],["trading","Trading & Barter","coins"],["economy","Trade Exchanges","store"],["time","Session Time","scroll"],["music","Music & Ambience","book"]].map(([id,label,icon])=>({id,label,icon,href:`/features/${id}`})),
+  ...[["quests","Quests","scroll"],["factions","Factions","users"],["npcs","People & NPCs","users"],["trading","Trading & Barter","coins"],["economy","Trade Exchanges","store"],["time","Session Time","scroll"],["music","Music & Ambience","book"],["visibility","What players can see","users"]].map(([id,label,icon])=>({id,label,icon,href:`/features/${id}`})),
   { id: "party", label: "Party sheets", href: "/party", icon: "users" },
   { id: "chat", label: "Party chat", href: "/share?chat=1", icon: "message" },
   { id: "library", label: "Library", href: "/library", icon: "book" },
@@ -58,7 +58,7 @@ export const shortcutIcons = [
   "save",
 ];
 export function destinationsFor(role = "dm") {
-  return shortcutDestinations.filter(x=>role === "dm" || !["encounter","loot","funds","downtime","financial","reports","review","shops","backup","time","music"].includes(x.id))
+  return shortcutDestinations.filter(x=>role === "dm" || !["encounter","loot","funds","downtime","financial","reports","review","shops","backup","time","music","visibility"].includes(x.id))
     .map(x => role === "dm" && x.id === "character" ? { ...x, href: "/characters" } : x);
 }
 /** @param {unknown} raw */
