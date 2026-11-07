@@ -1,3 +1,34 @@
+# Lootsplitter 1.18.0
+
+Android version code **26**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.17.0 build commit `caeb0e4` (tabletop protocol 31; 1.17.0 used protocol 28). No native Android code changed since 1.17.0.
+
+## Added
+
+- **3D dice** (#445, #446, #447, #453): character-sheet rolls throw dice that land on the recorded result (d4–d20, d100 as tens + units, advantage/disadvantage), using `@3d-dice/dice-box-threejs` (MIT) with Lootsplitter's own colours; a device setting turns them off or picks a colour, and reduced motion turns them off. In a shared room the DM's screen and the TV display throw players' rolls; the DM's own rolls (encounter rolls and loot tables, barter checks the DM asks the server to roll, treasure pool d100s) appear only on the DM's screen and never on the TV.
+- **Factions** (#438), **favor market** (#439) and **quest renown** (#441): per-character renown with named tiers, the party's median attitude, Favor earned from renown gains and spent at a DM-built favor market, per-tier prices at the shops and places a faction controls, and quests whose renown rewards apply on completion.
+
+## Improved
+
+- **Coins** (#450): give, sell and loan approval keep platinum and electrum on the device and online alike; device loan approval runs the shared command; device coin postings and edits apply the shared limits and refuse an edit made on out-of-date coins.
+- **Text** (#455, #456): Help and website text rewritten in plain language; the changelog groups changes by audience.
+- **Item details** (#449): uses left is kept whichever field is filled first.
+
+## Fixed
+
+- Gifting part of a stack moves full items; the partly used one stays with the giver (#450).
+- Table dice follow players who roll from account character sheets, and recover after a stalled request (#447, #453).
+- Signed-out guests no longer send account requests that are bound to be refused (#452).
+
+## Not in this release
+
+- `@capacitor/haptics` is still waiting: adding it needs the hand-started Add npm packages workflow (#444), which needs the owner's OK. The map wheel keeps using `navigator.vibrate` (1.16.0).
+
+## After updating
+
+Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. Older installs keep working with the website; drafts they cannot read are refused with a request to finish on the updated website.
+
+---
+
 # Lootsplitter 1.17.0
 
 Android version code **25**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.16.0 build commit `093eafa` (tabletop protocol 28; 1.16.0 used protocol 19). No native Android code changed since 1.16.0.
