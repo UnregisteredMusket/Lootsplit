@@ -27,6 +27,13 @@ export const resources: Resource[] = [
     ],
   },
   {
+    name: "Capacitor Haptics",
+    description:
+      "The Android app's short tick when the map actions wheel opens, and when a finger moves onto a slice, uses the Capacitor Haptics plugin by Ionic. The website keeps the browser's own vibrate call.",
+    license: "MIT.",
+    links: [{ label: "@capacitor/haptics", url: "https://github.com/ionic-team/capacitor-plugins/tree/main/haptics" }],
+  },
+  {
     name: "Android home-screen widget platform references",
     kind: "reference",
     description:
