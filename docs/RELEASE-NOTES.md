@@ -1,3 +1,7 @@
+# Next Android release (not yet released)
+
+- **Native haptics** (`feature/android-haptics`): the map actions wheel's tick now uses `@capacitor/haptics` 8.0.2 (MIT; a light impact) in the Android app, falling back to `navigator.vibrate(10)` if the plugin fails. The website is unchanged. Reduced motion still turns the tick off.
+
 # Lootsplitter 1.18.0
 
 Android version code **26**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.17.0 build commit `caeb0e4` (tabletop protocol 31; 1.17.0 used protocol 28). No native Android code changed since 1.17.0.

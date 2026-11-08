@@ -27,6 +27,7 @@ import {
 } from "@/lib/quire/map-view-state";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeatKnown } from "@/lib/quire/seat";
+import { hapticTick } from "@/lib/mobile/haptics";
 import { MapCombatHud } from "./map-combat-hud";
 import { MapInitiativePanel } from "./map-initiative-panel";
 import { MapConnectedTools, type EntranceDraft } from "./map-connected-tools";
@@ -3531,9 +3532,7 @@ function MapViewport({
       />
     ) : null;
   // The phone's press-and-hold radial (map tokens PR 5; mockups radial-mobile, radial-mobile-320).
-  const tick = () => {
-    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) navigator.vibrate?.(10);
-  };
+  const tick = hapticTick;
   const lastTouch = useRef(0),
     pressAt = useRef<{ x: number; y: number; tokenId?: string }>(undefined),
     fireRadial = useRef<(pointerId: number) => void>(() => undefined);
