@@ -445,12 +445,39 @@ export function decisiveRun(runs) {
 export const MANUAL_COVERED_BY = new Map([
   ["Verify existing live website (read only)", "Deploy verified website"],
 ]);
-/** The newest successful covering run newer than a cancelled manual run, or null. */
-export function supersedingRun(run, runs, previous) {
-  const cover = MANUAL_COVERED_BY.get(run?.name);
-  if (!cover || run.conclusion !== "cancelled" || !Number.isSafeInteger(run.updatedAt)) return null;
+/**
+ * Dependabot security-update jobs (GitHub's "dynamic" runs, named "npm_and_yarn in /. for
+ * better-auth, … - Update #1684407833"). Each job has its own name, so a failed one is never
+ * followed by a newer run of the same workflow and stayed red for good (Field monitor,
+ * 2026-11-05 to 11-08: "security_update_not_possible" for minimatch, fixed on main by #437).
+ * Such a job only opens a pull request; it is not build or test evidence. What it guards, no
+ * vulnerable dependency on main, is checked on every main push by the OSV-Scanner job in
+ * `DEPENDABOT_COVERED_BY`, so a newer successful run of that workflow on the same branch
+ * supersedes the failed job. Until then it stays red, and the failure stays in history.
+ */
+export const DEPENDABOT_COVERED_BY = "Code health and security scans";
+// Stored run names are cut to 160 characters (owner-monitor.mjs), which drops the "- Update #N"
+// ending of a long package list, so the trigger decides; a record without one needs the ending.
+const DEPENDABOT_PREFIX = /^[a-z_]+ in \/\S*(?: for |$| - Update #)/;
+export const isDependabotRun = (run) =>
+  !!run &&
+  DEPENDABOT_PREFIX.test(run.name || "") &&
+  (run.event === "dynamic" || (!run.event && / - Update #\d+$/.test(run.name)));
+/** What can supersede this run, or null: a cancelled manual audit or a failed Dependabot job. */
+function coverFor(run) {
+  if (!run || !Number.isSafeInteger(run.updatedAt)) return null;
+  const manual = MANUAL_COVERED_BY.get(run.name);
   // A run recorded with its trigger must have been manual; older records carry no trigger.
-  if (run.event && run.event !== "workflow_dispatch") return null;
+  if (manual && run.conclusion === "cancelled" && (!run.event || run.event === "workflow_dispatch"))
+    return manual;
+  if (isDependabotRun(run) && [...WORKFLOW_FAILED, "cancelled"].includes(run.conclusion))
+    return DEPENDABOT_COVERED_BY;
+  return null;
+}
+/** The newest successful covering run newer than a cancelled manual run or failed Dependabot job. */
+export function supersedingRun(run, runs, previous) {
+  const cover = coverFor(run);
+  if (!cover) return null;
   const remembered = previous?.get?.(workflowComponent(cover, run.branch));
   const candidates = [
     ...runs.filter((r) => r.name === cover && r.branch === run.branch),
@@ -541,7 +568,9 @@ async function workflowDiagnostics(db, development, previous, now, add) {
     report(
       component,
       "not-applicable",
-      `${decided.name}: cancelled (manual run, last updated ${at(decided.updatedAt)}); superseded by ${cover.name}: success at ${at(cover.updatedAt)}, whose own read-only live audit passed. This manual audit never reruns on its own.`,
+      isDependabotRun(decided)
+        ? `${decided.name}: ${decided.conclusion} (Dependabot update job, last updated ${at(decided.updatedAt)}); superseded by ${cover.name}: success at ${at(cover.updatedAt)}, whose dependency vulnerability scan (OSV-Scanner) of this branch passed. Dependabot jobs never rerun under the same name.`
+        : `${decided.name}: cancelled (manual run, last updated ${at(decided.updatedAt)}); superseded by ${cover.name}: success at ${at(cover.updatedAt)}, whose own read-only live audit passed. This manual audit never reruns on its own.`,
       decided,
       {
         historyChecked: true,
