@@ -39,10 +39,18 @@ function CommitText({
   maxLength?: number;
 }) {
   const [text, setText] = useState(shown);
-  useEffect(() => setText(shown), [shown]);
+  const input = useRef<HTMLInputElement>(null);
+  // Follow the value from outside (uses left following a new maximum) only while the box is not
+  // being typed in: rewriting a focused box drops its selection, so the next key is appended
+  // (main-bound PR 464, 2026-11-08: the maximum's 7 landed as "5" was typed and left read "75").
+  // Leaving the box shows the committed value anyway.
+  useEffect(() => {
+    if (typeof document === "undefined" || document.activeElement !== input.current) setText(shown);
+  }, [shown]);
   return (
     <Field label={label} hint={hint}>
       <TextInput
+        ref={input}
         aria-label={ariaLabel}
         value={text}
         maxLength={maxLength}
