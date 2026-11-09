@@ -961,6 +961,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / world / dev-map-party-move | open | 2 | 18s → 25s | +7s | +38.89% |
 | verify / Development / world / dev-map-move-approval | open | 2 | 6s → 9s | +3s | +50% |
 | verify / Development / world / dev-player-onboarding | open | 3 | 21s → 41s | +20s | +95.24% |
+| Code health and security scans / initial queue | open | 2 | 1s → 4s | +3s | +300% |
 | Development / gameplay / dev-encounter-xp | open | 2 | 16s → 24s | +8s | +50% |
 | Development / gameplay / dev-economy-health | open | 2 | 14s → 21s | +7s | +50% |
 
@@ -968,6 +969,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-09T16:11:14Z | step: Committed secrets (gitleaks) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41406666801/job/125150157878) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42652146581/job/129281027927) |
+| 2026-11-09T16:11:13Z | step: Dependency vulnerabilities (OSV-Scanner) / osv-scan / Pull ghcr.io/google/osv-scanner-action:v2.7.0 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40282385797/job/121438326465) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42652146581/job/129281028092) |
+| 2026-11-09T16:11:04.000Z | queue: Code health and security scans / initial queue | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41406666801) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42652146581) |
 | 2026-11-09T00:29:09Z | step: Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40295617464/job/121480897927) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42538277797/job/128907398654) |
 | 2026-11-08T12:46:11Z | step: native-widget (35) / Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39698891915/job/119562960700) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42481154601/job/128733157232) |
 | 2026-11-08T12:36:42Z | step: Add npm packages / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42229802637/job/127932488192) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42481061870/job/128732873541) |
