@@ -13,6 +13,8 @@ import {
   decisiveRun,
   recentlyResolved,
   MANUAL_COVERED_BY,
+  DEPENDABOT_COVERED_BY,
+  isDependabotRun,
 } from "../cloudflare/monitor-journal.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 
@@ -751,6 +753,82 @@ test("without GitHub data or deploy evidence a cancelled manual run stays a gap,
     assert.equal(live.state, "unavailable");
     assert.equal(live.color, "yellow");
     assert.match(live.symptom, /No completed build or test result was returned/);
+  } finally {
+    DB.close();
+  }
+});
+
+// Field monitor 2026-11-05 to 11-08: a Dependabot security-update job failed once and stayed red,
+// because every Dependabot job has its own run name and never reruns.
+const DEPENDABOT_NAME = (
+  "npm_and_yarn in /. for @better-auth/drizzle-adapter, @better-auth/kysely-adapter, " +
+  "@tanstack/react-start, better-auth, minimatch, seroval, sharp, undici, uuid, vite, zod - Update #1684407833"
+).slice(0, 160); // stored names are cut to 160 characters
+const DEPENDABOT_C = `Workflow: ${DEPENDABOT_NAME} (main)`;
+const SCANS = "Code health and security scans";
+const dependabot = (conclusion, fields = {}) =>
+  run(DEPENDABOT_NAME, "main", conclusion, {
+    event: "dynamic",
+    startedAt: instant - 60 * HOUR,
+    updatedAt: instant - 59 * HOUR,
+    ...fields,
+  });
+
+test("Dependabot update jobs are recognised by trigger and name, even with a cut name", () => {
+  assert.ok(!DEPENDABOT_NAME.includes("Update #"), "the fixture name lost its ending");
+  assert.ok(isDependabotRun(dependabot("failure")));
+  assert.ok(isDependabotRun({ name: "npm_and_yarn in /. - Update #12" }), "old record, full name");
+  assert.ok(!isDependabotRun({ name: DEPENDABOT_NAME }), "old record, cut name: not assumed");
+  assert.ok(!isDependabotRun(run("Verify preserved functionality", "main", "failure", { event: "dynamic" })));
+  assert.ok(!isDependabotRun(run(DEPENDABOT_NAME, "main", "failure", { event: "push" })));
+  assert.equal(DEPENDABOT_COVERED_BY, SCANS);
+});
+
+test("the covering workflow runs OSV-Scanner on every main push", () => {
+  const files = readdirSync(".github/workflows").filter((f) => /\.ya?ml$/.test(f));
+  const text = files
+    .map((f) => readFileSync(`.github/workflows/${f}`, "utf8"))
+    .find((t) => /^name:\s*(.+)$/m.exec(t)?.[1].trim() === DEPENDABOT_COVERED_BY);
+  assert.ok(text, `${DEPENDABOT_COVERED_BY} exists`);
+  assert.match(text, /osv-scanner/i);
+  assert.match(text, /^ {2}push:/m, "it runs on push");
+});
+
+test("a failed Dependabot job stays red until a newer successful security scan on main", async () => {
+  const DB = localAccountDb();
+  try {
+    const olderScan = run(SCANS, "main", "success", { updatedAt: instant - 70 * HOUR });
+    let result = await snap(DB, github({ runs: [dependabot("failure"), olderScan] }), instant - 58 * HOUR);
+    assert.equal(find(result, DEPENDABOT_C).color, "red", "An older scan does not cover a newer failure");
+    assert.ok(overall(result.diagnostics).reason.includes(DEPENDABOT_C), "needs attention");
+    const failedScan = run(SCANS, "main", "failure", { updatedAt: instant - 40 * HOUR });
+    result = await snap(DB, github({ runs: [failedScan, dependabot("failure")] }), instant - 39 * HOUR);
+    assert.equal(find(result, DEPENDABOT_C).color, "red", "A failed scan covers nothing");
+    // The scan passed after the job failed; the job has aged out of the scanned runs.
+    const scan = run(SCANS, "main", "success", { updatedAt: instant - HOUR });
+    result = await snap(DB, github({ runs: [scan] }), instant);
+    const item = find(result, DEPENDABOT_C);
+    assert.equal(item.state, "not-applicable");
+    assert.equal(item.color, "green");
+    assert.equal(item.lastSuccessAt, null, "Superseded is never recorded as a success");
+    assert.match(item.symptom, /failure \(Dependabot update job.*superseded by Code health and security scans: success.*OSV-Scanner/);
+    assert.ok(!overall(result.diagnostics).reason.includes(DEPENDABOT_C), "no longer attention");
+    const resolved = await recentlyResolved(DB, instant, result.diagnostics);
+    assert.ok(resolved.items.find((i) => i.component === DEPENDABOT_C), "listed as recently resolved");
+  } finally {
+    DB.close();
+  }
+});
+
+test("a failed scan on another branch does not cover, and a successful one there does not either", async () => {
+  const DB = localAccountDb();
+  try {
+    const branchScan = run(SCANS, "fix/x", "success", { updatedAt: instant - HOUR });
+    const result = await snap(
+      DB,
+      github({ runs: [branchScan, dependabot("failure")], openPulls: [pr(1, "fix/x")] }),
+    );
+    assert.equal(find(result, DEPENDABOT_C).color, "red");
   } finally {
     DB.close();
   }
