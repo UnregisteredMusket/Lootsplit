@@ -513,7 +513,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 13s | +9s | +225% |
 | Development / accounts-2 / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 5s | +3s | +150% |
 | Packaged standby / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 3 | 2s → 186s | +184s | +9200% |
-| Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 2s → 5s | +3s | +150% |
+| Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 4 | 2s → 6s | +4s | +200% |
 | Packaged standby / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 9s | +7s | +350% |
 | Development / desktop / dev-map-tiles | open | 3 | 133s → 220s | +87s | +65.41% |
 | deploy / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 17s | +13s | +325% |
@@ -968,6 +968,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-09T00:29:09Z | step: Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40295617464/job/121480897927) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42538277797/job/128907398654) |
 | 2026-11-08T12:46:11Z | step: native-widget (35) / Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39698891915/job/119562960700) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42481154601/job/128733157232) |
 | 2026-11-08T12:36:42Z | step: Add npm packages / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42229802637/job/127932488192) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42481061870/job/128732873541) |
 | 2026-11-07T15:21:59Z | step: Code checks and immutable builds / unit-tests | 170s → 198s | +28s | +16.47% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40942217474/job/123688255262) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42385705379/job/128442509328) |
