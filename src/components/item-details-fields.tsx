@@ -39,7 +39,7 @@ function CommitText({
   maxLength?: number;
 }) {
   // While the box is being typed in it shows the typed text; otherwise it shows the committed
-  // value directly, in the same render that changes it. Copying the value in an effect (#465)
+  // value directly, in the same render that changes it. Copying the value in an effect (PR 465)
   // rewrote the box a render later, so a box focused in between lost its selection and the next
   // key was appended: the maximum's 7 then "5" read "75" (main 3ea8ea5, 2026-11-10).
   const [text, setText] = useState(shown);
