@@ -107,6 +107,10 @@ export function pendingCommandDescription(value: unknown): string {
       return `${c.before ? "Edit" : "Add"} market event: ${c.after.name}`;
     case "market-event-end":
       return `End market event: ${c.before.name}`;
+    case "settlement-profile":
+      return `${c.profile ? "Set" : "Clear"} settlement size · location ${c.locationId}`;
+    case "settlement-ladder":
+      return `Settlement sizes · ${c.after.ladder === "simple" ? "five steps" : "eight sizes"}`;
     case "faction-save":
       return `${c.revision === null ? "Add" : "Edit"} faction: ${c.faction.name}`;
     case "faction-visibility":

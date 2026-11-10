@@ -20,6 +20,7 @@ import { validateTradeEconomy } from "./trade-economy.ts";
 import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
 import { marketAdjustmentsSchema, marketEventsSchema } from "./market-events.ts";
 import { factionAdjustmentsSchema, factionsSchema } from "./factions.ts";
+import { settlementsSchema } from "./settlements-schema.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { validatePropertyLocations, listingSchema } from "./property.ts";
 import type { CloudTable } from "./cloud.ts";
@@ -107,6 +108,12 @@ const journalFields = z.object({
   factions: factionsSchema.optional(),
   /** A player's copy only: combined rates where factions they may not see apply (factions.ts). */
   factionAdjustments: factionAdjustmentsSchema.optional(),
+  /**
+   * Settlement tiers (settlements.ts, phase S1): the ladder, tier names and one profile per city or
+   * town, keyed by market location ID. Changes only through the DM's settlement commands; older
+   * clients drop the key and their whole-journal writes keep the stored copy (no protocol bump).
+   */
+  settlements: settlementsSchema.optional(),
   finance: financeSchema.optional(),
   reports: z
     .array(
@@ -348,6 +355,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   delete next.marketAdjustments;
   delete next.factions;
   delete next.factionAdjustments;
+  delete next.settlements;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -517,6 +525,9 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     // the unknown key, so their whole-journal writes keep the stored factions.
     ...(current.factions ? { factions: current.factions } : {}),
     ...(current.factionAdjustments ? { factionAdjustments: current.factionAdjustments } : {}),
+    // Settlement tiers change only through their commands; older clients drop the unknown key, so
+    // their whole-journal writes keep the stored settlements.
+    ...(current.settlements ? { settlements: current.settlements } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);

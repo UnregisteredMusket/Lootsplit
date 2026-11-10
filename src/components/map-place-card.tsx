@@ -10,6 +10,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { readServices } from "@/lib/quire/services-schema";
 import { approvedOffers, serviceLabel } from "@/lib/quire/services";
 import { locationPath, readMarketLocations } from "@/lib/quire/shop-locations";
+import { settlementAt, settlementLabel } from "@/lib/quire/settlements";
 import {
   mapServiceAllowed,
   partyAt,
@@ -94,6 +95,8 @@ export function MapPlaceCard({
     ? map.connected?.placements.find((p) => sameRecord(p.record, reference))
     : undefined;
   const shop = reference?.kind === "shop" ? table.shops.find((s) => s.id === reference.id) : undefined;
+  // Settlement tiers: a place's size (a district shows its city's), from the viewer's own table.
+  const settlement = reference?.kind === "location" ? settlementAt(table.journal, reference.id) : undefined;
   // Temple, workshop and inn providers at this shop (docs/SERVICES.md); a player's table holds only
   // providers with approved offers.
   const shopServices = shop
@@ -179,6 +182,12 @@ export function MapPlaceCard({
         <>
           <ul className="map-place-chips" aria-label="Status">
             {shop && <li>{shop.closed ? "Closed" : "Open"}</li>}
+            {settlement && (
+              <li data-testid="settlement-tier">
+                {settlement.inherited ? `${settlement.location.name}: ` : ""}
+                {settlementLabel(settlement)}
+              </li>
+            )}
             {here && (
               <li className="map-place-chip-here">
                 {partySplit(table) ? `${hereGroups.map((g) => groupInfo(table, g).name).join(", ")} ${hereGroups.length === 1 ? "is" : "are"} here` : "The party is here"}

@@ -285,6 +285,9 @@ jobs:
       - name: dev-quest-renown
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-quest-renown 240 node scripts/quest-renown-browser-audit.mjs
+      - name: dev-settlement-tiers
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-settlement-tiers 240 node scripts/settlement-tiers-browser-audit.mjs
       - name: dev-dice-3d
         if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-dice-3d 240 node scripts/dice-3d-browser-audit.mjs

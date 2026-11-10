@@ -510,6 +510,20 @@ export const HELP_GROUPS: HelpGroup[] = [
         ],
       },
       {
+        id: "settlement-tiers",
+        title: "Settlement sizes and new-shop defaults",
+        audience: "DM",
+        paragraphs: [
+          "Give a city or town a size in Market → Manage regions, cities, towns and areas: choose the place under Edit location, then Size of … below its form. The default ladder is Pathfinder's eight sizes (Thorp, Hamlet, Village, Small town, Large town, Small city, Large city, Metropolis); Settlement sizes switches the campaign to five steps (Village, Town, City, Large city, Capital) and renames any size. A ladder that leaves a place without its size is refused until you change or clear that place's size. An area has no size of its own: it shares its city's or town's.",
+          "A size sets what a shop created there starts with: Thorp and Hamlet Poor, Village and Small town Modest, Large town and Small city Rich, Large city and Metropolis Princely (five steps: Village Poor, Town Modest, City Rich, Large city and Capital Princely). You can override the wealth per place and give new shops there a merchant purse and a refill on restock, in gold pieces. The shop composer applies them when you choose the place and says where they came from; you can still change the wealth before opening the shop, and the purse afterwards in the shop's Edit. Shops added by importing names get them too. Shops that already exist are never changed, now or when you change a size later.",
+          "Players who can see a place see its size and population (in Market for the party's location, and on the place's map card); the new-shop wealth, purse and refill stay with you. Saving or clearing a size is a DM-only line in Activity. Removing a place, or making it a region or an area, removes its size too. Price and availability limits by size are not part of this yet.",
+        ],
+        links: [
+          ["Market locations", "/market#market-locations"],
+          ["Shops & stock", "/market"],
+        ],
+      },
+      {
         id: "dm-feature-screens",
         title: "Financial Settings, Shop schedules and Review Reports",
         audience: "DM",

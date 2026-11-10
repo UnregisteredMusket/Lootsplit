@@ -161,6 +161,8 @@ export function previewMarketNames(
   shops: Shop[],
   raw: MarketNameRow[],
   batchId: string,
+  /** Settlement tiers (settlements.ts `newShopDefaults`): what a new shop at a place starts with. */
+  defaultsAt?: (locationId: string, market: MarketLocations) => { wealth: Shop["wealth"]; buyRate: number; merchantPurse?: number; merchantPurseRefill?: number } | undefined,
 ) {
   const rows = marketNameRowsSchema.parse(raw);
   const next = structuredClone(market);
@@ -212,6 +214,7 @@ export function previewMarketNames(
     if (kind === "shop") {
       if (parentId && !next.locations.some((row) => row.id === parentId))
         throw Error("The selected shop location no longer exists.");
+      const defaults = parentId ? defaultsAt?.(parentId, next) : undefined;
       addedShops.push({
         id,
         name,
@@ -219,12 +222,14 @@ export function previewMarketNames(
         place: "",
         notes: "",
         sellRate: 1,
-        buyRate: 0.5,
-        wealth: "modest",
+        buyRate: defaults?.buyRate ?? 0.5,
+        wealth: defaults?.wealth ?? "modest",
         category: "general",
         priceScale: 1,
         closed: true,
         ...(parentId ? { locationId: parentId } : {}),
+        ...(defaults?.merchantPurse !== undefined ? { merchantPurse: defaults.merchantPurse } : {}),
+        ...(defaults?.merchantPurseRefill !== undefined ? { merchantPurseRefill: defaults.merchantPurseRefill } : {}),
       });
     } else {
       const location = { id, kind, name, parentId, description: "" };
