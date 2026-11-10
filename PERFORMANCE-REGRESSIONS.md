@@ -513,7 +513,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / dev-ships | open | 2 | 55s → 80s | +25s | +45.45% |
 | Development / accounts-2 / dev-bug | open | 3 | 5s → 9s | +4s | +80% |
 | Code checks and immutable builds / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 3s → 7s | +4s | +133.33% |
-| Packaged standby / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 13s | +9s | +225% |
+| Packaged standby / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 4 | 4s → 15s | +11s | +275% |
 | Development / accounts-2 / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 5s | +3s | +150% |
 | Packaged standby / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 3 | 2s → 186s | +184s | +9200% |
 | Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 4 | 2s → 6s | +4s | +200% |
@@ -978,6 +978,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-10T17:56:20Z | step: Packaged standby / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39816808625/job/119958992786) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42868543155/job/130018265464) |
 | 2026-11-10T15:47:18Z | step: Development / gameplay / dev-shop-lists | 17s → 22s | +5s | +29.41% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42835242012/job/129897086559) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42846209698/job/129934310405) |
 | 2026-11-10T15:43:41Z | step: Development / gameplay / dev-settlement-tiers | 19s → 26s | +7s | +36.84% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42786979657/job/129732330563) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42843368508/job/129932408701) |
 | 2026-11-10T15:29:38Z | step: native-widget (35) / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42834589850/job/129893321097) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42843362742/job/129924172425) |
