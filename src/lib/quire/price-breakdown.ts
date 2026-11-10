@@ -68,6 +68,11 @@ export type PriceBreakdown = {
    * is paid.
    */
   refused?: string;
+  /**
+   * Settlement limits, DM exemption (owner decision 2026-11-10): the DM sells above the place's
+   * per-item limit at the full payout; this says what players would get. Nothing is lowered.
+   */
+  warning?: string;
 };
 
 /**
@@ -313,7 +318,8 @@ export function shopBuyBreakdown(
  * the merchant-purse rules (merchant.ts): the off-list rate for categories outside the shop's buy
  * list (rounded down) and the per-item purchase limit. The purse itself only refuses a sale; it
  * never changes the price, so it is not a factor. Settlement limits (S2) come last: above the
- * place's per-item limit the shop pays the limit (a factor) or refuses (`refused`).
+ * place's per-item limit the shop pays the limit (a factor) or refuses (`refused`); for the DM
+ * (`settlementExempt`) neither, only a `warning`.
  */
 export function shopSellBreakdown(
   shop: Pick<Shop, "buyRate"> & Partial<Pick<Shop, "acceptAnyCategory" | "acceptedCategories" | "category" | "offListPercent" | "purchaseLimit">>,
@@ -327,6 +333,12 @@ export function shopSellBreakdown(
     factions?: readonly FactionEffect[];
     /** The shop's settlement sale cap (settlements.ts `settlementSaleLimit`); none when unset. */
     settlementLimit?: SettlementSaleLimit;
+    /**
+     * The seller is the DM (owner decision 2026-11-10): the settlement cap neither refuses nor
+     * lowers the payout, and `warning` says what players would get. The shop's own Most paid for
+     * one item and its merchant purse are not part of this and still apply.
+     */
+    settlementExempt?: boolean;
   } = {},
 ): PriceBreakdown {
   // Item identification: an unidentified item is priced at its presented value and category, so
@@ -362,7 +374,12 @@ export function shopSellBreakdown(
   // Settlement limits (S2): the most a shop in this place pays for one item.
   const limit = options.settlementLimit;
   let refused: string | undefined;
-  if (limit && unit > limit.copper) {
+  let warning: string | undefined;
+  if (limit && unit > limit.copper && options.settlementExempt)
+    warning = `Over ${limit.place}'s limit of ${formatCopper(limit.copper)} for one item; players would be ${
+      limit.mode === "pay-limit" ? `paid ${formatCopper(limit.copper)} each` : "refused"
+    }. You're the DM, so this sale goes through at ${formatCopper(unit)} each.`;
+  else if (limit && unit > limit.copper) {
     if (limit.mode === "pay-limit") {
       factors.push({ key: "settlement-limit", label: `Shops in ${limit.place} pay at most ${formatCopper(limit.copper)} for one item`, copper: limit.copper - unit });
       unit = limit.copper;
@@ -376,6 +393,7 @@ export function shopSellBreakdown(
     quantity,
     total: unit * quantity,
     ...(refused ? { refused } : {}),
+    ...(warning ? { warning } : {}),
   };
 }
 

@@ -5,8 +5,9 @@
 // Create a shop at the Docks starts Princely and says the defaults come from Port City. Switching
 // to five steps is refused while Port City is a Metropolis (an eight-size tier). Phase S2 (limits):
 // the DM turns the per-item sale cap on (Refuse) and limits a Metropolis's generated stock to
-// Uncommon; a 20,000 gp sale there is refused with the 16,000 gp limit named, and the composer at
-// the Docks disables Rare and Magic with the cap's note. No sideways scrolling at 1280, 390 and 320
+// Uncommon; a player would be refused a 20,000 gp sale there with the 16,000 gp limit named, while
+// the DM (exempt, owner decision 2026-11-10) sees the warning in the sell form and sells at the full
+// 20,000 gp; the composer at the Docks disables Rare and Magic with the cap's note. No sideways scrolling at 1280, 390 and 320
 // px. Never targets a real campaign.
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
@@ -22,13 +23,19 @@ const browser = await chromium.launch({
 await mkdir("test-results/settlement-tiers", { recursive: true });
 const tavern = {
   id: "tavern", name: "Old Tavern", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5,
-  wealth: "modest", category: "inn", priceScale: 1, locationId: "docks", merchantPurse: 5000, acceptAnyCategory: true,
+  wealth: "modest", category: "inn", priceScale: 1, locationId: "docks", merchantPurse: 2_500_000, acceptAnyCategory: true,
 };
 const snapshot = (page) =>
   page.evaluate(async () => {
     const { economySnapshot } = await import("/src/lib/quire/economy.ts");
     const t = await economySnapshot();
-    return { settlements: t.journal?.settlements ?? null, shops: t.shops, events: (t.journal?.events ?? []).filter((e) => e.summary.startsWith("Settlement")) };
+    return {
+      settlements: t.journal?.settlements ?? null,
+      shops: t.shops,
+      events: (t.journal?.events ?? []).filter((e) => e.summary.startsWith("Settlement")),
+      crowns: t.holdings.filter((h) => h.id === "crown").length,
+      sales: t.ledger.filter((l) => l.transactionType === "sale").map((l) => l.copper),
+    };
   });
 const sideways = (page) => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
 async function manage(page) {
@@ -107,13 +114,33 @@ try {
     assert.deepEqual(books.shops, [tavern], `${width}: limits never change an existing shop`);
     assert.equal(await sideways(page), false, `${width}: the limits form scrolls sideways`);
     await limits.screenshot({ path: `test-results/settlement-tiers/limits-${width}.png` });
-    const refusal = await page.evaluate(async () => {
-      const { sellToShop } = await import("/src/lib/quire/economy.ts");
-      return sellToShop({ holdingId: "crown", shopId: "tavern", quantity: 1 }).then(() => "sold", (e) => e.message);
+    // A player's quote (the pricing every player path charges) is refused with the limit named.
+    const playerQuote = await page.evaluate(async () => {
+      const { shopSale } = await import("/src/lib/quire/sale-split.ts");
+      const { economySnapshot } = await import("/src/lib/quire/economy.ts");
+      const t = await economySnapshot();
+      return shopSale(t.holdings.find((h) => h.id === "crown"), t.shops.find((s) => s.id === "tavern"), 1, t.journal, t.purses, "player").refused;
     });
-    assert.equal(refusal, "Shops in Port City pay at most 16,000 gp for one item; this one would fetch 20,000 gp, so this shop won't buy it.");
+    assert.equal(playerQuote, "Shops in Port City pay at most 16,000 gp for one item; this one would fetch 20,000 gp, so this shop won't buy it.");
+    // The DM is exempt (owner decision 2026-11-10): the sell form warns, then sells at the full payout.
+    await openApplication(page, origin + "/shop/tavern?sell=crown");
+    const sellForm = page.locator("form#sell");
+    await sellForm.waitFor();
+    await sellForm
+      .getByTestId("settlement-sale-dm-warning")
+      .getByText("Over Port City's limit of 16,000 gp for one item; players would be refused. You're the DM, so this sale goes through at 20,000 gp each.")
+      .waitFor();
+    assert.equal(await sellForm.getByTestId("settlement-sale-refused").count(), 0, `${width}: the DM is not refused`);
+    assert.equal(await sideways(page), false, `${width}: the sell form scrolls sideways`);
+    await sellForm.screenshot({ path: `test-results/settlement-tiers/dm-warning-${width}.png` });
+    await sellForm.getByRole("button", { name: "Sell", exact: true }).click();
+    // Read from the action's own toast: the crown is the DM's only item, so once it sells the
+    // sell form gives way to "This account has nothing this shop will buy." and its notice goes too.
+    await page.getByText("Sale recorded.").first().waitFor();
     books = await snapshot(page);
-    assert.deepEqual(books.shops, [tavern], `${width}: a refused sale moves nothing`);
+    assert.equal(books.crowns, 0, `${width}: the crown was sold`);
+    assert.deepEqual(books.sales, [2_000_000], `${width}: one sale at the full 20,000 gp`);
+    assert.equal(books.shops[0].merchantPurse, tavern.merchantPurse - 2_000_000, `${width}: the shop's purse paid it`);
 
     // The party's place cards show the size; the Docks' card is the area, Port City's carries it.
     await openApplication(page, origin + "/market");

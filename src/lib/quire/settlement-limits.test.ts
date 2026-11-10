@@ -3,8 +3,9 @@
 // with a tier). These tests pin: old journals and places without a tier sell exactly as before; the
 // DM-only `settlement-limits` command (checked against what the DM saw, replay, history); refusals
 // and capped payouts in `sell` and sell-and-split with copper conserved; the shared engine, the DM's
-// device and the player link's own transaction agreeing on payouts and error text; older apps
-// (protocol 31) refused where the cap lowers a payout; the player projection (the mode and each
+// device and the player link's own transaction agreeing on payouts and error text; the DM exempt
+// from the cap with a warning (owner decision 2026-11-10; the shop's own limit and purse still
+// apply); older apps (protocol 31) refused where the cap lowers a player's payout; the player projection (the mode and each
 // visible place's limit only; tier names only for tiers visible places use); and that the rarity cap
 // filters generated stock but never hand-added stock.
 import "./commands.ts";
@@ -171,6 +172,7 @@ test("defaults: Pathfinder base values per tier, sale cap off and rarity cap on;
     assert.equal(settlementSaleLimit(t.journal, drink), undefined);
     const crown = t.holdings.find((h) => h.id === "crown")!;
     assert.deepEqual(shopSale(crown, drink, 2, t.journal, t.purses), shopSellBreakdown(drink, 300_000, 2, crown, { events: [], factions: [] }));
+    assert.deepEqual(shopSale(crown, drink, 2, t.journal, t.purses, "dm"), shopSale(crown, drink, 2, t.journal, t.purses), "no cap: no DM warning");
     const sold = applyCommand(t, ariaSeat, sell("s1", "crown", 2));
     assert.equal(wallet(sold, "aria") - wallet(t, "aria"), 300_000);
   }
@@ -222,7 +224,8 @@ test("refuse: an item above the place's limit is refused with the limit named; n
   // The hamlet's limit is 200 gp; the DM's per-tier value and a place's own value both win.
   // (The DM sells at Brook's mill: the party is in the Docks.)
   assert.equal(wallet(applyCommand(t, dmSeat, sell("s4", "mug", 1, "mill")), "aria") - wallet(t, "aria"), 200);
-  assert.equal(errorOf(() => applyCommand(t, dmSeat, sell("s4b", "crown", 1, "mill"))), REFUSAL.replace("Port City", "Brook").replace("1,000 gp", "200 gp"));
+  // The DM is exempt (owner decision 2026-11-10): Brook's 200 gp limit neither refuses nor lowers it.
+  assert.equal(wallet(applyCommand(t, dmSeat, sell("s4b", "crown", 1, "mill")), "aria") - wallet(t, "aria"), 150_000);
   const tier = run(t, limits("l2", { sale: "refuse", saleLimits: { "small-town": 150_000 } }, limitSettings(settlementsOf(t))));
   assert.equal(wallet(applyCommand(tier, ariaSeat, sell("s5", "crown", 1)), "aria") - wallet(t, "aria"), 150_000);
   const place = run(t, profile("p3", "port-city", { tier: "small-town", population: "about 3,000", saleLimit: 200_000 }, { tier: "small-town", population: "about 3,000" }));
@@ -256,10 +259,18 @@ test("pay at the limit: each pricier item pays the limit, shown as a factor; cop
 test("sell and split: refused lots are named, capped lots split evenly, and every copper lands somewhere", () => {
   const input = { fundId: "hoard", shopId: "drink", lots: [{ holdingId: "hoard-crown", quantity: 2 }, { holdingId: "hoard-mug", quantity: 3 }], recipientIds: ["aria", "bram"], rule: "party-fund" as const };
   const refusing = capped("refuse");
-  assert.equal(saleProblem(refusing.holdings[2]!, drink, "dm", refusing.journal, refusing.purses), REFUSAL);
-  assert.throws(() => planSaleSplit(refusing, input, { actor: "dm" }), { message: `Jewelled crown: ${REFUSAL}` });
+  assert.equal(saleProblem(refusing.holdings[2]!, drink, "player", refusing.journal, refusing.purses), REFUSAL);
+  assert.throws(() => planSaleSplit(refusing, input, { actor: "player" }), { message: `Jewelled crown: ${REFUSAL}` });
+  // A player who may spend from the fund is refused by the shared command too.
+  const hoardSeat: CloudSeat = { ...ariaSeat, purseIds: ["aria", "hoard"] };
+  const fullPlan = planSaleSplit(sized(), input, { actor: "player" });
+  const asSeen = (p: typeof fullPlan, id: string): Command => ({
+    id, kind: "sale-split", fundId: "hoard", shopId: "drink", lots: input.lots, recipientIds: input.recipientIds,
+    remainder: { rule: "party-fund" }, expect: { proceeds: p.proceeds, share: p.split.share, remainderTo: p.split.remainderTo },
+  });
+  assert.equal(errorOf(() => applyCommand(refusing, hoardSeat, asSeen(fullPlan, "ssp"))), `Jewelled crown: ${REFUSAL}`);
   const t = capped("pay-limit");
-  const plan = planSaleSplit(t, input, { actor: "dm" });
+  const plan = planSaleSplit(t, input, { actor: "player" });
   // Two crowns at the 1,000 gp limit and three mugs at round(401 × 0.5) = 201 cp.
   assert.deepEqual(plan.lots.map((l) => [l.unitPaid, l.paid]), [[100_000, 200_000], [201, 603]]);
   assert.equal(plan.proceeds, 200_603);
@@ -267,14 +278,90 @@ test("sell and split: refused lots are named, capped lots split evenly, and ever
     id: "ss1", kind: "sale-split", fundId: "hoard", shopId: "drink", lots: input.lots, recipientIds: input.recipientIds,
     remainder: { rule: "party-fund" }, expect: { proceeds: plan.proceeds, share: plan.split.share, remainderTo: plan.split.remainderTo },
   };
-  const split = run(t, cmd);
+  const split = applyCommand(t, hoardSeat, cmd);
   const gains = ["aria", "bram", "hoard"].map((id) => wallet(split, id) - wallet(t, id));
   assert.equal(gains.reduce((a, b) => a + b, 0), plan.proceeds, "proceeds are conserved through the split");
   assert.equal(gains[0], gains[1]);
   assert.equal(drink.merchantPurse! - split.shops.find((s) => s.id === "drink")!.merchantPurse!, plan.proceeds);
   // A stale plan (made before the DM turned the cap on) is refused, never paid at the old price.
-  const old = planSaleSplit(sized(), input, { actor: "dm" });
-  assert.match(errorOf(() => run(t, { ...cmd, id: "ss2", expect: { proceeds: old.proceeds, share: old.split.share, remainderTo: old.split.remainderTo } })), /changed/);
+  const old = planSaleSplit(sized(), input, { actor: "player" });
+  assert.match(errorOf(() => applyCommand(t, hoardSeat, { ...cmd, id: "ss2", expect: { proceeds: old.proceeds, share: old.split.share, remainderTo: old.split.remainderTo } })), /changed/);
+});
+
+test("DM exemption: the DM's sell and sell-and-split go through at the full payout with a warning; players stay capped", () => {
+  const WARN = (mode: "refuse" | "pay-limit") =>
+    `Over Port City's limit of 1,000 gp for one item; players would be ${mode === "refuse" ? "refused" : "paid 1,000 gp each"}. You're the DM, so this sale goes through at 1,500 gp each.`;
+  const input = { fundId: "hoard", shopId: "drink", lots: [{ holdingId: "hoard-crown", quantity: 2 }, { holdingId: "hoard-mug", quantity: 3 }], recipientIds: ["aria", "bram"], rule: "party-fund" as const };
+  for (const mode of ["refuse", "pay-limit"] as const) {
+    const t = capped(mode);
+    const crown = t.holdings.find((h) => h.id === "crown")!;
+    // The DM's quote: the full payout, no cap factor, no refusal, and the warning.
+    const dmQuote = shopSale(crown, drink, 2, t.journal, t.purses, "dm");
+    assert.deepEqual(
+      { ...dmQuote, warning: undefined },
+      { ...shopSellBreakdown(drink, 300_000, 2, crown, { events: [], factions: [] }), warning: undefined },
+      `${mode}: the DM's breakdown is the uncapped one`,
+    );
+    assert.equal(dmQuote.total, 300_000);
+    assert.equal(dmQuote.warning, WARN(mode));
+    assert.equal(dmQuote.refused, undefined);
+    // A player's quote is unchanged: refused, or paid the limit; never a warning.
+    const playerQuote = shopSale(crown, drink, 2, t.journal, t.purses, "player");
+    assert.equal(playerQuote.warning, undefined);
+    assert.deepEqual(playerQuote, shopSale(crown, drink, 2, t.journal, t.purses), "players are the default");
+    // An item under the limit carries no warning for the DM either.
+    assert.equal(shopSale(t.holdings.find((h) => h.id === "mug")!, drink, 1, t.journal, t.purses, "dm").warning, undefined);
+    // The shared `sell`: the DM is paid in full and the shop's purse pays exactly that.
+    const sold = applyCommand(t, dmSeat, sell("d1", "crown", 2));
+    assert.equal(wallet(sold, "aria") - wallet(t, "aria"), 300_000);
+    assert.equal(drink.merchantPurse! - sold.shops.find((s) => s.id === "drink")!.merchantPurse!, 300_000);
+    assert.deepEqual(sold.ledger.filter((l) => l.id.startsWith("d1")).map((l) => l.copper), [300_000]);
+    // The same sale by the player who owns it: refused, or paid the limit.
+    const playerSale = errorOf(() => applyCommand(t, ariaSeat, sell("d2", "crown", 2)));
+    if (mode === "refuse") assert.equal(playerSale, REFUSAL);
+    else assert.equal(wallet(applyCommand(t, ariaSeat, sell("d2", "crown", 2)), "aria") - wallet(t, "aria"), 200_000);
+    // Sell and split by the DM: full proceeds, the warning on the capped lot only, copper conserved.
+    assert.equal(saleProblem(t.holdings[2]!, drink, "dm", t.journal, t.purses), null);
+    const plan = planSaleSplit(t, input, { actor: "dm" });
+    assert.deepEqual(plan.lots.map((l) => [l.unitPaid, l.paid, l.warning ?? null]), [[150_000, 300_000, WARN(mode)], [201, 603, null]]);
+    assert.equal(plan.proceeds, 300_603);
+    const cmd: Command = {
+      id: "dss", kind: "sale-split", fundId: "hoard", shopId: "drink", lots: input.lots, recipientIds: input.recipientIds,
+      remainder: { rule: "party-fund" }, expect: { proceeds: plan.proceeds, share: plan.split.share, remainderTo: plan.split.remainderTo },
+    };
+    const split = run(t, cmd);
+    const gains = ["aria", "bram", "hoard"].map((id) => wallet(split, id) - wallet(t, id));
+    assert.equal(gains.reduce((a, b) => a + b, 0), 300_603, "proceeds are conserved through the split");
+    assert.equal(drink.merchantPurse! - split.shops.find((s) => s.id === "drink")!.merchantPurse!, 300_603);
+    // Replaying the command ID after it applied is a no-op in a room (receipts); the planner is
+    // pure, so the same input plans the same payout again.
+    assert.deepEqual(planSaleSplit(t, input, { actor: "dm" }), plan);
+    // A player's plan for the same lots is capped (or refused); the DM's expectation doesn't help a
+    // player: the server prices from the seat, so the player's command with the DM's numbers is refused.
+    const hoardSeat: CloudSeat = { ...ariaSeat, purseIds: ["aria", "hoard"] };
+    assert.notEqual(errorOf(() => applyCommand(t, hoardSeat, { ...cmd, id: "pss" })), "no error");
+  }
+});
+
+test("DM exemption covers only the settlement cap: the shop's own per-item limit and merchant purse still apply", () => {
+  const t = capped("refuse");
+  // The shop's own Most paid for one item (900 gp) applies to the DM as before.
+  const own = { ...t, shops: t.shops.map((s) => (s.id === "drink" ? { ...s, purchaseLimit: 90_000 } : s)) };
+  const ownQuote = shopSale(own.holdings[0]!, own.shops[0]!, 1, own.journal, own.purses, "dm");
+  assert.equal(ownQuote.unit, 90_000);
+  assert.equal(ownQuote.warning, undefined, "under the settlement limit after the shop's own limit: no warning");
+  assert.equal(wallet(applyCommand(own, dmSeat, sell("o1", "crown", 1)), "aria") - wallet(t, "aria"), 90_000);
+  // A shop limit above the settlement's: the DM is paid up to the shop's limit, with the warning.
+  const high = { ...t, shops: t.shops.map((s) => (s.id === "drink" ? { ...s, purchaseLimit: 120_000 } : s)) };
+  assert.equal(wallet(applyCommand(high, dmSeat, sell("o2", "crown", 1)), "aria") - wallet(t, "aria"), 120_000);
+  assert.match(shopSale(high.holdings[0]!, high.shops[0]!, 1, high.journal, high.purses, "dm").warning!, /goes through at 1,200 gp each/);
+  // The merchant purse: a shop with 1,000 gp left can't pay the DM's 1,500 gp; nothing moves.
+  const poor = { ...t, shops: t.shops.map((s) => (s.id === "drink" ? { ...s, merchantPurse: 100_000, showPurse: true } : s)) };
+  const refused = errorOf(() => applyCommand(poor, dmSeat, sell("o3", "crown", 1)));
+  assert.notEqual(refused, "no error");
+  assert.doesNotMatch(refused, /Port City/);
+  const input = { fundId: "hoard", shopId: "drink", lots: [{ holdingId: "hoard-crown", quantity: 1 }], recipientIds: ["aria", "bram"], rule: "party-fund" as const };
+  assert.throws(() => planSaleSplit(poor, input, { actor: "dm" }));
 });
 
 test("projection: players get the mode and each visible place's limit; never the tier table, other places or the rarity cap", () => {
@@ -366,6 +453,18 @@ test("shared rooms: a player can't change limits, a replayed sale pays once, the
   const after = await state();
   assert.equal(wallet(after, "aria") - start, quoted, "paid once, at the quoted limit");
   assert.equal(after.ledger.filter((l) => l.id.startsWith("c2")).length, 1);
+  // The DM's seat is exempt (owner decision 2026-11-10), decided from the seat's token: the DM
+  // sells the hoard's crown at the full 1,500 gp, once, even when retried.
+  const dmView = (await roomState(DT)).table;
+  const dmQuote = shopSale(dmView.holdings.find((h) => h.id === "hoard-crown")!, dmView.shops.find((s) => s.id === "drink")!, 1, dmView.journal, dmView.purses, "dm");
+  assert.equal(dmQuote.total, 150_000);
+  assert.match(dmQuote.warning!, /You're the DM/);
+  const hoardStart = wallet(after, "hoard");
+  await submitCommands({ ...DT, batchId: "c3", commands: [sell("c3", "hoard-crown", 1)] });
+  await submitCommands({ ...DT, batchId: "c3", commands: [sell("c3", "hoard-crown", 1)] });
+  const dmAfter = await state();
+  assert.equal(wallet(dmAfter, "hoard") - hoardStart, 150_000, "paid once, in full");
+  assert.equal(dmAfter.ledger.filter((l) => l.id.startsWith("c3")).length, 1);
 });
 
 test("protocol 32: older apps are refused where the cap lowers a payout; drafts with settlement commands ask them to update", async () => {
@@ -385,6 +484,10 @@ test("protocol 32: older apps are refused where the cap lowers a payout; drafts 
   // The updated app is paid at the limit.
   await submitCommands({ ...OLD, tabletopProtocol: SETTLEMENT_LIMITS_PROTOCOL, batchId: "o3", commands: [sell("o3", "crown", 1)] });
   assert.equal(wallet(await state(), "aria") - start, 100_200);
+  // The DM on an older app: the cap changes no DM payout, so the sale goes through at the full
+  // 1,500 gp the older app shows (owner decision 2026-11-10: the DM is exempt).
+  await submitCommands({ code: dm.code, token: dm.token, tabletopProtocol: QUEST_RENOWN_PROTOCOL, batchId: "o4", commands: [sell("o4", "crown", 1)] });
+  assert.equal(wallet(await state(), "aria") - start, 250_200);
   // Drafts with any settlement command ask protocol 31 apps to finish on the updated website.
   const t = sized();
   for (const c of [limits("d1", { sale: "refuse" }), profile("d2", "uptown", { tier: "village" })]) {
@@ -405,19 +508,29 @@ test("offline parity: the DM's device and the player link pay and refuse exactly
     const once = await economySnapshot();
     assert.deepEqual(once.journal!.settlements, shared.journal!.settlements);
     assert.equal(once.journal!.events.filter((e) => e.summary.startsWith("Settlement limits")).length, 1, "retries change nothing");
-    // The DM's device runs the shared `sell`.
-    const sharedSale = (() => {
+    // The DM's device runs the shared `sell` as the DM: exempt from the cap (owner decision
+    // 2026-11-10), with a retry of the same command ID changing nothing.
+    const outcome = (seat: CloudSeat) => {
       try {
-        return wallet(applyCommand(shared, dmSeat, sell("s1", "crown", 2)), "aria") - wallet(shared, "aria");
+        return wallet(applyCommand(shared, seat, sell("s1", "crown", 2)), "aria") - wallet(shared, "aria");
       } catch (e) {
         return (e as Error).message;
       }
-    })();
-    const device = await executeLocalCommand(sell("s1", "crown", 2)).then(
-      async () => wallet(await economySnapshot(), "aria") - wallet(once, "aria"),
+    };
+    const dmSale = outcome(dmSeat);
+    const sharedSale = outcome(ariaSeat);
+    const device = await executeLocalCommand(sell(`${mode}-s1`, "crown", 2)).then(
+      async () => {
+        await executeLocalCommand(sell(`${mode}-s1`, "crown", 2));
+        const after = await economySnapshot();
+        assert.equal(after.ledger.filter((l) => l.id.startsWith(`${mode}-s1`)).length, 1, `${mode}: the device's retry is a no-op`);
+        assert.equal(drink.merchantPurse! - after.shops.find((x) => x.id === "drink")!.merchantPurse!, wallet(after, "aria") - wallet(once, "aria"), "copper conserved");
+        return wallet(after, "aria") - wallet(once, "aria");
+      },
       (e: Error) => e.message,
     );
-    assert.deepEqual(device, sharedSale, `${mode}: device`);
+    assert.deepEqual(device, dmSale, `${mode}: device`);
+    assert.equal(dmSale, 300_000, `${mode}: the DM is paid in full`);
     // The player link: economy.ts's own transaction on Aria's projected copy, with a retry.
     const projected = seatView(shared, { purseIds: ["aria"] });
     setSeat({ role: "player", purseIds: ["aria"], shopIds: ["drink", "stall", "mill"], openedAt: 0 });
@@ -430,6 +543,7 @@ test("offline parity: the DM's device and the player link pay and refuse exactly
       },
       (e: Error) => e.message,
     );
+    // The player link is a player: capped exactly as the shared engine caps Aria's seat.
     assert.deepEqual(link, sharedSale, `${mode}: player link`);
     assert.deepEqual(sharedSale, mode === "refuse" ? REFUSAL : 200_000);
     // Limits are the DM's on the device too.
