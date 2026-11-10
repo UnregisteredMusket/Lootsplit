@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.19.0",
+    "date": "2026-11-10",
+    "summary": "A small update: the map's action wheel gives a proper phone vibration, and fixes for item details, shared rooms and the DM's dice.",
+    "features": [
+      "The map's press-and-hold action wheel now uses the phone's own vibration when it opens and as your finger moves onto a slice. Reduced motion still turns it off."
+    ],
+    "improvements": [
+      "Pin to Desk on the What players can see page."
+    ],
+    "fixes": [
+      "Typing in Uses left right after changing Maximum uses no longer adds the new digit to the old number.",
+      "Reopening a shared room no longer redraws the page and loses what you just did, such as a downtime decision.",
+      "The DM's screen no longer misses some players' dice rolls.",
+      "Dice the DM's screen rolls for a barter check show only on the DM's screen.",
+      "Gift coins in an activity report are capped like other coin entries, and a gift that is too large is refused whole."
+    ]
+  },
+  {
     "version": "1.18.0",
     "date": "2026-11-07",
     "summary": "The app gets 3D dice, factions and the fixes made since 1.17.0: renown, favor and quest rewards, dice for players and the DM, coin handling that matches the website, and plainer help text.",

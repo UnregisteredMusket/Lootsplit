@@ -1,6 +1,27 @@
-# Next Android release (not yet released)
+# Lootsplitter 1.19.0
 
-- **Native haptics** (`feature/android-haptics`): the map actions wheel's tick now uses `@capacitor/haptics` 8.0.2 (MIT; a light impact) in the Android app, falling back to `navigator.vibrate(10)` if the plugin fails. The website is unchanged. Reduced motion still turns the tick off.
+Android version code **27**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data. Bundles the web client merged since the 1.18.0 build commit `99db029` (tabletop protocol unchanged at 31). One native change: the `@capacitor/haptics` plugin.
+
+## Added
+
+- **Native haptics** (#464): the map actions wheel's tick uses `@capacitor/haptics` 8.0.2 (MIT; a light impact) in the Android app, falling back to `navigator.vibrate(10)` if the plugin fails. The website is unchanged. Reduced motion still turns the tick off.
+
+## Improved
+
+- **What players can see** has Pin to Desk (#458).
+
+## Fixed
+
+- Award item details: Uses left no longer gains the new digit when typed right after changing Maximum uses (#465).
+- Reopening a shared room keeps its session, so the page no longer redraws and drops a just-made decision (#460).
+- The DM's screen no longer misses players' dice rolls (#461).
+- Auto-rolled barter dice show on the DM's screen only; activity-report gift coins are capped at the shared limit, all or nothing (#458).
+
+## After updating
+
+Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. 1.18.0 installs keep working with the website.
+
+---
 
 # Lootsplitter 1.18.0
 
