@@ -40,7 +40,9 @@ jobs:
   build:
     name: Code checks and immutable builds
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 15, not 10 (2026-11-10): main also stamps and builds the website (web-build ~2.5–3.5 min), and
+    # on slow runners the whole job ran 10–10.5 min (main 79f7eb7, twice) against ~7.5 on a normal day.
+    timeout-minutes: 15
     permissions:
       contents: read
       id-token: write
