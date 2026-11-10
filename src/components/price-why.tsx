@@ -92,6 +92,7 @@ export function PriceWhy({
           {b.negotiator?.party && <span className="price-why-note">The party fund pays; no one negotiates.</span>}
           {b.note && <span className="price-why-note">{b.note}</span>}
           {b.refused && <span className="price-why-note">{b.refused}</span>}
+          {b.warning && <span className="price-why-note">{b.warning}</span>}
         </span>
       )}
     </span>

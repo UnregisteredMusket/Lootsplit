@@ -38,6 +38,8 @@ export type SaleLot = {
   unitPaid: number;
   paid: number;
   pooled: boolean;
+  /** The DM sells this above the settlement's per-item limit (`shopSale`'s warning); display only. */
+  warning?: string;
 };
 
 export type SaleSplitPlan = {
@@ -53,7 +55,10 @@ export type SaleSplitPlan = {
  * Selling `quantity` of `h` to `shop`, priced the one way every sale path uses (the shared `sell`
  * and `sale-split` commands, the player link's `sellToShop` in economy.ts, the sell form's
  * breakdown): today's market events, faction standing and the settlement's per-item sale cap
- * (settlements.ts, S2). `refused` is set when the settlement refuses the item.
+ * (settlements.ts, S2). `refused` is set when the settlement refuses the item. The DM is exempt
+ * from the settlement cap (owner decision 2026-11-10): `actor` "dm" pays the full payout with a
+ * `warning`; the shop's own per-item limit and purse still apply. The actor comes from the seat
+ * (the shared engine's seat role, the device's own seat), never from a command field.
  */
 export function shopSale(
   h: Pick<Holding, "unitCopper" | "category" | "unidentified">,
@@ -61,11 +66,13 @@ export function shopSale(
   quantity: number,
   journal?: SaleSplitTable["journal"],
   purses: SaleSplitTable["purses"] = [],
+  actor: "dm" | "player" = "player",
 ): PriceBreakdown {
   return shopSellBreakdown(shop, h.unitCopper, quantity, h, {
     events: saleEvents(journal, shop, h),
     factions: factionEffects(journal, purses, shop),
     settlementLimit: settlementSaleLimit(journal, shop),
+    ...(actor === "dm" ? { settlementExempt: true } : {}),
   });
 }
 
@@ -81,8 +88,10 @@ export function unitSalePrice(
   journal?: SaleSplitTable["journal"],
   /** The campaign's purses: the party's faction standing changes it too (factions.ts). */
   purses: SaleSplitTable["purses"] = [],
+  /** The DM is exempt from the settlement cap (`shopSale`). */
+  actor: "dm" | "player" = "player",
 ): number {
-  return shopSale(h, shop, 1, journal, purses).unit;
+  return shopSale(h, shop, 1, journal, purses, actor).unit;
 }
 
 /**
@@ -106,8 +115,8 @@ export function saleProblem(
     return error instanceof Error ? error.message : "This item can't be sold here.";
   }
   if (h.equipped) return "Unequip this item before selling it.";
-  const sale = shopSale(h, shop, 1, journal, purses);
-  // Settlement limits (S2): above the place's per-item limit, with "refuse" chosen.
+  const sale = shopSale(h, shop, 1, journal, purses, actor);
+  // Settlement limits (S2): above the place's per-item limit, with "refuse" chosen (never the DM).
   if (sale.refused) return sale.refused;
   if (sale.unit < 1) return `${shop.name} pays nothing for this item.`;
   return null;
@@ -144,7 +153,8 @@ export function planSaleSplit(
     if (lot.quantity > h.quantity) throw Error(`Only ${h.quantity} × ${h.name} ${h.quantity === 1 ? "is" : "are"} in ${fund.name}.`);
     const problem = saleProblem(h, shop, options.actor, t.journal, t.purses);
     if (problem) throw Error(`${h.name}: ${problem}`);
-    const unitPaid = unitSalePrice(h, shop, t.journal, t.purses);
+    const sale = shopSale(h, shop, 1, t.journal, t.purses, options.actor);
+    const unitPaid = sale.unit;
     lots.push({
       holdingId: h.id,
       name: h.name,
@@ -153,6 +163,7 @@ export function planSaleSplit(
       unitPaid,
       paid: unitPaid * lot.quantity,
       pooled: !!h.pool,
+      ...(sale.warning ? { warning: sale.warning } : {}),
     });
   }
   const proceeds = lots.reduce((sum, l) => sum + l.paid, 0);

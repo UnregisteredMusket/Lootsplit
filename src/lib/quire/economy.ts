@@ -1533,9 +1533,11 @@ export async function sellToShop(
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
     // The same market events, faction standing and settlement sale cap the shared `sell` command
-    // applies (sale-split.ts `shopSale`); a refused item is refused with the same text.
+    // applies (sale-split.ts `shopSale`); a refused item is refused with the same text. This path
+    // is only the player link (the DM's device runs the shared `sell` above, where the DM's seat
+    // is exempt from the cap), so it is always priced as a player.
     const everyone = await request<Purse[]>(tx.objectStore("purses").getAll());
-    const priced = shopSale(holding, shop, quantity, journal, everyone);
+    const priced = shopSale(holding, shop, quantity, journal, everyone, "player");
     if (priced.refused) throw Error(priced.refused);
     const paid = priced.total;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");

@@ -818,12 +818,14 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
     // Item identification: shopSale prices an unidentified item as presented; today's
     // market events for its category apply exactly as the `sell` command applies them.
     // Settlement limits (S2): the same shopSale every sale path charges, so a refusal or a capped
-    // payout shows before confirming.
+    // payout shows before confirming. The DM is exempt from the cap (owner decision 2026-11-10)
+    // and sees a warning instead; the server decides the exemption from the seat.
     sale =
       holding && shop
-        ? shopSale(holding, shop, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, journal, purses)
+        ? shopSale(holding, shop, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, journal, purses, seat.role === "dm" ? "dm" : "player")
         : null,
     refused = !eligibility && sale?.refused ? sale.refused : "",
+    capWarning = !eligibility && sale?.warning ? sale.warning : "",
     unitOffer = sale ? sale.unit : 0,
     payout = unitOffer * asked;
   // Merchant purse: the refusal shows before confirming (the amount only where this seat may read it).
@@ -892,6 +894,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
       )}
       {eligibility && <p role="status">{eligibility}</p>}
       {refused && <p role="status" data-testid="settlement-sale-refused">{refused}</p>}
+      {capWarning && <p role="status" data-testid="settlement-sale-dm-warning">{capWarning}</p>}
       {purseNotice && (
         <p role="status">
           {purseNotice}

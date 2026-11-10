@@ -12,7 +12,7 @@ import { useSeatGroups } from "@/lib/quire/use-seat-groups";
 import { shopVisible } from "@/lib/quire/vendors";
 import { formatCopper } from "@/lib/quire/money";
 import { creditCoins, defaultSplitRule, isNpc, remainderText, splitRecipients, type SplitRule } from "@/lib/quire/coin-split";
-import { lotLabel, planSaleSplit, saleProblem, unitSalePrice, type SaleSplitPlan } from "@/lib/quire/sale-split";
+import { lotLabel, planSaleSplit, saleProblem, shopSale, unitSalePrice, type SaleSplitPlan } from "@/lib/quire/sale-split";
 import { merchantName, revealPurse } from "@/lib/quire/merchant";
 import type { Purse } from "@/lib/quire/types";
 import { SplitPreview, SplitRecipientPicker, SplitRules } from "./coin-split";
@@ -152,6 +152,13 @@ export function SellAndSplit({
               {listOf(plan.split.recipientIds.map(name))} each get <strong>{formatCopper(plan.split.share)}</strong>.
             </li>
             {plan.split.remainder > 0 && <li>{remainderText(plan.split, name)}</li>}
+            {plan.lots
+              .filter((l) => l.warning)
+              .map((l) => (
+                <li key={l.holdingId} data-testid="settlement-sale-dm-warning">
+                  {l.name}: {l.warning}
+                </li>
+              ))}
           </ul>
         </div>
         <p className="text-sm text-muted">
@@ -225,7 +232,10 @@ export function SellAndSplit({
         {items.map((h) => {
           const why = problem(h.id);
           const qty = chosen[h.id] ?? 0;
-          const pays = shop ? unitSalePrice(h, shop, economy.journal, economy.purses) : 0;
+          // The DM is exempt from the settlement's per-item cap and sees a warning instead.
+          const sale = shop ? shopSale(h, shop, 1, economy.journal, economy.purses, actor) : null;
+          const pays = sale?.unit ?? 0;
+          const capWarning = !why && sale?.warning ? sale.warning : "";
           return (
             <div className={`coin-split-check${why ? " is-disabled" : ""}`} key={h.id}>
               <input
@@ -242,6 +252,12 @@ export function SellAndSplit({
                 <small>
                   {why ??
                     `${h.quantity > 1 ? `${h.quantity} × ` : ""}${formatCopper(h.unitCopper)} value · ${shop?.name} pays ${formatCopper(pays * Math.max(1, qty || h.quantity))}${shop?.merchantAffords?.[h.id] === "none" ? ` · ${merchantName(shop)} can't afford this` : ""}`}
+                  {capWarning && (
+                    <>
+                      <br />
+                      <span data-testid="settlement-sale-dm-warning">{capWarning}</span>
+                    </>
+                  )}
                 </small>
               </span>
               {!why && qty > 0 && h.quantity > 1 ? (
@@ -271,7 +287,7 @@ export function SellAndSplit({
       </fieldset>
       <div className="coin-split-preview-head sale-split-proceeds" aria-live="polite">
         <strong>Proceeds</strong>
-        <span className="tabular-nums">{formatCopper(lots.reduce((sum, l) => sum + (shop ? unitSalePrice(items.find((h) => h.id === l.holdingId)!, shop, economy.journal, economy.purses) * l.quantity : 0), 0))}</span>
+        <span className="tabular-nums">{formatCopper(lots.reduce((sum, l) => sum + (shop ? unitSalePrice(items.find((h) => h.id === l.holdingId)!, shop, economy.journal, economy.purses, actor) * l.quantity : 0), 0))}</span>
       </div>
       <SplitRecipientPicker
         table={table}
