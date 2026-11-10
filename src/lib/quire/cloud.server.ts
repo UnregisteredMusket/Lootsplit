@@ -65,6 +65,7 @@ import {
   ZONES_PROTOCOL,
   MARKET_EVENTS_PROTOCOL,
   FACTIONS_PROTOCOL,
+  SETTLEMENT_LIMITS_PROTOCOL,
 } from "./tabletop-protocol.ts";
 
 /**
@@ -1222,6 +1223,8 @@ export async function submitCommands(input: {
         marketEventsUnsupported: (input.tabletopProtocol ?? 0) < MARKET_EVENTS_PROTOCOL,
         // Factions: an older app's prices omit faction standing, so a changed price is refused.
         factionsUnsupported: (input.tabletopProtocol ?? 0) < FACTIONS_PROTOCOL,
+        // Settlement limits: an older app's payouts omit the per-item cap, so a lowered one is refused.
+        settlementLimitsUnsupported: (input.tabletopProtocol ?? 0) < SETTLEMENT_LIMITS_PROTOCOL,
         random: (draw) => {
           const key = command.id + ":" + draw;
           if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());

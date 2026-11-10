@@ -23,7 +23,7 @@ import { StockPages } from "./shop-stock-manager";
 import { LocationOptions } from "./market-locations";
 import { MarketImageUpload } from "./market-image-upload";
 import { readMarketLocations } from "@/lib/quire/shop-locations";
-import { newShopDefaults } from "@/lib/quire/settlements";
+import { newShopDefaults, rarityAllowed, settlementMaxRarity } from "@/lib/quire/settlements";
 
 export function ShopComposer() {
   const navigate = useNavigate();
@@ -114,6 +114,9 @@ export function ShopComposer() {
   }, [prefs, prefsReady]);
   // What a shop created here starts with (settlement tiers); recomputed as the location changes.
   const placeDefaults = newShopDefaults(journal, locationId || null);
+  // Settlement limits (S2): generated stock stops at the place's rarest; hand-added stock never does.
+  const rarityCap = settlementMaxRarity(journal, locationId || null);
+  const maxRarity = rarityCap?.rarity;
 
   const lines = useMemo(() => {
     const rng = rngFrom(shelfSeed);
@@ -128,6 +131,7 @@ export function ShopComposer() {
         realm,
         selection,
         itemCount,
+        ...(maxRarity ? { maxRarity } : {}),
         ...(quantityMode === "suggested"
           ? {}
           : { quantity: quantityMode === "unlimited" ? null : quantity }),
@@ -147,9 +151,13 @@ export function ShopComposer() {
     itemCount,
     quantityMode,
     quantity,
+    maxRarity,
   ]);
   const available = catalog.filter(
-    (item) => flags[item.rarity] && (category === "mixed" || item.category === category),
+    (item) =>
+      flags[item.rarity] &&
+      rarityAllowed(item.rarity, maxRarity) &&
+      (category === "mixed" || item.category === category),
   ).length;
   const currentPreviewPage = Math.min(previewPage, Math.max(0, Math.ceil(lines.length / 25) - 1));
 
@@ -308,23 +316,37 @@ export function ShopComposer() {
         <fieldset>
           <legend className="mb-2 text-sm font-medium">What it carries</legend>
           <div className="grid grid-cols-2 gap-2">
-            {RARITIES.map((rarity) => (
-              <label
-                key={rarity.value}
-                className="flex min-h-11 items-center gap-2 rounded-sm border border-border px-3 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  className="size-6 accent-accent"
-                  checked={flags[rarity.value]}
-                  onChange={() =>
-                    setFlags((current) => ({ ...current, [rarity.value]: !current[rarity.value] }))
-                  }
-                />
-                {rarity.label}
-              </label>
-            ))}
+            {RARITIES.map((rarity) => {
+              const capped = !rarityAllowed(rarity.value, maxRarity);
+              return (
+                <label
+                  key={rarity.value}
+                  className={cn(
+                    "flex min-h-11 items-center gap-2 rounded-sm border border-border px-3 text-sm",
+                    capped && "text-muted",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="size-6 accent-accent"
+                    checked={flags[rarity.value] && !capped}
+                    disabled={capped}
+                    onChange={() =>
+                      setFlags((current) => ({ ...current, [rarity.value]: !current[rarity.value] }))
+                    }
+                  />
+                  {rarity.label}
+                </label>
+              );
+            })}
           </div>
+          {rarityCap ? (
+            <p className="mt-1 text-sm text-muted" data-testid="settlement-rarity-cap">
+              {rarityCap.source}: generated stock here goes up to{" "}
+              {RARITIES.find((r) => r.value === rarityCap.rarity)?.label.toLowerCase() ?? rarityCap.rarity}. Add rarer
+              items by hand after opening the shop, or change the cap under Manage regions, cities, towns and areas.
+            </p>
+          ) : null}
         </fieldset>
         <Slider
           label="Base price multiplier"

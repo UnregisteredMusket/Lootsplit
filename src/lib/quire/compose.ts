@@ -14,6 +14,11 @@ export type ComposeInput = {
   itemCount?: number;
   /** Omit for generated quantities; null means unlimited. Services stay unlimited. */
   quantity?: number | null;
+  /**
+   * Settlement limits (settlements.ts `settlementMaxRarity`, S2): the rarest generated stock at the
+   * new shop's place. Omit for no cap. Only generated stock is capped; hand-added stock never is.
+   */
+  maxRarity?: ItemRarity;
 };
 
 export type ShelfDraft = {
@@ -61,7 +66,8 @@ export function composeShelf(catalog: CatalogItem[], input: ComposeInput, rng: (
   if (input.selection === "count" && (!Number.isSafeInteger(input.itemCount) || input.itemCount! < 1))
     throw new Error("Enter a positive whole number of item types.");
   const depth = Math.min(1.8, Math.max(0.35, input.depth));
-  const wanted = ORDER.filter((rarity) => input.flags[rarity]);
+  const rarest = input.maxRarity === undefined ? ORDER.length - 1 : ORDER.indexOf(input.maxRarity);
+  const wanted = ORDER.filter((rarity, index) => input.flags[rarity] && index <= rarest);
   const pool = catalog.filter((item) => wanted.includes(item.rarity) && (input.category === "mixed" || item.category === input.category));
   const shuffled = shuffle(pool, rng);
   const lines: ShelfDraft[] = [];

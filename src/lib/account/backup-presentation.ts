@@ -111,6 +111,8 @@ export function pendingCommandDescription(value: unknown): string {
       return `${c.profile ? "Set" : "Clear"} settlement size · location ${c.locationId}`;
     case "settlement-ladder":
       return `Settlement sizes · ${c.after.ladder === "simple" ? "five steps" : "eight sizes"}`;
+    case "settlement-limits":
+      return `Settlement limits · sale cap ${c.after.sale === "off" ? "off" : c.after.sale === "refuse" ? "refuses" : "pays the limit"} · rarity cap ${c.after.rarity ? "on" : "off"}`;
     case "faction-save":
       return `${c.revision === null ? "Add" : "Edit"} faction: ${c.faction.name}`;
     case "faction-visibility":

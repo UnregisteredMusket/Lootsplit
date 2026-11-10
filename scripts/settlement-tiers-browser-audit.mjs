@@ -3,8 +3,11 @@
 // shops, from Market → Manage regions, cities, towns and areas. The party's place cards in Market
 // show the size (the Docks share their city's); the existing shop keeps its own wealth and purse;
 // Create a shop at the Docks starts Princely and says the defaults come from Port City. Switching
-// to five steps is refused while Port City is a Metropolis (an eight-size tier). No sideways scrolling at 1280,
-// 390 and 320 px. Never targets a real campaign.
+// to five steps is refused while Port City is a Metropolis (an eight-size tier). Phase S2 (limits):
+// the DM turns the per-item sale cap on (Refuse) and limits a Metropolis's generated stock to
+// Uncommon; a 20,000 gp sale there is refused with the 16,000 gp limit named, and the composer at
+// the Docks disables Rare and Magic with the cap's note. No sideways scrolling at 1280, 390 and 320
+// px. Never targets a real campaign.
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -19,7 +22,7 @@ const browser = await chromium.launch({
 await mkdir("test-results/settlement-tiers", { recursive: true });
 const tavern = {
   id: "tavern", name: "Old Tavern", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5,
-  wealth: "modest", category: "inn", priceScale: 1, locationId: "docks", merchantPurse: 5000,
+  wealth: "modest", category: "inn", priceScale: 1, locationId: "docks", merchantPurse: 5000, acceptAnyCategory: true,
 };
 const snapshot = (page) =>
   page.evaluate(async () => {
@@ -49,7 +52,8 @@ try {
       setSeat(DM_SEAT);
       await applyCloudTable({
         purses: [{ ...blankPurse("character"), id: "aria", name: "Aria Thorne" }],
-        holdings: [],
+        // S2: worth 40,000 gp; the tavern's 50% buy rate pays 20,000 gp, above a Metropolis's 16,000 gp.
+        holdings: [{ id: "crown", purseId: "aria", name: "Jewelled crown", kind: "item", quantity: 1, unitCopper: 4_000_000, notes: "", category: "general" }],
         shops: [tavern],
         stock: [],
         ledger: [], listings: [], loans: [], sheets: [], notes: [],
@@ -90,6 +94,27 @@ try {
     books = await snapshot(page);
     assert.equal(books.settlements.ladder, undefined);
 
+    // S2: the sale cap (Refuse) and a Metropolis's rarest generated stock, saved by one command;
+    // the result is read from the moment of the click, not after a settled state.
+    const limits = page.getByTestId("settlement-limits-form");
+    await limits.getByLabel("Per-item sale cap").selectOption("refuse");
+    await limits.getByLabel("Rarest generated stock in a Metropolis").selectOption("uncommon");
+    await limits.getByRole("button", { name: "Save limits" }).click();
+    await limits.getByText("Settlement limits saved.").waitFor();
+    books = await snapshot(page);
+    assert.deepEqual(books.settlements.limits, { sale: "refuse", maxRarity: { metropolis: "uncommon" } });
+    assert.deepEqual(books.events.at(-1)?.summary, "Settlement limits saved: sale cap refuse pricier items; rarity cap on");
+    assert.deepEqual(books.shops, [tavern], `${width}: limits never change an existing shop`);
+    assert.equal(await sideways(page), false, `${width}: the limits form scrolls sideways`);
+    await limits.screenshot({ path: `test-results/settlement-tiers/limits-${width}.png` });
+    const refusal = await page.evaluate(async () => {
+      const { sellToShop } = await import("/src/lib/quire/economy.ts");
+      return sellToShop({ holdingId: "crown", shopId: "tavern", quantity: 1 }).then(() => "sold", (e) => e.message);
+    });
+    assert.equal(refusal, "Shops in Port City pay at most 16,000 gp for one item; this one would fetch 20,000 gp, so this shop won't buy it.");
+    books = await snapshot(page);
+    assert.deepEqual(books.shops, [tavern], `${width}: a refused sale moves nothing`);
+
     // The party's place cards show the size; the Docks' card is the area, Port City's carries it.
     await openApplication(page, origin + "/market");
     await page.getByTestId("settlement-tier").filter({ hasText: "Metropolis · about 25,000" }).first().waitFor();
@@ -98,6 +123,10 @@ try {
     await page.getByRole("button", { name: /Create a shop/ }).click();
     const note = page.getByTestId("settlement-shop-defaults");
     await note.getByText(/Port City · Metropolis: new shops here start at\s+Princely wealth, with a merchant purse of/).waitFor();
+    // S2: generated stock at the Docks stops at Uncommon; Rare and Magic can't be ticked.
+    await page.getByTestId("settlement-rarity-cap").getByText(/Port City · Metropolis: generated stock here goes up to\s+uncommon/).waitFor();
+    for (const label of ["Rare", "Magic"])
+      assert.equal(await page.getByRole("checkbox", { name: label, exact: true }).isDisabled(), true, `${width}: ${label} is above the cap`);
     assert.equal(await sideways(page), false, `${width}: the shop composer scrolls sideways`);
     assert.deepEqual(errors, []);
     await context.close();
