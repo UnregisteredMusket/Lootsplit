@@ -19,6 +19,18 @@ const errors = [];
 const total = (text) => Number(/: (-?\d+)/.exec(text ?? "")?.[1]);
 const caption = (page) => page.locator(".dice-roll-caption span");
 const settled = (page) => page.locator('.dice-roll-overlay[data-settled="true"]');
+/** The caption of the next throw this page settles, caught even if it clears before it is read. */
+const settledCaption = (page) => {
+  const seen = page
+    .waitForFunction(
+      () => document.querySelector('.dice-roll-overlay[data-settled="true"] .dice-roll-caption span')?.textContent,
+      null,
+      { polling: 100, timeout: 45000 },
+    )
+    .then((handle) => handle.jsonValue());
+  seen.catch(() => {}); // reported where it is awaited
+  return seen;
+};
 async function open() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 860 } });
   await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
@@ -71,16 +83,18 @@ try {
   // The player rolls from their own sheet.
   await navigateApplication(player, origin + "/");
   await player.getByRole("link", { name: "Character Sheet", exact: true }).click();
+  // The DM's screen and the TV display throw the same roll at about the same time, and settled
+  // dice clear after 2.6 s, so both are watched from the click: waiting for the DM first missed a
+  // TV throw that settled and cleared earlier (main a192290 and PR #468, 2026-11-10, line 82).
+  const dmSaw = settledCaption(dm);
+  const tvSaw = settledCaption(tv);
   await player.locator(".quick-roll button").first().click();
   await settled(player).waitFor();
   const own = await caption(player).textContent();
   const recorded = Number((await player.locator(".quick-roll output").first().textContent())?.split(" ")[0]);
   assert.equal(total(own), recorded, `player caption ${own}`);
-  // The DM's screen and the TV display throw the same roll within a few polls.
-  await settled(dm).waitFor();
-  assert.equal(await caption(dm).textContent(), own, "the DM sees the player's roll");
-  await settled(tv).waitFor();
-  assert.equal(await caption(tv).textContent(), own, "the TV display throws it too");
+  assert.equal(await dmSaw, own, "the DM sees the player's roll");
+  assert.equal(await tvSaw, own, "the TV display throws it too");
   assert.ok(!(await tv.locator("body").innerText()).includes("Dice player"), "the TV copy names no seat");
   await dm.screenshot({ path: `${out}/dm.png` });
   await tv.screenshot({ path: `${out}/tv.png` });
