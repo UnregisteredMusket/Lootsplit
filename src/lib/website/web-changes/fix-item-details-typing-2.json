@@ -1,0 +1,8 @@
+{
+  "title": "Uses left keeps what you type right after changing Maximum uses",
+  "audience": "dm",
+  "summary": "The earlier fix still let a quick entry in Uses left, right after changing Maximum uses, add the new digit to the old number (5 became 75). The box now updates in the same step as the maximum.",
+  "items": [
+    "Charges fields in Add loot and an encounter's loot review show the saved value until you start typing, then exactly what you type."
+  ]
+}

@@ -8,7 +8,7 @@
  * check (`itemDetailsProblem`) refuses. Text fields commit when they hold a valid value and fall
  * back to the last valid one when left.
  */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Field, Segmented, Switch, TextInput } from "./ui";
 import { MAX_USES } from "@/lib/quire/item-uses";
 import { formatCopper, parsePrice } from "@/lib/quire/money";
@@ -38,28 +38,29 @@ function CommitText({
   ariaLabel: string;
   maxLength?: number;
 }) {
+  // While the box is being typed in it shows the typed text; otherwise it shows the committed
+  // value directly, in the same render that changes it. Copying the value in an effect (#465)
+  // rewrote the box a render later, so a box focused in between lost its selection and the next
+  // key was appended: the maximum's 7 then "5" read "75" (main 3ea8ea5, 2026-11-10).
   const [text, setText] = useState(shown);
-  const input = useRef<HTMLInputElement>(null);
-  // Follow the value from outside (uses left following a new maximum) only while the box is not
-  // being typed in: rewriting a focused box drops its selection, so the next key is appended
-  // (main-bound PR 464, 2026-11-08: the maximum's 7 landed as "5" was typed and left read "75").
-  // Leaving the box shows the committed value anyway.
-  useEffect(() => {
-    if (typeof document === "undefined" || document.activeElement !== input.current) setText(shown);
-  }, [shown]);
+  const [editing, setEditing] = useState(false);
   return (
     <Field label={label} hint={hint}>
       <TextInput
-        ref={input}
         aria-label={ariaLabel}
-        value={text}
+        value={editing ? text : shown}
         maxLength={maxLength}
         inputMode={numeric ? "numeric" : undefined}
+        onFocus={() => {
+          setText(shown);
+          setEditing(true);
+        }}
         onChange={(e) => {
           setText(e.target.value);
+          setEditing(true);
           commit(e.target.value);
         }}
-        onBlur={() => setText(shown)}
+        onBlur={() => setEditing(false)}
       />
     </Field>
   );
