@@ -134,8 +134,9 @@ try {
     assert.equal(await sideways(page), false, `${width}: the sell form scrolls sideways`);
     await sellForm.screenshot({ path: `test-results/settlement-tiers/dm-warning-${width}.png` });
     await sellForm.getByRole("button", { name: "Sell", exact: true }).click();
-    // Read from the action's own notice, not a settled page.
-    await sellForm.getByText("Sale recorded.").waitFor();
+    // Read from the action's own toast: the crown is the DM's only item, so once it sells the
+    // sell form gives way to "This account has nothing this shop will buy." and its notice goes too.
+    await page.getByText("Sale recorded.").first().waitFor();
     books = await snapshot(page);
     assert.equal(books.crowns, 0, `${width}: the crown was sold`);
     assert.deepEqual(books.sales, [2_000_000], `${width}: one sale at the full 20,000 gp`);
