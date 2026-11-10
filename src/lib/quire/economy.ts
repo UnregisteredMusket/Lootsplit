@@ -518,8 +518,15 @@ export async function openComposedShop(input: {
   category: ShopCategory;
   priceScale: number;
   lines: ShelfDraft[];
+  /** Settlement tiers (settlements.ts): a starting merchant purse and refill from the place. */
+  merchantPurse?: number;
+  merchantPurseRefill?: number;
 }): Promise<string> {
   const shop = normalizeShop({
+    ...(input.merchantPurse !== undefined ? { merchantPurse: input.merchantPurse } : {}),
+    ...(input.merchantPurse !== undefined && input.merchantPurseRefill !== undefined
+      ? { merchantPurseRefill: input.merchantPurseRefill }
+      : {}),
     ...(input.locationId ? { locationId: input.locationId } : {}),
     ...(input.image ? { image: input.image } : {}),
     id: crypto.randomUUID(),

@@ -27,6 +27,7 @@ import { projectMerchantPurse } from "./merchant.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 import { projectMarketEvents } from "./market-events.ts";
 import { hiddenFactionIds, projectFactions } from "./factions.ts";
+import { projectSettlements } from "./settlements.ts";
 import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
 import { propertyAvailableToGroups } from "./property.ts";
 import { projectPartyGroups } from "./party-groups-project.ts";
@@ -403,6 +404,9 @@ export function projectRecord(
       { shops: t.shops, locationIds: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)) },
       options.hiddenFactions,
     );
+    // Settlement tiers (settlements.ts): tier and population of the places this seat can already
+    // see; the DM's new-shop defaults (wealth, purse, refill) are never sent.
+    projectSettlements(t.journal, new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)));
     // Journeys: status, progress and terrain; private routes and fogged waypoints are cut here.
     projectJourneys(
       table,

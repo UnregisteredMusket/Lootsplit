@@ -1,0 +1,13 @@
+{
+  "title": "Settlement sizes for cities and towns",
+  "summary": "DMs can give each city or town a size, from Thorp to Metropolis, and new shops there start with the wealth that size suggests.",
+  "items": [
+    "Choose a size for a city or town in Market under Manage regions, cities, towns and areas. Its areas share it.",
+    "Pick Pathfinder's eight sizes (the default) or five simple steps, and rename any size.",
+    "A size suggests the wealth of new shops there: hamlets start Poor, small towns Modest, large towns Rich and large cities Princely.",
+    "Optionally give new shops in a place a merchant purse and a refill amount.",
+    "Shops that already exist keep their wealth and purse; a size only sets the starting values of new shops.",
+    "Players see a place's size and population where they can already see the place, never your new-shop settings."
+  ],
+  "audience": "dm"
+}

@@ -181,6 +181,8 @@ type EconomyApi = {
     category: ShopCategory;
     priceScale: number;
     lines: ShelfDraft[];
+    merchantPurse?: number;
+    merchantPurseRefill?: number;
   }) => Promise<string>;
   openShelfOutcome: (
     input: Parameters<EconomyApi["openShelf"]>[0],

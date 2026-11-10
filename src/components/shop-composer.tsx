@@ -23,6 +23,7 @@ import { StockPages } from "./shop-stock-manager";
 import { LocationOptions } from "./market-locations";
 import { MarketImageUpload } from "./market-image-upload";
 import { readMarketLocations } from "@/lib/quire/shop-locations";
+import { newShopDefaults } from "@/lib/quire/settlements";
 
 export function ShopComposer() {
   const navigate = useNavigate();
@@ -102,7 +103,17 @@ export function ShopComposer() {
     setSellRate(prefs.defaultSell);
     setBuyRate(prefs.defaultBuy);
     setBuyTouched(Math.abs(prefs.defaultBuy - suggestedBuyRate(prefs.defaultWealth)) > 0.02);
+    // Settlement tiers: the party's place sets the starting wealth when it has a profile.
+    const place = newShopDefaults(journal, locationId);
+    if (place) {
+      setWealth(place.wealth);
+      if (Math.abs(prefs.defaultBuy - suggestedBuyRate(prefs.defaultWealth)) <= 0.02) setBuyRate(place.buyRate);
+    }
+    // Only the first seeding; later location choices go through chooseLocation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs, prefsReady]);
+  // What a shop created here starts with (settlement tiers); recomputed as the location changes.
+  const placeDefaults = newShopDefaults(journal, locationId || null);
 
   const lines = useMemo(() => {
     const rng = rngFrom(shelfSeed);
@@ -184,6 +195,13 @@ export function ShopComposer() {
     if (!buyTouched) setBuyRate(suggestedBuyRate(next));
   }
 
+  /** A new location: its settlement profile (if any) sets the wealth; nothing else changes. */
+  function chooseLocation(next: string) {
+    setLocationId(next);
+    const place = newShopDefaults(journal, next || null);
+    if (place) chooseWealth(place.wealth);
+  }
+
   async function open() {
     if (lines.length === 0) {
       toast("Nothing matched. Turn a rarity on, or add items to the catalog.");
@@ -204,6 +222,11 @@ export function ShopComposer() {
         category,
         priceScale,
         lines,
+        // Settlement tiers: the place's starting merchant purse and refill, if the DM set them.
+        ...(placeDefaults?.merchantPurse !== undefined ? { merchantPurse: placeDefaults.merchantPurse } : {}),
+        ...(placeDefaults?.merchantPurseRefill !== undefined
+          ? { merchantPurseRefill: placeDefaults.merchantPurseRefill }
+          : {}),
       });
       toast.success(
         result.status === "pending"
@@ -257,11 +280,22 @@ export function ShopComposer() {
           <SearchSelect
             aria-label="New shop availability"
             value={locationId}
-            onValueChange={(selectedValue) => setLocationId(selectedValue)}
+            onValueChange={(selectedValue) => chooseLocation(selectedValue)}
           >
             <option value="">Campaignwide · available everywhere</option>
             {LocationOptions({ market: market })}
           </SearchSelect>
+          {placeDefaults ? (
+            <span className="mt-1 block text-muted" data-testid="settlement-shop-defaults">
+              {placeDefaults.source}: new shops here start at{" "}
+              {WEALTHS.find((w) => w.value === placeDefaults.wealth)?.label ?? placeDefaults.wealth} wealth
+              {placeDefaults.merchantPurse !== undefined
+                ? `, with a merchant purse of ${formatCopper(placeDefaults.merchantPurse)}${placeDefaults.merchantPurseRefill !== undefined ? ` (refills to ${formatCopper(placeDefaults.merchantPurseRefill)})` : ""}`
+                : ""}
+              . Change the wealth here and the purse later under the shop&apos;s Edit; shops already open keep
+              their own settings.
+            </span>
+          ) : null}
         </label>
         <MarketImageUpload
           label="New shop image"

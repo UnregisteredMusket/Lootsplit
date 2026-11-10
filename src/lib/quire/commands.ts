@@ -52,6 +52,8 @@ import { applyAttunementCommand, attunedBefore, attunementFromNotes, attunementC
 import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts";
 import { applyMarketEventCommand, lineEvents, OLD_CLIENT_EVENT_PRICE, saleEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
 import { applyFactionCommand, factionCommands, factionEffects, factionKinds, OLD_CLIENT_FACTION_PRICE, type FactionCommand } from "./factions.ts";
+import { settlementCommands, settlementKinds, type SettlementCommand } from "./settlements-schema.ts";
+import { applySettlementCommand, dropSettlementProfile, newShopDefaults, settlementKind } from "./settlements.ts";
 import { applyFavorCommand, favorCommands, favorKinds, type FavorCommand } from "./favor-market.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
@@ -371,6 +373,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...factionCommands,
   // The favor market (favor-market.ts; tabletop protocol 30): players ask, the DM decides.
   ...favorCommands,
+  // Settlement tiers (settlements.ts, phase S1): DM-only; outside every strict schema, no protocol bump.
+  ...settlementCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export type CommandInput = Command extends infer C
@@ -637,7 +641,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     dm();
     const market = readMarketLocations(journal.market);
     if (marketNameFingerprint(market, t.shops) !== cmd.before) throw Error("Location or shop names changed elsewhere. Review a fresh import preview.");
-    const plan = previewMarketNames(market, t.shops, cmd.rows, cmd.id);
+    // Settlement tiers: a new shop at a place with a profile (or in an area of one, including an
+    // area this import adds) starts with its defaults. New cities and towns have no profile yet.
+    const plan = previewMarketNames(market, t.shops, cmd.rows, cmd.id, (locationId, names) =>
+      newShopDefaults({ settlements: journal.settlements, market: names }, locationId),
+    );
     if (plan.locations.length || plan.shops.length) {
       journal.market = readMarketLocations({ ...market, locations: [...market.locations, ...plan.locations] });
       t.shops.push(...plan.shops);
@@ -689,6 +697,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       ...(cmd.after ? [cmd.after] : []),
     ];
     journal.market = readMarketLocations(market);
+    // Settlement tiers: a removed place, or one that is no longer a city or town, keeps no profile.
+    if ((!cmd.after || !settlementKind(cmd.after)) && dropSettlementProfile(journal, cmd.locationId))
+      journal.events.push({ id: cmd.id + "-event-" + journal.events.length, at, summary: `Settlement profile cleared: ${current?.name ?? "a removed place"}`, kind: "management", dmOnly: true });
     event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
   } else if (cmd.kind === "party-location" && cmd.groupId && cmd.groupId !== MAIN_GROUP) {
     dm();
@@ -1034,6 +1045,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         ...(options.dmOnly ? { dmOnly: true } : {}),
         ...(options.factionId ? { factionId: options.factionId } : {}),
       }),
+    );
+  } else if (settlementKinds.has(cmd.kind)) {
+    // DM only; checked against what the DM saw; one DM-only history line. Shops are never touched.
+    applySettlementCommand(t, seat, cmd as SettlementCommand, (summary) =>
+      journal.events.push({ id: cmd.id + "-event-" + journal.events.length, at, summary, kind: "management", dmOnly: true }),
     );
   } else if (favorKinds.has(cmd.kind)) {
     // Spending Favor: players ask for their own characters; the DM approves (spends once, never

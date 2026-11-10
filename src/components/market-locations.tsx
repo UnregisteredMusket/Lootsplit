@@ -18,6 +18,8 @@ import { Button, Fold, Select, TextInput } from "./ui";
 import { MarketImageUpload } from "./market-image-upload";
 import { MarketNameImport } from "./market-name-import";
 import { requestConfirm } from "@/lib/quire/confirm-store";
+import { settlementKind } from "@/lib/quire/settlements";
+import { SettlementLadderForm, SettlementProfileEditor, SettlementTierText } from "./settlement-tiers";
 
 export function LocationOptions({ market }: { market: MarketLocations }) {
   const byId = new Map(market.locations.map((l) => [l.id, l]));
@@ -122,6 +124,7 @@ export function MarketLocationsPanel() {
               <div className="p-3">
                 <p className="text-sm capitalize text-muted">{location.kind}</p>
                 <h2 className="font-display text-xl">{location.name}</h2>
+                {settlementKind(location) ? <SettlementTierText locationId={location.id} /> : null}
                 {location.description ? (
                   <p className="mt-1 whitespace-pre-wrap text-sm">{location.description}</p>
                 ) : null}
@@ -161,6 +164,11 @@ export function MarketLocationsPanel() {
                 onClose={() => setEditing(null)}
               />
             ) : null}
+            {/* Settlement tiers: a saved city's or town's size, saved by its own command. */}
+            {selected && settlementKind(selected) ? (
+              <SettlementProfileEditor key={`settlement-${selected.id}`} location={selected} />
+            ) : null}
+            <SettlementLadderForm />
           </div>
         </Fold>
       ) : null}
