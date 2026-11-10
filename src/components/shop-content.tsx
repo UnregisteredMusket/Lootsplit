@@ -63,6 +63,7 @@ import type { Holding, Shop, StockLine } from "@/lib/quire/types";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { initialPayer, rememberPayer, rememberedPayer } from "@/lib/quire/shop-counter-memory";
 import { RemoveButton } from "@/components/quire-ui";
+import { ShopStockLists } from "@/components/shop-lists";
 import { CatalogStockPicker, ShopStockList } from "@/components/shop-stock-manager";
 import { Button, Confirm, Field, Segmented, TextInput } from "@/components/ui";
 import { requestConfirm } from "@/lib/quire/confirm-store";
@@ -368,6 +369,7 @@ export function ShopContent({
           {pdf}
         </div>
       ) : null}
+      {viewing === "edit" ? <ShopStockLists shop={shop} disabled={editDirty} /> : null}
       {viewing === "edit" ? (
         <Button
           variant="secondary"

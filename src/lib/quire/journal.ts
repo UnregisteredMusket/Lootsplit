@@ -21,6 +21,7 @@ import { marketLocationsSchema, validateShopLocations } from "./shop-locations.t
 import { marketAdjustmentsSchema, marketEventsSchema } from "./market-events.ts";
 import { factionAdjustmentsSchema, factionsSchema } from "./factions.ts";
 import { settlementsSchema } from "./settlements-schema.ts";
+import { shopListsSchema } from "./shop-lists-schema.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { validatePropertyLocations, listingSchema } from "./property.ts";
 import type { CloudTable } from "./cloud.ts";
@@ -114,6 +115,13 @@ const journalFields = z.object({
    * clients drop the key and their whole-journal writes keep the stored copy (no protocol bump).
    */
   settlements: settlementsSchema.optional(),
+  /**
+   * Alternative shop lists (shop-lists.ts): the DM's library of named stock lists and the list each
+   * shop last had swapped in. DM-only (players' copies never carry it); changes only through the
+   * DM's shop-list commands. Older clients drop the key and their whole-journal writes keep the
+   * stored copy.
+   */
+  shopLists: shopListsSchema.optional(),
   finance: financeSchema.optional(),
   reports: z
     .array(
@@ -356,6 +364,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   delete next.factions;
   delete next.factionAdjustments;
   delete next.settlements;
+  delete next.shopLists;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -528,6 +537,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     // Settlement tiers change only through their commands; older clients drop the unknown key, so
     // their whole-journal writes keep the stored settlements.
     ...(current.settlements ? { settlements: current.settlements } : {}),
+    // Shop lists change only through their commands (shop-lists.ts); a journal write keeps them.
+    ...(current.shopLists ? { shopLists: current.shopLists } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);

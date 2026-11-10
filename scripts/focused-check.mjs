@@ -28,6 +28,7 @@ const featureAudits = {
   "favor-market": "scripts/favor-market-browser-audit.mjs",
   "quest-renown": "scripts/quest-renown-browser-audit.mjs",
   "settlement-tiers": "scripts/settlement-tiers-browser-audit.mjs",
+  "shop-lists": "scripts/shop-lists-browser-audit.mjs",
   "dice-3d": "scripts/dice-3d-browser-audit.mjs",
   "dice-3d-table": "scripts/dice-3d-table-browser-audit.mjs",
   "preview-as-player": "scripts/preview-as-player-browser-audit.mjs",

@@ -1,0 +1,12 @@
+{
+  "title": "Shop lists: swap a shop's stock for the season or the story",
+  "summary": "DMs can build named stock lists, such as Winter goods or Post-siege, and swap any shop's stock to one whenever they choose. The stock it replaces is saved as a list, so you can swap back.",
+  "items": [
+    "Build and edit a library of shop lists in Market under Shop lists.",
+    "Save any shop's current stock as a list from the shop's Edit mode.",
+    "Swap stock to a list: the shop gets the list's items at its prices and quantities, and the old stock is saved as a list named after the shop and the date.",
+    "Coins, merchant purses, what a shop buys and items characters own never change.",
+    "Players see only the shop's new stock; your lists stay private."
+  ],
+  "audience": "dm"
+}

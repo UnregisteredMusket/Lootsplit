@@ -54,6 +54,8 @@ import { applyMarketEventCommand, lineEvents, OLD_CLIENT_EVENT_PRICE, saleEvents
 import { applyFactionCommand, factionCommands, factionEffects, factionKinds, OLD_CLIENT_FACTION_PRICE, type FactionCommand } from "./factions.ts";
 import { settlementCommands, settlementKinds, type SettlementCommand } from "./settlements-schema.ts";
 import { applySettlementCommand, dropSettlementProfile, newShopDefaults, OLD_CLIENT_SETTLEMENT_PRICE, settlementKind, settlementSaleLimit } from "./settlements.ts";
+import { shopListCommands, shopListKinds, type ShopListCommand } from "./shop-lists-schema.ts";
+import { applyShopListCommand } from "./shop-lists.ts";
 import { applyFavorCommand, favorCommands, favorKinds, type FavorCommand } from "./favor-market.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
@@ -375,6 +377,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...favorCommands,
   // Settlement tiers (settlements.ts, phase S1): DM-only; outside every strict schema, no protocol bump.
   ...settlementCommands,
+  // Alternative shop lists (shop-lists.ts; tabletop protocol 33): DM-only library and stock swaps.
+  ...shopListCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export type CommandInput = Command extends infer C
@@ -1049,6 +1053,12 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   } else if (settlementKinds.has(cmd.kind)) {
     // DM only; checked against what the DM saw; one DM-only history line. Shops are never touched.
     applySettlementCommand(t, seat, cmd as SettlementCommand, (summary) =>
+      journal.events.push({ id: cmd.id + "-event-" + journal.events.length, at, summary, kind: "management", dmOnly: true }),
+    );
+  } else if (shopListKinds.has(cmd.kind)) {
+    // DM only; checked against the stock and list the DM saw; one DM-only history line. A swap
+    // replaces only the shop's stock lines (and saves the outgoing stock) — never coins or purses.
+    applyShopListCommand(t, seat, cmd as ShopListCommand, (summary) =>
       journal.events.push({ id: cmd.id + "-event-" + journal.events.length, at, summary, kind: "management", dmOnly: true }),
     );
   } else if (favorKinds.has(cmd.kind)) {

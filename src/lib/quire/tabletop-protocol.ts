@@ -237,8 +237,18 @@ export const QUEST_RENOWN_PROTOCOL = 31;
  * finish on the updated website.
  */
 export const SETTLEMENT_LIMITS_PROTOCOL = 32;
+/**
+ * Protocol 33 (2026-11-10, alternative shop lists; shop-lists.ts): the DM may send
+ * `shop-list-save`, `shop-list-delete`, `shop-list-capture` and `shop-list-swap`, and the journal
+ * may carry `shopLists` (DM-only; players' copies never have it). The key is outside every strict
+ * schema, so every protocol receives the table unchanged (older clients drop it and their
+ * whole-journal writes keep the stored copy, journal.ts); a swap writes ordinary stock lines that
+ * every protocol reads. Only drafts with a `shop-list-*` command (strict command schema) ask
+ * protocol 32 and older to finish on the updated website.
+ */
+export const SHOP_LISTS_PROTOCOL = 33;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = SETTLEMENT_LIMITS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = SHOP_LISTS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1371,12 +1381,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= SETTLEMENT_LIMITS_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= SHOP_LISTS_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 33: alternative shop lists.
+      if (typeof c.kind === "string" && c.kind.startsWith("shop-list-")) return true;
+      if (protocol && protocol >= SETTLEMENT_LIMITS_PROTOCOL) return false;
       // Protocol 32: settlement tiers and limits.
       if (typeof c.kind === "string" && c.kind.startsWith("settlement-")) return true;
       if (protocol && protocol >= QUEST_RENOWN_PROTOCOL) return false;

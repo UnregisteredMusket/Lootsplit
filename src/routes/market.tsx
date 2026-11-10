@@ -23,6 +23,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { Shell } from "@/components/shell";
 import { PriceHarvest } from "@/components/price-harvest";
 import { ShopComposer } from "@/components/shop-composer";
+import { ShopListsPanel } from "@/components/shop-lists";
 import { MarketBoard } from "@/components/market-board";
 import { TradeExchangeSection } from "@/components/market-exchange-section";
 import "@/components/shop-counter.css";
@@ -395,6 +396,11 @@ function MarketPage() {
       {seat.role === "dm" ? (
         <Fold title="Create a shop" hint="Type, wealth, and stock.">
           <ShopComposer />
+        </Fold>
+      ) : null}
+      {seat.role === "dm" && ready ? (
+        <Fold title="Shop lists" hint="Named stock lists to swap into any shop." anchorId="shop-lists">
+          <ShopListsPanel />
         </Fold>
       ) : null}
       {restockNotice && <p role="status">{restockNotice}</p>}
