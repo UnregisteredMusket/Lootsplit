@@ -10,9 +10,10 @@ import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type Spl
 import { assertCarried } from "./custody.ts";
 import { assertMerchantSale, merchantShortfall, revealPurse } from "./merchant.ts";
 import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
-import { shopSellBreakdown } from "./price-breakdown.ts";
+import { shopSellBreakdown, type PriceBreakdown } from "./price-breakdown.ts";
 import { saleEvents } from "./market-events.ts";
 import { factionEffects } from "./factions.ts";
+import { settlementSaleLimit } from "./settlements.ts";
 import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
@@ -49,8 +50,28 @@ export type SaleSplitPlan = {
 };
 
 /**
+ * Selling `quantity` of `h` to `shop`, priced the one way every sale path uses (the shared `sell`
+ * and `sale-split` commands, the player link's `sellToShop` in economy.ts, the sell form's
+ * breakdown): today's market events, faction standing and the settlement's per-item sale cap
+ * (settlements.ts, S2). `refused` is set when the settlement refuses the item.
+ */
+export function shopSale(
+  h: Pick<Holding, "unitCopper" | "category" | "unidentified">,
+  shop: Shop,
+  quantity: number,
+  journal?: SaleSplitTable["journal"],
+  purses: SaleSplitTable["purses"] = [],
+): PriceBreakdown {
+  return shopSellBreakdown(shop, h.unitCopper, quantity, h, {
+    events: saleEvents(journal, shop, h),
+    factions: factionEffects(journal, purses, shop),
+    settlementLimit: settlementSaleLimit(journal, shop),
+  });
+}
+
+/**
  * What one unit of `h` fetches at `shop`: the Sell to shop rule (price-breakdown.ts), including
- * the off-list rate and purchase limit. The shop's purse is checked for the whole sale. An
+ * the off-list rate, purchase limit and the settlement's per-item cap. The shop's purse is checked for the whole sale. An
  * unidentified item is priced at its presented value and category, never its true ones.
  */
 export function unitSalePrice(
@@ -61,10 +82,7 @@ export function unitSalePrice(
   /** The campaign's purses: the party's faction standing changes it too (factions.ts). */
   purses: SaleSplitTable["purses"] = [],
 ): number {
-  return shopSellBreakdown(shop, h.unitCopper, 1, h, {
-    events: saleEvents(journal, shop, h),
-    factions: factionEffects(journal, purses, shop),
-  }).unit;
+  return shopSale(h, shop, 1, journal, purses).unit;
 }
 
 /**
@@ -88,7 +106,10 @@ export function saleProblem(
     return error instanceof Error ? error.message : "This item can't be sold here.";
   }
   if (h.equipped) return "Unequip this item before selling it.";
-  if (unitSalePrice(h, shop, journal, purses) < 1) return `${shop.name} pays nothing for this item.`;
+  const sale = shopSale(h, shop, 1, journal, purses);
+  // Settlement limits (S2): above the place's per-item limit, with "refuse" chosen.
+  if (sale.refused) return sale.refused;
+  if (sale.unit < 1) return `${shop.name} pays nothing for this item.`;
   return null;
 }
 

@@ -19,7 +19,7 @@ import { MarketImageUpload } from "./market-image-upload";
 import { MarketNameImport } from "./market-name-import";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 import { settlementKind } from "@/lib/quire/settlements";
-import { SettlementLadderForm, SettlementProfileEditor, SettlementTierText } from "./settlement-tiers";
+import { SettlementLadderForm, SettlementLimitsForm, SettlementProfileEditor, SettlementTierText } from "./settlement-tiers";
 
 export function LocationOptions({ market }: { market: MarketLocations }) {
   const byId = new Map(market.locations.map((l) => [l.id, l]));
@@ -169,6 +169,7 @@ export function MarketLocationsPanel() {
               <SettlementProfileEditor key={`settlement-${selected.id}`} location={selected} />
             ) : null}
             <SettlementLadderForm />
+            <SettlementLimitsForm />
           </div>
         </Fold>
       ) : null}

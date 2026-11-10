@@ -226,8 +226,19 @@ export const FAVOR_MARKET_PROTOCOL = 30;
  * schema) ask protocol 30 and older to finish on the updated website.
  */
 export const QUEST_RENOWN_PROTOCOL = 31;
+/**
+ * Protocol 32 (2026-11-10, settlement limits; settlements.ts S2): the DM may send
+ * `settlement-limits`, and settlement profiles may carry `saleLimit` and `maxRarity`. The stored
+ * settlements stay in the non-strict journal key (older clients strip what they don't know and the
+ * server keeps its copy), so every protocol receives the table unchanged. Older apps price sales
+ * without the settlement's per-item cap, so the server refuses their sales whose payout the cap
+ * lowers (`settlementLimitsUnsupported`; a refused item is refused for every app). Drafts with any
+ * `settlement-*` command (S1's too: apps before S1 can't parse them) ask protocol 31 and older to
+ * finish on the updated website.
+ */
+export const SETTLEMENT_LIMITS_PROTOCOL = 32;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = QUEST_RENOWN_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = SETTLEMENT_LIMITS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -1360,12 +1371,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= QUEST_RENOWN_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= SETTLEMENT_LIMITS_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 32: settlement tiers and limits.
+      if (typeof c.kind === "string" && c.kind.startsWith("settlement-")) return true;
+      if (protocol && protocol >= QUEST_RENOWN_PROTOCOL) return false;
       // Protocol 31: a quest's giver faction and renown rewards.
       if (c.kind === "quest-renown") return true;
       if (protocol && protocol >= FAVOR_MARKET_PROTOCOL) return false;

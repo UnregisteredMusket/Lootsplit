@@ -38,7 +38,7 @@ import { estateImportCommand, estateImportFingerprint, previewEstateImport } fro
 import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEstatePurchase, removeEstateSite, validateEstate } from "./estate.ts";
 import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
-import { planSaleSplit, MAX_SALE_LOTS, lotLabel } from "./sale-split.ts";
+import { planSaleSplit, MAX_SALE_LOTS, lotLabel, shopSale } from "./sale-split.ts";
 import { creditCoins } from "./coin-split.ts";
 import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
 import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
@@ -53,7 +53,7 @@ import { applyItemUseCommand, itemUseCommands, movedUses } from "./item-uses.ts"
 import { applyMarketEventCommand, lineEvents, OLD_CLIENT_EVENT_PRICE, saleEvents, marketEventCommands, marketEventKinds, type MarketEventCommand } from "./market-events.ts";
 import { applyFactionCommand, factionCommands, factionEffects, factionKinds, OLD_CLIENT_FACTION_PRICE, type FactionCommand } from "./factions.ts";
 import { settlementCommands, settlementKinds, type SettlementCommand } from "./settlements-schema.ts";
-import { applySettlementCommand, dropSettlementProfile, newShopDefaults, settlementKind } from "./settlements.ts";
+import { applySettlementCommand, dropSettlementProfile, newShopDefaults, OLD_CLIENT_SETTLEMENT_PRICE, settlementKind, settlementSaleLimit } from "./settlements.ts";
 import { applyFavorCommand, favorCommands, favorKinds, type FavorCommand } from "./favor-market.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
@@ -1380,13 +1380,19 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const shown = presentedHolding(h);
     const events = saleEvents(journal, s, h);
     const factions = factionEffects(journal, t.purses, s);
-    const paid = shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events, factions }).total;
-    if (execution.marketEventsUnsupported && events.length && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { factions }).total)
+    // Settlement limits (settlements.ts, S2): refused above the place's per-item limit, or paid at it.
+    const settlementLimit = settlementSaleLimit(journal, s);
+    const priced = shopSale(h, s, cmd.quantity, journal, t.purses);
+    if (priced.refused) throw Error(priced.refused);
+    const paid = priced.total;
+    if (execution.settlementLimitsUnsupported && settlementLimit && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events, factions }).total)
+      throw Error(OLD_CLIENT_SETTLEMENT_PRICE);
+    if (execution.marketEventsUnsupported && events.length && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { factions, settlementLimit }).total)
       throw Error(OLD_CLIENT_EVENT_PRICE);
     if (
       execution.factionsUnsupported &&
       factions.length &&
-      paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events: execution.marketEventsUnsupported ? [] : events }).total
+      paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events: execution.marketEventsUnsupported ? [] : events, settlementLimit }).total
     )
       throw Error(OLD_CLIENT_FACTION_PRICE);
     // Merchant purse: the shop pays from it, or the whole sale is refused.
@@ -1571,6 +1577,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       })
     )
       throw Error(OLD_CLIENT_EVENT_PRICE);
+    // An older app (protocol < 32) planned it without the settlement's per-item limit.
+    if (execution.settlementLimitsUnsupported && plan.proceeds !== cmd.expect.proceeds && settlementSaleLimit(journal, shop))
+      throw Error(OLD_CLIENT_SETTLEMENT_PRICE);
     // An older app (protocol < 29) planned it without factions: refused with a reason, never paid.
     if (execution.factionsUnsupported && plan.proceeds !== cmd.expect.proceeds && factionEffects(journal, t.purses, shop).length > 0)
       throw Error(OLD_CLIENT_FACTION_PRICE);

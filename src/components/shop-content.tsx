@@ -43,11 +43,13 @@ import {
   listPriceDerivation,
   negotiatorFor,
   shopBuyBreakdown,
-  shopSellBreakdown,
   type Negotiator,
+  type SettlementSaleLimit,
 } from "@/lib/quire/price-breakdown";
+import { shopSale } from "@/lib/quire/sale-split";
+import { settlementSaleLimit } from "@/lib/quire/settlements";
 import { shopAsking } from "@/lib/quire/vendors";
-import { eventRate, lineEvents, saleEvents } from "@/lib/quire/market-events";
+import { eventRate, lineEvents } from "@/lib/quire/market-events";
 import { factionBuyRate, factionEffects } from "@/lib/quire/factions";
 import { blackMarketPremium, markupDisplay, shopMarkupNote } from "@/lib/quire/market-markup";
 import { PriceWhy } from "@/components/price-why";
@@ -239,7 +241,7 @@ export function ShopContent({
                 ""
               )}
             </p>
-            <MerchantTerms shop={shop} dm={dm} />
+            <MerchantTerms shop={shop} dm={dm} limit={settlementSaleLimit(economy.journal, shop)} />
           </div>
           {dm ? (
             <OpenSwitch shop={shop} />
@@ -757,12 +759,17 @@ function AddGood({ shopId }: { shopId: string }) {
 }
 
 /** The shop's buying terms: purse (where this seat may read it), per-item limit, off-list rate. */
-function MerchantTerms({ shop, dm }: { shop: Shop; dm: boolean }) {
+function MerchantTerms({ shop, dm, limit }: { shop: Shop; dm: boolean; limit?: SettlementSaleLimit }) {
   const parts: string[] = [];
   if (hasMerchantPurse(shop) && revealPurse(shop, dm ? "dm" : "player"))
     parts.push(`Purse ${formatCopper(shop.merchantPurse)}${dm && !shop.showPurse ? " (DM only)" : ""}`);
   else if (hasMerchantPurse(shop) || shop.purseLimited) parts.push("Limited purse");
   if (shop.purchaseLimit !== undefined) parts.push(`pays at most ${formatCopper(shop.purchaseLimit)} per item`);
+  // Settlement limits (S2): the place's per-item cap, which players may see for this shop.
+  if (limit && (shop.purchaseLimit === undefined || shop.purchaseLimit > limit.copper))
+    parts.push(
+      `shops in ${limit.place} ${limit.mode === "refuse" ? "won't buy an item worth more than" : "pay at most"} ${formatCopper(limit.copper)} per item`,
+    );
   if (offListPercent(shop) && !shop.acceptAnyCategory && shop.category !== "mixed")
     parts.push(`buys anything else at ${offListPercent(shop)}% of its rate`);
   return parts.length ? <p className="text-sm text-muted">{parts.join(" · ")}</p> : null;
@@ -808,15 +815,15 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
     }
   }
   const asked = Number(qty),
-    // Item identification: shopSellBreakdown prices an unidentified item as presented; today's
+    // Item identification: shopSale prices an unidentified item as presented; today's
     // market events for its category apply exactly as the `sell` command applies them.
+    // Settlement limits (S2): the same shopSale every sale path charges, so a refusal or a capped
+    // payout shows before confirming.
     sale =
       holding && shop
-        ? shopSellBreakdown(shop, holding.unitCopper, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, holding, {
-            events: saleEvents(journal, shop, holding),
-            factions: factionEffects(journal, purses, shop),
-          })
+        ? shopSale(holding, shop, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, journal, purses)
         : null,
+    refused = !eligibility && sale?.refused ? sale.refused : "",
     unitOffer = sale ? sale.unit : 0,
     payout = unitOffer * asked;
   // Merchant purse: the refusal shows before confirming (the amount only where this seat may read it).
@@ -843,7 +850,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
       style={{ scrollMarginTop: "6rem" }}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!holding || closed || turnLocked || locked || busy || eligibility || purseRefuses) return;
+        if (!holding || closed || turnLocked || locked || busy || eligibility || refused || purseRefuses) return;
         setBusy(true);
         setError("");
         setNotice("");
@@ -884,6 +891,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
         </p>
       )}
       {eligibility && <p role="status">{eligibility}</p>}
+      {refused && <p role="status" data-testid="settlement-sale-refused">{refused}</p>}
       {purseNotice && (
         <p role="status">
           {purseNotice}
@@ -926,6 +934,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
             locked ||
             busy ||
             !!eligibility ||
+            !!refused ||
             purseRefuses ||
             !Number.isSafeInteger(asked) ||
             asked < 1 ||

@@ -1,0 +1,12 @@
+{
+  "title": "Settlement limits on what shops buy and stock",
+  "summary": "A city's or town's size can now cap what its shops pay for one item and how rare the stock of new shops there can be. Both are yours to switch and adjust.",
+  "items": [
+    "Turn on a per-item sale cap: shops in a small place refuse items worth more than its limit, or pay the limit instead, as you choose.",
+    "Suggested limits follow Pathfinder: a thorp pays at most 50 gp for one item, a small town 1,000 gp, a metropolis 16,000 gp.",
+    "New shops' generated stock stops at the place's rarest: hamlets common, villages uncommon, large towns rare, large cities magic. Items you add by hand are never limited.",
+    "Change any size's limit or rarest stock, or give one place its own, under Manage regions, cities, towns and areas.",
+    "Players see the limit in Why this payout? when they sell; shops already open keep their stock."
+  ],
+  "audience": "dm"
+}

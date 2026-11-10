@@ -62,7 +62,19 @@ export type PriceBreakdown = {
   total: number;
   negotiator?: Negotiator;
   note?: string;
+  /**
+   * Settlement limits (settlements.ts, S2): why this shop won't buy the item at all (one item is
+   * above its place's per-item limit and the DM chose "refuse"). Sales throw this text; nothing
+   * is paid.
+   */
+  refused?: string;
 };
+
+/**
+ * The per-item sale cap of a shop's settlement (settlements.ts `settlementSaleLimit`): the limit
+ * in whole copper, what happens above it, and the place's name for the explanation.
+ */
+export type SettlementSaleLimit = { copper: number; mode: "refuse" | "pay-limit"; place: string };
 
 const pct = (rate: number) => Math.round((rate - 1) * 1000) / 10;
 
@@ -300,7 +312,8 @@ export function shopBuyBreakdown(
  * Selling to a shop: the `sell` and `sale-split` payout. With the item's category it also applies
  * the merchant-purse rules (merchant.ts): the off-list rate for categories outside the shop's buy
  * list (rounded down) and the per-item purchase limit. The purse itself only refuses a sale; it
- * never changes the price, so it is not a factor.
+ * never changes the price, so it is not a factor. Settlement limits (S2) come last: above the
+ * place's per-item limit the shop pays the limit (a factor) or refuses (`refused`).
  */
 export function shopSellBreakdown(
   shop: Pick<Shop, "buyRate"> & Partial<Pick<Shop, "acceptAnyCategory" | "acceptedCategories" | "category" | "offListPercent" | "purchaseLimit">>,
@@ -312,6 +325,8 @@ export function shopSellBreakdown(
     events?: readonly MarketEventEffect[];
     /** Factions controlling this shop (factions.ts `factionEffects`): sales pay the inverse rate. */
     factions?: readonly FactionEffect[];
+    /** The shop's settlement sale cap (settlements.ts `settlementSaleLimit`); none when unset. */
+    settlementLimit?: SettlementSaleLimit;
   } = {},
 ): PriceBreakdown {
   // Item identification: an unidentified item is priced at its presented value and category, so
@@ -344,12 +359,23 @@ export function shopSellBreakdown(
     factors.push({ key: "purchase-limit", label: `Pays at most ${cp(shop.purchaseLimit)} for one item`, copper: shop.purchaseLimit - unit });
     unit = shop.purchaseLimit;
   }
+  // Settlement limits (S2): the most a shop in this place pays for one item.
+  const limit = options.settlementLimit;
+  let refused: string | undefined;
+  if (limit && unit > limit.copper) {
+    if (limit.mode === "pay-limit") {
+      factors.push({ key: "settlement-limit", label: `Shops in ${limit.place} pay at most ${formatCopper(limit.copper)} for one item`, copper: limit.copper - unit });
+      unit = limit.copper;
+    } else
+      refused = `Shops in ${limit.place} pay at most ${formatCopper(limit.copper)} for one item; this one would fetch ${formatCopper(unit)}, so this shop won't buy it.`;
+  }
   return {
     base: { label: "Lot value", copper: unitCopper },
     factors,
     unit,
     quantity,
     total: unit * quantity,
+    ...(refused ? { refused } : {}),
   };
 }
 

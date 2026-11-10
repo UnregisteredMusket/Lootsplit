@@ -10,16 +10,30 @@
  * - Defaults apply only when a shop is created there (the shop composer and imported shop names);
  *   no command rewrites an existing shop's wealth or purse, and a place without a profile behaves
  *   exactly as before.
- * - Players (`projectSettlements`, called from `projectRecord`) receive the ladder, tier names and
- *   only the profiles of places they can already see, with tier and population only; the
- *   new-shop overrides stay with the DM.
+ * - Players (`projectSettlements`, called from `projectRecord`) receive the ladder, the names of
+ *   the tiers their visible places use and only the profiles of places they can already see, with
+ *   tier and population only; the new-shop overrides stay with the DM.
+ *
+ * Phase S2 (owner decisions 2026-11-10), limits:
+ * - Per-item sale cap, OFF until the DM turns it on. Each tier has a limit (whole copper; the DM may
+ *   change it per tier or per place): when one item's payout at a shop in that place is above it,
+ *   the sale is refused (the default) or the shop pays the limit for each such item. Shops at a
+ *   place without a tier, and campaign-wide shops, have no cap. `settlementSaleLimit` feeds
+ *   `shopSellBreakdown`, so `sell` and `sale-split` (commands.ts, also the device), the player
+ *   link's `sellToShop` (economy.ts) and the price breakdown players see all apply the same rule.
+ *   Players' copies carry the mode and each visible place's effective limit, nothing else.
+ * - Rarity cap on generated stock, ON for places with a tier unless the DM turns it off: the shop
+ *   composer never generates stock above the place's rarest (`settlementMaxRarity`). Hand-added
+ *   stock is never limited, and no existing shop is changed. DM-only; never sent to players.
  */
 import { locationPath, readMarketLocations, type MarketLocation, type MarketLocations } from "./shop-locations.ts";
 import {
   DEFAULT_SETTLEMENT_LADDER,
   MAX_SETTLEMENTS,
   SETTLEMENT_LADDERS,
+  STOCK_RARITIES,
   settlementsSchema,
+  type SettlementLimitSettings,
   type SettlementCommand,
   type SettlementLadderSettings,
   type SettlementProfile,
@@ -28,7 +42,8 @@ import {
 } from "./settlements-schema.ts";
 import { BUY_RATE } from "./scale.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
-import type { Wealth } from "./types.ts";
+import type { SettlementSaleLimit } from "./price-breakdown.ts";
+import type { ItemRarity, Shop, Wealth } from "./types.ts";
 
 type JournalLike = { settlements?: unknown; market?: unknown } | undefined | null;
 
@@ -125,11 +140,72 @@ export function newShopDefaults(journal: JournalLike, locationId: string | null 
   };
 }
 
+/** S2: the campaign's limits with defaults filled in (sale cap off, rarity cap on). */
+export function limitSettings(s: Pick<Settlements, "limits">): SettlementLimitSettings {
+  const l = s.limits ?? {};
+  return { sale: l.sale ?? "off", saleLimits: l.saleLimits ?? {}, rarity: !l.rarityOff, maxRarity: l.maxRarity ?? {} };
+}
+/** S2: a tier's per-item sale limit: the DM's value for the tier, or the ladder's default. */
+export function tierSaleLimit(s: Pick<Settlements, "limits">, tier: Pick<SettlementTier, "id" | "saleLimit">): number {
+  return s.limits?.saleLimits?.[tier.id] ?? tier.saleLimit;
+}
+/** S2: a tier's rarest generated stock: the DM's value for the tier, or the ladder's default. */
+export function tierMaxRarity(s: Pick<Settlements, "limits">, tier: Pick<SettlementTier, "id" | "maxRarity">): ItemRarity {
+  return s.limits?.maxRarity?.[tier.id] ?? tier.maxRarity;
+}
+/** A place's per-item sale limit: its own override, else its tier's. */
+function effectiveSaleLimit(s: Settlements, here: Pick<SettlementHere, "profile" | "tier">): number {
+  return here.profile.saleLimit ?? tierSaleLimit(s, here.tier);
+}
+
+/**
+ * S2: the per-item sale cap at a shop, or undefined when none applies (the cap is off, the shop is
+ * campaign-wide, or its place has no tier). Feeds `shopSellBreakdown` in every sale path.
+ */
+export function settlementSaleLimit(journal: JournalLike, shop: Pick<Shop, "locationId">): SettlementSaleLimit | undefined {
+  if (!journal?.settlements || !shop.locationId) return undefined;
+  const s = safeSettlements(journal);
+  const mode = limitSettings(s).sale;
+  if (mode === "off") return undefined;
+  const here = settlementAt(journal, shop.locationId);
+  if (!here) return undefined;
+  return { copper: effectiveSaleLimit(s, here), mode, place: here.location.name };
+}
+
+/**
+ * S2: the rarest stock the shop composer may generate for a new shop at this location, or
+ * undefined (the rarity cap is off, or the place has no tier). Hand-added stock is never limited.
+ */
+export function settlementMaxRarity(
+  journal: JournalLike,
+  locationId: string | null | undefined,
+): { rarity: ItemRarity; source: string } | undefined {
+  const here = settlementAt(journal, locationId);
+  if (!here) return undefined;
+  const s = safeSettlements(journal);
+  if (!limitSettings(s).rarity) return undefined;
+  return { rarity: here.profile.maxRarity ?? tierMaxRarity(s, here.tier), source: `${here.location.name} · ${here.tier.name}` };
+}
+/** Whether a rarity is at or below a cap (the catalog's order: common, uncommon, rare, magic). */
+export function rarityAllowed(rarity: ItemRarity, cap: ItemRarity | undefined): boolean {
+  return cap === undefined || STOCK_RARITIES.indexOf(rarity) <= STOCK_RARITIES.indexOf(cap);
+}
+
+/** S2: an older app (protocol < 32) priced this sale without the settlement's limit. */
+export const OLD_CLIENT_SETTLEMENT_PRICE =
+  "This town's shops now pay less for this item, and this older Lootsplitter app can't show the new price. Finish this on the updated website; nothing was sold.";
+/** The sale cap's wording in the DM's history line. */
+export function saleCapLabel(mode: SettlementLimitSettings["sale"]): string {
+  return mode === "off" ? "off" : mode === "refuse" ? "refuse pricier items" : "pay the limit";
+}
+
 const STALE = "This place's settlement changed elsewhere. Refresh before saving; nothing was saved.";
 const STALE_LADDER = "The settlement ladder changed elsewhere. Refresh before saving; nothing was saved.";
+const STALE_LIMITS = "The settlement limits changed elsewhere. Refresh before saving; nothing was saved.";
 
 function store(journal: { settlements?: unknown }, s: Settlements) {
-  const empty = !Object.keys(s.places).length && !s.ladder && !(s.names && Object.keys(s.names).length);
+  if (s.limits && !Object.keys(s.limits).length) delete s.limits;
+  const empty = !Object.keys(s.places).length && !s.ladder && !(s.names && Object.keys(s.names).length) && !s.limits;
   if (empty) delete journal.settlements;
   else journal.settlements = settlementsSchema.parse(s);
 }
@@ -164,8 +240,25 @@ export function applySettlementCommand(
     const next: Settlements = { places: s.places };
     if (cmd.after.ladder !== DEFAULT_SETTLEMENT_LADDER) next.ladder = cmd.after.ladder;
     if (Object.keys(names).length) next.names = names;
+    // S2: the limits stay; the DM's per-tier values follow the tiers the new ladder has.
+    if (s.limits) next.limits = limitsFor(limitSettings(s), cmd.after.ladder);
     store(journal, next);
     log(`Settlement ladder saved: ${SETTLEMENT_LADDERS[cmd.after.ladder].name}`);
+    return;
+  }
+  if (cmd.kind === "settlement-limits") {
+    const current = limitSettings(s);
+    if (JSON.stringify(sortedLimits(current)) !== JSON.stringify(sortedLimits(cmd.before))) throw Error(STALE_LIMITS);
+    const ladder = ladderSettings(s).ladder;
+    const keys = new Set(SETTLEMENT_LADDERS[ladder].tiers.map((x) => x.id));
+    if ([...Object.keys(cmd.after.saleLimits), ...Object.keys(cmd.after.maxRarity)].some((k) => !keys.has(k)))
+      throw Error("Each limit belongs to one of this campaign's tiers. Refresh; nothing was saved.");
+    const limits = limitsFor(cmd.after, ladder);
+    const next: Settlements = { ...s };
+    if (Object.keys(limits).length) next.limits = limits;
+    else delete next.limits;
+    store(journal, next);
+    log(`Settlement limits saved: sale cap ${saleCapLabel(cmd.after.sale)}; rarity cap ${cmd.after.rarity ? "on" : "off"}`);
     return;
   }
   const market = readMarketLocations(journal.market);
@@ -193,6 +286,28 @@ export function applySettlementCommand(
 }
 const sortedProfile = (p: SettlementProfile | null) =>
   p && Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)));
+const sortedRecord = <T,>(r: Record<string, T>) => Object.fromEntries(Object.entries(r).sort(([a], [b]) => a.localeCompare(b)));
+const sortedLimits = (l: SettlementLimitSettings) => ({
+  sale: l.sale,
+  saleLimits: sortedRecord(l.saleLimits),
+  rarity: l.rarity,
+  maxRarity: sortedRecord(l.maxRarity),
+});
+/**
+ * The stored form of the DM's limits on a ladder: only what differs from the defaults, and only
+ * for that ladder's tiers.
+ */
+function limitsFor(l: SettlementLimitSettings, ladder: SettlementLadderSettings["ladder"]): NonNullable<Settlements["limits"]> {
+  const tiers = new Map(SETTLEMENT_LADDERS[ladder].tiers.map((t) => [t.id, t]));
+  const saleLimits = Object.fromEntries(Object.entries(l.saleLimits).filter(([k, v]) => tiers.has(k) && tiers.get(k)!.saleLimit !== v));
+  const maxRarity = Object.fromEntries(Object.entries(l.maxRarity).filter(([k, v]) => tiers.has(k) && tiers.get(k)!.maxRarity !== v));
+  return {
+    ...(l.sale !== "off" ? { sale: l.sale } : {}),
+    ...(Object.keys(saleLimits).length ? { saleLimits } : {}),
+    ...(!l.rarity ? { rarityOff: true as const } : {}),
+    ...(Object.keys(maxRarity).length ? { maxRarity } : {}),
+  };
+}
 const sortedSettings = (s: SettlementLadderSettings) => ({
   ladder: s.ladder,
   names: Object.fromEntries(Object.entries(s.names).sort(([a], [b]) => a.localeCompare(b))),
@@ -212,25 +327,43 @@ export function dropSettlementProfile(journal: { settlements?: unknown }, locati
 }
 
 /**
- * A player's settlements (projectRecord): the ladder and tier names, and for each place the seat
- * can see (`visibleLocationIds`, the projected market) only its tier and population. The new-shop
- * overrides (wealth, purse, refill) are the DM's.
+ * A player's settlements (projectRecord): the ladder, and for each place the seat can see
+ * (`visibleLocationIds`, the projected market) only its tier and population, plus the names of the
+ * tiers those places use (privacy review of S1: a renamed tier no visible place uses is the DM's).
+ * The new-shop overrides (wealth, purse, refill) and the rarity cap are the DM's. S2: when the
+ * sale cap is on, the mode and each visible place's effective limit (players see the limit in the
+ * breakdown of a sale they make there); never the per-tier table or other places' limits.
  */
 export function projectSettlements(journal: { settlements?: unknown }, visibleLocationIds: ReadonlySet<string>): void {
   if (!journal.settlements) return;
   const s = safeSettlements(journal);
+  const tiers = settlementTiers(s);
+  const sale = limitSettings(s).sale;
   const places = Object.fromEntries(
     Object.entries(s.places)
       .filter(([locationId]) => visibleLocationIds.has(locationId))
-      .map(([locationId, p]) => [locationId, { tier: p.tier, ...(p.population ? { population: p.population } : {}) }]),
+      .map(([locationId, p]) => {
+        const tier = tiers.find((t) => t.id === p.tier);
+        return [
+          locationId,
+          {
+            tier: p.tier,
+            ...(p.population ? { population: p.population } : {}),
+            ...(sale !== "off" && tier ? { saleLimit: effectiveSaleLimit(s, { profile: p, tier }) } : {}),
+          },
+        ];
+      }),
   );
   if (!Object.keys(places).length) {
     delete journal.settlements;
     return;
   }
+  const used = new Set(Object.values(places).map((p) => p.tier));
+  const names = Object.fromEntries(Object.entries(s.names ?? {}).filter(([tier]) => used.has(tier)));
   journal.settlements = {
     ...(s.ladder ? { ladder: s.ladder } : {}),
-    ...(s.names && Object.keys(s.names).length ? { names: s.names } : {}),
+    ...(Object.keys(names).length ? { names } : {}),
+    ...(sale !== "off" ? { limits: { sale } } : {}),
     places,
   };
 }

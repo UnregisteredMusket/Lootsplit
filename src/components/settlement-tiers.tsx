@@ -1,33 +1,39 @@
 /**
- * Settlement tiers, phase S1 (settlements.ts; owner design 2026-11-10), in Market → Manage regions,
- * cities, towns and areas: the campaign's ladder and tier names, and one city's or town's profile
- * (tier, population, and the defaults a new shop there starts with). Every change is one DM-only
- * `settlement-*` command; nothing here changes an existing shop.
+ * Settlement tiers, phases S1 and S2 (settlements.ts; owner design and decisions 2026-11-10), in
+ * Market → Manage regions, cities, towns and areas: the campaign's ladder and tier names, its limits
+ * (per-item sale cap, rarity cap on generated stock, per-tier values), and one city's or town's
+ * profile (tier, population, the defaults a new shop there starts with, and its own limits). Every
+ * change is one DM-only `settlement-*` command; nothing here changes an existing shop.
  */
 import { useState } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import type { CommandInput } from "@/lib/quire/commands";
-import { WEALTHS } from "@/lib/quire/labels";
+import { RARITIES, WEALTHS } from "@/lib/quire/labels";
 import { formatCopper } from "@/lib/quire/money";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import type { MarketLocation } from "@/lib/quire/shop-locations";
 import {
   ladderSettings,
+  limitSettings,
   readSettlements,
   settlementAt,
   settlementLabel,
   settlementTiers,
+  tierMaxRarity,
+  tierSaleLimit,
 } from "@/lib/quire/settlements";
 import {
   MAX_POPULATION_TEXT,
   MAX_TIER_NAME,
   SETTLEMENT_LADDERS,
   settlementLadderIds,
+  type SaleCapMode,
   type SettlementLadderId,
+  type SettlementLimitSettings,
   type SettlementProfile,
   type Settlements,
 } from "@/lib/quire/settlements-schema";
-import type { Wealth } from "@/lib/quire/types";
+import type { ItemRarity, Wealth } from "@/lib/quire/types";
 import { Button, Select, TextInput } from "./ui";
 import { Status, useFactionCommand } from "./faction-command";
 
@@ -151,10 +157,15 @@ export function SettlementProfileEditor({ location }: { location: MarketLocation
   const [wealth, setWealth] = useState<Wealth | "">(before?.wealth ?? "");
   const [purse, setPurse] = useState(gp(before?.purse));
   const [refill, setRefill] = useState(gp(before?.refill));
+  // S2: this place's own sale limit and rarest generated stock (blank: its size's).
+  const [saleLimit, setSaleLimit] = useState(gp(before?.saleLimit));
+  const [maxRarity, setMaxRarity] = useState<ItemRarity | "">(before?.maxRarity ?? "");
   const [problem, setProblem] = useState("");
-  const tierWealth = tiers.find((t) => t.id === tier)?.wealth;
-  const draft = { tier, population: population.trim(), wealth, purse: purse.trim(), refill: refill.trim() };
-  const saved = { tier: before?.tier ?? "", population: before?.population ?? "", wealth: before?.wealth ?? "", purse: gp(before?.purse), refill: gp(before?.refill) };
+  const chosen = tiers.find((t) => t.id === tier);
+  const tierWealth = chosen?.wealth;
+  const limits = limitSettings(settlements);
+  const draft = { tier, population: population.trim(), wealth, purse: purse.trim(), refill: refill.trim(), saleLimit: saleLimit.trim(), maxRarity };
+  const saved = { tier: before?.tier ?? "", population: before?.population ?? "", wealth: before?.wealth ?? "", purse: gp(before?.purse), refill: gp(before?.refill), saleLimit: gp(before?.saleLimit), maxRarity: before?.maxRarity ?? "" };
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   useDraftGuard(dirty, "settlement size");
   const command = useFactionCommand(`settlement-profile|${location.id}|${JSON.stringify(before)}|${JSON.stringify(draft)}`);
@@ -162,14 +173,18 @@ export function SettlementProfileEditor({ location }: { location: MarketLocation
     if (!tier) return null;
     const purseCopper = copperFromGp(purse);
     const refillCopper = copperFromGp(refill);
+    const limitCopper = copperFromGp(saleLimit);
     if (purseCopper === null || refillCopper === null) return "Enter the purse and refill in gold pieces, for example 100 or 2.5.";
     if (refillCopper !== undefined && purseCopper === undefined) return "Set a merchant purse before its refill.";
+    if (limitCopper === null || limitCopper === 0) return "Enter the most paid for one item in gold pieces, at least 1 cp (0.01), or leave it blank.";
     return {
       tier,
       ...(population.trim() ? { population: population.trim() } : {}),
       ...(wealth ? { wealth } : {}),
       ...(purseCopper !== undefined ? { purse: purseCopper } : {}),
       ...(refillCopper !== undefined ? { refill: refillCopper } : {}),
+      ...(limitCopper !== undefined ? { saleLimit: limitCopper } : {}),
+      ...(maxRarity ? { maxRarity } : {}),
     };
   }
   const prefix = `settlement-${location.id}`;
@@ -241,6 +256,24 @@ export function SettlementProfileEditor({ location }: { location: MarketLocation
               <TextInput aria-label="New shops' purse refill in gp" inputMode="decimal" value={refill} disabled={command.busy} onChange={(e) => setRefill(e.target.value)} />
             </label>
           </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="block text-sm">
+              Most a shop here pays for one item, gp (blank: {chosen ? `${formatCopper(tierSaleLimit(settlements, chosen))} from the size` : "the size's"}
+              {limits.sale === "off" ? "; the sale cap is off" : ""})
+              <TextInput aria-label="Most paid for one item here in gp" inputMode="decimal" value={saleLimit} disabled={command.busy} onChange={(e) => setSaleLimit(e.target.value)} />
+            </label>
+            <label className="block text-sm">
+              Rarest generated stock{limits.rarity ? "" : " (the rarity cap is off)"}
+              <Select aria-label="Rarest generated stock here" value={maxRarity} disabled={command.busy} onChange={(e) => setMaxRarity(e.target.value as ItemRarity | "")}>
+                <option value="">From the size ({RARITIES.find((r) => r.value === (chosen ? tierMaxRarity(settlements, chosen) : undefined))?.label ?? "size"})</option>
+                {RARITIES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </div>
         </>
       ) : null}
       {problem ? <p role="alert">{problem}</p> : null}
@@ -256,6 +289,137 @@ export function SettlementProfileEditor({ location }: { location: MarketLocation
           {before.refill !== undefined ? `, refilled to ${formatCopper(before.refill)}` : ""}.
         </p>
       ) : null}
+    </form>
+  );
+}
+
+const SALE_CAP_LABELS: Record<SaleCapMode, string> = {
+  off: "Off: shops pay whatever an item is worth",
+  refuse: "Refuse: a shop won't buy an item above the limit",
+  "pay-limit": "Pay the limit: a shop pays the limit for that item",
+};
+
+/**
+ * DM (S2): the campaign's settlement limits. The per-item sale cap is off until turned on (refuse
+ * by default); the rarity cap on generated stock is on. Per-tier values show the ladder's
+ * defaults; only changed values are stored.
+ */
+export function SettlementLimitsForm() {
+  const settlements = useSettlements();
+  // A new ladder has other tiers: the form starts again from what is stored.
+  return <LimitsForm key={ladderSettings(settlements).ladder} />;
+}
+function LimitsForm() {
+  const settlements = useSettlements();
+  const before = limitSettings(settlements);
+  const tiers = settlementTiers(settlements);
+  const [sale, setSale] = useState<SaleCapMode>(before.sale);
+  const [rarity, setRarity] = useState(before.rarity);
+  const [limits, setLimits] = useState<Record<string, string>>(() =>
+    Object.fromEntries(tiers.map((t) => [t.id, gp(tierSaleLimit(settlements, t))])),
+  );
+  const [rarest, setRarest] = useState<Record<string, ItemRarity>>(() =>
+    Object.fromEntries(tiers.map((t) => [t.id, tierMaxRarity(settlements, t)])),
+  );
+  const [problem, setProblem] = useState("");
+  function after(): SettlementLimitSettings | string {
+    const saleLimits: Record<string, number> = {};
+    for (const t of tiers) {
+      const copper = copperFromGp(limits[t.id] ?? "");
+      if (copper === undefined) continue;
+      if (copper === null || copper === 0) return `Enter ${t.name}'s limit in gold pieces, at least 1 cp (0.01).`;
+      if (copper !== t.saleLimit) saleLimits[t.id] = copper;
+    }
+    const maxRarity = Object.fromEntries(tiers.flatMap((t) => (rarest[t.id] && rarest[t.id] !== t.maxRarity ? [[t.id, rarest[t.id]!]] : [])));
+    return { sale, saleLimits, rarity, maxRarity };
+  }
+  const next = after();
+  const dirty = typeof next === "string" || JSON.stringify(next) !== JSON.stringify(before);
+  useDraftGuard(dirty, "settlement limits");
+  const command = useFactionCommand(`settlement-limits|${JSON.stringify(before)}|${JSON.stringify(next)}`);
+  return (
+    <form
+      aria-label="Settlement limits"
+      data-testid="settlement-limits-form"
+      className="space-y-3 rounded-sm border border-border p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (typeof next === "string") {
+          setProblem(next);
+          return;
+        }
+        setProblem("");
+        void command.send({ kind: "settlement-limits", before, after: next } as CommandInput, "Settlement limits saved.");
+      }}
+    >
+      <p className="text-sm font-medium">What a town's shops will buy and stock</p>
+      <p className="text-sm text-muted">
+        Shops in a place with a size can cap what they pay for one item, and new shops&apos; generated stock can stop at a rarity.
+        Stock you add by hand is never limited; shops already open keep their stock.
+      </p>
+      <label className="block text-sm">
+        Per-item sale cap
+        <Select aria-label="Per-item sale cap" value={sale} disabled={command.busy} onChange={(e) => setSale(e.target.value as SaleCapMode)}>
+          {(Object.keys(SALE_CAP_LABELS) as SaleCapMode[]).map((mode) => (
+            <option key={mode} value={mode}>
+              {SALE_CAP_LABELS[mode]}
+            </option>
+          ))}
+        </Select>
+      </label>
+      <label className="flex min-h-11 items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="size-6 accent-accent"
+          aria-label="Cap generated stock by rarity"
+          checked={rarity}
+          disabled={command.busy}
+          onChange={(e) => setRarity(e.target.checked)}
+        />
+        Cap new shops&apos; generated stock by the place&apos;s size
+      </label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {tiers.map((t) => (
+          <fieldset key={t.id} className="rounded-sm border border-border p-2 text-sm">
+            <legend className="px-1 text-muted">{t.name}</legend>
+            <label className="block">
+              Most paid for one item, gp
+              <TextInput
+                aria-label={`Most paid for one item in a ${t.name}, gp`}
+                inputMode="decimal"
+                placeholder={gp(t.saleLimit)}
+                value={limits[t.id] ?? ""}
+                disabled={command.busy}
+                onChange={(e) => setLimits({ ...limits, [t.id]: e.target.value })}
+              />
+            </label>
+            <label className="mt-1 block">
+              Rarest generated stock
+              <Select
+                aria-label={`Rarest generated stock in a ${t.name}`}
+                value={rarest[t.id] ?? t.maxRarity}
+                disabled={command.busy}
+                onChange={(e) => setRarest({ ...rarest, [t.id]: e.target.value as ItemRarity })}
+              >
+                {RARITIES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </fieldset>
+        ))}
+      </div>
+      <p className="text-sm text-faint">
+        Suggested limits are Pathfinder&apos;s base values. Players selling to a capped shop see its limit in Why this payout?; places
+        without a size, and campaignwide shops, have no cap.
+      </p>
+      {problem ? <p role="alert">{problem}</p> : null}
+      <Status error={command.error} notice={command.notice} />
+      <Button type="submit" disabled={command.busy || !dirty}>
+        {command.busy ? "Saving…" : "Save limits"}
+      </Button>
     </form>
   );
 }

@@ -85,7 +85,7 @@ export async function noteRollSeq(
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([
-      read({ data: { tabletopProtocol: 31, code: seat.code, token: seat.token, after: last } }),
+      read({ data: { tabletopProtocol: 32, code: seat.code, token: seat.token, after: last } }),
       new Promise<never>((_, reject) => {
         timeout = setTimeout(() => reject(Error("timed out")), READ_TIMEOUT_MS);
       }),
