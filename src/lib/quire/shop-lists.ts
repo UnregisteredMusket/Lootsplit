@@ -243,8 +243,10 @@ export function applyShopListCommand(
   const incoming: StockLine[] = list.items.map((item, i) => {
     const lineId = item.lineId && !used.has(item.lineId) ? item.lineId : `${cmd.id.slice(0, 120)}-${i}`;
     used.add(lineId);
-    // A trade link whose commodity or exchange no longer exists is dropped (the item stays).
+    // A trade link whose commodity or exchange no longer exists is dropped (the item stays), and
+    // so is a link on a service: trade-stock-link refuses services (review of PR 472).
     const linked =
+      !item.service &&
       !!item.commodityId &&
       !!item.tradeExchangeId &&
       !!economy?.commodities?.some((c) => c.id === item.commodityId) &&
