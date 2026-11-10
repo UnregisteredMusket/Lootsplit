@@ -21,6 +21,16 @@ Android version code **27**, same package and permanent signing certificate. Ins
 
 Nothing to reconnect. Local campaigns, sign-in and placed widgets are kept. 1.18.0 installs keep working with the website.
 
+## Release verification
+
+Published November 10, 2026 by `android-release.yml` (run 42777673402, attempt 2), started automatically by the version bump merged to main `a192290` (#467). Attempt 1 stopped in main verification on `dev-dice-3d-table`: the audit waited for the DM's dice before looking at the TV display, whose throw had already settled and cleared (a test race, fixed by #469); re-running only the failed jobs passed, and the release then passed the preservation checks, the widget checks and the signed-APK upgrade gate.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `9b158fb115c7f7aef353a4795a080902e0e744782af0aa37d3d5718f45cc8e3b` (33,291,953 bytes), matching SHA256SUMS.txt.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.18.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.19.0 and versionCode 27.
+- The native code contains the Capacitor Haptics plugin and the bundled web client calls it.
+
 ---
 
 # Lootsplitter 1.18.0
