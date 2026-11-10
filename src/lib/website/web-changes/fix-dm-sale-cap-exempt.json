@@ -1,0 +1,10 @@
+{
+  "title": "The DM can sell above a town's sale cap, with a warning",
+  "summary": "A settlement's per-item sale cap now applies to players only. When you sell above it, the sale goes through at the full payout and you see what players would get first.",
+  "items": [
+    "Sell to shop, Sell and split and Why this payout? say the place's limit and that players would be refused or paid the limit.",
+    "The shop's own Most paid for one item and its purse still apply to your sales.",
+    "Players, player links and guests are capped exactly as before."
+  ],
+  "audience": "dm"
+}

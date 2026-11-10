@@ -1391,8 +1391,13 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const events = saleEvents(journal, s, h);
     const factions = factionEffects(journal, t.purses, s);
     // Settlement limits (settlements.ts, S2): refused above the place's per-item limit, or paid at it.
-    const settlementLimit = settlementSaleLimit(journal, s);
-    const priced = shopSale(h, s, cmd.quantity, journal, t.purses);
+    // The DM's seat is exempt (owner decision 2026-11-10): full payout, decided by the seat's role,
+    // never by a command field. The shop's own per-item limit and merchant purse still apply.
+    // For the DM the cap changes no payout, so an older DM app shows the right price and the
+    // old-client checks below compare without it.
+    const seller = seat.role === "dm" ? "dm" : "player";
+    const settlementLimit = seller === "dm" ? undefined : settlementSaleLimit(journal, s);
+    const priced = shopSale(h, s, cmd.quantity, journal, t.purses, seller);
     if (priced.refused) throw Error(priced.refused);
     const paid = priced.total;
     if (execution.settlementLimitsUnsupported && settlementLimit && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events, factions }).total)
@@ -1587,8 +1592,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       })
     )
       throw Error(OLD_CLIENT_EVENT_PRICE);
-    // An older app (protocol < 32) planned it without the settlement's per-item limit.
-    if (execution.settlementLimitsUnsupported && plan.proceeds !== cmd.expect.proceeds && settlementSaleLimit(journal, shop))
+    // An older app (protocol < 32) planned it without the settlement's per-item limit. The DM is
+    // exempt from the cap (owner decision 2026-11-10), so a DM's older app planned the right payout.
+    if (execution.settlementLimitsUnsupported && seat.role !== "dm" && plan.proceeds !== cmd.expect.proceeds && settlementSaleLimit(journal, shop))
       throw Error(OLD_CLIENT_SETTLEMENT_PRICE);
     // An older app (protocol < 29) planned it without factions: refused with a reason, never paid.
     if (execution.factionsUnsupported && plan.proceeds !== cmd.expect.proceeds && factionEffects(journal, t.purses, shop).length > 0)
