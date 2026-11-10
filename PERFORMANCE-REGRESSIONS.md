@@ -455,7 +455,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Player references / worker / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 1s → 3s | +2s | +200% |
 | native-widget (24) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 1s → 3s | +2s | +200% |
 | native-widget (35) / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 6 | 3s → 14s | +11s | +366.67% |
-| native-widget (35) / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 1s → 3s | +2s | +200% |
+| native-widget (35) / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 4 | 1s → 8s | +7s | +700% |
 | Development / accounts / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 10s | +9s | +900% |
 | verify / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 6 | 1s → 14s | +13s | +1300% |
 | Code checks and immutable builds / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 9 | 1s → 46s | +45s | +4500% |
@@ -972,11 +972,18 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-encounter-xp | open | 2 | 16s → 24s | +8s | +50% |
 | Development / gameplay / dev-economy-health | open | 2 | 14s → 21s | +7s | +50% |
 | verify / Packaged Worker / economy | open | 2 | 253s → 369s | +116s | +45.85% |
+| Development / gameplay / dev-settlement-tiers | open | 2 | 19s → 34s | +15s | +78.95% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-10T15:47:18Z | step: Development / gameplay / dev-shop-lists | 17s → 22s | +5s | +29.41% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42835242012/job/129897086559) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42846209698/job/129934310405) |
+| 2026-11-10T15:43:41Z | step: Development / gameplay / dev-settlement-tiers | 19s → 26s | +7s | +36.84% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42786979657/job/129732330563) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42843368508/job/129932408701) |
+| 2026-11-10T15:29:38Z | step: native-widget (35) / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42834589850/job/129893321097) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42843362742/job/129924172425) |
+| 2026-11-10T14:44:39Z | step: Development / gameplay / dev-settlement-tiers | 22s → 34s | +12s | +54.55% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42798485680/job/129769722791) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42834728986/job/129895655442) |
+| 2026-11-10T14:36:46Z | step: native-widget (35) / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39580751157/job/119157454208) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42834589850/job/129893321097) |
+| 2026-11-10T10:31:37Z | step: Development / gameplay / dev-settlement-tiers | 19s → 22s | +3s | +15.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42778816136/job/129705335776) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42798485680/job/129769722791) |
 | 2026-11-10T08:37:54Z | step: publish-apk / Publish versioned download and checksum | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119808297170) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42777673402/job/129720925110) |
 | 2026-11-10T08:37:45Z | step: publish-apk / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119808297170) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42777673402/job/129720925110) |
 | 2026-11-10T08:10:05Z | step: verify / Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39931411655/job/120340386087) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42777673402/job/129699948011) |
