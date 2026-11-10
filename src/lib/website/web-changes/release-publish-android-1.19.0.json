@@ -1,0 +1,9 @@
+{
+  "title": "Android 1.19.0 download with phone vibration on the map wheel",
+  "audience": "android",
+  "summary": "The website's Android download is now version 1.19.0: the map's action wheel uses the phone's own vibration, plus the fixes made since 1.18.0.",
+  "items": [
+    "Downloads offers Android 1.19.0 with its checksum; install it over the existing app. Saved campaigns, sign-in and placed widgets are kept.",
+    "Fixes since 1.18.0: Uses left typing, reopened shared rooms keeping your last action, and the DM's screen missing players' dice."
+  ]
+}
