@@ -90,6 +90,8 @@ export function projectRecord(
   );
   if (!dm) {
     delete t.journal.resourceLibrary;
+    // Alternative shop lists (shop-lists.ts): the DM's library and which list each shop uses.
+    delete t.journal.shopLists;
     const world = readWorld(t.journal.world);
     delete world.combat;
     world.maps = world.maps

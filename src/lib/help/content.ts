@@ -526,6 +526,20 @@ export const HELP_GROUPS: HelpGroup[] = [
         ],
       },
       {
+        id: "shop-lists",
+        title: "Shop lists: swap a shop's stock",
+        audience: "DM",
+        paragraphs: [
+          "Shop lists are named stock lists you build once and can swap into any shop whenever you like, such as Winter goods or Post-siege. Manage them in Market → Shop lists: New shop list (a name, an optional note only you see, and items with a price and a quantity; leave the quantity blank for unlimited), Edit to rename a list or change its items, and Delete. A campaign holds up to 60 lists of up to 200 items each (2,000 items in all).",
+          "On a shop, choose Edit: Save stock as list copies the shop's current stock (names, prices, quantities, notes, rarity) into a new list without changing the shop. Swap stock to… replaces the shop's stock with the chosen list's items, fresh at the list's prices and quantities. Before anything changes, the confirmation names the stock being replaced and the name it will be saved under, \"<Shop> stock before <list>, <date>\", so you can swap back later; you can rename or delete that list like any other. Nothing new is saved when the shop was empty or a list already holds exactly that stock (swapping the same list in again simply restocks it from the list).",
+          "A swap changes only the shop's stock lines. Coins, the merchant purse and its refill, what the shop buys, its wealth, the ledger, the treasure pool and items characters already own stay as they are, and selling from the shop never changes the list. Swapping a saved stock back restores the same lines, so an earlier purchase can still be undone. A swap is refused, and nothing changes, if a property supplier buys from a line it would remove, or if the stock or the list changed elsewhere since you opened it. Players see only the shop's new stock; your lists, which list a shop uses and the DM-only Activity line for each change stay with you.",
+        ],
+        links: [
+          ["Shop lists", "/market#shop-lists"],
+          ["Shops & stock", "/market"],
+        ],
+      },
+      {
         id: "dm-feature-screens",
         title: "Financial Settings, Shop schedules and Review Reports",
         audience: "DM",

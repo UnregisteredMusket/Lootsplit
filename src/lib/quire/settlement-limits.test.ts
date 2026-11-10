@@ -370,7 +370,7 @@ test("shared rooms: a player can't change limits, a replayed sale pays once, the
 
 test("protocol 32: older apps are refused where the cap lowers a payout; drafts with settlement commands ask them to update", async () => {
   assert.equal(SETTLEMENT_LIMITS_PROTOCOL, 32);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, SETTLEMENT_LIMITS_PROTOCOL);
+  assert.ok(CURRENT_TABLETOP_PROTOCOL >= SETTLEMENT_LIMITS_PROTOCOL);
   const dm = await openRoom({ name: "Old app", table: capped("pay-limit") });
   const aria = await joinRoom({ code: dm.code, purseId: "aria", name: "Aria" });
   await choosePace({ code: dm.code, token: dm.token, live: true });

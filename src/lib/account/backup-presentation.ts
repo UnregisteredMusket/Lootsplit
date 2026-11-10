@@ -113,6 +113,14 @@ export function pendingCommandDescription(value: unknown): string {
       return `Settlement sizes · ${c.after.ladder === "simple" ? "five steps" : "eight sizes"}`;
     case "settlement-limits":
       return `Settlement limits · sale cap ${c.after.sale === "off" ? "off" : c.after.sale === "refuse" ? "refuses" : "pays the limit"} · rarity cap ${c.after.rarity ? "on" : "off"}`;
+    case "shop-list-save":
+      return `${c.before ? "Edit" : "Add"} shop list: ${c.list.name} (${c.list.items.length} items)`;
+    case "shop-list-delete":
+      return `Delete shop list · ${c.listId}`;
+    case "shop-list-capture":
+      return `Save shop stock as list: ${c.name} · shop ${c.shopId}`;
+    case "shop-list-swap":
+      return `Swap shop stock to list ${c.listId} · shop ${c.shopId}; current stock saved as ${c.savedName}`;
     case "faction-save":
       return `${c.revision === null ? "Add" : "Edit"} faction: ${c.faction.name}`;
     case "faction-visibility":
