@@ -175,7 +175,7 @@ try {
       await buyFromShop({ stockId: "sword", purseId: "tamsin", quantity: 1 });
       return refused;
     });
-    assert.match(across, /not available at the current location/);
+    assert.match(across, /This shop isn't where Tamsin Reed's group/);
     await seatAs(page, ["brannoc"]);
     await go(page, "/party");
     await page.getByText("You're with Harbour watch").first().waitFor();

@@ -5,16 +5,12 @@ import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { validateServices } from "./services-validation.ts";
 import { serviceOrderOpen } from "./services-schema.ts";
 import { projectRecord } from "./session-records.ts";
-import { shopVisible, validateWorld } from "./world.ts";
-import { charismaFor, listingBreakdown, shopBuyBreakdown } from "./price-breakdown.ts";
-import { lineEvents } from "./market-events.ts";
-import { factionEffects } from "./factions.ts";
-import { shopSale } from "./sale-split.ts";
+import { validateWorld } from "./world.ts";
+import { charismaFor, listingBreakdown } from "./price-breakdown.ts";
 import { favorKinds } from "./favor-market.ts";
-import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
+import { randomTradeRoll, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
-import { assertMerchantSale, creditMerchant, isService, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
 import { applyCommand, applyCommandBatch, commandSchema, type CommandRequest } from "./commands.ts";
 import { actionDigest, commandIdentity } from "./command-identity.ts";
 import { ensureCityExchanges } from "./city-exchanges.ts";
@@ -46,7 +42,7 @@ import {
 } from "./estate.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { POOL_GUARD } from "./custody.ts";
-import { attunementFromNotes, attunementKinds, attunementProblem } from "./attunement.ts";
+import { attunementKinds, attunementProblem } from "./attunement.ts";
 import { usesProblem } from "./item-uses.ts";
 import { itemDetailsProblem } from "./item-details.ts";
 import { isUnidentified, presentedHolding } from "./item-identity.ts";
@@ -1388,6 +1384,12 @@ async function assertPlayerTrade(tx: IDBTransaction, purseId: string, journal?: 
 
 export type TradeOptions = { commandId?: string };
 
+/**
+ * Shop purchases and sales run the authoritative shared command (review P3c), on the DM's device
+ * and on a player link alike (audit 2026-11-10, A8): the player link's seat is the device's
+ * `localSeat`, so the shared engine's ownership, visibility, ship-position, pricing and
+ * item-identification rules apply, and a retried command ID is applied once.
+ */
 export async function buyFromShop(
   input: {
     stockId: string;
@@ -1396,123 +1398,12 @@ export async function buyFromShop(
   },
   options: TradeOptions = {},
 ): Promise<void> {
-  const quantity = tradeQuantity(input.quantity);
-  const command = {
-    kind: "buy" as const,
+  return executeLocalCommand({
+    kind: "buy",
     stockId: input.stockId,
     purseId: input.purseId,
-    quantity,
-  };
-  // Device campaigns run the authoritative shared command (review P3c).
-  if (getSeat().role !== "player")
-    return executeLocalCommand({
-      ...command,
-      ...(options.commandId ? { id: options.commandId } : {}),
-    });
-  const id = options.commandId || crypto.randomUUID();
-  commandSchema.parse({ ...command, id });
-  const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id }));
-  await atomic(["purses", "holdings", "stock", "shops", "ledger", "meta"], async (tx) => {
-    if (await alreadyApplied(tx, receipt)) return;
-    await assertPlayerTrade(tx, input.purseId);
-    const stock = await request<StockLine | undefined>(tx.objectStore("stock").get(input.stockId));
-    if (!stock) throw new Error("That item is no longer in the shop.");
-    const shop = await request<Shop | undefined>(tx.objectStore("shops").get(stock.shopId));
-    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
-    if (!shop || !purse) throw new Error("Choose an account and a shop.");
-    const journal = readJournal(
-      (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
-    );
-    if (
-      (shop.blackMarket && !journal.world?.blackMarketActive) ||
-      (getSeat().role === "player" &&
-        !shopVisible(
-          shop,
-          { journal },
-          actingGroups({ journal, purses: [purse] }, purse.id, getSeat().purseIds),
-        ))
-    )
-      throw Error("This vendor is not available at the current location.");
-    if (shop.closed) throw new Error("This shop is closed.");
-    if (stock.quantity !== null && stock.quantity < quantity)
-      throw new Error("The shop does not have that many.");
-    const score = await charismaOf(purse, tx);
-    // The same market events and faction standing the shared `buy` command applies.
-    const everyone = await request<Purse[]>(tx.objectStore("purses").getAll());
-    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity, {
-      events: lineEvents(journal, shop, stock),
-      factions: factionEffects(journal, everyone, shop),
-    }).total;
-    const coins = spendCoins(purse.coins, cost);
-    if (!coins) throw new Error("Insufficient funds.");
-    // Each purchase is a separate lot. A matching name does not identify the
-    // same valuation, notes, equipment or provenance as previously owned goods.
-    const holding: Holding | null = isService(stock)
-      ? null
-      : {
-          id: id + "-item",
-          purseId: purse.id,
-          name: stock.name,
-          category: stockCategory(stock, shop),
-          kind: "item",
-          quantity,
-          unitCopper: stock.copper,
-          notes: stock.notes,
-          // Open5e goods carry "Requires attunement" in their notes (attunement.ts).
-          ...attunementFromNotes(stock.notes),
-          ...(stock.commodityId
-            ? {
-                commodityId: stock.commodityId,
-                weight: journal.tradeEconomy?.commodities.find((c) => c.id === stock.commodityId)
-                  ?.weight,
-                ...(journal.tradeEconomy?.commodities.find((c) => c.id === stock.commodityId)
-                  ?.materialKey
-                  ? {
-                      materialKey: journal.tradeEconomy!.commodities.find(
-                        (c) => c.id === stock.commodityId,
-                      )!.materialKey,
-                    }
-                  : {}),
-              }
-            : {}),
-        };
-    // Merchant purse: the purchase price goes to the shop, as in the shared command.
-    const merchant = structuredClone(shop);
-    creditMerchant(merchant, cost);
-    tx.objectStore("purses").put({ ...purse, coins });
-    if (merchant.merchantPurse !== shop.merchantPurse) tx.objectStore("shops").put(merchant);
-    if (holding) tx.objectStore("holdings").put(holding);
-    if (stock.quantity !== null)
-      tx.objectStore("stock").put({
-        ...stock,
-        quantity: stock.quantity - quantity,
-      });
-    const percent = score === null ? 0 : charismaOffPercent(score);
-    const summary =
-      `Bought ${quantity} ${stock.name} from ${shop.name}` +
-      (percent ? `, Charisma ${score}, ${percent}% off` : "");
-    const entry: LedgerLine = {
-      ...logLine(purse.id, shop.id, summary, -cost, "purchase"),
-      id,
-      purchase: { stockId: stock.id, quantity, holding },
-    };
-    if (stock.tradeExchangeId) {
-      const receipt = recordShopTrade(
-        { ...emptyCloudTable(), journal, stock: [stock] },
-        {
-          id: entry.id,
-          at: entry.at,
-          stockId: stock.id,
-          purseId: purse.id,
-          direction: "buy",
-          quantity,
-          copper: cost,
-        },
-      );
-      if (receipt) entry.trade = { receiptId: receipt.id, leg: "owner" };
-      tx.objectStore("meta").put({ id: "journal", value: journal });
-    }
-    tx.objectStore("ledger").put(entry);
+    quantity: tradeQuantity(input.quantity),
+    ...(options.commandId ? { id: options.commandId } : {}),
   });
 }
 
@@ -1524,119 +1415,12 @@ export async function sellToShop(
   },
   options: TradeOptions = {},
 ): Promise<void> {
-  const quantity = tradeQuantity(input.quantity);
-  const command = {
-    kind: "sell" as const,
+  return executeLocalCommand({
+    kind: "sell",
     holdingId: input.holdingId,
     shopId: input.shopId,
-    quantity,
-  };
-  // Device campaigns run the authoritative shared command (review P3c).
-  if (getSeat().role !== "player")
-    return executeLocalCommand({
-      ...command,
-      ...(options.commandId ? { id: options.commandId } : {}),
-    });
-  const id = options.commandId || crypto.randomUUID();
-  commandSchema.parse({ ...command, id });
-  const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id }));
-  await atomic(["purses", "holdings", "shops", "stock", "ledger", "meta"], async (tx) => {
-    if (await alreadyApplied(tx, receipt)) return;
-    const holding = await request<Holding | undefined>(
-      tx.objectStore("holdings").get(input.holdingId),
-    );
-    const shop = await request<Shop | undefined>(tx.objectStore("shops").get(input.shopId));
-    if (!holding || !shop) throw new Error("That sale cannot be made.");
-    assertCarried(holding);
-    const journal = readJournal(
-      (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
-    );
-    await assertPlayerTrade(tx, holding.purseId, journal);
-    const seller = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
-    if (
-      (shop.blackMarket && !journal.world?.blackMarketActive) ||
-      (getSeat().role === "player" &&
-        !shopVisible(
-          shop,
-          { journal },
-          actingGroups(
-            { journal, purses: seller ? [seller] : [] },
-            holding.purseId,
-            getSeat().purseIds,
-          ),
-        ))
-    )
-      throw Error("This vendor is not available at the current location.");
-    if (holding.kind === "property")
-      assertEstateDisposable(
-        {
-          purses: [],
-          holdings: await request<Holding[]>(tx.objectStore("holdings").getAll()),
-          shops: [],
-          stock: [],
-          journal,
-        },
-        holding.id,
-      );
-    if (shop.closed) throw new Error("This shop is closed.");
-    assertMerchantSale(holding, shop);
-    if (holding.quantity < quantity) throw new Error("You do not have that many.");
-    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
-    if (!purse) throw new Error("This account no longer exists.");
-    // The same market events, faction standing and settlement sale cap the shared `sell` command
-    // applies (sale-split.ts `shopSale`); a refused item is refused with the same text. This path
-    // is only the player link (the DM's device runs the shared `sell` above, where the DM's seat
-    // is exempt from the cap), so it is always priced as a player.
-    const everyone = await request<Purse[]>(tx.objectStore("purses").getAll());
-    const priced = shopSale(holding, shop, quantity, journal, everyone, "player");
-    if (priced.refused) throw Error(priced.refused);
-    const paid = priced.total;
-    if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");
-    // Merchant purse: paid from it or the sale is refused, as in the shared command.
-    const merchant = structuredClone(shop);
-    payFromMerchant(merchant, paid, revealPurse(shop, getSeat().role));
-    tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, paid) });
-    if (merchant.merchantPurse !== shop.merchantPurse) tx.objectStore("shops").put(merchant);
-    if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
-    else tx.objectStore("holdings").put({ ...holding, quantity: holding.quantity - quantity });
-    const entry = {
-      ...logLine(
-        purse.id,
-        shop.id,
-        `Sold ${quantity} ${holding.name} to ${shop.name}`,
-        paid,
-        "sale",
-      ),
-      id,
-    };
-    tx.objectStore("ledger").put(entry);
-    if (holding.commodityId) {
-      const lines = await request<StockLine[]>(
-        tx.objectStore("stock").index("shopId").getAll(shop.id),
-      );
-      // The shared sell links the shop's first line of this commodity.
-      const linked = lines.find((s) => s.commodityId === holding.commodityId);
-      if (linked) {
-        const receipt = recordShopTrade(
-          { ...emptyCloudTable(), journal, stock: [linked] },
-          {
-            id: entry.id,
-            at: entry.at,
-            stockId: linked.id,
-            purseId: purse.id,
-            direction: "sell",
-            quantity,
-            copper: paid,
-          },
-        );
-        if (receipt)
-          tx.objectStore("ledger").put({
-            ...entry,
-            trade: { receiptId: receipt.id, leg: "owner" },
-          });
-        tx.objectStore("meta").put({ id: "journal", value: journal });
-      }
-    }
+    quantity: tradeQuantity(input.quantity),
+    ...(options.commandId ? { id: options.commandId } : {}),
   });
 }
 
