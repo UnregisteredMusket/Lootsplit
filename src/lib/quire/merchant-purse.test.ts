@@ -15,17 +15,12 @@ import { readJournal } from "./journal.ts";
 import { readFinance } from "./finance.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { canonicalJson } from "./canonical-json.ts";
-import { planSaleSplit, type SaleSplitInput } from "./sale-split.ts";
+import { planSaleSplit, projectMerchantPurse, shopSale, unitSalePrice, type SaleSplitInput } from "./sale-split.ts";
 import { projectRecord } from "./session-records.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { applyCloudTable, buyFromShop, economySnapshot, executeLocalCommand, sellToShop } from "./economy.ts";
 import { DM_SEAT, setSeat, type BillFile } from "./table.ts";
-import {
-  merchantSaleNotice,
-  merchantUnitOffer,
-  purchaseLimited,
-  projectMerchantPurse,
-} from "./merchant.ts";
+import { merchantSaleNotice } from "./merchant.ts";
 import { shopSellBreakdown, viewerBreakdown } from "./price-breakdown.ts";
 import type { Holding, Shop } from "./types.ts";
 
@@ -183,8 +178,8 @@ test("a scheduled restock refills the purse when downtime is approved, not on it
 test("the purchase limit caps what the shop pays for one item", () => {
   const t = campaign(marlow({ purchaseLimit: 600, merchantPurse: undefined }));
   const sword = t.holdings[0];
-  assert.equal(merchantUnitOffer(sword, t.shops[0]), 600);
-  assert.equal(purchaseLimited(sword, t.shops[0]), true);
+  assert.equal(unitSalePrice(sword, t.shops[0]), 600);
+  assert.ok(shopSale(sword, t.shops[0], 1).factors.some((f) => f.key === "purchase-limit"));
   assert.equal(copper(act(t, sell(2), "limited"), "a"), 5_000 + 1_200);
 });
 
@@ -193,7 +188,7 @@ test("Why this payout? lists the off-list rate and purchase limit and matches wh
   const t = campaign(shop);
   for (const h of t.holdings) {
     const b = shopSellBreakdown(shop, h.unitCopper, 2, h);
-    assert.equal(b.unit, merchantUnitOffer(h, shop), h.name);
+    assert.equal(b.unit, unitSalePrice(h, shop), h.name);
     assert.equal(b.base.copper + b.factors.reduce((n, f) => n + f.copper, 0), b.unit, h.name);
   }
   // Longsword: 2,000 → 1,000 at 50%, capped at 600. Potion: 1,000 → 500 → 200 off-list.
@@ -210,8 +205,8 @@ test("off the buy list: refused unless the shop buys anything else at a penalty"
   assert.throws(() => act(campaign(), sell(1, "potion"), "potion-no"), /does not buy that item category/);
   const t = campaign(marlow({ offListPercent: 40 }));
   // Potion: 1,000 cp × 50% = 500 cp, × 40% = 200 cp. Swords stay at the normal rate.
-  assert.equal(merchantUnitOffer(t.holdings[1], t.shops[0]), 200);
-  assert.equal(merchantUnitOffer(t.holdings[0], t.shops[0]), 1_000);
+  assert.equal(unitSalePrice(t.holdings[1], t.shops[0]), 200);
+  assert.equal(unitSalePrice(t.holdings[0], t.shops[0]), 1_000);
   const after = act(t, sell(2, "potion"), "potion-yes");
   assert.equal(copper(after, "a"), 5_400);
   assert.equal(after.shops[0].merchantPurse, 830);

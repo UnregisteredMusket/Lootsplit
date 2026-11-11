@@ -600,3 +600,13 @@ test("every server path that projects an archived session passes today's hidden 
     for (const call of calls) assert.match(call, /hiddenFactions/, `${file}: ${call}`);
   }
 });
+
+// Audit I1: the player's hidden-purse projection priced lots without the faction rate.
+test("a hidden merchant purse is judged at the faction payout players are actually paid", () => {
+  const t = world();
+  t.shops = t.shops.map((s) => (s.id === "drink" ? { ...s, merchantPurse: 210 } : s));
+  // 400 / 0.855 × 50% = 234 cp a mug, more than the 210 cp purse holds.
+  assert.equal(unitSalePrice(t.holdings[0]!, drink, t.journal, t.purses), 234);
+  assert.equal(projectRecord(t, ariaSeat).shops.find((s) => s.id === "drink")!.merchantAffords!.mug, "none");
+  assert.throws(() => applyCommand(t, ariaSeat, { id: "f-sell", kind: "sell", holdingId: "mug", shopId: "drink", quantity: 1 }), /can't afford/);
+});

@@ -8,7 +8,7 @@
  */
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
 import { assertCarried } from "./custody.ts";
-import { assertMerchantSale, merchantShortfall, revealPurse } from "./merchant.ts";
+import { assertMerchantSale, hasMerchantPurse, merchantShortfall, revealPurse } from "./merchant.ts";
 import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
 import { shopSellBreakdown, type PriceBreakdown } from "./price-breakdown.ts";
 import { saleEvents } from "./market-events.ts";
@@ -92,6 +92,39 @@ export function unitSalePrice(
   actor: "dm" | "player" = "player",
 ): number {
   return shopSale(h, shop, 1, journal, purses, actor).unit;
+}
+
+/**
+ * Player projection of a shop's purse (session-records.ts): unless the DM shows it, the amount
+ * and refill are removed and only whether the merchant can afford each readable lot remains.
+ * Each lot is priced by `shopSale`, the one price every sale path charges (market events,
+ * faction standing, off-list rate, purchase limit and the settlement cap), so the warning a
+ * player sees matches what the server accepts (audit I1). Pass the campaign's journal and
+ * purses; a lot the settlement refuses gets no entry (its refusal is shown instead).
+ */
+export function projectMerchantPurse(
+  shop: Shop,
+  holdings: Holding[],
+  journal?: SaleSplitTable["journal"],
+  purses: SaleSplitTable["purses"] = [],
+): Shop {
+  if (!hasMerchantPurse(shop) || shop.showPurse) return shop;
+  const projected: Shop = { ...shop, purseLimited: true, merchantAffords: {} };
+  for (const h of holdings) {
+    if (h.kind !== "item") continue;
+    try {
+      assertMerchantSale(h, shop);
+    } catch {
+      continue;
+    }
+    const sale = shopSale(h, shop, 1, journal, purses, "player");
+    if (sale.refused || sale.unit < 1) continue;
+    projected.merchantAffords![h.id] =
+      sale.unit * h.quantity <= shop.merchantPurse ? "all" : sale.unit <= shop.merchantPurse ? "some" : "none";
+  }
+  delete projected.merchantPurse;
+  delete projected.merchantPurseRefill;
+  return projected;
 }
 
 /**

@@ -20,7 +20,6 @@ import {
   merchantSaleNotice,
   offListPercent,
   onBuyList,
-  purchaseLimited,
   revealPurse,
 } from "@/lib/quire/merchant";
 import { knownUnitCopper } from "@/lib/quire/item-identity";
@@ -884,8 +883,8 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
           {!eligibility && !onBuyList(holding, shop) && offListPercent(shop)
             ? ` × ${offListPercent(shop)}% (not on its buy list)`
             : ""}
-          {!eligibility && purchaseLimited(holding, shop)
-            ? ` · pays at most ${formatCopper(unitOffer)} for one item`
+          {!eligibility && shop.purchaseLimit !== undefined && sale?.factors.some((f) => f.key === "purchase-limit")
+            ? ` · pays at most ${formatCopper(shop.purchaseLimit)} for one item`
             : ""}
           .{" "}
           {Number.isSafeInteger(asked) && asked > 0
