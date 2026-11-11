@@ -76,7 +76,7 @@ import {
 } from "./finance.ts";
 import { assertMerchantSale, creditMerchant, isService, merchantRefill, merchantShortfall, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
-import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
+import { readJournal, preserveJournalMetadata, eventSubject, type EventSubject, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
 import { referencePolicySchema, referencePolicy } from "./reference-access.ts";
 import { artworkSchema } from "./artwork.ts";
@@ -453,6 +453,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     kind: "management" | "prices" | "request" | "session" = "management",
     purseId?: string,
     change?: NonNullable<CloudTable["journal"]>["events"][number]["change"],
+    /** The shop, place, listing or NPC the line names (hidden activity lines, audit 2026-11-10 B1). */
+    subject?: EventSubject,
   ) => {
     if (cmd.kind === "patch" && cmd.changes.some((c) => c.store === "journal")) return;
     journal.events.push({
@@ -462,6 +464,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       kind,
       ...(purseId ? { purseId } : {}),
       ...(change ? { change } : {}),
+      ...(subject ? eventSubject(subject) : {}),
     });
   };
   if (seat.role !== "dm" && cmd.kind === "character") {
@@ -563,8 +566,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyQuestCommand(t, seat, cmd as QuestCommand, at);
   } else if (journeyKinds.has(cmd.kind)) {
     journal.world = readWorld(journal.world);
-    applyJourneyCommand(t, seat, cmd as JourneyCommand, at, (summary, purseId) =>
-      event(summary, "management", purseId),
+    applyJourneyCommand(t, seat, cmd as JourneyCommand, at, (summary, purseId, subject) =>
+      event(summary, "management", purseId, undefined, subject),
     );
   } else if (partyGroupKinds.has(cmd.kind)) {
     applyPartyGroupCommand(t, seat, cmd as PartyGroupCommand, at, (summary, purseId, dmOnly) =>
@@ -639,6 +642,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       cmd.after
         ? `Listing saved: ${cmd.after.name}`
         : `Listing removed: ${current?.name || cmd.listingId}`,
+      "management",
+      undefined,
+      undefined,
+      { listingId: cmd.listingId },
     );
   } else if (cmd.kind === "property-profile") {
     dm();
@@ -683,7 +690,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (!same({ locationId: shop.locationId ?? null, image: shop.image ?? null }, cmd.before)) throw Error("This shop's location or image changed elsewhere. Refresh before saving.");
     if (cmd.locationId) shop.locationId = cmd.locationId; else delete shop.locationId;
     if (cmd.image) shop.image = cmd.image; else delete shop.image;
-    event(`Shop location and image saved: ${shop.name}`);
+    event(`Shop location and image saved: ${shop.name}`, "management", undefined, undefined, { shopId: shop.id });
   } else if (cmd.kind === "market-location") {
     dm();
     const market = readMarketLocations(journal.market);
@@ -725,7 +732,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // Settlement tiers: a removed place, or one that is no longer a city or town, keeps no profile.
     if ((!cmd.after || !settlementKind(cmd.after)) && dropSettlementProfile(journal, cmd.locationId))
       journal.events.push({ id: cmd.id + "-event-" + journal.events.length, at, summary: `Settlement profile cleared: ${current?.name ?? "a removed place"}`, kind: "management", dmOnly: true });
-    event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
+    event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed", "management", undefined, undefined, cmd.after ? { locationId: cmd.locationId } : undefined);
   } else if (cmd.kind === "party-location" && cmd.groupId && cmd.groupId !== MAIN_GROUP) {
     dm();
     applyGroupLocation(
@@ -805,7 +812,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       shop.schedule = { ...cmd.schedule, lastRestockDay: f.day };
       shop.closed = !shop.schedule.openDays.includes(f.day % shop.schedule.cycleDays);
     } else delete shop.schedule;
-    event(`Shop schedule ${cmd.schedule ? "updated" : "disabled"}: ${shop.name}`);
+    event(`Shop schedule ${cmd.schedule ? "updated" : "disabled"}: ${shop.name}`, "management", undefined, undefined, { shopId: shop.id });
   } else if (cmd.kind === "property-plan") {
     const f = editableFinance();
     const holding = t.holdings.find((h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
@@ -1270,7 +1277,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       if (line.quantity! + cmd.quantity > 100000) throw new Error("Stock quantity is too large.");
       line.quantity! += cmd.quantity;
     }
-    event(`Restocked ${shop.name}: +${cmd.quantity} per finite stock line`);
+    event(`Restocked ${shop.name}: +${cmd.quantity} per finite stock line`, "management", undefined, undefined, { shopId: shop.id });
     // The DM's Restock also refills a merchant purse to its refill amount (DM-only event).
     const refill = merchantRefill(shop);
     if (refill) {
@@ -1821,6 +1828,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
           change.after === null
             ? "Shop removed"
             : `Shop updated: ${(change.after as { name: string }).name}`,
+          "management",
+          undefined,
+          undefined,
+          change.after === null ? undefined : { shopId: change.id },
         );
       if (
         change.store === "stock" &&
@@ -1838,6 +1849,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
             before: { copper: (change.before as { copper: number }).copper },
             after: { copper: (change.after as { copper: number }).copper },
           },
+          { shopId: (change.after as { shopId: string }).shopId },
         );
       const rows = (t[change.store] ?? []) as any[];
       const rowId = (x: any) => (change.store === "sheets" ? x.purseId : x.id);

@@ -616,6 +616,8 @@ export async function repriceShop(shop: Shop): Promise<void> {
       "prices",
       undefined,
       change.change,
+      // Hidden activity lines (audit 2026-11-10 B1): the shop the line names, as the room records it.
+      { shopId: normalized.id },
     );
   await done;
 }
@@ -821,6 +823,7 @@ export async function saveShop(shop: Shop): Promise<void> {
           sellRate: shop.sellRate,
         },
       },
+      { shopId: shop.id },
     );
   });
 }
@@ -848,6 +851,7 @@ export async function saveStock(line: StockLine, assertScope?: () => void): Prom
           before: { copper: before.copper },
           after: { copper: line.copper },
         },
+        { shopId: line.shopId },
       );
   });
 }
@@ -891,7 +895,7 @@ export async function editStockLine(
         entityId: line.id,
         before: { copper: current!.copper },
         after: { copper: line.copper },
-      });
+      }, { shopId: line.shopId });
   });
 }
 
@@ -928,6 +932,9 @@ export async function addShelfStock(shopId: string, rows: ShelfDraft[]): Promise
         tx,
         `Added ${added} catalog items to ${shop.name}; existing stock preserved`,
         "management",
+        undefined,
+        undefined,
+        { shopId: shop.id },
       );
     return added;
   });
@@ -2962,7 +2969,7 @@ async function audit(
   kind: "prices" | "management",
   purseId?: string,
   change?: Journal["events"][number]["change"],
-  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly">,
+  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly" | "shopId">,
 ) {
   const store = tx.objectStore("meta");
   const row = await request<{ value: unknown } | undefined>(store.get("journal"));

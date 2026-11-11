@@ -584,10 +584,24 @@ export function projectRecord(
     // A renown or Favor line of a faction hidden now (perhaps hidden again after players saw it)
     // is withheld with its faction (factions.ts).
     const secretFactions = new Set([...hiddenFactionIds(table), ...(options.hiddenFactions ?? [])]);
+    // Hidden activity lines (audit 2026-11-10 B1, owner decision (a)): a line about a shop, stock
+    // line, place, listing or NPC reaches this player only while that record is in this same
+    // projection (decided after every other part of it).
+    const subjectVisible = eventSubjectVisible(table, {
+      shops: new Set(t.shops.map((s) => s.id)),
+      locations: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
+      listings: new Set(t.listings.map((l) => l.id)),
+      npcs: new Set(world.npcs.map((n) => n.id)),
+    });
     t.journal.events = t.journal.events
       .flatMap((e) => {
         if (e.dmOnly) return [];
         if (e.factionId && secretFactions.has(e.factionId)) return [];
+        const subject = subjectVisible(e);
+        if (!subject) return [];
+        // A legacy line's subject read from its recorded change stays with it once `change` is
+        // dropped below, so a projected copy projected again (a player's device) keeps it.
+        if (subject.shopId && !e.shopId) e = { ...e, shopId: subject.shopId };
         const loot = lootEvent(e);
         if (loot !== undefined) return loot ? [loot] : [];
         return (
@@ -747,4 +761,52 @@ export function archiveSession(table: CloudTable, id: string, name: string, at =
   journal.editReports = [];
   for (const p of table.purses) p.rolls = [];
   return record;
+}
+
+type JournalEvent = NonNullable<CloudTable["journal"]>["events"][number];
+/**
+ * Activity lines that named a shop, stock line, place or listing before lines carried their
+ * subject (audit 2026-11-10 B1). Such a line without a subject, purse or property cannot be
+ * checked against the record it names, so players no longer receive it; the DM keeps it. Lines
+ * with a recorded change (`change.entityId`) are checked against that shop or stock line instead.
+ */
+const LEGACY_SUBJECT_LINES = [
+  /^Shop updated: /,
+  /^(Updated|Created) shop: /,
+  /^Shop location and image saved: /,
+  /^Shop schedule (updated|disabled): /,
+  /^Restocked /,
+  /^Added \d+ catalog items to /,
+  /^Location saved: /,
+  /^Listing (saved|removed): /,
+  /^Journey to (?!a point on the map ).+ (proposed|updated|denied|withdrawn|stopped on the road|saved)$/,
+];
+/**
+ * Whether a player whose projection holds `visible` may read an activity line (hidden activity
+ * lines, audit 2026-11-10 B1; owner decision (a), 2026-11-11): default-deny for every line about
+ * a shop, stock line, place, listing or NPC. A stock line counts as visible with its shop; a
+ * removed record is in no projection, so its named lines stay with the DM. Returns false, or the
+ * line's subject (a legacy line's shop read from its recorded change).
+ */
+export function eventSubjectVisible(
+  table: Pick<CloudTable, "stock">,
+  visible: { shops: Set<string>; locations: Set<string>; listings: Set<string>; npcs: Set<string> },
+) {
+  return (e: JournalEvent): false | { shopId?: string } => {
+    let shopId = e.shopId;
+    if (!shopId && e.change?.entityId) {
+      if (e.change.entity === "shop") shopId = e.change.entityId;
+      else if (e.change.entity === "stock") {
+        const line = table.stock.find((l) => l.id === e.change!.entityId);
+        if (!line) return false;
+        shopId = line.shopId;
+      }
+    }
+    if (shopId && !visible.shops.has(shopId)) return false;
+    if (e.locationId && !visible.locations.has(e.locationId)) return false;
+    if (e.listingId && !visible.listings.has(e.listingId)) return false;
+    if (e.npcId && !visible.npcs.has(e.npcId)) return false;
+    if (shopId || e.locationId || e.listingId || e.npcId || e.purseId || e.propertyId) return { shopId };
+    return !LEGACY_SUBJECT_LINES.some((pattern) => pattern.test(e.summary)) && {};
+  };
 }
