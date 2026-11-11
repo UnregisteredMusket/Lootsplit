@@ -387,3 +387,34 @@ test("financial projections exclude other characters and all downtime quote snap
  assert.deepEqual(p.journal!.finance!.downtime,[]);
  assert.ok(!JSON.stringify(p.journal!.finance).includes("Private other debt"));
 });
+
+test("a loan credit adds coins on top and keeps platinum and electrum (audit A4)", () => {
+  const t = fixture();
+  t.purses[0].coins = { pp: 3, gp: 1, ep: 4, sp: 0, cp: 0 };
+  const before = toCopper(t.purses[0].coins);
+  const next = act(t, { kind: "finance-loan", terms: { ...terms, payment: 0 }, principal: 100 });
+  assert.deepEqual(next.purses[0].coins, { pp: 3, gp: 2, ep: 4, sp: 0, cp: 0 });
+  assert.equal(toCopper(next.purses[0].coins), before + 100);
+  // A lender-funded loan: the lender pays exact change, the borrower keeps every coin.
+  const lent = act(t, {
+    kind: "finance-loan",
+    terms: { ...terms, lenderId: "b", payment: 0 },
+    principal: 100,
+  });
+  assert.deepEqual(lent.purses[0].coins, { pp: 3, gp: 2, ep: 4, sp: 0, cp: 0 });
+  assert.equal(toCopper(lent.purses[1].coins), 4900);
+});
+test("a repayment the borrower cannot afford says so, not the coin limit (audit A5)", () => {
+  const t = funded({ payment: 0 });
+  t.purses[0].coins = fromCopper(50);
+  const loanId = t.journal!.finance!.loans[0].id;
+  assert.throws(
+    () => applyCommand(t, player, { id: "short-pay", kind: "bank-repay", loanId, copper: 100 }),
+    (e: Error) => /holds only 50 cp|Insufficient funds/.test(e.message) && !/coin limit/.test(e.message),
+  );
+  t.purses[0].coins = { gp: 1e11, pp: 0, ep: 0, sp: 0, cp: 0 };
+  assert.throws(
+    () => act(t, { kind: "finance-loan", terms: { ...terms, payment: 0 }, principal: 1 }),
+    /supported coin limit/,
+  );
+});

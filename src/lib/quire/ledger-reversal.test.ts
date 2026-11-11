@@ -451,3 +451,16 @@ test("offline Undo behaves the same with a reused void ID in an archive", async 
   assert.equal(wallet(after, "a"), before, "no second reversal offline");
   assert.equal(after.ledger.filter(l => l.reversalOf === "X").length, 0);
 });
+
+test("reversing an exchange trade credits coins on top and keeps platinum and electrum (audit A4)", () => {
+  const initial = tradeFixture();
+  initial.purses.find(p => p.id === "a")!.coins = { pp: 30, ep: 4, gp: 20, sp: 0, cp: 0 };
+  const bought = buy(initial);
+  const held = bought.purses.find(p => p.id === "a")!.coins;
+  assert.ok(held.pp > 0, "the buyer still holds platinum after paying: " + JSON.stringify(held));
+  const corrected = reverse(bought);
+  const after = corrected.purses.find(p => p.id === "a")!.coins;
+  assert.equal(toCopper(after), toCopper(initial.purses.find(p => p.id === "a")!.coins));
+  assert.equal(after.pp, held.pp);
+  assert.equal(after.ep, held.ep);
+});
