@@ -1,0 +1,13 @@
+{
+  "title": "Unidentified sales stay secret on a player device, and shelf undo fixes",
+  "summary": "Follow-ups to the November audit that needed the owner's decision: player-device shop trades follow the shared rules, undoing a purchase after a stock swap no longer adds extra stock, campaign deletion clears what only that campaign used, and a few clearer messages.",
+  "items": [
+    "On a device in the player role, buying and selling at a shop follow exactly the rules of a shared room. Selling an unidentified item records it under the name players see, never its true name.",
+    "Undoing a purchase refunds the coins and takes the item back, but no longer raises a shelf above the quantity its shop list gives it after the list was swapped back in.",
+    "Deleting a shared campaign also removes its stored map images, roll history, manual-roll setting and your encounters for it. Its recovery backup still holds them, and restoring it brings them back.",
+    "When a campaign can't be deleted, the message now names the one reason: your access changed, the campaign changed, or its recovery copy is too large.",
+    "A campaign's factions together are limited to 400 KB. Factions saved before stay as they are and can always be edited smaller.",
+    "In the Android app, the TV / player display switch now explains that the display opens from a web browser."
+  ],
+  "audience": "everyone"
+}
