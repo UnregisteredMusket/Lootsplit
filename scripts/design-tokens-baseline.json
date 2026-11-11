@@ -22,7 +22,6 @@
     "src/components/shell.tsx": 9,
     "src/components/website/release-presentation.css": 6,
     "src/components/website/website.css": 44,
-    "src/lib/help/content.ts": 1,
     "src/lib/icons/resolve.ts": 47,
     "src/lib/quire/map-visibility-render.ts": 2,
     "src/lib/quire/property-deed.ts": 11,
