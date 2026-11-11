@@ -21,7 +21,7 @@ concurrency:
 jobs:
   focused:
     name: Player references / ${{ matrix.runtime }} / account shard ${{ matrix.shard }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     # 10 minutes for the checks after browser installation, plus the install step's own bound.
     timeout-minutes: 22
     strategy:

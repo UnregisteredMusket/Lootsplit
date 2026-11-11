@@ -27,7 +27,7 @@ concurrency:
 jobs:
   capture:
     name: Capture product screenshots
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       # Only to commit the captured images back to this screenshots branch.

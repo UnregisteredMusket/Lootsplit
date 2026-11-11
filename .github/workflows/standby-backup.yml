@@ -15,7 +15,7 @@ concurrency:
 jobs:
   backup:
     if: github.ref == 'refs/heads/main' && vars.STANDBY_BACKUPS_ENABLED == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 20
     steps:

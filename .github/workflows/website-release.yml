@@ -22,7 +22,7 @@ jobs:
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       github.repository == 'UnregisteredMusket/Lootsplit'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     environment: production
     # Deploy plus live audits of two origins (lootsplitter.com + workers.dev) since #214.
     timeout-minutes: 25

@@ -33,6 +33,23 @@ export function parseDryRun(output) {
   return null;
 }
 
+/**
+ * Without package lists (a fresh runner whose apt-get update cannot reach the archive), apt's
+ * simulation names each requested package it does not have installed as unlocatable. Returns those
+ * packages, or null when the output has any other error (then nothing is known).
+ */
+export function unlocatable(output) {
+  const errors = output.split("\n").filter((line) => /^E: /.test(line));
+  if (!errors.length) return null;
+  const missing = [];
+  for (const line of errors) {
+    const match = /^E: (?:Unable to locate package (\S+)|Package '([^']+)' has no installation candidate)\s*$/.exec(line);
+    if (!match) return null;
+    missing.push(match[1] ?? match[2]);
+  }
+  return checked(missing);
+}
+
 /** True when every package is an optional font package (fonts-*, xfonts-*). */
 export function fontsOnly(packages) {
   return packages.length > 0 && packages.every((name) => /^(fonts|xfonts)-/.test(name));
@@ -108,7 +125,21 @@ function main() {
   let check = dryRun();
   // The simulation needs current package lists; refresh them once and ask again.
   if (!check.parsed) {
-    update();
+    try {
+      update();
+    } catch (error) {
+      // The archive is unreachable (2026-11-11: every runner, for hours). Without lists apt still
+      // names the packages that are not installed; when those are only optional fonts, the
+      // headless shell runs on the image's own fonts, as it does after a failed font install.
+      const absent = unlocatable(check.text);
+      if (!absent || !fontsOnly(absent)) throw error;
+      console.log(`::warning title=Chromium install::Package archive unreachable; optional font packages skipped: ${absent.join(" ")}`);
+      const shell = bounded("headless shell", node, [cli, "install", "--only-shell", "chromium"], { seconds: 120 });
+      console.log(
+        `::notice title=Chromium install::System libraries: ${absent.length} missing, all optional fonts (${absent.join(" ")}); archive unreachable, continued without them. Headless shell ${process.env.CHROMIUM_CACHE_HIT === "true" ? "restored from cache" : "downloaded"}, ready in ${shell}s.`,
+      );
+      return;
+    }
     check = dryRun();
   }
   if (!check.parsed) throw Error(`Unrecognized Playwright dependency check: ${check.text.trim().slice(0, 600)}`);

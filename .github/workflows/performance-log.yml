@@ -14,7 +14,7 @@ concurrency:
 jobs:
   record:
     if: github.repository == 'UnregisteredMusket/Lootsplit'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       # Never check out a triggering PR or consume its executable artifacts.

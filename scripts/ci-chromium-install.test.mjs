@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { bounded, fontsOnly, missingPackages, parseDryRun } from "./ci-chromium-install.mjs";
+import { bounded, fontsOnly, missingPackages, parseDryRun, unlocatable } from "./ci-chromium-install.mjs";
 
 const dryRun =
   'sudo -- sh -c "apt-get update&& apt-get install -y --no-install-recommends libasound2t64 libnss3 xvfb fonts-liberation"\n';
@@ -60,4 +60,18 @@ test("only optional font packages may be skipped when the mirror cannot supply t
   assert.equal(fontsOnly(["fonts-freefont-ttf", "xfonts-scalable", "fonts-unifont"]), true);
   assert.equal(fontsOnly(["fonts-liberation", "libnss3"]), false);
   assert.equal(fontsOnly([]), false);
+});
+
+test("without package lists, apt's unlocatable packages are the missing ones", () => {
+  // Playwright 1.63's dry run, run on a runner whose apt-get update could not reach the archive.
+  const output =
+    "Error: 'apt-get install -s' exited with code 100:\nReading package lists...\nE: Unable to locate package fonts-unifont\nE: Unable to locate package xfonts-utils\n    at reportMissingDependenciesLinux\n";
+  assert.deepEqual(unlocatable(output), ["fonts-unifont", "xfonts-utils"]);
+  assert.equal(fontsOnly(unlocatable(output)), true);
+  assert.deepEqual(unlocatable("E: Unable to locate package libnss3\n"), ["libnss3"]);
+  assert.equal(fontsOnly(unlocatable("E: Unable to locate package libnss3\n")), false);
+  // Any other apt error means nothing is known.
+  assert.equal(unlocatable("E: Could not get lock /var/lib/apt/lists/lock\nE: Unable to locate package fonts-unifont\n"), null);
+  assert.equal(unlocatable("Reading package lists...\n"), null);
+  assert.throws(() => unlocatable("E: Unable to locate package $(evil)\n"), /Unexpected package/);
 });

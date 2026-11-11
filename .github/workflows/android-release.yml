@@ -36,7 +36,7 @@ jobs:
       contents: read
   main-verification:
     needs: [verify, native]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       # Reads the independent verify.yml main-push run and its jobs.
@@ -55,7 +55,7 @@ jobs:
         run: node scripts/recovery-step.mjs android-main-verification 660 node scripts/android-main-verification.mjs
   release-apk:
     needs: [verify, native, main-verification]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     # Builds and signs only. The signing keystore never shares a job with the emulator runner or
     # with a release-writing token: upgrade-gate tests and publish-apk publishes this exact file,
@@ -149,7 +149,7 @@ jobs:
   upgrade-gate:
     needs: [release-apk]
     if: needs.release-apk.outputs.skip != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     # No secrets and no write access: installs the previous public release, then upgrades it in
     # place with the exact signed APK from release-apk.
@@ -202,7 +202,7 @@ jobs:
   publish-apk:
     needs: [release-apk, upgrade-gate]
     if: needs.release-apk.outputs.skip != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     # The only job that can write releases. No Android SDK, emulator, npm install or signing key:
     # it publishes the file whose SHA-256 release-apk recorded after the certificate check.
