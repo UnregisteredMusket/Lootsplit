@@ -80,7 +80,7 @@ test("a protocol 31 app's smith order at the old rounded price is accepted and c
   const dm = await openRoom({ name: "Forge DM", table: t });
   const hero = await joinRoom({ code: dm.code, purseId: "hero", name: "Hero" });
   await choosePace({ ...dm, live: true });
-  const seen = projectRecord((await roomState(dm)).table, { id: hero.seatId, token: hero.token, name: "Hero", role: "player", purseIds: ["hero"] });
+  const seen = projectRecord((await roomState(dm)).table, { id: hero.seatId, role: "player", purseIds: ["hero"] });
   const exact = smithQuote(seen, "forge", "hero", d);
   const old = smithQuote(seen, "forge", "hero", d, { legacyRounding: true });
   assert.equal(old.terms.costCopper - exact.terms.costCopper, 1, "the two roundings differ here");
@@ -93,7 +93,7 @@ test("a protocol 31 app's smith order at the old rounded price is accepted and c
   assert.equal(start - (await wallet()), old.terms.costCopper, "charged what the old app showed");
   // A current app is quoted and charged the exact price.
   const now = await wallet();
-  const next = smithQuote(projectRecord((await roomState(dm)).table, { id: hero.seatId, token: hero.token, name: "Hero", role: "player", purseIds: ["hero"] }), "forge", "hero", d);
+  const next = smithQuote(projectRecord((await roomState(dm)).table, { id: hero.seatId, role: "player", purseIds: ["hero"] }), "forge", "hero", d);
   await submitCommands({
     code: dm.code, token: hero.token, batchId: "new-order", tabletopProtocol: CURRENT_TABLETOP_PROTOCOL,
     commands: [{ id: "new-order", kind: "smith-order", shopId: "forge", purseId: "hero", design: d, before: next.before }],
