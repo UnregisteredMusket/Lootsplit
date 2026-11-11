@@ -83,7 +83,7 @@ test("protocol 19: older clients get no move requests; their drafts are refused"
   const t = ask(fixture());
   assert.equal(MOVE_APPROVAL_PROTOCOL, 19);
   assert.equal(tableForProtocol(t, 18).journal!.world!.moveRequests, undefined);
-  assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-move-request" }]) }, 18), /unfinished map actions/);
+  assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-move-request" }]) }, 18), /unfinished actions/);
 });
 
 // Privacy review 2026-10-29 (finding B11): approving re-checks the movement mode, fog and turn.

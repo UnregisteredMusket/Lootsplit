@@ -209,7 +209,7 @@ test("legacy protocol 0/1 maps and journal writes retain connected metadata; uns
           { table: t, draft: JSON.stringify([{ kind: "map-save", map: a }]) },
           version,
         ),
-      /unfinished map actions/,
+      /unfinished actions/,
     );
   }
   assert.deepEqual(tabletopResponse({ table: t, draft: "[]" }, 2).table, t);
