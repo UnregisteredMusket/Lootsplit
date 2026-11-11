@@ -119,6 +119,21 @@ const privateSheets = await fetch(`${origin}/api/account/sheets`, {
   signal: AbortSignal.timeout(15000),
 });
 assert.equal(privateSheets.status, 401);
+// The human check on sign-up, sign-in and password reset (cloudflare/turnstile.mjs) stays
+// configured on the deployed site (audit 2026-11-10 H10): a lost TURNSTILE_SECRET_KEY turns it
+// off silently. Read-only: the public form config, never the secret. The disposable packaged
+// Worker in CI has no secret, so there the check is only that the config is served.
+const captcha = await fetch(`${origin}/api/account/captcha`, {
+  headers: fixtureHeaders(),
+  signal: AbortSignal.timeout(15000),
+});
+assert.equal(captcha.status, 200);
+const captchaSettings = await captcha.json();
+assert.equal(typeof captchaSettings.required, "boolean");
+if (!fixtureHeaders()) {
+  assert.equal(captchaSettings.required, true, `${origin} must require the Turnstile human check`);
+  assert.match(captchaSettings.siteKey, /^0x[\w-]+$/, `${origin} must serve the Turnstile site key`);
+}
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
   args: ["--no-sandbox"],

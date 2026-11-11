@@ -1,4 +1,12 @@
-import { ACCOUNT_BACKUP_BYTES, accountBackupBytesSql, readBackupPayload } from "./backup-parts.mjs";
+import {
+  ACCOUNT_BACKUP_BYTES,
+  accountBackupBytesSql,
+  BACKUP_PARTS_KEY,
+  backupPartStatements,
+  backupParts,
+  backupPartsCompleteSql,
+  readBackupPayload,
+} from "./backup-parts.mjs";
 import {
   backupBytesSql,
   backupCampaignKeySql,
@@ -673,118 +681,10 @@ export async function handleAccounts(request, env, context = null) {
         .run();
       return cors(json({ ok: true }));
     }
-    if (path === "/api/account/backup" && request.method === "POST") {
-      const payload = body.payload;
-      if (
-        !payload ||
-        payload.kind !== "quire" ||
-        ![1, 2].includes(payload.version) ||
-        !Array.isArray(payload.purses) ||
-        !Array.isArray(payload.holdings) ||
-        !Array.isArray(payload.ledger) ||
-        !Array.isArray(payload.shops) ||
-        !Array.isArray(payload.stock)
-      )
-        fail("Invalid campaign backup.");
-      if (payload.books?.length || payload.articles?.length)
-        fail("Private PDFs must stay on your device.");
-      await validateBackupMapAssets(db, userId, payload);
-      const id = crypto.randomUUID();
-      const serialized = JSON.stringify(payload);
-      // Per-campaign limit (backup-rotation.mjs): the campaign's oldest backup is replaced only
-      // when the request confirms that exact backup, after the new one is stored. A backup from an
-      // older app has no campaign key and only meets the account limits below.
-      const campaignKey = campaignBackupKey(body.campaignKey);
-      const plan = await planBackupRotation(db, userId, campaignKey, body.replace);
-      const rotating = plan.replace ? 1 : 0;
-      // Per-account bound so one account cannot fill the shared database. The checks are part of
-      // the INSERT, so concurrent uploads cannot each pass a separate pre-check. A replaced backup
-      // no longer counts, because it is removed in the same batch.
-      const insert = db
-        .prepare(
-          `INSERT INTO library_backups (id,user_id,name,body,created_at,campaign_key) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM library_backups WHERE user_id=?)-?<? AND ${accountBackupBytesSql}-${rotating ? backupBytesSql : "0"}+?<=? AND ${campaignGuardSql(campaignKey, plan)}`,
-        )
-        .bind(
-          id,
-          userId,
-          text(body.name),
-          serialized,
-          Date.now(),
-          campaignKey,
-          userId,
-          rotating,
-          LIBRARY_LIMITS.backups,
-          userId,
-          userId,
-          ...(rotating ? [plan.replace.id, userId, plan.replace.id] : []),
-          serialized.length,
-          LIBRARY_LIMITS.backupBytes,
-          ...campaignGuardArgs(userId, campaignKey, plan),
-        );
-      const results = await db.batch([
-        insert,
-        ...(plan.replace
-          ? [
-              replaceStatement(
-                db,
-                userId,
-                plan,
-                "EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?)",
-                [id, userId],
-              ),
-            ]
-          : []),
-      ]);
-      if (!results[0].meta.changes) {
-        // Either the account is full even after rotation, or the campaign's backups changed
-        // since the request was made (another device saved or removed one).
-        const again = await planBackupRotation(db, userId, campaignKey, body.replace);
-        if ((again.replace?.id ?? null) !== (plan.replace?.id ?? null))
-          fail(
-            "Your online backups changed on another device. Refresh your Library and save again. Your device data has not changed.",
-            409,
-          );
-        fail(
-          `Your account backup storage is full (up to ${LIBRARY_LIMITS.backups} backups or ${LIBRARY_LIMITS.backupBytes / 1_000_000} MB). Download and remove an older backup from your Library, then save again. Your device data has not changed.`,
-          413,
-        );
-      }
-      return cors(json({ id, replaced: plan.replace?.id ?? null }));
-    }
-    if (path === "/api/account/read-backup" && request.method === "POST") {
-      const row = await db
-        .prepare("SELECT body FROM library_backups WHERE id=? AND user_id=?")
-        .bind(text(body.id), userId)
-        .first();
-      if (!row) fail("Backup not found.", 404);
-      // A large deletion backup is stored in parts (backup-parts.mjs), read back verified.
-      const stored = await readBackupPayload(db, text(body.id), row.body);
-      const protocol = tabletopHeader(request);
-      // Protocol 2 differs only by compact fog history, which expands losslessly.
-      const payload = protocol === 2 ? tableForProtocol(stored, 2) : stored;
-      if (
-        (protocol < 2 &&
-          JSON.stringify(tableForProtocol(stored, protocol)) !== JSON.stringify(stored)) ||
-        (protocol < 5 && hasPlacementStyles(stored)) ||
-        (protocol < 6 && hasMapScales(stored)) ||
-        (protocol < 7 && hasJourneys(stored)) ||
-        (protocol < 8 && hasNpcServices(stored)) ||
-        (protocol < 9 && hasWave2Services(stored)) ||
-        (protocol < 10 && hasPartyGroups(stored)) ||
-        (protocol < FOOTPRINT_PROTOCOL && hasFootprintTokens(stored)) ||
-        (protocol < GRID_MODE_PROTOCOL && hasHiddenGrids(stored)) ||
-        (protocol < PLAYER_MOVEMENT_PROTOCOL && hasMovementSettings(stored)) ||
-        (protocol < GROUP_COMMANDS_PROTOCOL && hasPartyFormation(stored)) ||
-        (protocol < FOLLOW_VIEW_PROTOCOL && hasFollowView(stored)) ||
-        (protocol < ZONES_PROTOCOL && hasZones(stored)) ||
-        (protocol < MOVE_APPROVAL_PROTOCOL && hasMoveRequests(stored))
-      )
-        fail(
-          "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",
-          409,
-        );
-      return cors(json({ payload }));
-    }
+    if (path === "/api/account/backup" && request.method === "POST")
+      return cors(json(await saveLibraryBackup(db, userId, body)));
+    if (path === "/api/account/read-backup" && request.method === "POST")
+      return cors(json({ payload: await readLibraryBackup(db, userId, body, tabletopHeader(request)) }));
     if (path === "/api/account/character" && request.method === "POST") {
       const profile = {
         name: text(body.name),
@@ -829,20 +729,8 @@ export async function handleAccounts(request, env, context = null) {
         );
       return cors(json({ id }));
     }
-    if (path === "/api/account/remove" && request.method === "POST") {
-      const table = {
-        backup: "library_backups",
-        character: "library_characters",
-        membership: "library_members",
-      }[body.kind];
-      if (!table) fail("Unknown library entry.");
-      const column = body.kind === "membership" ? "code" : "id";
-      await db
-        .prepare(`DELETE FROM ${table} WHERE ${column}=? AND user_id=?`)
-        .bind(text(body.id), userId)
-        .run();
-      return cors(json({ ok: true }));
-    }
+    if (path === "/api/account/remove" && request.method === "POST")
+      return cors(json(await removeLibraryEntry(db, userId, body)));
     fail("Not found.", 404);
   } catch (error) {
     return cors(
@@ -858,4 +746,157 @@ export async function handleAccounts(request, env, context = null) {
       ),
     );
   }
+}
+
+/**
+ * Save an online backup to the account library (`/api/account/backup`).
+ * @param {any} db @param {string} userId @param {any} body
+ */
+export async function saveLibraryBackup(db, userId, body) {
+  const payload = body.payload;
+  if (
+    !payload ||
+    payload.kind !== "quire" ||
+    ![1, 2].includes(payload.version) ||
+    !Array.isArray(payload.purses) ||
+    !Array.isArray(payload.holdings) ||
+    !Array.isArray(payload.ledger) ||
+    !Array.isArray(payload.shops) ||
+    !Array.isArray(payload.stock)
+  )
+    fail("Invalid campaign backup.");
+  if (payload.books?.length || payload.articles?.length)
+    fail("Private PDFs must stay on your device.");
+  await validateBackupMapAssets(db, userId, payload);
+  const id = crypto.randomUUID();
+  const serialized = JSON.stringify(payload);
+  // A backup too large for one D1 row (2 MB) is stored in parts like a deletion copy
+  // (backup-parts.mjs, migration 0027): the row keeps the parts marker, the parts are written in
+  // the same batch only if the row was, and reading joins and verifies them. The request body
+  // limit (readBody, 4 MB) keeps a backup far below the 32-part maximum.
+  const chunked = backupParts(serialized);
+  const rowBody = chunked ? JSON.stringify({ [BACKUP_PARTS_KEY]: chunked.marker }) : serialized;
+  const storedChars = chunked
+    ? rowBody.length + chunked.parts.reduce((sum, part) => sum + part.length, 0)
+    : serialized.length;
+  // Per-campaign limit (backup-rotation.mjs): the campaign's oldest backup is replaced only
+  // when the request confirms that exact backup, after the new one is stored. A backup from an
+  // older app has no campaign key and only meets the account limits below.
+  const campaignKey = campaignBackupKey(body.campaignKey);
+  const plan = await planBackupRotation(db, userId, campaignKey, body.replace);
+  const rotating = plan.replace ? 1 : 0;
+  // Per-account bound so one account cannot fill the shared database. The checks are part of
+  // the INSERT, so concurrent uploads cannot each pass a separate pre-check. A replaced backup
+  // no longer counts, because it is removed in the same batch.
+  const insert = db
+    .prepare(
+      `INSERT INTO library_backups (id,user_id,name,body,created_at,campaign_key) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM library_backups WHERE user_id=?)-?<? AND ${accountBackupBytesSql}-${rotating ? backupBytesSql : "0"}+?<=? AND ${campaignGuardSql(campaignKey, plan)}`,
+    )
+    .bind(
+      id,
+      userId,
+      text(body.name),
+      rowBody,
+      Date.now(),
+      campaignKey,
+      userId,
+      rotating,
+      LIBRARY_LIMITS.backups,
+      userId,
+      userId,
+      ...(rotating ? [plan.replace.id, userId, plan.replace.id] : []),
+      storedChars,
+      LIBRARY_LIMITS.backupBytes,
+      ...campaignGuardArgs(userId, campaignKey, plan),
+    );
+  // The replaced backup is removed only once the new one is fully stored (every part).
+  const results = await db.batch([
+    insert,
+    ...(chunked ? backupPartStatements(db, id, userId, chunked.parts) : []),
+    ...(plan.replace
+      ? [
+          replaceStatement(
+            db,
+            userId,
+            plan,
+            `EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?)${chunked ? ` AND ${backupPartsCompleteSql}` : ""}`,
+            [id, userId, ...(chunked ? [id, chunked.marker.parts] : [])],
+          ),
+        ]
+      : []),
+  ]);
+  if (!results[0].meta.changes) {
+    // Either the account is full even after rotation, or the campaign's backups changed
+    // since the request was made (another device saved or removed one).
+    const again = await planBackupRotation(db, userId, campaignKey, body.replace);
+    if ((again.replace?.id ?? null) !== (plan.replace?.id ?? null))
+      fail(
+        "Your online backups changed on another device. Refresh your Library and save again. Your device data has not changed.",
+        409,
+      );
+    fail(
+      `Your account backup storage is full (up to ${LIBRARY_LIMITS.backups} backups or ${LIBRARY_LIMITS.backupBytes / 1_000_000} MB). Download and remove an older backup from your Library, then save again. Your device data has not changed.`,
+      413,
+    );
+  }
+  return { id, replaced: plan.replace?.id ?? null };
+}
+
+/**
+ * Remove a library entry (`/api/account/remove`).
+ * @param {any} db @param {string} userId @param {any} body
+ */
+export async function removeLibraryEntry(db, userId, body) {
+  // Own keys only: an Object prototype name such as "constructor" is unknown, not a table.
+  const tables = {
+    backup: "library_backups",
+    character: "library_characters",
+    membership: "library_members",
+  };
+  const table = typeof body.kind === "string" && Object.hasOwn(tables, body.kind) ? tables[body.kind] : null;
+  if (!table) fail("Unknown library entry.");
+  const column = body.kind === "membership" ? "code" : "id";
+  await db
+    .prepare(`DELETE FROM ${table} WHERE ${column}=? AND user_id=?`)
+    .bind(text(body.id), userId)
+    .run();
+  return { ok: true };
+}
+
+/**
+ * An online backup's payload for a client of tabletop `protocol` (`/api/account/read-backup`).
+ * @param {any} db @param {string} userId @param {any} body @param {number} protocol
+ */
+export async function readLibraryBackup(db, userId, body, protocol = CURRENT_TABLETOP_PROTOCOL) {
+  const row = await db
+    .prepare("SELECT body FROM library_backups WHERE id=? AND user_id=?")
+    .bind(text(body.id), userId)
+    .first();
+  if (!row) fail("Backup not found.", 404);
+  // A large backup is stored in parts (backup-parts.mjs), read back verified.
+  const stored = await readBackupPayload(db, text(body.id), row.body);
+  // Protocol 2 differs only by compact fog history, which expands losslessly.
+  const payload = protocol === 2 ? tableForProtocol(stored, 2) : stored;
+  if (
+    (protocol < 2 &&
+      JSON.stringify(tableForProtocol(stored, protocol)) !== JSON.stringify(stored)) ||
+    (protocol < 5 && hasPlacementStyles(stored)) ||
+    (protocol < 6 && hasMapScales(stored)) ||
+    (protocol < 7 && hasJourneys(stored)) ||
+    (protocol < 8 && hasNpcServices(stored)) ||
+    (protocol < 9 && hasWave2Services(stored)) ||
+    (protocol < 10 && hasPartyGroups(stored)) ||
+    (protocol < FOOTPRINT_PROTOCOL && hasFootprintTokens(stored)) ||
+    (protocol < GRID_MODE_PROTOCOL && hasHiddenGrids(stored)) ||
+    (protocol < PLAYER_MOVEMENT_PROTOCOL && hasMovementSettings(stored)) ||
+    (protocol < GROUP_COMMANDS_PROTOCOL && hasPartyFormation(stored)) ||
+    (protocol < FOLLOW_VIEW_PROTOCOL && hasFollowView(stored)) ||
+    (protocol < ZONES_PROTOCOL && hasZones(stored)) ||
+    (protocol < MOVE_APPROVAL_PROTOCOL && hasMoveRequests(stored))
+  )
+    fail(
+      "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",
+      409,
+    );
+  return payload;
 }
