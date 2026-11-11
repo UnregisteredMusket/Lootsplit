@@ -69,6 +69,9 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
     next.closed = false;
     next.ownerId = userId;
     next.sessionId = crypto.randomUUID();
+    // A link rotated by a kick or ban (audit 2026-11-10 B4) expires with the session, like any
+    // older link: the reopened room's link is its new session.
+    delete next.invitationSession;
     next.invitations = {};
     next.revision = row.version.revision + 1;
     const players = next.seats.filter((s) => s.role === "player");

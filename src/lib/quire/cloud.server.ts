@@ -302,7 +302,7 @@ export async function previewRoom(
   refuseProbeRoom(room);
   // The same refusals as joinRoom, before anything about the room is shown.
   if (room.testMode) throw Error("Test rooms are private to the owner.");
-  requireInvitationSession(room, sessionId);
+  if (!seatedAccount(room, userId)) requireInvitationSession(room, sessionId);
   const blocked = userId ? room.blockedUsers?.[userId] : undefined;
   if (blocked === "banned") throw Error("You are banned from this campaign.");
   return {
@@ -342,9 +342,10 @@ export async function joinRoom(input: {
     const room = await must(input.code);
     refuseProbeRoom(room, probe);
     if (room.testMode) throw Error("Test rooms are private to the owner.");
-    requireInvitationSession(room, input.sessionId);
-    const existing =
-      input.userId && room.seats.find((s) => s.userId === input.userId && s.role === "player");
+    // A seated account keeps its seat after the link rotates (B4: seated players are unaffected);
+    // everyone else needs the current link.
+    const existing = seatedAccount(room, input.userId);
+    if (!existing) requireInvitationSession(room, input.sessionId);
     if (existing)
       return {
         token: existing.token,
@@ -374,6 +375,9 @@ export async function joinRoom(input: {
     if (previous) claimed.seat.id = previous.id;
     if (input.invitation && room.invitations?.[input.purseId] !== input.invitation)
       throw Error("This invitation has expired.");
+    // A kicked character taken with the DM's fresh invitation (checked above): remember which
+    // departed record it re-invites, so a signed-out rejoin can later be linked to that account.
+    if (restriction?.status === "kicked") claimed.seat.reinvited = restriction.id;
     if (input.userId && claimed.room.blockedUsers) delete claimed.room.blockedUsers[input.userId];
     if (claimed.room.invitations) delete claimed.room.invitations[input.purseId];
     const next = { ...claimed.room, revision: claimed.room.revision + 1 };
@@ -515,7 +519,7 @@ export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnc
         code: access.code,
         seatId: seat.id,
         userId: seat.userId,
-        sessionId: access.sessionId,
+        sessionId: invitationSessionOf(access),
         revision: access.revision,
         encounterActive,
         ...(rollSeq === undefined ? {} : { rollSeq }),
@@ -742,7 +746,13 @@ export type RoomView = {
   encounterActive?: boolean;
   userId?: string;
   viewOnly?: boolean;
+  /** The current invitation link's session (rotated on kick and ban). */
   sessionId?: string;
+  /**
+   * Present once the link has been rotated: the play session this campaign's seats keep ("" when
+   * the room never had one). Current apps key their screens and drafts by it.
+   */
+  playSession?: string;
   code: string;
   revision: number;
   turn: number;
@@ -770,9 +780,18 @@ export type RoomView = {
   rollSeq?: number;
 };
 
+/** The session the current invitation link carries (B4: rotated on kick and ban). */
+export function invitationSessionOf(room: Pick<CloudRoom, "sessionId" | "invitationSession">) {
+  return room.invitationSession ?? room.sessionId;
+}
 function requireInvitationSession(room: CloudRoom, sessionId?: string) {
-  if (room.sessionId && room.sessionId !== sessionId)
+  const current = invitationSessionOf(room);
+  if (current && current !== sessionId)
     throw Error("This invitation has expired. Ask the DM for the current session link.");
+}
+/** A signed-in account already seated as a player reopening its link gets its own seat back. */
+function seatedAccount(room: CloudRoom, userId?: string) {
+  return userId ? room.seats.find((s) => s.userId === userId && s.role === "player") : undefined;
 }
 
 async function must(
@@ -846,7 +865,11 @@ async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): P
     encounterActive: await activeEncounter(room.code),
     userId: seat.userId,
     code: room.code,
-    sessionId: room.sessionId,
+    // The session for links and the join lookup; after a kick or ban it differs from the play
+    // session, which current apps read from `playSession` (older apps take the new one: they keep
+    // their seat and play on, and their share buttons build the current link).
+    sessionId: invitationSessionOf(room),
+    ...(room.invitationSession !== undefined ? { playSession: room.sessionId ?? "" } : {}),
     revision: room.revision,
     turn: room.turn,
     viewOnly: room.viewOnly === true,
@@ -1703,6 +1726,12 @@ export async function manageRoom(input: {
       ];
       if (userId && (input.action === "kick" || input.action === "ban"))
         (next.blockedUsers ??= {})[userId] = input.action === "ban" ? "banned" : "kicked";
+      // B4 (owner decision 2026-11-11): a kick or ban replaces the invitation link, so the removed
+      // person cannot come back signed out as another character with the link they had. Seated
+      // players keep their seats and play session; the DM's view carries the new link at once.
+      // A guest-opened room (no session) gets its first invitation session here.
+      if (input.action === "kick" || input.action === "ban")
+        next.invitationSession = crypto.randomUUID();
       const { applyCommand } = await import("./commands.ts");
       for (const p of next.table.purses.filter(
         (p) => target.purseIds.includes(p.id) && p.editingAllowed,

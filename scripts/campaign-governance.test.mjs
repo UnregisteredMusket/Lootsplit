@@ -336,8 +336,14 @@ test("leaving releases the seat; kick requires a fresh invite; ban blocks altern
     });
     await manageRoom({ code, token, action: "kick", seatId: rejoined.seatId });
     assert.equal((await campaignRecords(db, "player")).reports.length, 1);
+    // Kick and ban rotate the invitation link (audit 2026-11-10 B4); the old link is refused.
     await assert.rejects(
       joinRoom({ code, purseId: "other", name: "Player", userId: "player" }),
+      /invitation has expired/,
+    );
+    let sessionId = (await readRoom(code)).invitationSession;
+    await assert.rejects(
+      joinRoom({ code, purseId: "other", name: "Player", userId: "player", sessionId }),
       /fresh invitation/,
     );
     await manageRoom({ code, token, action: "invite", seatId: rejoined.seatId });
@@ -348,14 +354,16 @@ test("leaving releases the seat; kick requires a fresh invite; ban blocks altern
       name: "Player",
       invitation: invite,
       userId: "player",
+      sessionId,
     });
     await db
       .prepare("UPDATE library_members SET seat_id=?,token=? WHERE user_id=?")
       .bind(latest.seatId, latest.token, "player")
       .run();
     await manageRoom({ code, token, action: "ban", seatId: latest.seatId });
+    sessionId = (await readRoom(code)).invitationSession;
     await assert.rejects(
-      joinRoom({ code, purseId: "other", name: "Player", userId: "player" }),
+      joinRoom({ code, purseId: "other", name: "Player", userId: "player", sessionId }),
       /banned/,
     );
     assert.equal((await campaignRecords(db, "player")).reports.length, 0);

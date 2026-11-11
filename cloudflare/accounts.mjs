@@ -290,12 +290,33 @@ export async function linkAccountSeat(db, userId, body, limit = hostedCampaignLi
     (seat.userId && seat.userId !== userId)
   )
     fail("This seat belongs to another account.", 409);
+  // Audit 2026-11-10 B4: a kicked or banned account cannot take a seat by joining signed out and
+  // linking it afterwards. A banned account never links. A kicked account may link only a seat
+  // joinRoom marked as the DM's fresh invitation for that account's own kicked character
+  // (`reinvited`: the departed record's ID; never inferred from shared purses such as the party
+  // fund), and linking it lifts the restriction as a signed-in rejoin does.
+  const blocked = room.blockedUsers?.[userId];
+  if (blocked === "banned") fail("You are banned from this campaign.", 403);
+  const reinvited =
+    blocked === "kicked" &&
+    seat.role === "player" &&
+    typeof seat.reinvited === "string" &&
+    (room.departed || []).some(
+      (s) => s.id === seat.reinvited && s.userId === userId && s.status === "kicked",
+    );
+  if (blocked === "kicked" && !reinvited)
+    fail(
+      "A fresh invitation from the DM is required. Ask the DM for one and open it to rejoin.",
+      403,
+    );
+  if (reinvited) delete room.blockedUsers[userId];
   const owner = await db
     .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=?")
     .bind(code, seat.id)
     .first();
   if (owner && owner.user_id !== userId) fail("This seat is linked to another account.", 409);
-  const changes = seat.userId !== userId || (seat.role === "dm" && room.ownerId !== userId);
+  const changes =
+    reinvited || seat.userId !== userId || (seat.role === "dm" && room.ownerId !== userId);
   // Taking ownership of an unowned live room (a guest-era DM seat) makes this account its host.
   const hosting = seat.role === "dm" && room.ownerId !== userId;
   if (hosting) await assertCanHost(db, userId, "link", limit);
