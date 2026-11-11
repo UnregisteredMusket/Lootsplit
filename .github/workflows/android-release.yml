@@ -97,11 +97,13 @@ jobs:
         run: node scripts/check-android-release.mjs --skip-released-unchanged
       - run: npm run build:mobile && npx cap sync android
         if: steps.release-check.outputs.skip != 'true'
-      - name: Require current main before signing
+      # Pinned to this run's own commit (audit G9): it must still be on main, not main's head, so
+      # a merge during the release no longer fails it.
+      - name: Require the release commit on main before signing
         if: steps.release-check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
+        run: node scripts/android-main-verification.mjs --on-main
       - name: Sign release with permanent key
         id: sign
         if: steps.release-check.outputs.skip != 'true'
@@ -242,7 +244,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
+          node scripts/android-main-verification.mjs --on-main
           version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' src/lib/quire/version.ts)
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk "release/Lootsplit-$version.apk"

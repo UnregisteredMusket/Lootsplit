@@ -30,7 +30,11 @@ import {
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import audiences from "../src/lib/website/web-audiences.json" with { type: "json" };
-import { RELEASE_WORKFLOW_FILE, releaseRunOutcome } from "../src/lib/deployment/release-run.mjs";
+import {
+  RELEASE_WORKFLOW_FILE,
+  isDeployedOutcome,
+  releaseRunOutcome,
+} from "../src/lib/deployment/release-run.mjs";
 
 export const REPOSITORY = "UnregisteredMusket/Lootsplit";
 export const NOTES_DIR = "src/lib/website/web-changes";
@@ -404,8 +408,8 @@ export function stampNotes({ notes, deploys, contains, current = null }) {
 /**
  * Keep only real deployments among the successful release runs `stampNotes` would use.
  *
- * deploys:  candidates, oldest first: [{ sha, date, verifyRunId, runs: [{ id, attempt }] }]
- *           (every successful release run of that commit, oldest first)
+ * deploys:  candidates, oldest first: [{ sha, date, verifyRunId, runs: [{ id, attempt, conclusion }] }]
+ *           (every successful or failed release run of that commit, oldest first)
  * outcome:  async (run) => releaseRunOutcome of that run attempt's jobs
  *
  * Checks lazily, only the candidates stampNotes reads (the first deploy containing each note and
@@ -432,8 +436,12 @@ export async function confirmDeploys({ notes, deploys, contains, outcome }) {
         let confirmed = null;
         for (const run of deploy.runs) {
           const result = await outcome(run);
+          // A failed run without a recognisable deploy job deployed nothing (audit G6 reads failed
+          // runs too); an unrecognisable successful run still fails closed.
+          if (!result && run.conclusion === "failure") continue;
           if (!result) throw new Error(`Release run ${run.id} has no recognisable deploy job`);
-          if (result === "deployed") {
+          // A commit that deployed but whose live audit failed is live (audit G6, "live, unaudited").
+          if (isDeployedOutcome(result)) {
             confirmed = { ...deploy, deployRunId: run.id };
             break;
           }
@@ -469,11 +477,11 @@ async function githubJson(path, { attempts = 3 } = {}) {
   throw lastError;
 }
 
-async function successfulRuns(workflow, since, extra = "") {
+async function successfulRuns(workflow, since, extra = "", status = "success") {
   const runs = [];
   for (let page = 1; page <= 30; page++) {
     const data = await githubJson(
-      `actions/workflows/${workflow}/runs?branch=main&status=success&per_page=100&page=${page}` +
+      `actions/workflows/${workflow}/runs?branch=main&status=${status}&per_page=100&page=${page}` +
         `&created=${encodeURIComponent(`>=${since}`)}${extra}`,
     );
     runs.push(...data.workflow_runs);
@@ -530,10 +538,14 @@ export async function collectEntries({ mode, root = ".", runId = process.env.GIT
     throw new Error(`Notes not committed on this branch: ${missing.map((m) => m.path).join(", ")}`);
   const oldest = located.map((item) => item.date).sort()[0];
   const since = new Date(Date.parse(oldest) - 2 * 86_400_000).toISOString().slice(0, 10);
-  const [releases, verifications] = await Promise.all([
+  // Failed release runs too: a deploy whose live audit failed stays live (audit G6) and its run
+  // ends red; its jobs say whether it deployed (confirmDeploys).
+  const [succeeded, failed, verifications] = await Promise.all([
     successfulRuns(RELEASE_WORKFLOW, since),
+    successfulRuns(RELEASE_WORKFLOW, since, "", "failure"),
     successfulRuns(VERIFY_WORKFLOW, since, "&event=push"),
   ]);
+  const releases = [...succeeded, ...failed];
   const verifyRun = new Map();
   for (const run of verifications.sort((a, b) => a.created_at.localeCompare(b.created_at)))
     if (!verifyRun.has(run.head_sha)) verifyRun.set(run.head_sha, run.id);
@@ -543,7 +555,7 @@ export async function collectEntries({ mode, root = ".", runId = process.env.GIT
     if (!verifyRun.has(run.head_sha)) continue;
     const known = bySha.get(run.head_sha);
     if (known) {
-      known.runs.push({ id: run.id, attempt: run.run_attempt || 1 });
+      known.runs.push({ id: run.id, attempt: run.run_attempt || 1, conclusion: run.conclusion });
       continue;
     }
     let date;
@@ -556,7 +568,7 @@ export async function collectEntries({ mode, root = ".", runId = process.env.GIT
       sha: run.head_sha,
       date,
       verifyRunId: verifyRun.get(run.head_sha),
-      runs: [{ id: run.id, attempt: run.run_attempt || 1 }],
+      runs: [{ id: run.id, attempt: run.run_attempt || 1, conclusion: run.conclusion }],
     };
     bySha.set(run.head_sha, deploy);
     candidates.push(deploy);

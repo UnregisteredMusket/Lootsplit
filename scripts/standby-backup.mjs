@@ -5,7 +5,8 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
-import { migrationIdentity } from "./standby-artifact.mjs";
+import { execFileSync } from "node:child_process";
+import { migrationIdentity, migrationIdentityOf } from "./standby-artifact.mjs";
 
 let recoveryStage = "configuration";
 export class SafeBackupError extends Error {}
@@ -31,6 +32,32 @@ export function validateDatabase(db, expected = migrationIdentity()) {
   assert.equal(db.prepare("PRAGMA integrity_check").get().integrity_check, "ok", "Database integrity check failed");
   assert.equal(db.prepare("PRAGMA foreign_key_check").all().length, 0, "Database has broken references");
   assert.deepEqual(db.prepare("SELECT name FROM d1_migrations ORDER BY name").all().map((row) => row.name), expected.migrations, "Restore using the matching source release");
+}
+/**
+ * The migration identity of a commit, read from git rather than the checkout (audit G13): the
+ * backup runs from main, which can hold a migration that is merged but not deployed yet, while the
+ * live database matches the live commit. Fetches the commit when the shallow checkout lacks it.
+ */
+export function migrationIdentityAt(commit, git = (args) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] })) {
+  assert.match(commit || "", /^[a-f0-9]{40}$/, "Live commit must be a full commit SHA");
+  try { git(["cat-file", "-e", `${commit}^{commit}`]); } catch { git(["fetch", "--no-tags", "--depth=1", "origin", commit]); }
+  const names = git(["ls-tree", "--name-only", commit, "cloudflare/migrations/"]).split("\n").filter(Boolean).map((path) => path.slice(path.lastIndexOf("/") + 1));
+  return migrationIdentityOf(names, (name) => git(["show", `${commit}:cloudflare/migrations/${name}`]));
+}
+/**
+ * The live commit whose migrations the exported database holds. The release identity is read
+ * before and after the export; a snapshot matching neither (a release applied migrations but the
+ * new Worker was not live yet) is refused rather than stored with a wrong source commit.
+ */
+export function liveSource(sql, commits, identityAt = migrationIdentityAt) {
+  const db = new DatabaseSync(":memory:");
+  let applied;
+  try { db.exec(sql); applied = db.prepare("SELECT name FROM d1_migrations ORDER BY name").all().map((row) => row.name); } finally { db.close(); }
+  for (const commit of [...new Set(commits)]) {
+    const expected = identityAt(commit);
+    if (JSON.stringify(expected.migrations) === JSON.stringify(applied)) return { commit, expected };
+  }
+  throw new SafeBackupError(`The database's ${applied.length} applied migrations match no live commit (${[...new Set(commits)].map((c) => c.slice(0, 7)).join(", ")}); a release may have been applying migrations. Nothing was stored; re-run after it finishes`);
 }
 export function makeSnapshot(sql, sourceCommit, expected = migrationIdentity()) {
   assert.match(sourceCommit, /^[a-f0-9]{40}$/);
@@ -132,18 +159,28 @@ async function main() {
   if (mode === "export") {
     keyBytes(process.env.BACKUP_ENCRYPTION_KEY); // Fail before asking D1 to pause queries.
     recoveryStage = "primary release identity";
-    const identity = await fetch(`${primaryOrigin}/assets/release-identity.json`, { cache: "no-store", signal: AbortSignal.timeout(20000) });
-    assert.ok(identity.ok, "Primary release identity unavailable");
-    const { commit } = await identity.json();
+    const liveCommit = async () => {
+      const identity = await fetch(`${primaryOrigin}/assets/release-identity.json`, { cache: "no-store", signal: AbortSignal.timeout(20000) });
+      assert.ok(identity.ok, "Primary release identity unavailable");
+      const { commit: live } = await identity.json();
+      assert.match(live || "", /^[a-f0-9]{40}$/, "Primary release identity has no commit");
+      return live;
+    };
+    const before = await liveCommit();
+    recoveryStage = "live commit migrations";
+    migrationIdentityAt(before); // Fail before asking D1 to pause queries if git cannot read it.
     recoveryStage = "Cloudflare export";
     const sql = await exportD1({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
+    recoveryStage = "primary release identity";
+    const after = await liveCommit();
     recoveryStage = "snapshot schema and integrity validation";
-    const snapshot = makeSnapshot(sql, commit);
+    const { commit, expected } = liveSource(sql, [before, after]);
+    const snapshot = makeSnapshot(sql, commit, expected);
     recoveryStage = "encryption and restore verification";
     const encrypted = seal(snapshot, process.env.BACKUP_ENCRYPTION_KEY);
     const recovered = unseal(encrypted, process.env.BACKUP_ENCRYPTION_KEY);
     assert.equal(recovered.sha256, hash(recovered.sql));
-    makeSnapshot(recovered.sql, recovered.sourceCommit);
+    makeSnapshot(recovered.sql, recovered.sourceCommit, expected);
     recoveryStage = "encrypted artifact write";
     mkdirSync("recovery/encrypted", { recursive: true, mode: 0o700 });
     writeFileSync(`recovery/encrypted/${snapshot.snapshotId}.enc`, encrypted, { flag: "wx", mode: 0o600 });

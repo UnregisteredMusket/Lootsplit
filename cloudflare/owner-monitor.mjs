@@ -2,7 +2,11 @@ import { assertActive, roleOf } from "./members.mjs";
 import { serverMonitor } from "./monitoring.mjs";
 import { ownerAnalytics } from "./game-analytics.mjs";
 import { widgetSeverity } from "./monitor-model.mjs";
-import { RELEASE_WORKFLOW_PATH, releaseRunOutcome } from "../src/lib/deployment/release-run.mjs";
+import {
+  RELEASE_WORKFLOW_PATH,
+  isDeployedOutcome,
+  releaseRunOutcome,
+} from "../src/lib/deployment/release-run.mjs";
 
 const repository = "UnregisteredMusket/Lootsplit";
 const github = `https://api.github.com/repos/${repository}`;
@@ -130,6 +134,8 @@ export function activityEvents(runs, openPulls, closedPulls, limit = ACTIVITY_EV
       ? ["run-started", "active", run.status === "in_progress" ? "running" : run.status]
       : run.superseded === true
         ? ["run-superseded", "ok", "superseded by a newer commit, not deployed,"]
+        : run.unaudited === true
+          ? ["run-failed", "fail", "deployed, live audit failed (live, unaudited),"]
         : run.conclusion === "success"
           ? ["run-succeeded", "ok", "passed"]
           : run.conclusion === "neutral"
@@ -215,23 +221,30 @@ const RELEASE_OUTCOME_LIMIT = 500;
 // New (not yet remembered) successful release attempts read per collection, in parallel.
 export const RELEASE_LOOKUP_LIMIT = 20;
 /**
- * Classifies every successful release run in the scan: `deployed: true` on real deployments, and
+ * Classifies every successful or failed release run in the scan: `deployed: true` on real
+ * deployments (plus `unaudited: true` when the live audit did not pass), and
  * `superseded: true, deployed: false, deployment: false` on superseded ones, so no reader (latest
  * deployment, Deploys tile, activity, workflow diagnostics, live-audit coverage) counts them as
- * deployments. Failed, cancelled and running release runs keep their conclusion and need no
- * lookup. An unreadable or unrecognised jobs list, or more new attempts than one collection reads,
+ * deployments. Conclusions are never changed. Cancelled and running release runs need no lookup. An unreadable or unrecognised jobs list, or more new attempts than one collection reads,
  * throws: the GitHub source is then unavailable (an explicit gap) instead of guessing; outcomes
  * read before that are remembered, so the next collection continues.
  */
 export async function markReleaseRuns(runs, lookup) {
   const key = (run) => `${run.id}:${run.attempt || 1}`;
+  // Failed release runs are read too (audit G6): a deploy whose live audit failed stays live and is
+  // marked `deployed: true, unaudited: true`; its conclusion stays "failure", so it stays red.
   const releases = runs.filter(
-    (run) => run.deployment && run.status === "completed" && run.conclusion === "success",
+    (run) =>
+      run.deployment &&
+      run.status === "completed" &&
+      (run.conclusion === "success" || run.conclusion === "failure"),
   );
   const unknown = releases.filter((run) => !RELEASE_OUTCOMES.has(key(run)));
   await Promise.all(
     unknown.slice(0, RELEASE_LOOKUP_LIMIT).map(async (run) => {
-      const outcome = releaseRunOutcome(await lookup(run));
+      let outcome = releaseRunOutcome(await lookup(run));
+      // A failed run with no recognisable deploy job deployed nothing; only successes fail closed.
+      if (!outcome && run.conclusion === "failure") outcome = "not-deployed";
       if (!outcome) throw new Error("Invalid release jobs");
       if (RELEASE_OUTCOMES.size >= RELEASE_OUTCOME_LIMIT)
         RELEASE_OUTCOMES.delete(RELEASE_OUTCOMES.keys().next().value);
@@ -241,7 +254,8 @@ export async function markReleaseRuns(runs, lookup) {
   if (unknown.length > RELEASE_LOOKUP_LIMIT) throw new Error("Release runs not classified yet");
   for (const run of releases) {
     const outcome = RELEASE_OUTCOMES.get(key(run));
-    run.deployed = outcome === "deployed";
+    run.deployed = isDeployedOutcome(outcome);
+    if (outcome === "live-unaudited") run.unaudited = true;
     if (outcome === "superseded") {
       run.superseded = true;
       run.deployment = false;
