@@ -1,8 +1,0 @@
-{
-  "title": "Item charges keep what you typed",
-  "summary": "When adding loot with charges, entering uses left before the maximum no longer loses it.",
-  "items": [
-    "Uses left is kept whichever field you fill in first; the form still refuses uses left above the maximum."
-  ],
-  "audience": "everyone"
-}

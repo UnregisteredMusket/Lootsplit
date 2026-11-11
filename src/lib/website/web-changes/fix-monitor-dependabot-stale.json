@@ -1,8 +1,0 @@
-{
-  "title": "Owner monitor clears a failed Dependabot job after a passing security scan",
-  "audience": "behind-the-scenes",
-  "summary": "A Dependabot security-update job that failed once stayed red on the owner's Field monitor for good, because each job has its own name and can't be re-run.",
-  "items": [
-    "The failure now clears once a newer security scan of main passes, and it stays in the monitor's history. A failed scan clears nothing."
-  ]
-}

@@ -1,8 +1,0 @@
-{
-  "title": "Uses left no longer gains extra digits while you type",
-  "audience": "dm",
-  "summary": "When awarding an item with charges, typing in Uses left just after changing Maximum uses could add the new digit to the old number (5 became 75).",
-  "items": [
-    "Uses left still starts at the maximum, but it no longer rewrites itself while you are typing in it."
-  ]
-}
