@@ -4,12 +4,15 @@
 //
 // - library_limits: account request counters (accounts.mjs rateLimit), keyed by a hashed IP,
 //   a hashed account id or a hashed signed-in IP, with `window` = the current minute number.
-//   Only the current minute is ever read.
+//   Only the current minute is ever read. The hourly and daily credential counters
+//   (credential-limits.mjs) store the minute their window ends, so they are kept until an hour
+//   after their window closes.
 // - rateLimit: Better Auth's own per-IP counter (storage "database", 60 s window), with
 //   `lastRequest` in milliseconds.
-// - signin_throttle: per-email failed sign-in counter (signin-throttle.mjs), keyed by a hashed
-//   email. A row whose last failure is older than SIGNIN_THROTTLE.resetAfterMs (24 h) no longer
-//   counts and whose wait has ended changes nothing, so it is deleted.
+// - signin_throttle: failed sign-in counters (signin-throttle.mjs), keyed by a hashed email plus
+//   network, or a hashed email alone for the email-wide count. A row whose last failure is
+//   older than SIGNIN_THROTTLE.resetAfterMs (24 h) no longer counts and whose wait has ended
+//   changes nothing, so it is deleted.
 import { SIGNIN_THROTTLE } from "./signin-throttle.mjs";
 
 const MINUTE = 60_000;

@@ -8,16 +8,21 @@ on:
     - cron: '17 9 * * *'
 permissions:
   contents: read
-# Serializes snapshots with primary deployments. Nothing restores automatically.
+  # scripts/production-lane.mjs reads website release runs.
+  actions: read
+# Its own queue (audit G10): sharing lootsplit-production let a queued backup cancel a pending
+# deploy (GitHub keeps one pending run per group). Backups and releases stay apart through
+# scripts/production-lane.mjs instead. Nothing restores automatically.
 concurrency:
-  group: lootsplit-production
+  group: lootsplit-backup
   cancel-in-progress: false
 jobs:
   backup:
     if: github.ref == 'refs/heads/main' && vars.STANDBY_BACKUPS_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 20
+    # Up to 25 minutes waiting for a running website release, then the export (12-minute limit).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -27,6 +32,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Wait for a running website release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/production-lane.mjs wait-for-release
+      # The step name is read by scripts/production-lane.mjs (BACKUP_EXPORT_STEP); keep them equal.
+      # Validates against the migrations of the commit that is live (audit G13), fetched from git.
       - name: Export consistently and encrypt before writing to disk
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

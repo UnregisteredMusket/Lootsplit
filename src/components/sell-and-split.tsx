@@ -48,8 +48,8 @@ export function SellAndSplit({
   const items = economy.holdings.filter((h) => h.purseId === fundId && h.kind === "item");
   const [chosen, setChosen] = useState<Record<string, number>>({});
   const table = useMemo(
-    () => ({ purses: economy.purses, journal: economy.journal, holdings: economy.holdings, shops: economy.shops }),
-    [economy.purses, economy.journal, economy.holdings, economy.shops],
+    () => ({ purses: economy.purses, journal: economy.journal, holdings: economy.holdings, shops: economy.shops, sheets: economy.sheets }),
+    [economy.purses, economy.journal, economy.holdings, economy.shops, economy.sheets],
   );
   const eligible = splitRecipients(table, actor);
   const [recipientIds, setRecipientIds] = useState<string[]>(() =>
@@ -62,7 +62,7 @@ export function SellAndSplit({
   const [error, setError] = useState("");
   const problem = (id: string) => {
     const h = items.find((x) => x.id === id);
-    return h && shop ? saleProblem(h, shop, actor, economy.journal, economy.purses) : "Choose a shop.";
+    return h && shop ? saleProblem(h, shop, actor, economy.journal, economy.purses, economy.sheets) : "Choose a shop.";
   };
   const lots = items
     .filter((h) => chosen[h.id] && !problem(h.id))
@@ -233,7 +233,7 @@ export function SellAndSplit({
           const why = problem(h.id);
           const qty = chosen[h.id] ?? 0;
           // The DM is exempt from the settlement's per-item cap and sees a warning instead.
-          const sale = shop ? shopSale(h, shop, 1, economy.journal, economy.purses, actor) : null;
+          const sale = shop ? shopSale(h, shop, 1, economy.journal, economy.purses, actor, economy.sheets) : null;
           const pays = sale?.unit ?? 0;
           const capWarning = !why && sale?.warning ? sale.warning : "";
           return (
@@ -287,7 +287,7 @@ export function SellAndSplit({
       </fieldset>
       <div className="coin-split-preview-head sale-split-proceeds" aria-live="polite">
         <strong>Proceeds</strong>
-        <span className="tabular-nums">{formatCopper(lots.reduce((sum, l) => sum + (shop ? unitSalePrice(items.find((h) => h.id === l.holdingId)!, shop, economy.journal, economy.purses, actor) * l.quantity : 0), 0))}</span>
+        <span className="tabular-nums">{formatCopper(lots.reduce((sum, l) => sum + (shop ? unitSalePrice(items.find((h) => h.id === l.holdingId)!, shop, economy.journal, economy.purses, actor, economy.sheets) * l.quantity : 0), 0))}</span>
       </div>
       <SplitRecipientPicker
         table={table}

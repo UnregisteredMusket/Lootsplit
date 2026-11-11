@@ -11,6 +11,9 @@ on:
         Android test APK,
         Encrypted offsite database backup,
         Verify remote standby recovery,
+        Code health and security scans,
+        Record performance regressions,
+        Weekly development speed summary,
       ]
     types: [completed]
 permissions:
@@ -37,6 +40,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
+      # Email goes out only when RESEND_API_KEY, FAILURE_REPORT_EMAIL and FAILURE_REPORT_FROM are
+      # set as secrets of the production environment (the owner's to configure). Without them the
+      # report is still saved as an artifact and summary, with a warning naming what is missing.
       - name: Save report and send configured email
         env:
           GH_TOKEN: ${{ github.token }}

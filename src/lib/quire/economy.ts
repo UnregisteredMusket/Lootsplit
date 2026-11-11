@@ -616,6 +616,8 @@ export async function repriceShop(shop: Shop): Promise<void> {
       "prices",
       undefined,
       change.change,
+      // Hidden activity lines (audit 2026-11-10 B1): the shop the line names, as the room records it.
+      { shopId: normalized.id },
     );
   await done;
 }
@@ -821,6 +823,7 @@ export async function saveShop(shop: Shop): Promise<void> {
           sellRate: shop.sellRate,
         },
       },
+      { shopId: shop.id },
     );
   });
 }
@@ -848,6 +851,7 @@ export async function saveStock(line: StockLine, assertScope?: () => void): Prom
           before: { copper: before.copper },
           after: { copper: line.copper },
         },
+        { shopId: line.shopId },
       );
   });
 }
@@ -891,7 +895,7 @@ export async function editStockLine(
         entityId: line.id,
         before: { copper: current!.copper },
         after: { copper: line.copper },
-      });
+      }, { shopId: line.shopId });
   });
 }
 
@@ -928,6 +932,9 @@ export async function addShelfStock(shopId: string, rows: ShelfDraft[]): Promise
         tx,
         `Added ${added} catalog items to ${shop.name}; existing stock preserved`,
         "management",
+        undefined,
+        undefined,
+        { shopId: shop.id },
       );
     return added;
   });
@@ -1288,8 +1295,12 @@ function logLine(
 
 async function charismaOf(purse: Purse, tx: IDBTransaction): Promise<number | null> {
   // The same rule as the shared command engine (`charismaFor`); sheets load only when needed.
-  if (purse.kind === "party" || purse.sheet) return charismaFor(purse, []);
-  return charismaFor(purse, readSheets(await request(tx.objectStore("meta").get("sheets"))));
+  return charismaFor(purse, await sheetsFor(purse, tx));
+}
+/** The sheets `charismaFor` needs for `purse` (none when its Charisma is on the purse). */
+async function sheetsFor(purse: Purse, tx: IDBTransaction) {
+  if (purse.kind === "party" || purse.sheet) return [];
+  return readSheets(await request(tx.objectStore("meta").get("sheets")));
 }
 
 async function atomic<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
@@ -1598,7 +1609,8 @@ export async function sellToShop(
     // is only the player link (the DM's device runs the shared `sell` above, where the DM's seat
     // is exempt from the cap), so it is always priced as a player.
     const everyone = await request<Purse[]>(tx.objectStore("purses").getAll());
-    const priced = shopSale(holding, shop, quantity, journal, everyone, "player");
+    // Capped at what this shop charges this seller for the item (audit A1), Charisma included.
+    const priced = shopSale(holding, shop, quantity, journal, everyone, "player", await sheetsFor(purse, tx));
     if (priced.refused) throw Error(priced.refused);
     assertExpectedPrice(input.expect, priced.unit);
     const paid = priced.total;
@@ -2978,7 +2990,7 @@ async function audit(
   kind: "prices" | "management",
   purseId?: string,
   change?: Journal["events"][number]["change"],
-  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly">,
+  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly" | "shopId">,
 ) {
   const store = tx.objectStore("meta");
   const row = await request<{ value: unknown } | undefined>(store.get("journal"));

@@ -43,9 +43,12 @@ jobs:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
       - run: npm ci
       - run: npm run build:mobile && npx cap sync android
-      - name: Install browser for native account controls
+      # The same cached, bounded installer as the browser audits (continues without optional
+      # fonts when the Ubuntu archive is unreachable); the audit launches headless.
+      - name: Install Chromium for Playwright
+        timeout-minutes: 12
+        uses: ./.github/actions/playwright-chromium
         if: matrix.api == 35
-        run: npx playwright install --with-deps chromium
       - name: Verify mobile widget controls
         if: matrix.api == 35
         run: node scripts/mobile-owner-widget-browser-audit.mjs

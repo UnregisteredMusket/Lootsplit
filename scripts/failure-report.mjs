@@ -1,4 +1,5 @@
 import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
+import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -50,6 +51,29 @@ export function buildReport(run, jobs, liveCommit = "unconfirmed") {
   };
 }
 
+/**
+ * A cancelled run that a newer run of the same workflow and branch replaced (a push to a pull
+ * request cancels its running verification, a newer schedule replaces a pending one) is not a
+ * failure to report (audit G11). Returns that newer run, or null. A cancelled run with no newer
+ * run, and every other conclusion, is still reported.
+ */
+export function replacingRun(run, runs) {
+  if (run?.conclusion !== "cancelled" || !Array.isArray(runs)) return null;
+  return (
+    runs
+      .filter(
+        (other) =>
+          other &&
+          other.id !== run.id &&
+          other.workflow_id === run.workflow_id &&
+          other.head_branch === run.head_branch &&
+          Number.isSafeInteger(other.run_number) &&
+          other.run_number > run.run_number,
+      )
+      .sort((a, b) => b.run_number - a.run_number)[0] || null
+  );
+}
+
 export function emailConfiguration(env = process.env) {
   const required = ["FAILURE_REPORT_EMAIL", "FAILURE_REPORT_FROM", "RESEND_API_KEY"];
   const missing = required.filter((key) => !env[key]);
@@ -87,6 +111,20 @@ async function main() {
   )
     throw Error("Invalid source workflow");
   const headers = { Authorization: `Bearer ${process.env.GH_TOKEN}` };
+  if (run.conclusion === "cancelled") {
+    assert.ok(Number.isSafeInteger(run.workflow_id) && Number.isSafeInteger(run.run_number), "Invalid source workflow");
+    const { workflow_runs: newer } = await requestJson(
+      `https://api.github.com/repos/UnregisteredMusket/Lootsplit/actions/workflows/${run.workflow_id}/runs?branch=${encodeURIComponent(run.head_branch || "")}&per_page=20`,
+      { headers },
+    );
+    const replacement = replacingRun(run, newer);
+    if (replacement) {
+      const note = `Not reported: ${run.name} run ${run.id} was cancelled and replaced by newer run ${replacement.id} on ${run.head_branch}.`;
+      console.log(note);
+      if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `    ${note}\n`);
+      return;
+    }
+  }
   const jobs = [];
   for (let page = 1; page <= 10; page++) {
     const data = await requestJson(

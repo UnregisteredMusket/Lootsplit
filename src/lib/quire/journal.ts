@@ -205,6 +205,15 @@ const journalFields = z.object({
         identityEnded: identityEndedSchema.optional(),
         /** Factions (factions.ts): the faction a renown or Favor line is about (players lose it while hidden). */
         factionId: id.optional(),
+        /**
+         * Hidden activity lines (audit 2026-11-10 B1): the shop, place, listing or NPC a DM's edit
+         * line names. A player receives the line only while that record is in the same player's
+         * projection (session-records.ts `eventSubjectVisible`).
+         */
+        shopId: id.optional(),
+        locationId: id.optional(),
+        listingId: id.optional(),
+        npcId: id.optional(),
         change: z
           .object({
             entity: z.enum(["stock", "realm", "shop", "holding", "account"]),
@@ -390,6 +399,9 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   const privateEvents = new Set(current.events.filter((e) => e.dmOnly).map((e) => e.id));
   // Older clients drop an event's faction tag; the stored one keeps it hidden with its faction.
   const factionOf = new Map(current.events.flatMap((e) => (e.factionId ? [[e.id, e.factionId] as const] : [])));
+  // Older clients also drop a line's subject (shop, place, listing, NPC); the stored one keeps it
+  // hidden from players while that record is.
+  const subjectOf = new Map(current.events.map((e) => [e.id, eventSubject(e)]));
   const entries = new Map((current.entries || []).map((entry) => [entry.id, entry]));
   for (const entry of next.entries || []) {
     const old = entries.get(entry.id);
@@ -553,6 +565,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
         ...(split ? { split } : {}),
         ...(privateEvents.has(event.id) ? { dmOnly: true } : {}),
         ...(factionOf.has(event.id) ? { factionId: factionOf.get(event.id)! } : {}),
+        ...subjectOf.get(event.id),
+        ...eventSubject(event),
       };
     }),
   });
@@ -575,4 +589,15 @@ function keepGroups(next: StoredPosition[], current: StoredPosition[], aboard: S
       kept.downtime = { ...kept.downtime, returnGroupId: old.downtime.returnGroupId };
     return kept;
   });
+}
+
+export type EventSubject = { shopId?: string; locationId?: string; listingId?: string; npcId?: string };
+/** The subject fields of a journal event (hidden activity lines, audit 2026-11-10 B1). */
+export function eventSubject(e: EventSubject) {
+  return {
+    ...(e.shopId ? { shopId: e.shopId } : {}),
+    ...(e.locationId ? { locationId: e.locationId } : {}),
+    ...(e.listingId ? { listingId: e.listingId } : {}),
+    ...(e.npcId ? { npcId: e.npcId } : {}),
+  };
 }

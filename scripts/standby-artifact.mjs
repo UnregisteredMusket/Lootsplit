@@ -4,10 +4,14 @@ import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } f
 import { execFileSync } from "node:child_process";
 import { fileHashes, verifyArtifact } from "./release-artifact.mjs";
 
-export function migrationIdentity() {
-  const migrations = readdirSync("cloudflare/migrations").filter((name) => name.endsWith(".sql")).sort();
-  const migrationsHash = createHash("sha256").update(JSON.stringify(migrations.map((name) => [name, readFileSync(`cloudflare/migrations/${name}`, "utf8")]))).digest("hex");
+/** Migration names and hash from a file list and a reader (checkout, or a commit in git). */
+export function migrationIdentityOf(names, read) {
+  const migrations = names.filter((name) => name.endsWith(".sql")).sort();
+  const migrationsHash = createHash("sha256").update(JSON.stringify(migrations.map((name) => [name, read(name)]))).digest("hex");
   return { migrations, migrationsHash };
+}
+export function migrationIdentity() {
+  return migrationIdentityOf(readdirSync("cloudflare/migrations"), (name) => readFileSync(`cloudflare/migrations/${name}`, "utf8"));
 }
 if (process.argv[1]?.endsWith("/standby-artifact.mjs")) {
   const root = "dist/standby-release";

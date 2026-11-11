@@ -239,3 +239,76 @@ test("a superseded website release is not reported as a deployment anywhere in t
   );
   assert.equal(unknown.state, "unavailable");
 });
+
+test("a deploy whose live audit failed is a deployment flagged live, unaudited, and stays red (audit G6)", async () => {
+  const { CURRENT_MAIN_STEP, LIVE_AUDIT_STEP, LIVE_RELEASE_STEP } =
+    await import("../src/lib/deployment/release-run.mjs");
+  const release = (id, sha, conclusion, minutesAgo) => ({
+    id,
+    name: "Deploy verified website",
+    status: "completed",
+    conclusion,
+    run_attempt: 1,
+    head_branch: "main",
+    head_sha: sha.repeat(40),
+    event: "workflow_run",
+    path: ".github/workflows/website-release.yml",
+    run_started_at: new Date(Date.now() - (minutesAgo + 5) * 60000).toISOString(),
+    updated_at: new Date(Date.now() - minutesAgo * 60000).toISOString(),
+  });
+  const steps = {
+    // Deployed, live audit failed, marker recorded.
+    9102: [
+      [CURRENT_MAIN_STEP, "success"],
+      [LIVE_AUDIT_STEP, "failure"],
+      [LIVE_RELEASE_STEP, "success"],
+    ],
+    // Migrations failed: nothing deployed.
+    9101: [
+      [CURRENT_MAIN_STEP, "success"],
+      [LIVE_AUDIT_STEP, "skipped"],
+      [LIVE_RELEASE_STEP, "skipped"],
+    ],
+  };
+  const fetcher = async (url) => {
+    const lookup = /\/actions\/runs\/(\d+)\/attempts\/1\/jobs/.exec(url);
+    if (lookup)
+      return Response.json({
+        jobs: [
+          {
+            name: "deploy",
+            conclusion: "failure",
+            steps: steps[lookup[1]].map(([name, conclusion]) => ({ name, conclusion })),
+          },
+        ],
+      });
+    if (url.includes("/actions/runs?"))
+      return Response.json({
+        workflow_runs: [release(9102, "e", "failure", 1), release(9101, "d", "failure", 10)],
+      });
+    return Response.json([]);
+  };
+  const result = await developmentActivity(
+    { DB: { unaudited: true }, OWNER_MONITOR_GITHUB: "true" },
+    fetcher,
+  );
+  assert.equal(result.state, "ready");
+  const [unaudited, failed] = result.data.runs;
+  assert.equal(unaudited.deployed, true);
+  assert.equal(unaudited.unaudited, true);
+  assert.equal(unaudited.conclusion, "failure");
+  assert.equal(failed.deployed, false);
+  assert.equal(failed.unaudited, undefined);
+  assert.equal(result.data.latestDeployment.unaudited, true);
+  assert.deepEqual(
+    result.data.events.map((e) => [e.kind, e.state, e.text]),
+    [
+      [
+        "run-failed",
+        "fail",
+        "Deploy verified website deployed, live audit failed (live, unaudited), on main",
+      ],
+      ["run-failed", "fail", "Deploy verified website failed on main"],
+    ],
+  );
+});

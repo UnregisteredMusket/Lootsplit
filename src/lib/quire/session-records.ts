@@ -40,7 +40,7 @@ import { projectJourneys } from "./journey-engine.ts";
 import { projectQuestMapLinks, projectQuests, questNamedPurses, type QuestProjectionContext } from "./quests.ts";
 import { isDeferredSnapshot } from "./history-pages.ts";
 import { isUnidentified, projectIdentities, redactIdentity, tableSecrets } from "./item-identity.ts";
-import type { Holding } from "./types.ts";
+import type { Holding, LedgerLine } from "./types.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
@@ -420,9 +420,10 @@ export function projectRecord(
     const companions = new Set(
       table.purses.filter((p) => companionFundsReadable(table, p, seat)).map((p) => p.id),
     );
-    t.ledger = t.ledger.filter(
-      (l) => seat.purseIds.includes(l.purseId) || companions.has(l.purseId),
-    );
+    const shopNames = hiddenShopNames(table, new Set(t.shops.map((s) => s.id)));
+    t.ledger = t.ledger
+      .filter((l) => seat.purseIds.includes(l.purseId) || companions.has(l.purseId))
+      .map(shopNames);
     // Treasure pool: pooled party-fund lots are visible to seats with a party character
     // (owner decision, 2026-10-23); other fund items keep the "Allow party fund" rule.
     const poolFundIds = seatInParty(table, seat)
@@ -445,7 +446,7 @@ export function projectRecord(
     }
     // Merchant purses stay DM-only unless the DM shows them; players learn only whether the
     // merchant can afford each lot they can read (merchant.ts).
-    t.shops = t.shops.map((shop) => projectMerchantPurse(shop, t.holdings, table.journal, table.purses));
+    t.shops = t.shops.map((shop) => projectMerchantPurse(shop, t.holdings, table.journal, table.purses, table.sheets));
     if (t.journal.propertyOperations) {
       const keys = new Set([
         ...estate.sites.flatMap((site) => [site.templateKey, ...site.completedTemplates]),
@@ -584,10 +585,27 @@ export function projectRecord(
     // A renown or Favor line of a faction hidden now (perhaps hidden again after players saw it)
     // is withheld with its faction (factions.ts).
     const secretFactions = new Set([...hiddenFactionIds(table), ...(options.hiddenFactions ?? [])]);
+    // Hidden activity lines (audit 2026-11-10 B1, owner decision (a)): a line about a shop, stock
+    // line, place, listing or NPC reaches this player only while that record is in this same
+    // projection (decided after every other part of it).
+    const subjectVisible = eventSubjectVisible(table, {
+      shops: new Set(t.shops.map((s) => s.id)),
+      locations: new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
+      listings: new Set(t.listings.map((l) => l.id)),
+      npcs: new Set(world.npcs.map((n) => n.id)),
+    });
     t.journal.events = t.journal.events
       .flatMap((e) => {
         if (e.dmOnly) return [];
         if (e.factionId && secretFactions.has(e.factionId)) return [];
+        const subject = subjectVisible(e);
+        if (!subject) return [];
+        // A legacy line's subject read from its recorded change stays with it once `change` is
+        // dropped below, so a projected copy projected again (a player's device) keeps it.
+        if (subject.shopId && !e.shopId) e = { ...e, shopId: subject.shopId };
+        // A purse's own line about a hidden shop (the DM's sale for a party fund) is kept, with
+        // the shop read as "a merchant".
+        if (subject.merchant) e = { ...e, summary: renameShop(e.summary, table, e.shopId!, "Sold to a merchant") };
         const loot = lootEvent(e);
         if (loot !== undefined) return loot ? [loot] : [];
         return (
@@ -747,4 +765,85 @@ export function archiveSession(table: CloudTable, id: string, name: string, at =
   journal.editReports = [];
   for (const p of table.purses) p.rolls = [];
   return record;
+}
+
+type JournalEvent = NonNullable<CloudTable["journal"]>["events"][number];
+/**
+ * Activity lines that named a shop, stock line, place or listing before lines carried their
+ * subject (audit 2026-11-10 B1). Such a line without a subject, purse or property cannot be
+ * checked against the record it names, so players no longer receive it; the DM keeps it. Lines
+ * with a recorded change (`change.entityId`) are checked against that shop or stock line instead.
+ */
+const LEGACY_SUBJECT_LINES = [
+  /^Shop updated: /,
+  /^(Updated|Created) shop: /,
+  /^Shop location and image saved: /,
+  /^Shop schedule (updated|disabled): /,
+  /^Restocked /,
+  /^Added \d+ catalog items to /,
+  /^Location saved: /,
+  /^Listing (saved|removed): /,
+  /^Reviewed .+ storage and shipyard terms\.$/,
+  /^Journey to (?!a point on the map ).+ (proposed|updated|denied|withdrawn|stopped on the road|saved)$/,
+];
+/**
+ * Whether a player whose projection holds `visible` may read an activity line (hidden activity
+ * lines, audit 2026-11-10 B1; owner decision (a), 2026-11-11): default-deny for every line about
+ * a shop, stock line, place, listing or NPC. A stock line counts as visible with its shop; a
+ * removed record is in no projection, so its named lines stay with the DM. Returns false, or the
+ * line's subject (a legacy line's shop read from its recorded change).
+ */
+export function eventSubjectVisible(
+  table: Pick<CloudTable, "stock">,
+  visible: { shops: Set<string>; locations: Set<string>; listings: Set<string>; npcs: Set<string> },
+) {
+  let stockShops: Map<string, string> | undefined;
+  return (e: JournalEvent): false | { shopId?: string; merchant?: true } => {
+    let shopId = e.shopId;
+    if (!shopId && e.change?.entityId) {
+      if (e.change.entity === "shop") shopId = e.change.entityId;
+      else if (e.change.entity === "stock") {
+        stockShops ??= new Map(table.stock.map((l) => [l.id, l.shopId]));
+        shopId = stockShops.get(e.change.entityId);
+        if (!shopId) return false;
+      }
+    }
+    // A purse's own line keeps its place in that purse's history, naming the shop neutrally.
+    if (shopId && !visible.shops.has(shopId)) return e.purseId && e.shopId ? { shopId, merchant: true } : false;
+    if (e.locationId && !visible.locations.has(e.locationId)) return false;
+    if (e.listingId && !visible.listings.has(e.listingId)) return false;
+    if (e.npcId && !visible.npcs.has(e.npcId)) return false;
+    if (shopId || e.locationId || e.listingId || e.npcId || e.purseId || e.propertyId) return { shopId };
+    return !LEGACY_SUBJECT_LINES.some((pattern) => pattern.test(e.summary)) && {};
+  };
+}
+
+/** How a player reads a shop the DM traded at while it was hidden from them (B1 follow-up). */
+export const HIDDEN_SHOP_NAME = "a merchant";
+function renameShop(summary: string, table: Pick<CloudTable, "shops">, shopId: string, fallback: string) {
+  const name = table.shops.find((s) => s.id === shopId)?.name;
+  if (name && summary.includes(name)) return summary.split(name).join(HIDDEN_SHOP_NAME);
+  // Already renamed (a projected copy projected again on a player's device) stays as it is; a
+  // renamed or removed shop's old name can't be found in the text: the line says only what it was.
+  return summary.includes(HIDDEN_SHOP_NAME) ? summary : fallback;
+}
+/**
+ * Ledger lines a player reads (projectRecord, player-view.ts `playerTable`, older history pages):
+ * a DM's trade at a shop hidden from the purse's players (`hiddenShop`) keeps its line, amount and
+ * receipt, and names the shop "a merchant" while that shop is not in `visibleShops`. Trades at a
+ * shop the player could see keep its name after the party moves on (no `hiddenShop`).
+ */
+export function hiddenShopNames(table: Pick<CloudTable, "shops">, visibleShops: Set<string>) {
+  return <L extends Pick<LedgerLine, "summary" | "shopId" | "copper" | "hiddenShop">>(line: L): L =>
+    line.hiddenShop && line.shopId && !visibleShops.has(line.shopId)
+      ? {
+          ...line,
+          summary: renameShop(line.summary, table, line.shopId, line.copper < 0 ? "Bought from a merchant" : "Sold to a merchant"),
+        }
+      : line;
+}
+/** The shops a player seat sees, decided as `projectRecord` decides them (for older history pages). */
+export function seatVisibleShops(table: CloudTable, seat: Pick<CloudSeat, "role" | "purseIds">) {
+  const groups = seatGroups(table, seat);
+  return new Set(table.shops.filter((shop) => shopVisible(shop, table, groups)).map((s) => s.id));
 }
