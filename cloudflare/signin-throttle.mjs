@@ -12,7 +12,10 @@
 // a network with no failures for the address is never made to wait, so the owner still signs in.
 //
 // Enumeration safety: keys are hashes of the normalized email (and network), whether or not an
-// account uses it, and every step (reserve, count, wait) is identical for registered and
+// account uses it. Keys that include a network are HMAC-SHA-256 with the server secret
+// (ACCOUNT_SECRET), so someone reading the database who knows an email cannot test which IPv4
+// network tried it; the email-only key keeps its earlier unkeyed form so existing rows still count.
+// Every step (reserve, count, wait) is identical for registered and
 // unregistered addresses. Only a successful sign-in, which needs the right password, clears the
 // network's state early; the email-only count ends a day after its last failure.
 //
@@ -79,21 +82,41 @@ export function signinNetwork(ip) {
   );
 }
 
+const hex = (buffer) =>
+  Array.from(new Uint8Array(buffer), (b) => b.toString(16).padStart(2, "0")).join("");
+/**
+ * HMAC-SHA-256 of `value` with the server secret, as hex. Used for every stored key that contains
+ * a network, so a database reader cannot brute-force the network (2^32 IPv4 addresses) from a
+ * known email. Without a secret (unit tests only: the account API refuses to run without
+ * ACCOUNT_SECRET) it falls back to plain SHA-256.
+ */
+export async function keyedDigest(secret, value) {
+  const data = new TextEncoder().encode(value);
+  if (typeof secret !== "string" || !secret) return hex(await crypto.subtle.digest("SHA-256", data));
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return hex(await crypto.subtle.sign("HMAC", key, data));
+}
+
 /**
  * Throttle key for an email address as submitted, and for one network when `network` is given;
- * null when there is no usable address. The email-only key is the one used before H3, so a
- * deploy carries existing counts over as the email-wide count.
+ * null when there is no usable address. The email-only key is the unkeyed SHA-256 used before H3,
+ * so a deploy carries existing counts over as the email-wide count. The network key is keyed with
+ * `secret` (keyedDigest). Waits stored before this change were under the email-only key, which no
+ * longer imposes a wait of its own, so the deploy can only shorten a wait in progress.
  */
-export async function signinKey(email, network) {
+export async function signinKey(email, network, secret) {
   if (typeof email !== "string") return null;
   const normalized = email.trim().toLowerCase();
   if (!normalized || normalized.length > 320) return null;
-  const input =
-    network === undefined ? "signin:" + normalized : "signin-net:" + network + "\n" + normalized;
-  const bytes = new Uint8Array(
-    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)),
-  );
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  if (network === undefined)
+    return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("signin:" + normalized)));
+  return keyedDigest(secret, "signin-net:" + network + "\n" + normalized);
 }
 
 /** Whether the address is under attack: email-wide failures within a day at or past the ceiling. */
@@ -208,11 +231,12 @@ export function signinWaitMessage(retryAfterMs, pressed = false) {
 /**
  * Wraps an email sign-in: throttle check, the real handler, then the outcome. `ip` is the
  * request's cf-connecting-ip; the wait applies to that network only (see the top of this file).
+ * `secret` is ACCOUNT_SECRET, which keys the stored network key.
  */
-export async function throttledSignin(db, email, signIn, now = Date.now, ip = null) {
+export async function throttledSignin(db, email, signIn, now = Date.now, ip = null, secret) {
   const emailKey = await signinKey(email);
   if (!emailKey) return signIn();
-  const key = await signinKey(email, signinNetwork(ip));
+  const key = await signinKey(email, signinNetwork(ip), secret);
   const at = now();
   const pressed = await emailPressed(db, emailKey, at);
   const reserved = await reserveSigninAttempt(db, key, at, pressed);

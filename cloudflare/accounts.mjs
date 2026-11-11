@@ -382,7 +382,13 @@ export async function handleAccounts(request, env, context = null) {
       // The app skips the human check, so its sign-ups, sign-ins and recovery-key resets get a
       // much smaller allowance per network (audit 2026-11-10 H1; credential-limits.mjs).
       if (native)
-        await appCredentialAllowance(env.DB, path, request.headers.get("cf-connecting-ip"));
+        await appCredentialAllowance(
+          env.DB,
+          path,
+          request.headers.get("cf-connecting-ip"),
+          Date.now(),
+          env.ACCOUNT_SECRET,
+        );
       // Turnstile on sign-up, sign-in and recovery-key reset (website only; see turnstile.mjs).
       await verifyCaptcha(env, request, {
         path,
@@ -410,13 +416,29 @@ export async function handleAccounts(request, env, context = null) {
         if (path === "/api/account/auth/sign-in/email") {
           const signIn = request;
           return cors(
-            await throttledSignin(env.DB, body?.email, () => auth.handler(signIn), Date.now, ip),
+            await throttledSignin(
+              env.DB,
+              body?.email,
+              () => auth.handler(signIn),
+              Date.now,
+              ip,
+              env.ACCOUNT_SECRET,
+            ),
           );
         }
         // A few "already registered" replies per network a day (audit 2026-11-10 H5).
         if (path === "/api/account/auth/sign-up/email") {
           const signUp = request;
-          return cors(await limitedSignup(env.DB, body?.email, ip, () => auth.handler(signUp)));
+          return cors(
+            await limitedSignup(
+              env.DB,
+              body?.email,
+              ip,
+              () => auth.handler(signUp),
+              Date.now,
+              env.ACCOUNT_SECRET,
+            ),
+          );
         }
       }
       return cors(await auth.handler(request));

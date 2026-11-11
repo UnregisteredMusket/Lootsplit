@@ -8,6 +8,7 @@ import {
   signinDelay,
   signinKey,
   signinNetwork,
+  keyedDigest,
   reserveSigninAttempt,
   throttledSignin,
 } from "../cloudflare/signin-throttle.mjs";
@@ -257,4 +258,27 @@ test("H3: past the email-wide ceiling every network waits from its first failure
   time.advance(SIGNIN_THROTTLE.resetAfterMs + 1);
   for (let i = 0; i < SIGNIN_THROTTLE.freeFailures; i++)
     assert.equal((await attempt(db, time, "hero@example.com", "a wrong password", "10.201.0.1")).status, 401);
+});
+
+// Privacy review of PR 494: a stored key that contains a network is keyed with the server secret,
+// so a database reader who knows an email cannot brute-force which IPv4 network tried it.
+test("network keys are HMAC with the server secret; the email-only key keeps its earlier form", async () => {
+  const db = localAccountDb();
+  const time = clock();
+  const secret = "only-a-disposable-test-secret-12345678901234567890";
+  const sha = async (value) =>
+    Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (b) => b.toString(16).padStart(2, "0")).join("");
+  for (let i = 0; i < 6; i++)
+    await throttledSignin(db, "hero@example.com", fakeSignin("hero@example.com", "wrong"), time.now, "203.0.113.7", secret);
+  const keys = (await db.prepare("SELECT key FROM signin_throttle ORDER BY key").all()).results.map((r) => r.key);
+  const keyed = await signinKey("hero@example.com", signinNetwork("203.0.113.7"), secret);
+  assert.deepEqual(keys, [await sha("signin:hero@example.com"), keyed].sort());
+  assert.equal(await signinKey("hero@example.com"), await sha("signin:hero@example.com"), "unchanged email-only key");
+  assert.notEqual(keyed, await signinKey("hero@example.com", signinNetwork("203.0.113.7")), "not the unkeyed digest");
+  assert.notEqual(keyed, await signinKey("hero@example.com", signinNetwork("203.0.113.7"), secret + "x"));
+  assert.notEqual(keyed, await sha("signin-net:203.0.113.7\nhero@example.com"));
+  assert.equal(await keyedDigest(secret, "a"), await keyedDigest(secret, "a"));
+  // The keyed wait works as before.
+  const waiting = await throttledSignin(db, "hero@example.com", fakeSignin("hero@example.com", "the right password"), time.now, "203.0.113.7", secret);
+  assert.equal(waiting.status, 429);
 });

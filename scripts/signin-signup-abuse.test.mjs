@@ -128,6 +128,26 @@ test("H5: a burst of new sign-ups never leaves the network refused (privacy revi
   assert.equal(await run("late@example.com"), 200);
 });
 
+test("H1/H5: stored counter keys are keyed with the server secret, never the network itself", async () => {
+  const db = localAccountDb();
+  const secret = "only-a-disposable-test-secret-12345678901234567890";
+  await appCredentialAllowance(db, SIGN_UP, "203.0.113.5", start, secret);
+  await limitedSignup(db, "x@example.com", "203.0.113.5", async () => new Response(null, { status: 200 }), () => start, secret);
+  const keys = (await db.prepare("SELECT key FROM library_limits").all()).results.map((r) => r.key);
+  assert.equal(keys.length, 2);
+  const sha = async (value) =>
+    Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (b) => b.toString(16).padStart(2, "0")).join("");
+  for (const key of keys) {
+    assert.ok(!key.includes("203.0.113"));
+    const hash = key.split(":")[1];
+    assert.notEqual(hash, await sha("203.0.113.5"));
+    assert.notEqual(hash, await sha("credential-net:203.0.113.5"));
+  }
+  // The keyed allowance still counts per network.
+  for (let i = 1; i < APP_CREDENTIAL_LIMITS.signUpsPerDay; i++) await appCredentialAllowance(db, SIGN_UP, "203.0.113.5", start, secret);
+  await refused(appCredentialAllowance(db, SIGN_UP, "203.0.113.5", start, secret), /today/);
+});
+
 // ---- H2: site-wide storage guard ----
 
 const usageRow = async (db, bytes, checkedAt, id = `usage:${checkedAt}`) => {

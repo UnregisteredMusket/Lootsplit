@@ -308,11 +308,11 @@ test("failed sign-ins slow one email down, the same way for unknown emails, and 
     assert.equal(ok.status, 200, JSON.stringify(ok.data));
     const keys = (await DB.prepare("SELECT key FROM signin_throttle").all()).results.map((r) => r.key);
     assert.ok(
-      !keys.includes(await signinKey("throttle@example.com", signinNetwork("192.0.2.250"))),
+      !keys.includes(await signinKey("throttle@example.com", signinNetwork("192.0.2.250"), env.ACCOUNT_SECRET)),
       "a successful sign-in clears that network's count",
     );
     assert.ok(
-      keys.includes(await signinKey("no-such-account@example.com", signinNetwork("192.0.2.250"))),
+      keys.includes(await signinKey("no-such-account@example.com", signinNetwork("192.0.2.250"), env.ACCOUNT_SECRET)),
       "the unknown address keeps its count",
     );
   } finally {

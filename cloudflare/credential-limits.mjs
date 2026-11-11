@@ -26,7 +26,7 @@
 // Counters live in library_limits (key, window, hits). `window` is the minute number at which the
 // counting window ends, so rate-limit-expiry.mjs (which deletes rows whose window is more than an
 // hour in the past) only removes a row an hour after its window has closed.
-import { signinNetwork } from "./signin-throttle.mjs";
+import { keyedDigest, signinNetwork } from "./signin-throttle.mjs";
 
 export const APP_CREDENTIAL_LIMITS = Object.freeze({ signUpsPerDay: 5, signInsPerHour: 20 });
 export const DUPLICATE_SIGNUP_REPLIES_PER_DAY = 3;
@@ -38,10 +38,9 @@ const SIGN_UP = "/api/account/auth/sign-up/email";
 const SIGN_IN = "/api/account/auth/sign-in/email";
 const RECOVER = "/api/account/recover";
 
-const digest = async (value) =>
-  Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+// Keys are HMAC-SHA-256 of the network with the server secret (ACCOUNT_SECRET), never the network
+// itself, so stored counters do not reveal which networks signed up or signed in.
+const networkKey = (secret, ip) => keyedDigest(secret, "credential-net:" + signinNetwork(ip));
 /** The window containing `now` of length `size`: its end, as a minute number and in ms. */
 const windowEnd = (now, size) => {
   const end = (Math.floor(now / size) + 1) * size;
@@ -66,10 +65,10 @@ function hit(db, key, window) {
  * Counts an app-origin (no human check) sign-up, sign-in or recovery-key reset against its
  * network's allowance; throws a 429 account error past it. Other paths are not counted.
  */
-export async function appCredentialAllowance(db, path, ip, now = Date.now()) {
+export async function appCredentialAllowance(db, path, ip, now = Date.now(), secret) {
   const signUp = path === SIGN_UP;
   if (!signUp && path !== SIGN_IN && path !== RECOVER) return;
-  const network = await digest(signinNetwork(ip));
+  const network = await networkKey(secret, ip);
   const window = windowEnd(now, signUp ? DAY : HOUR);
   const row = await hit(db, `${signUp ? "app-signup" : "app-signin"}:${network}`, window.minute);
   if (signUp && row.hits > APP_CREDENTIAL_LIMITS.signUpsPerDay)
@@ -84,24 +83,27 @@ export async function appCredentialAllowance(db, path, ip, now = Date.now()) {
     );
 }
 
-const duplicateKey = async (ip) => `signup-duplicate:${await digest(signinNetwork(ip))}`;
+const duplicateKey = async (secret, ip) => `signup-duplicate:${await networkKey(secret, ip)}`;
 const SIGNUP_PAUSED =
   "Too many sign-up attempts from this network today. If you already have an account, sign in instead; otherwise try again tomorrow.";
 
 /**
  * Wraps an email sign-up (website or app): refuses it once its network has had its share of
  * "already registered" replies today, otherwise runs it. Each sign-up is counted before it runs,
- * so parallel requests cannot all slip past the cap, and refunded unless the reply said the email
- * was already registered.
+ * so parallel requests cannot all slip past the cap, and refunded (refused ones included) unless
+ * the reply said the email was already registered. During a burst, sign-ups still in flight
+ * count, so some of the burst may be asked to wait; nothing stays counted afterwards.
  */
-export async function limitedSignup(db, email, ip, signUp, now = Date.now) {
+export async function limitedSignup(db, email, ip, signUp, now = Date.now, secret) {
   const at = now();
   const window = windowEnd(at, DAY);
-  const key = await duplicateKey(ip);
+  const key = await duplicateKey(secret, ip);
   const row = await hit(db, key, window.minute);
-  if (row.hits > DUPLICATE_SIGNUP_REPLIES_PER_DAY) refuse(SIGNUP_PAUSED, window.at - at);
   let duplicate = false;
   try {
+    // A refused attempt is refunded too (finally below): only replies that said "already
+    // registered" stay counted, so a burst of new sign-ups cannot leave the network refused.
+    if (row.hits > DUPLICATE_SIGNUP_REPLIES_PER_DAY) refuse(SIGNUP_PAUSED, window.at - at);
     const response = await signUp();
     // Better Auth answers an existing email with 422 USER_ALREADY_EXISTS…; the user row confirms
     // it whatever the reply's wording (Better Auth stores emails lower-cased).
