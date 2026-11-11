@@ -398,3 +398,41 @@ test("offline parity: the device runs the same commands with the same results, r
   assert.match(String(await executeLocalCommand(save("d5", "y", { name: "Y", items: [] })).catch((e: Error) => e.message)), /DM/);
   setSeat(DM_SEAT);
 });
+
+// Audit 2026-11-10, A9 (owner decision 2026-11-11): a list swap restocks a line fresh from the list,
+// so undoing a purchase made before the swap refunds the coins but never raises the shelf above the
+// quantity the shop's current list gives that line. A shelf already above it is never lowered.
+test("A9: undoing a purchase after a swap back never raises the shelf above the list's quantity", async () => {
+  const { canonicalJson } = await import("./canonical-json.ts");
+  const t0 = winterCampaign();
+  // "Usual" holds the shop's stock as it is: rope × 6, line "rope".
+  const t1 = run(t0, capture("c1", t0, "general", "Usual"));
+  const usual = listNamed(t1, "Usual");
+  const t2 = applyCommand(t1, ariaSeat, { id: "buy-rope", kind: "buy", stockId: "rope", purseId: "aria", quantity: 2 });
+  assert.equal(t2.stock.find((l) => l.id === "rope")!.quantity, 4);
+  const t3 = run(t2, swap("s1", t2, "general", "winter"));
+  const t4 = run(t3, swap("s2", t3, "general", usual.id));
+  assert.equal(t4.stock.find((l) => l.id === "rope")!.quantity, 6, "fresh from the list");
+  const line = t4.ledger.find((l) => l.id === "buy-rope")!;
+  const undo: Command = { id: "undo-rope", kind: "ledger-void", target: { kind: "ledger", id: line.id }, before: canonicalJson(line), reason: "Wrong purchase." };
+  const shared = run(t4, undo);
+  assert.equal(shared.stock.find((l) => l.id === "rope")!.quantity, 6, "the undo doesn't create two more ropes");
+  assert.deepEqual(shared.purses.find((p) => p.id === "aria")!.coins, t1.purses.find((p) => p.id === "aria")!.coins, "coins refunded");
+  assert.equal(shared.holdings.some((h) => h.id === "buy-rope-item"), false, "the bought rope leaves the character");
+  // The device runs the same command with the same result.
+  setSeat(DM_SEAT);
+  await applyCloudTable(t4);
+  await executeLocalCommand(undo);
+  assert.equal((await economySnapshot()).stock.find((l) => l.id === "rope")!.quantity, 6);
+  // Without a swap the undo still returns the item to the shelf.
+  const plain = run(t2, undo);
+  assert.equal(plain.stock.find((l) => l.id === "rope")!.quantity, 6);
+  // Part of the way: a shelf of 5 after the swap back goes to 6, not 7.
+  const t5 = structuredClone(t4);
+  t5.stock.find((l) => l.id === "rope")!.quantity = 5;
+  assert.equal(run(t5, undo).stock.find((l) => l.id === "rope")!.quantity, 6);
+  // A shelf the DM raised above the list is never lowered by an undo.
+  const t6 = structuredClone(t4);
+  t6.stock.find((l) => l.id === "rope")!.quantity = 9;
+  assert.equal(run(t6, undo).stock.find((l) => l.id === "rope")!.quantity, 9);
+});
