@@ -226,7 +226,7 @@ test("protocol 15: older clients see playerMovement only; their toggle sets Auto
   assert.equal(save({ playerMovement: false }).movement, "off");
   // Drafts with claims or the new fields ask older clients to update.
   for (const draft of [[{ kind: "map-token-claim" }], [{ kind: "map-tabletop", settings: { movement: "off" } }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 14), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 14), /unfinished actions/);
   // Older clients can't skip the turn rule: the server checks every protocol.
   const fight = combat(fixture());
   assert.throws(() => move(fight, "mira-token", 5, 5, mira, turn("ogre")), /Not your turn/);

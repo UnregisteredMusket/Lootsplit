@@ -298,7 +298,7 @@ test("older clients' pending drafts with footprint fields are refused with an up
     { kind: "map-token", mapId: "map", tokenId: "ogre", before: null, token: ogre },
   ]);
   for (const protocol of [0, 3, 10, 11])
-    assert.throws(() => tabletopResponse({ table: t, draft }, protocol), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft }, protocol), /unfinished actions/);
   assert.doesNotThrow(() => tabletopResponse({ table: t, draft }, FOOTPRINT_PROTOCOL));
   // Other older-client drafts still load.
   assert.doesNotThrow(() => tabletopResponse({ table: t, draft: "[]" }, 11));

@@ -116,7 +116,7 @@ test("older clients retain pending token locks, free-placement offsets and advan
           table: fixture(),
           draft: JSON.stringify([{ kind: "map-token", ...value }]),
         }),
-      /unfinished map actions/,
+      /unfinished actions/,
     );
 });
 test("client display retains the server's visible tokens without recomputing from redacted geometry", () => {
@@ -460,7 +460,7 @@ test("legacy envelopes retain protected imagery while omitting unsupported stric
   assert.ok(!JSON.stringify(old).includes("cHJpdmF0ZS1zb3VyY2U="));
   assert.ok(map(tabletopResponse(response, 1).table).tabletop);
   const pending = { ...response, draft: JSON.stringify([{ kind: "map-token-move" }]) };
-  assert.throws(() => tabletopResponse(pending), /unfinished map actions/);
+  assert.throws(() => tabletopResponse(pending), /unfinished actions/);
   assert.equal(tabletopResponse(pending, 1).draft, pending.draft);
 });
 test("older DM map/token writes preserve new configuration, locks, control and vision", () => {

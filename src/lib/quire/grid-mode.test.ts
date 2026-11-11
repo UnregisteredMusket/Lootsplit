@@ -198,7 +198,7 @@ test("protocol 14: older clients don't see the hidden-grid flag and their saves 
   assert.equal(map(saved).tabletop!.playerMovement, true);
   // Pending grid mode drafts ask older clients to finish on the updated website.
   for (const draft of [[{ kind: "map-grid-snap" }], [{ kind: "map-tabletop", settings: { gridHidden: true } }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 13), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 13), /unfinished actions/);
   assert.doesNotThrow(() => tabletopResponse({ table: t, draft: JSON.stringify([{ kind: "map-grid-snap" }]) }, 14));
 });
 

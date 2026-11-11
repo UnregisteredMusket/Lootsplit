@@ -118,7 +118,7 @@ test("protocol 16: the party formation default is kept from older clients' sessi
   assert.equal(readTabletopSession(saved).tvEnabled, true);
   assert.deepEqual(readTabletopSession(saved).partyFormation, { shape: "line", spacing: 1, rotation: 90 });
   for (const draft of [[{ kind: "map-tokens-place" }], [{ kind: "map-tokens-edit" }], [{ kind: "tabletop-session", session: { partyFormation: {} } }]])
-    assert.throws(() => tabletopResponse({ table: set, draft: JSON.stringify(draft) }, 15), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: set, draft: JSON.stringify(draft) }, 15), /unfinished actions/);
 });
 
 // Privacy review 2026-10-29 (finding A1): group placement and edits leave a generic activity line,

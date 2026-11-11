@@ -473,7 +473,7 @@ test("tabletop protocol 2 apps receive full snapshots and their writes still app
         },
         2,
       ),
-    /unfinished map actions/,
+    /unfinished actions/,
   );
   assert.doesNotThrow(() => tabletopResponse({ table: t, draft: "[]" }, 2));
 });
