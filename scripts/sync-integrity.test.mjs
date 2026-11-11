@@ -364,11 +364,16 @@ test("forgetting a membership cannot detach account identity from campaign bans,
       await assert.rejects(roomState({ code, token: player.token }), /not seated/);
       if (action === "kick" || action === "ban") {
         assert.equal(after.blockedUsers.player, action === "ban" ? "banned" : "kicked");
+        // Kick and ban rotate the invitation link (audit 2026-11-10 B4); these joins use the
+        // current link, so the account restriction itself is what refuses them.
+        const sessionId = after.invitationSession;
+        assert.ok(sessionId);
         await assert.rejects(
           joinRoom({
             code,
             purseId: "other",
             userId: "player",
+            sessionId,
             name: "Same account, other character",
           }),
           action === "ban" ? /banned/ : /fresh invitation/,
@@ -381,6 +386,7 @@ test("forgetting a membership cannot detach account identity from campaign bans,
               code,
               purseId: "other",
               userId: "player",
+            sessionId,
               name: "Wrong character",
               invitation,
             }),
@@ -390,6 +396,7 @@ test("forgetting a membership cannot detach account identity from campaign bans,
             code,
             purseId: "hero",
             userId: "player",
+            sessionId,
             name: "Invited player",
             invitation,
           });

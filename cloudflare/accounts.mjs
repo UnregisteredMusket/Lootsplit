@@ -288,6 +288,13 @@ export async function linkAccountSeat(db, userId, body, limit = hostedCampaignLi
     (seat.userId && seat.userId !== userId)
   )
     fail("This seat belongs to another account.", 409);
+  // Audit 2026-11-10 B4: a kicked or banned account cannot take a seat by joining signed out and
+  // linking it afterwards. A kicked account rejoins signed in with the DM's fresh invitation,
+  // which lifts the restriction (joinRoom).
+  const blocked = room.blockedUsers?.[userId];
+  if (blocked === "banned") fail("You are banned from this campaign.", 403);
+  if (blocked === "kicked")
+    fail("A fresh invitation from the DM is required. Sign in and open it to rejoin.", 403);
   const owner = await db
     .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=?")
     .bind(code, seat.id)

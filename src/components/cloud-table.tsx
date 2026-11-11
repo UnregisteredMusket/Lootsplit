@@ -49,6 +49,10 @@ type Mode = "local" | "turns" | "live";
 
 const validCode = (value: string) => /^[A-Z0-9]{4,12}(\.[a-f0-9-]{36})?$/i.test(value);
 
+// Audit 2026-11-10 B4: a kick or ban replaces the join link; the room card's buttons share the new one.
+const REMOVED_NOTICE =
+  "Done. The join link changed, so the old one no longer works. Use Share join link to invite anyone still to join; seated players keep playing.";
+
 export function CloudTable() {
   const router = useRouter();
   const search = useRouterState({ select: (s) => s.location.searchStr });
@@ -206,6 +210,8 @@ export function CloudTable() {
     setLookedUp(false);
   }
 
+  // The current invitation link's session; a kick or ban replaces it (audit 2026-11-10 B4).
+  const inviteSession = cloud.inviteSession || cloud.sessionId;
   function run(work: () => Promise<unknown>, ok?: string) {
     if (busy) return;
     setBusy(true);
@@ -220,8 +226,8 @@ export function CloudTable() {
   }
 
   async function invitePlayers() {
-    const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: cloud.sessionId });
-    const text = `Join my Lootsplitter room. Code: ${cloud.code}${cloud.sessionId ? "." + cloud.sessionId : ""}`;
+    const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: inviteSession });
+    const text = `Join my Lootsplitter room. Code: ${cloud.code}${inviteSession ? "." + inviteSession : ""}`;
     if (import.meta.env.VITE_MOBILE === "true") {
       const { Share } = await import("@capacitor/share");
       try {
@@ -663,7 +669,7 @@ export function CloudTable() {
             <div className="grid grid-cols-2 gap-3">
               <Button
                 disabled={unavailable}
-                onClick={() => run(() => copyText(cloud.sessionId ? `${cloud.code}.${cloud.sessionId}` : cloud.code), "Room code copied.")}
+                onClick={() => run(() => copyText(inviteSession ? `${cloud.code}.${inviteSession}` : cloud.code), "Room code copied.")}
               >
                 <Copy size={17} />
                 Copy session code
@@ -783,7 +789,7 @@ export function CloudTable() {
                     <Button disabled={unavailable} variant="secondary" onClick={() => run(() => manageParticipant("invite", item.id))}>Create fresh invitation</Button>
                   )}
                 {item.invitation && (
-                    <Button variant="secondary" onClick={() => { const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: cloud.sessionId, invitation: item.invitation! }); void navigator.clipboard.writeText(url).then(() => toast.success("Fresh invitation copied"), () => void requestPrompt({ title: "Copy fresh invitation", label: "Invitation link", body: "Copying was blocked. Select the link and copy it yourself.", defaultValue: url, confirmLabel: "Done" })); }}>Copy fresh invitation</Button>
+                    <Button variant="secondary" onClick={() => { const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: inviteSession, invitation: item.invitation! }); void navigator.clipboard.writeText(url).then(() => toast.success("Fresh invitation copied"), () => void requestPrompt({ title: "Copy fresh invitation", label: "Invitation link", body: "Copying was blocked. Select the link and copy it yourself.", defaultValue: url, confirmLabel: "Done" })); }}>Copy fresh invitation</Button>
                   )}
               </div>
               ))}
@@ -820,8 +826,8 @@ export function CloudTable() {
                         >
                           Dismiss player
                         </Button>
-                        <Button variant="ghost" disabled={unavailable} onClick={async () => { if (await requestConfirm({ title: `Kick ${item.name || "this player"}?`, body: "Rejoining requires a fresh invitation. Pending turns must be resolved first.", tone: "danger", confirmLabel: "Kick player" })) run(() => manageParticipant("kick", item.id)); }}>Kick</Button>
-                        <Button variant="ghost" disabled={unavailable} onClick={async () => { if (await requestConfirm({ title: `Ban ${item.name || "this player"} from this campaign?`, body: "Campaign access and reports will be blocked.", tone: "danger", confirmLabel: "Ban player" })) run(() => manageParticipant("ban", item.id)); }}>Ban</Button>
+                        <Button variant="ghost" disabled={unavailable} onClick={async () => { if (await requestConfirm({ title: `Kick ${item.name || "this player"}?`, body: "Rejoining requires a fresh invitation. The join link changes; seated players keep playing. Pending turns must be resolved first.", tone: "danger", confirmLabel: "Kick player" })) run(() => manageParticipant("kick", item.id), REMOVED_NOTICE); }}>Kick</Button>
+                        <Button variant="ghost" disabled={unavailable} onClick={async () => { if (await requestConfirm({ title: `Ban ${item.name || "this player"} from this campaign?`, body: "Campaign access and reports will be blocked. The join link changes; seated players keep playing.", tone: "danger", confirmLabel: "Ban player" })) run(() => manageParticipant("ban", item.id), REMOVED_NOTICE); }}>Ban</Button>
                       </>
                     ) : null}
                   </div>

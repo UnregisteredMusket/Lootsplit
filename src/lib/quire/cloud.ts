@@ -73,6 +73,12 @@ export type CloudRoom = {
   monitorProbe?: boolean;
   departed?: Array<CloudSeat & { status: "left" | "dismissed" | "kicked" | "banned"; userId?: string }>;
   invitations?: Record<string, string>;
+  /**
+   * The invitation link's session (audit 2026-11-10 B4): replaced on every kick and ban so a
+   * removed person's link stops working. Absent until the first kick or ban: the link then uses
+   * `sessionId`. Seats and the play session (`sessionId`) are never changed by it.
+   */
+  invitationSession?: string;
   blockedUsers?: Record<string, "kicked" | "banned">;
   drafts?: Record<string, import("./commands.ts").Command[]>;
   /**

@@ -99,7 +99,7 @@ export function keepStoredBody<T extends CloudRoom>(source: CloudRoom, derived: 
 export function roomImageSources(room: CloudRoom): Map<string, string> {
   return (room as CloudRoom & { [ROOM_IMAGE_SOURCES]?: Map<string, string> })[ROOM_IMAGE_SOURCES] ?? new Map();
 }
-export type RoomAccess = Pick<CloudRoom, "code" | "revision" | "ownerId" | "sessionId" | "closed" | "seats"> & {
+export type RoomAccess = Pick<CloudRoom, "code" | "revision" | "ownerId" | "sessionId" | "invitationSession" | "closed" | "seats"> & {
   /** The row's write_id (D1 only): with the revision, identifies one written room. */
   writeId?: string | null;
 };
@@ -109,18 +109,18 @@ export async function readRoomAccess(code: string): Promise<RoomAccess | null> {
   if (!db) {
     const room = (await localRooms()).find((r) => r.code === canonicalCode);
     if (!room) return null;
-    const { revision, ownerId, sessionId, closed, seats } = room;
-    return { code: canonicalCode, revision, ownerId, sessionId, closed, seats };
+    const { revision, ownerId, sessionId, invitationSession, closed, seats } = room;
+    return { code: canonicalCode, revision, ownerId, sessionId, invitationSession, closed, seats };
   }
   // Top-level fields only (they stay on the room row in sectioned storage).
   const row = await db.prepare(
-    "SELECT revision,write_id AS writeId,json_extract(body,'$.ownerId') AS ownerId,json_extract(body,'$.sessionId') AS sessionId,json_extract(body,'$.closed') AS closed,json_extract(body,'$.seats') AS seats FROM campaign_rooms WHERE code=?",
-  ).bind(canonicalCode).first<{ revision: number; writeId: string | null; ownerId: string | null; sessionId: string | null; closed: number | null; seats: string }>();
+    "SELECT revision,write_id AS writeId,json_extract(body,'$.ownerId') AS ownerId,json_extract(body,'$.sessionId') AS sessionId,json_extract(body,'$.invitationSession') AS invitationSession,json_extract(body,'$.closed') AS closed,json_extract(body,'$.seats') AS seats FROM campaign_rooms WHERE code=?",
+  ).bind(canonicalCode).first<{ revision: number; writeId: string | null; ownerId: string | null; sessionId: string | null; invitationSession: string | null; closed: number | null; seats: string }>();
   if (!row) return null;
   const seats: unknown = JSON.parse(row.seats);
   if (!Array.isArray(seats)) throw Error("The shared campaign's seat records are incomplete.");
   return { code: canonicalCode, revision: row.revision, writeId: row.writeId, ownerId: row.ownerId ?? undefined,
-    sessionId: row.sessionId ?? undefined, closed: row.closed === 1, seats: seats as RoomAccess["seats"] };
+    sessionId: row.sessionId ?? undefined, invitationSession: row.invitationSession ?? undefined, closed: row.closed === 1, seats: seats as RoomAccess["seats"] };
 }
 const FILE = path.join(process.cwd(), "data", "cloud-rooms.json");
 let localWrites: Promise<unknown> = Promise.resolve();

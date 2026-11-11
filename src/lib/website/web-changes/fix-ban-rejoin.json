@@ -1,0 +1,10 @@
+{
+  "title": "Kicking or banning a player now changes the join link",
+  "summary": "A removed player could sign out and come back as another unclaimed character with the link they already had. Kicking or banning now replaces the room's join link, and a removed account can no longer claim a seat.",
+  "items": [
+    "After a kick or ban, Share join link and Copy session code give the new link at once; the old one stops working.",
+    "Seated players keep playing with nothing to do.",
+    "A banned account cannot join or link a seat again, signed in or not; a kicked player rejoins through Copy fresh invitation."
+  ],
+  "audience": "dm"
+}

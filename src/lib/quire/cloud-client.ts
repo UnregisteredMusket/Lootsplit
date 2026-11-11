@@ -94,7 +94,13 @@ const initialView = {
   live: false,
   who: "",
   code: "",
+  /** The play session: screens, chat drafts and mutation scopes are keyed by it. */
   sessionId: "",
+  /**
+   * The session the room's invitation link carries ("" before the first response). It differs
+   * from `sessionId` after a kick or ban rotated the link (audit 2026-11-10 B4); links use it.
+   */
+  inviteSession: "",
   role: "dm" as "dm" | "player",
   seats: [] as RoomView["seats"],
   departed: [] as NonNullable<RoomView["departed"]>,
@@ -525,7 +531,11 @@ async function accept(value: RoomView, committed = false) {
       "This seat now belongs to a different account. Export your original pending work before switching.",
     );
   if (remote.userId) s.userId = remote.userId;
-  s.sessionId = remote.sessionId;
+  // A kick or ban rotates the invitation link (the view's `sessionId`) but not the play session,
+  // which the view then sends as `playSession` ("" for a room that never had one), so this
+  // seat's screens and drafts stay as they are (audit 2026-11-10 B4).
+  s.sessionId =
+    remote.playSession !== undefined ? remote.playSession || undefined : remote.sessionId;
   const acknowledged = new Set(remote.acknowledged);
   const acknowledgedLocal = s.pending.some((c) => acknowledged.has(c.id));
   s.pending = s.pending.filter((c) => !acknowledged.has(c.id));
@@ -634,7 +644,8 @@ async function accept(value: RoomView, committed = false) {
       live: remote.live,
       who: remote.who,
       code: remote.code,
-      sessionId: remote.sessionId || "",
+      sessionId: s.sessionId || "",
+      inviteSession: remote.sessionId || "",
       role: s.role,
       seats: remote.seats,
       departed: remote.departed || [],
@@ -1690,7 +1701,10 @@ export async function resumeAccountMembership(
       userId: member.userId,
       // The play session too: resumeTable publishes it before the first room response, so
       // feature screens keyed by it do not remount when that response lands (audit C4).
-      ...(remote.sessionId ? { sessionId: remote.sessionId } : {}),
+      // The play session (not a rotated invitation link; see accept).
+      ...((remote.playSession ?? remote.sessionId)
+        ? { sessionId: (remote.playSession ?? remote.sessionId)! }
+        : {}),
       token: member.token,
       seatId: remote.seatId,
       role,
