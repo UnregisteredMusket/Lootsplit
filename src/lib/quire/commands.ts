@@ -538,6 +538,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
                 ? "loan"
                 : "payment",
     });
+  // Hidden activity lines (B1 follow-up): the DM may trade for a purse at a shop its players
+  // can't see (players can't). The line is kept whole; players read the shop as "a merchant".
+  const markHiddenShop = (line: CloudTable["ledger"][number], shop: import("./types.ts").Shop, purseId: string) => {
+    if (!shopVisible(shop, t, actingGroups(t, purseId))) line.hiddenShop = true;
+  };
   const score = (purseId: string) =>
     charismaFor(t.purses.find((p) => p.id === purseId) ?? { id: purseId, kind: "character" }, t.sheets);
   const finance = () => (journal.finance ??= readFinance());
@@ -1348,6 +1353,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         };
     if (purchasedHolding) t.holdings.push(purchasedHolding);
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
+    markHiddenShop(t.ledger[t.ledger.length - 1]!, shop, cmd.purseId);
     const purchase = t.ledger[t.ledger.length - 1];
     purchase.purchase = { stockId: s.id, quantity: cmd.quantity, holding: structuredClone(purchasedHolding) };
     const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: s.id, purseId: cmd.purseId, direction: "buy", quantity: cmd.quantity, copper: cost });
@@ -1448,6 +1454,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
     log(h.purseId, `Sold ${cmd.quantity} ${shown.name} to ${s.name}`, paid, s.id);
+    markHiddenShop(t.ledger[t.ledger.length - 1]!, s, h.purseId);
     const linked = t.stock.find(
       (line) => line.shopId === s.id && line.commodityId === shown.commodityId && shown.commodityId,
     );
@@ -1649,6 +1656,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw Error("The sale or split changed (prices, items, the party fund or recipients moved). Review it again.");
     // Merchant purse: the whole sale is paid from it or nothing is sold (never half a sale).
     merchantPays(shop, plan.proceeds);
+    const fundSeesShop = shopVisible(shop, t, actingGroups(t, fund.id));
     // The sale: the fund receives each lot's price (keeping its own coins), one sale line per lot.
     fund.coins = creditCoins(fund.coins, plan.proceeds);
     for (const [i, lot] of plan.lots.entries()) {
@@ -1663,6 +1671,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         summary: `Sold ${lot.quantity} ${lot.name} to ${shop.name}`,
         copper: lot.paid,
         transactionType: "sale",
+        ...(fundSeesShop ? {} : { hiddenShop: true as const }),
       });
       const shown = presentedHolding(h);
       const linked = t.stock.find((line) => line.shopId === shop.id && line.commodityId === shown.commodityId && shown.commodityId);
@@ -1686,6 +1695,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       `Sold ${items} to ${shop.name} and split ${formatCopper(plan.proceeds)} from ${fund.name} among ${plan.split.n}`,
       "management",
       fund.id,
+      undefined,
+      // A shop the fund's players could not see: they read it as "a merchant" (session-records.ts).
+      fundSeesShop ? undefined : { shopId: shop.id },
     );
     const receipt = journal.events[journal.events.length - 1]!;
     receipt.split = {

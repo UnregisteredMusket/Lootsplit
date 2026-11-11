@@ -294,6 +294,8 @@ function tradeCampaign(): CloudTable {
     { id: "cup", purseId: "aria", name: "Tin cup", kind: "item", quantity: 2, unitCopper: 20, notes: "" },
   ];
   for (const s of t.shops) s.acceptAnyCategory = true;
+  // The bought item lands in Aria's inventory, so its own name is hers to read.
+  t.stock.find((l) => l.id === "vial")!.name = "Poison vial";
   return t;
 }
 function trades(t: CloudTable) {
@@ -315,7 +317,7 @@ test("B1 follow-up: a DM's trade at a hidden shop keeps the purse's lines, namin
   await submitCommands({ code: dm.code, token: aria.token, batchId: "aria-buy", commands: [{ id: "aria-buy", kind: "buy", stockId: "rope", purseId: "aria", quantity: 1 } as never] });
   const host = (await roomState(dm)).table;
   const dmLedger = host.ledger.map((l) => l.summary).join("\n");
-  assert.match(dmLedger, /Bought 1 SECRET Poison Vial from SECRET Night Bazaar/);
+  assert.match(dmLedger, /Bought 1 Poison vial from SECRET Night Bazaar/);
   assert.match(dmLedger, /Sold 1 Brass lamp to SECRET Night Bazaar/);
   assert.match(host.journal!.events.map((e) => e.summary).join("\n"), /to SECRET Night Bazaar and split/);
   for (const tabletopProtocol of [11, 33]) {
@@ -326,20 +328,27 @@ test("B1 follow-up: a DM's trade at a hidden shop keeps the purse's lines, namin
       assert.match(line!.summary, /a merchant/, id);
       assert.equal(line!.copper, host.ledger.find((l) => l.id === id)!.copper, id);
     }
-    const receipt = player.table.journal!.events.find((e) => e.split?.id === "dm-split-hidden");
-    assert.ok(receipt, `split receipt kept, protocol ${tabletopProtocol}`);
-    assert.match(receipt!.summary, /to a merchant and split/);
     assert.match(player.table.ledger.find((l) => l.id === "aria-buy")!.summary, /from General Store/);
+    // A player's device projects the view again: the lines read the same.
+    if (tabletopProtocol === 33)
+      assert.match(projectRecord(player.table, ariaSeat, { directory: true }).ledger.find((l) => l.id === "dm-buy-hidden")!.summary, /^Bought 1 Poison vial from a merchant/);
     assert.doesNotMatch(JSON.stringify(player), /SECRET/, `whole view, protocol ${tabletopProtocol}`);
   }
+  // A seat that holds the party fund reads the sale-and-split receipt, with the neutral name.
+  const fundSeat = { id: "fund-seat", role: "player" as const, purseIds: ["aria", "hoard"] };
+  const receipt = projectRecord(host, fundSeat, { directory: true }).journal!.events.find((e) => e.split?.id === "dm-split-hidden");
+  assert.ok(receipt, "split receipt kept");
+  assert.match(receipt!.summary, /to a merchant and split/);
+  assert.doesNotMatch(receipt!.summary, /SECRET/);
   // Archived session and CSV: same lines, same neutral name.
   await closeRoom({ ...dm, keepOnline: true });
   const archived = (await roomState(dm)).table;
   const snapshot = JSON.parse(projectArchivedReport(archived.journal!.reports!.at(-1)!, archived, ariaSeat).snapshot);
-  for (const id of HIDDEN_TRADE_LINES) assert.match(snapshot.ledger.find((l: { id: string }) => l.id === id).summary, /a merchant/, id);
+  // Aria's own lines (an archived session holds a player's own ledger lines).
+  for (const id of ["dm-buy-hidden", "dm-sell-hidden"]) assert.match(snapshot.ledger.find((l: { id: string }) => l.id === id).summary, /a merchant/, id);
   assert.doesNotMatch(JSON.stringify(snapshot), /SECRET/);
   const csv = ledgerExportRows(archived, { id: aria.seatId, role: "player", purseIds: ["aria"] });
-  for (const id of HIDDEN_TRADE_LINES) assert.ok(csv.some((r) => r.id === id), id);
+  for (const id of ["dm-buy-hidden", "dm-sell-hidden"]) assert.match(csv.find((r) => r.id === id)!.summary, /a merchant/, id);
   assert.doesNotMatch(JSON.stringify(csv), /SECRET/);
 });
 

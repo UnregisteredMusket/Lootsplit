@@ -14,7 +14,7 @@ import {
   seatInParty,
 } from "./character-position.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
-import { projectRecord } from "./session-records.ts";
+import { hiddenShopNames, projectRecord } from "./session-records.ts";
 import { projectIdentities } from "./item-identity.ts";
 import { characterControl, type Purse } from "./types.ts";
 import { npcController } from "./world.ts";
@@ -83,7 +83,10 @@ export function playerTable(table: CloudTable, record: CloudTable, seat: CloudSe
   const byId = new Map(table.purses.map((p) => [p.id, p]));
   return {
     ...record,
-    ledger: table.ledger.filter(playerLedgerLine(table, seat)),
+    // A DM's trade at a shop hidden from this player names it "a merchant" (B1 follow-up).
+    ledger: table.ledger
+      .filter(playerLedgerLine(table, seat))
+      .map(hiddenShopNames(table, new Set(record.shops.map((s) => s.id)))),
     purses: record.purses.map((projected) => {
       const p = byId.get(projected.id)!;
       if (!characterVisible(table, p)) return projected;
