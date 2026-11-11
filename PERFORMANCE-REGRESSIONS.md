@@ -172,7 +172,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Report workflow failure | open | 6 | 7s → 54s | +47s | +671.43% |
 | Development / desktop / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 5 | 21s → 409s | +388s | +1847.62% |
-| Packaged Worker / accounts / worker-finance | open | 9 | 11s → 60s | +49s | +445.45% |
+| Packaged Worker / accounts / worker-finance | open | 10 | 11s → 77s | +66s | +600% |
 | Development / governance / dev-theme | resolved | 3 | 20s → 57s | +37s | +185% |
 | Packaged Worker / accounts / worker-finance | open | 5 | 11s → 29s | +18s | +163.64% |
 | report / Save report and send configured email | open | 3 | 1s → 5s | +4s | +400% |
@@ -293,7 +293,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Verify preserved functionality | open | 8 | 422s → 4478s | +4056s | +961.14% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / interface / worker-market-locations | open | 3 | 23s → 63s | +40s | +173.91% |
-| Development / gameplay / dev-market-locations | open | 3 | 38s → 81s | +43s | +113.16% |
+| Development / gameplay / dev-market-locations | open | 4 | 38s → 94s | +56s | +147.37% |
 | market locations browser audit | open | 3 | 36.179s → 110.925s | +74.746s | +206.6% |
 | Packaged Worker / interface / worker-market-locations | resolved | 2 | 23s → 68s | +45s | +195.65% |
 | Development / gameplay / dev-market-locations | open | 4 | 27s → 92s | +65s | +240.74% |
@@ -921,6 +921,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / world / dev-world-features | open | 2 | 143s → 199s | +56s | +39.16% |
 | Development / desktop / dev-blacksmith | open | 2 | 72s → 96s | +24s | +33.33% |
 | Development / accounts-2 / dev-release | open | 2 | 47s → 65s | +18s | +38.3% |
+| Development / accounts / dev-account-1 | open | 2 | 98s → 137s | +39s | +39.8% |
 | Development / gameplay / dev-coin-split | open | 3 | 23s → 40s | +17s | +73.91% |
 | Development / gameplay / dev-loot-fairness | open | 2 | 26s → 43s | +17s | +65.38% |
 | Development / accounts-2 / dev-character | open | 2 | 22s → 31s | +9s | +40.91% |
@@ -978,6 +979,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-11T06:18:55Z | step: Development / gameplay / dev-lost-edits | 16s → 20s | +4s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42967116571/job/130347753338) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42967479913/job/130354627546) |
+| 2026-11-11T05:46:47Z | step: Development / accounts / dev-account-1 | 114s → 137s | +23s | +20.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40090890270/job/120863172863) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42967116571/job/130347753417) |
+| 2026-11-11T05:34:30Z | step: Development / gameplay / dev-market-locations | 81s → 94s | +13s | +16.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39952202908/job/120409214807) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42963080279/job/130334901567) |
+| 2026-11-11T04:50:09Z | step: Packaged Worker / accounts / worker-finance | 60s → 77s | +17s | +28.33% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40828844905/job/123299366913) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42960350963/job/130328425967) |
 | 2026-11-10T17:56:20Z | step: Packaged standby / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39816808625/job/119958992786) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42868543155/job/130018265464) |
 | 2026-11-10T15:47:18Z | step: Development / gameplay / dev-shop-lists | 17s → 22s | +5s | +29.41% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42835242012/job/129897086559) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42846209698/job/129934310405) |
 | 2026-11-10T15:43:41Z | step: Development / gameplay / dev-settlement-tiers | 19s → 26s | +7s | +36.84% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42786979657/job/129732330563) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42843368508/job/129932408701) |
