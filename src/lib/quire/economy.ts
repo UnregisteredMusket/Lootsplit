@@ -1288,8 +1288,12 @@ function logLine(
 
 async function charismaOf(purse: Purse, tx: IDBTransaction): Promise<number | null> {
   // The same rule as the shared command engine (`charismaFor`); sheets load only when needed.
-  if (purse.kind === "party" || purse.sheet) return charismaFor(purse, []);
-  return charismaFor(purse, readSheets(await request(tx.objectStore("meta").get("sheets"))));
+  return charismaFor(purse, await sheetsFor(purse, tx));
+}
+/** The sheets `charismaFor` needs for `purse` (none when its Charisma is on the purse). */
+async function sheetsFor(purse: Purse, tx: IDBTransaction) {
+  if (purse.kind === "party" || purse.sheet) return [];
+  return readSheets(await request(tx.objectStore("meta").get("sheets")));
 }
 
 async function atomic<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
@@ -1588,7 +1592,8 @@ export async function sellToShop(
     // is only the player link (the DM's device runs the shared `sell` above, where the DM's seat
     // is exempt from the cap), so it is always priced as a player.
     const everyone = await request<Purse[]>(tx.objectStore("purses").getAll());
-    const priced = shopSale(holding, shop, quantity, journal, everyone, "player");
+    // Capped at what this shop charges this seller for the item (audit A1), Charisma included.
+    const priced = shopSale(holding, shop, quantity, journal, everyone, "player", await sheetsFor(purse, tx));
     if (priced.refused) throw Error(priced.refused);
     const paid = priced.total;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");

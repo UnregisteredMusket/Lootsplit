@@ -445,7 +445,7 @@ export function projectRecord(
     }
     // Merchant purses stay DM-only unless the DM shows them; players learn only whether the
     // merchant can afford each lot they can read (merchant.ts).
-    t.shops = t.shops.map((shop) => projectMerchantPurse(shop, t.holdings, table.journal, table.purses));
+    t.shops = t.shops.map((shop) => projectMerchantPurse(shop, t.holdings, table.journal, table.purses, table.sheets));
     if (t.journal.propertyOperations) {
       const keys = new Set([
         ...estate.sites.flatMap((site) => [site.templateKey, ...site.completedTemplates]),
