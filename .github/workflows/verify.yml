@@ -25,7 +25,7 @@ env:
 jobs:
   changes:
     name: Change scope
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 3
     outputs:
       code: ${{ steps.scope.outputs.code }}
@@ -39,7 +39,7 @@ jobs:
 
   build:
     name: Code checks and immutable builds
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 15, not 10 (2026-11-10): main also stamps and builds the website (web-build ~2.5–3.5 min), and
     # on slow runners the whole job ran 10–10.5 min (main 79f7eb7, twice) against ~7.5 on a normal day.
     timeout-minutes: 15
@@ -123,7 +123,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     # Job timeouts are the earlier test budget plus the browser install step's own 12-minute bound,
     # so a slow runner install cannot consume the time the audits need.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 27
     permissions:
       contents: read
@@ -498,7 +498,7 @@ jobs:
         group: [accounts, features, world, economy, library, interface]
     # Job timeouts are the earlier test budget plus the browser install step's own 12-minute bound,
     # so a slow runner install cannot consume the time the audits need.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 27
     permissions:
       contents: read
@@ -679,7 +679,7 @@ jobs:
     if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
     # Job timeouts are the earlier test budget plus the browser install step's own 12-minute bound,
     # so a slow runner install cannot consume the time the audits need.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 24
     permissions:
       contents: read
@@ -732,7 +732,7 @@ jobs:
     if: github.event_name != 'pull_request'
     # Job timeouts are the earlier test budget plus the browser install step's own 12-minute bound,
     # so a slow runner install cannot consume the time the audits need.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 22
     permissions:
       contents: read
@@ -770,7 +770,7 @@ jobs:
     name: verify
     if: always()
     needs: [changes, build, development, worker, pr-worker, standby]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

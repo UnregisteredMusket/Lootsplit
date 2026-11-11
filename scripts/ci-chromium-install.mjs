@@ -72,8 +72,13 @@ function main() {
   const cli = join(dirname(require.resolve("playwright/package.json")), "cli.js");
   const node = process.execPath;
   const sudo = process.getuid?.() === 0 ? [] : ["sudo"];
-  const apt = (...args) => [
+  // `timeout` runs inside sudo: killing sudo alone leaves apt-get holding the lists lock, and the
+  // retry then fails on the lock instead of the mirror (2026-11-11, Ubuntu 26 runners).
+  const apt = (seconds, ...args) => [
     ...sudo,
+    "timeout",
+    "--kill-after=10",
+    String(seconds - 15),
     "env",
     "DEBIAN_FRONTEND=noninteractive",
     "apt-get",
@@ -89,7 +94,7 @@ function main() {
   let libraries = 0;
   const update = () => {
     if (updated) return;
-    const [cmd, ...args] = apt("update");
+    const [cmd, ...args] = apt(120, "update");
     libraries += bounded("apt-get update", cmd, args, { seconds: 120 });
     updated = true;
   };
@@ -121,7 +126,7 @@ function main() {
   let fontGap = "";
   if (missing.length) {
     update();
-    const [cmd, ...args] = apt("install", "-y", "--no-install-recommends", "--fix-missing", ...missing);
+    const [cmd, ...args] = apt(180, "install", "-y", "--no-install-recommends", "--fix-missing", ...missing);
     try {
       libraries += bounded("apt-get install", cmd, args, { seconds: 180 });
     } catch (first) {
