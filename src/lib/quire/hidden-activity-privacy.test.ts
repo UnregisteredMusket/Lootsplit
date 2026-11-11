@@ -17,6 +17,7 @@ import { fromCopper } from "./money.ts";
 import { applyCloudTable, economySnapshot, saveShop, saveStock, executeLocalCommand } from "./economy.ts";
 import { projectArchivedReport, projectRecord, archiveSession } from "./session-records.ts";
 import { ledgerExportRows } from "./ledger-export.ts";
+import { planSaleSplit } from "./sale-split.ts";
 import { DM_SEAT, setSeat } from "./table.ts";
 import { readWorld } from "./world-schema.ts";
 import type { Shop, StockLine } from "./types.ts";
@@ -279,4 +280,82 @@ test("B1 device parity: the device's own shop, price and place lines carry the s
   for (const pattern of VISIBLE) assert.match(text, pattern);
   // The device keeps every line for the DM.
   assert.match(device.journal!.events.map((e) => e.summary).join("\n"), /SECRET Poison Vial: 5000 cp → 9000 cp/);
+});
+
+// Residual hidden names (independent privacy review of PR 496): a DM's trade at a shop hidden
+// from a purse's players keeps every ledger line and the split receipt, but players read the
+// shop as "a merchant". Trades at shops players could see keep their names after the party
+// moves on.
+function tradeCampaign(): CloudTable {
+  const t = campaign();
+  t.holdings = [
+    { id: "gem", purseId: "hoard", name: "Ruby", kind: "item", quantity: 3, unitCopper: 1000, notes: "" },
+    { id: "lamp", purseId: "aria", name: "Brass lamp", kind: "item", quantity: 2, unitCopper: 200, notes: "" },
+    { id: "cup", purseId: "aria", name: "Tin cup", kind: "item", quantity: 2, unitCopper: 20, notes: "" },
+  ];
+  for (const s of t.shops) s.acceptAnyCategory = true;
+  return t;
+}
+function trades(t: CloudTable) {
+  const plan = planSaleSplit(t, { fundId: "hoard", shopId: "bazaar", lots: [{ holdingId: "gem", quantity: 1 }], recipientIds: ["aria"], rule: "party-fund" }, { actor: "dm" });
+  return [
+    { id: "dm-buy-hidden", kind: "buy", stockId: "vial", purseId: "aria", quantity: 1 },
+    { id: "dm-sell-hidden", kind: "sell", holdingId: "lamp", shopId: "bazaar", quantity: 1 },
+    { id: "dm-split-hidden", kind: "sale-split", fundId: "hoard", shopId: "bazaar", lots: [{ holdingId: "gem", quantity: 1 }], recipientIds: ["aria"], remainder: { rule: "party-fund" }, expect: { proceeds: plan.proceeds, share: plan.split.share, remainderTo: plan.split.remainderTo } },
+  ];
+}
+const HIDDEN_TRADE_LINES = ["dm-buy-hidden", "dm-sell-hidden", "dm-split-hidden-sale-0"];
+
+test("B1 follow-up: a DM's trade at a hidden shop keeps the purse's lines, naming the shop only to the DM (protocols 11 and 33)", async () => {
+  const dm = await openRoom({ name: "Hidden trades", table: tradeCampaign() });
+  const aria = await joinRoom({ code: dm.code, purseId: "aria", name: "Aria" });
+  await choosePace({ ...dm, live: true });
+  for (const command of trades((await roomState(dm)).table)) await submitCommands({ ...dm, batchId: command.id, commands: [command as never] });
+  // Aria's own trade at the visible General Store.
+  await submitCommands({ code: dm.code, token: aria.token, batchId: "aria-buy", commands: [{ id: "aria-buy", kind: "buy", stockId: "rope", purseId: "aria", quantity: 1 } as never] });
+  const host = (await roomState(dm)).table;
+  const dmLedger = host.ledger.map((l) => l.summary).join("\n");
+  assert.match(dmLedger, /Bought 1 SECRET Poison Vial from SECRET Night Bazaar/);
+  assert.match(dmLedger, /Sold 1 Brass lamp to SECRET Night Bazaar/);
+  assert.match(host.journal!.events.map((e) => e.summary).join("\n"), /to SECRET Night Bazaar and split/);
+  for (const tabletopProtocol of [11, 33]) {
+    const player = await roomState({ ...aria, code: dm.code, tabletopProtocol });
+    for (const id of HIDDEN_TRADE_LINES) {
+      const line = player.table.ledger.find((l) => l.id === id);
+      assert.ok(line, `${id} kept, protocol ${tabletopProtocol}`);
+      assert.match(line!.summary, /a merchant/, id);
+      assert.equal(line!.copper, host.ledger.find((l) => l.id === id)!.copper, id);
+    }
+    const receipt = player.table.journal!.events.find((e) => e.split?.id === "dm-split-hidden");
+    assert.ok(receipt, `split receipt kept, protocol ${tabletopProtocol}`);
+    assert.match(receipt!.summary, /to a merchant and split/);
+    assert.match(player.table.ledger.find((l) => l.id === "aria-buy")!.summary, /from General Store/);
+    assert.doesNotMatch(JSON.stringify(player), /SECRET/, `whole view, protocol ${tabletopProtocol}`);
+  }
+  // Archived session and CSV: same lines, same neutral name.
+  await closeRoom({ ...dm, keepOnline: true });
+  const archived = (await roomState(dm)).table;
+  const snapshot = JSON.parse(projectArchivedReport(archived.journal!.reports!.at(-1)!, archived, ariaSeat).snapshot);
+  for (const id of HIDDEN_TRADE_LINES) assert.match(snapshot.ledger.find((l: { id: string }) => l.id === id).summary, /a merchant/, id);
+  assert.doesNotMatch(JSON.stringify(snapshot), /SECRET/);
+  const csv = ledgerExportRows(archived, { id: aria.seatId, role: "player", purseIds: ["aria"] });
+  for (const id of HIDDEN_TRADE_LINES) assert.ok(csv.some((r) => r.id === id), id);
+  assert.doesNotMatch(JSON.stringify(csv), /SECRET/);
+});
+
+test("B1 follow-up: trades at a shop the player could see keep its name after the party moves on", () => {
+  let t = tradeCampaign();
+  t = applyCommand(t, ariaSeat, { id: "aria-buy", kind: "buy", stockId: "rope", purseId: "aria", quantity: 1 } as never);
+  t = applyCommand(t, ariaSeat, { id: "aria-sell", kind: "sell", holdingId: "cup", shopId: "general", quantity: 1 } as never);
+  t.journal!.market!.currentLocationId = "shadow";
+  const player = projectRecord(t, ariaSeat, { directory: true });
+  assert.match(player.ledger.find((l) => l.id === "aria-buy")!.summary, /from General Store/);
+  assert.match(player.ledger.find((l) => l.id === "aria-sell")!.summary, /to General Store/);
+});
+
+test("B1 follow-up: a legacy ship facility review line stays with the DM", () => {
+  const t = campaign();
+  t.journal!.events.push({ id: "legacy-facility", at: 20, kind: "management", summary: "Reviewed SECRET Smugglers Cove storage and shipyard terms." });
+  const player = projectRecord(t, ariaSeat, { directory: true });
+  assert.equal(player.journal!.events.some((e) => e.id === "legacy-facility"), false);
 });
