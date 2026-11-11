@@ -141,3 +141,23 @@ test("another seat's different action under the same ID never blocks or replaces
   await submitCommands({ code: dm.code, token: aria.token, batchId: "a1-retry", commands: [give("pass-x-1", 20)] });
   assert.equal(wallet((await roomState(dm)).table, "bram"), 5_030);
 });
+
+// Privacy review of PR 488: adopting another seat's receipt skipped authorization, so a seat could
+// confirm a guessed copy of another seat's action (an exact copy succeeded, a wrong one was
+// refused). Only a departed seat that held one of the same characters (a leave and rejoin) counts.
+test("a present seat's exact copy of another seat's action is refused like any other, and moves nothing", async () => {
+  const dm = await openRoom({ name: "Oracle DM", table: campaign() });
+  const aria = await joinRoom({ code: dm.code, purseId: "aria", name: "Aria" });
+  const bram = await joinRoom({ code: dm.code, purseId: "bram", name: "Bram" });
+  await choosePace({ ...dm, live: true });
+  const give = { id: "give-o", kind: "give" as const, fromId: "aria", toId: "bram", copper: 1_234, holdingId: null, quantity: 0 };
+  await submitCommands({ code: dm.code, token: aria.token, batchId: "a1", commands: [give] });
+  const before = (await roomState(dm)).table;
+  const wrong = await submitCommands({ code: dm.code, token: bram.token, batchId: "g1", commands: [{ ...give, copper: 1_000 }] }).then(() => "accepted", (e: Error) => e.message);
+  const exact = await submitCommands({ code: dm.code, token: bram.token, batchId: "g2", commands: [give] }).then(() => "accepted", (e: Error) => e.message);
+  assert.notEqual(exact, "accepted");
+  assert.equal(exact, wrong, "the same answer as a wrong guess");
+  const after = await roomState({ code: dm.code, token: bram.token });
+  assert.deepEqual(after.table.purses.map((p) => p.coins), before.purses.map((p) => p.coins));
+  assert.equal(after.acknowledged.includes("give-o"), false, "no acknowledgement for Bram");
+});

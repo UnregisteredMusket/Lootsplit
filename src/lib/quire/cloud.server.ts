@@ -1113,11 +1113,33 @@ export async function submitCommands(input: {
     const commandReceipts = new Map<string, string | undefined>();
     for (const list of byId.values())
       for (const r of list) if (r.key.startsWith(seat.id + ":")) commandReceipts.set(r.key, r.hash);
+    // Only a receipt from a seat that has left the room and held one of this seat's characters
+    // (or the same account) counts: the same player rejoining. A receipt from a seat still here is
+    // ignored, so the action runs under its own authorization and a guessed copy of another seat's
+    // action gets the same answer as any other (privacy review of PR 488).
+    const present = new Set(room.seats.map((s) => s.id));
+    const predecessor = (seatId: string) => {
+      if (present.has(seatId)) return false;
+      const gone = room.departed?.find((d) => d.id === seatId);
+      return (
+        !!gone &&
+        (gone.purseIds.some((id) => seat.purseIds.includes(id)) ||
+          (!!gone.userId && gone.userId === seat.userId))
+      );
+    };
     const adopted = new Set<string>();
     const elsewhere = new Map(
       commands
         .filter((c) => !commandReceipts.has(seat.id + ":" + c.id))
-        .map((c) => [c.id, (byId.get(c.id) ?? []).filter((r) => !r.key.startsWith(seat.id + ":"))] as const),
+        .map(
+          (c) =>
+            [
+              c.id,
+              (byId.get(c.id) ?? []).filter(
+                (r) => !r.key.startsWith(seat.id + ":") && predecessor(r.key.slice(0, r.key.indexOf(":"))),
+              ),
+            ] as const,
+        ),
     );
     for (const command of commands) {
       let match: string | undefined;
