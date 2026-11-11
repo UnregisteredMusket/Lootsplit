@@ -757,7 +757,9 @@ export async function saveLibraryCharacter(db, userId, body) {
   // unless the edited profile itself makes the account exceed it.
   const saved = await db
     .prepare(
-      `INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=?${guarded ? " AND COALESCE((SELECT LENGTH(body) FROM library_characters WHERE id=? AND user_id=?),-1)>=?" : ""} ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at`,
+      guarded
+        ? "INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=? AND COALESCE((SELECT LENGTH(body) FROM library_characters WHERE id=? AND user_id=?),-1)>=? ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at"
+        : "INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=? ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at",
     )
     .bind(
       id,
