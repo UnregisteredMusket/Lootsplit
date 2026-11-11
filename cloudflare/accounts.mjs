@@ -1,4 +1,12 @@
-import { ACCOUNT_BACKUP_BYTES, accountBackupBytesSql, readBackupPayload } from "./backup-parts.mjs";
+import {
+  ACCOUNT_BACKUP_BYTES,
+  accountBackupBytesSql,
+  BACKUP_PARTS_KEY,
+  backupPartStatements,
+  backupParts,
+  backupPartsCompleteSql,
+  readBackupPayload,
+} from "./backup-parts.mjs";
 import {
   backupBytesSql,
   backupCampaignKeySql,
@@ -762,6 +770,15 @@ export async function saveLibraryBackup(db, userId, body) {
   await validateBackupMapAssets(db, userId, payload);
   const id = crypto.randomUUID();
   const serialized = JSON.stringify(payload);
+  // A backup too large for one D1 row (2 MB) is stored in parts like a deletion copy
+  // (backup-parts.mjs, migration 0027): the row keeps the parts marker, the parts are written in
+  // the same batch only if the row was, and reading joins and verifies them. The request body
+  // limit (readBody, 4 MB) keeps a backup far below the 32-part maximum.
+  const chunked = backupParts(serialized);
+  const rowBody = chunked ? JSON.stringify({ [BACKUP_PARTS_KEY]: chunked.marker }) : serialized;
+  const storedChars = chunked
+    ? rowBody.length + chunked.parts.reduce((sum, part) => sum + part.length, 0)
+    : serialized.length;
   // Per-campaign limit (backup-rotation.mjs): the campaign's oldest backup is replaced only
   // when the request confirms that exact backup, after the new one is stored. A backup from an
   // older app has no campaign key and only meets the account limits below.
@@ -779,7 +796,7 @@ export async function saveLibraryBackup(db, userId, body) {
       id,
       userId,
       text(body.name),
-      serialized,
+      rowBody,
       Date.now(),
       campaignKey,
       userId,
@@ -788,20 +805,22 @@ export async function saveLibraryBackup(db, userId, body) {
       userId,
       userId,
       ...(rotating ? [plan.replace.id, userId, plan.replace.id] : []),
-      serialized.length,
+      storedChars,
       LIBRARY_LIMITS.backupBytes,
       ...campaignGuardArgs(userId, campaignKey, plan),
     );
+  // The replaced backup is removed only once the new one is fully stored (every part).
   const results = await db.batch([
     insert,
+    ...(chunked ? backupPartStatements(db, id, userId, chunked.parts) : []),
     ...(plan.replace
       ? [
           replaceStatement(
             db,
             userId,
             plan,
-            "EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?)",
-            [id, userId],
+            `EXISTS(SELECT 1 FROM library_backups WHERE id=? AND user_id=?)${chunked ? ` AND ${backupPartsCompleteSql}` : ""}`,
+            [id, userId, ...(chunked ? [id, chunked.marker.parts] : [])],
           ),
         ]
       : []),
@@ -828,11 +847,13 @@ export async function saveLibraryBackup(db, userId, body) {
  * @param {any} db @param {string} userId @param {any} body
  */
 export async function removeLibraryEntry(db, userId, body) {
-  const table = {
+  // Own keys only: an Object prototype name such as "constructor" is unknown, not a table.
+  const tables = {
     backup: "library_backups",
     character: "library_characters",
     membership: "library_members",
-  }[body.kind];
+  };
+  const table = typeof body.kind === "string" && Object.hasOwn(tables, body.kind) ? tables[body.kind] : null;
   if (!table) fail("Unknown library entry.");
   const column = body.kind === "membership" ? "code" : "id";
   await db
@@ -852,7 +873,7 @@ export async function readLibraryBackup(db, userId, body, protocol = CURRENT_TAB
     .bind(text(body.id), userId)
     .first();
   if (!row) fail("Backup not found.", 404);
-  // A large deletion backup is stored in parts (backup-parts.mjs), read back verified.
+  // A large backup is stored in parts (backup-parts.mjs), read back verified.
   const stored = await readBackupPayload(db, text(body.id), row.body);
   // Protocol 2 differs only by compact fog history, which expands losslessly.
   const payload = protocol === 2 ? tableForProtocol(stored, 2) : stored;
