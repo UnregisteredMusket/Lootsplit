@@ -159,3 +159,20 @@ test("C5: a deletion refused in its transaction names access or a campaign chang
     delete globalThis.__env__;
   }
 });
+
+test("C3: every new deletion is served by an index (no table scan)", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const { DatabaseSync } = await import("node:sqlite");
+  await import("../src/lib/quire/commands.ts");
+  const { campaignRecordsDeletedStatements } = await import("../cloudflare/account-campaigns.mjs");
+  const db = new DatabaseSync(":memory:");
+  const dir = new URL("../cloudflare/migrations/", import.meta.url);
+  for (const name of readdirSync(dir).filter((n) => n.endsWith(".sql")).sort()) db.exec(readFileSync(new URL(name, dir), "utf8"));
+  const statements = campaignRecordsDeletedStatements({ prepare: (sql) => ({ bind: () => sql }) }, "CODE", "user");
+  assert.equal(statements.length, 7);
+  for (const sql of statements) {
+    const plan = db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...Array((sql.match(/\?/g) || []).length).fill("x")).map((r) => r.detail).join(" | ");
+    assert.doesNotMatch(plan, /\bSCAN\b/, `${sql}: ${plan}`);
+  }
+  db.close();
+});
