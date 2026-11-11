@@ -8,6 +8,7 @@ import {
   updateRoom,
   keepStoredBody,
   roomImageSources,
+  lookupCommandIdReceipts,
   lookupReceipts,
   recentAcknowledged,
   roomReadVersion,
@@ -1106,6 +1107,17 @@ export async function submitCommands(input: {
         ...(room.drafts?.[seat.id] ?? []).map((c) => seat.id + ":" + c.id),
       ]),
     ]);
+    // The same action ID applied under another seat (a player who left and rejoined has a new
+    // seat ID): treated as this seat's own receipt, so it is never applied twice (audit A2).
+    const adopted = new Set<string>();
+    const elsewhere = await lookupCommandIdReceipts(
+      room,
+      commands.filter((c) => !commandReceipts.has(seat.id + ":" + c.id)).map((c) => c.id),
+    );
+    for (const [id, receipt] of elsewhere) {
+      commandReceipts.set(seat.id + ":" + id, receipt.hash);
+      adopted.add(id);
+    }
     const batchReceipt = await lookupReceipts(room, "batch", [key]);
     for (const command of commands) {
       const previous = commandReceipts.get(seat.id + ":" + command.id);
@@ -1309,6 +1321,10 @@ export async function submitCommands(input: {
       seen.add(key);
       if (!input.stage) receipts.push({ kind: "command", key, hash: hashes.get(command.id)! });
     }
+    // An adopted action (applied under an earlier seat) is acknowledged to this seat as well.
+    if (!input.stage)
+      for (const id of adopted)
+        receipts.push({ kind: "command", key: seat.id + ":" + id, hash: commandReceipts.get(seat.id + ":" + id) });
     if (!input.stage) receipts.push({ kind: "batch", key, hash: batchHash });
     for (const report of table.journal?.reports || [])
       if (!room.table.journal?.reports?.some((r) => r.id === report.id))

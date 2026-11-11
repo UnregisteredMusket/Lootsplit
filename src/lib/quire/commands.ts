@@ -1218,6 +1218,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     );
   } else if (cmd.kind === "payment-request") {
     const p = own(cmd.purseId);
+    // One row per ID: a duplicate would stay pending for good (decisions find the first; audit A2).
+    if (journal.requests.some((r) => r.id === cmd.id))
+      throw new Error("That payment request ID already identifies a different request.");
     journal.requests.push({
       id: cmd.id,
       at,
@@ -1684,6 +1687,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     });
   } else if (cmd.kind === "loan") {
     const p = own(cmd.purseId);
+    // One row per ID, as the device's askLoan already requires (audit A2).
+    if (t.loans.some((l) => l.id === cmd.id))
+      throw new Error("That loan request ID already identifies a different request.");
     t.loans.push({
       id: cmd.id,
       at,
