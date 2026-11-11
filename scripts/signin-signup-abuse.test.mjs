@@ -116,6 +116,18 @@ test("H5: parallel probes cannot pass the cap; a failed sign-up is refunded", as
     assert.equal((await limitedSignup(db, "known@example.com", "192.0.2.52", signUp("known@example.com"), () => start)).status, 422);
 });
 
+test("H5: a burst of new sign-ups never leaves the network refused (privacy review of PR 494)", async () => {
+  const db = localAccountDb();
+  const slow = async () => (await new Promise((r) => setTimeout(r, 20)), new Response(null, { status: 200 }));
+  const run = (email) => limitedSignup(db, email, "203.0.113.9", slow, () => start).then((r) => r.status, (e) => e.status);
+  // In-flight sign-ups count until they finish, so some of a burst may wait; none is kept.
+  const burst = await Promise.all([1, 2, 3, 4, 5, 6].map((i) => run(`p${i}@example.com`)));
+  assert.ok(burst.filter((s) => s === 200).length >= DUPLICATE_SIGNUP_REPLIES_PER_DAY, String(burst));
+  const row = await db.prepare("SELECT hits FROM library_limits WHERE key LIKE 'signup-duplicate:%'").first();
+  assert.equal(Number(row.hits), 0, "every attempt that was not a duplicate is refunded, refused ones too");
+  assert.equal(await run("late@example.com"), 200);
+});
+
 // ---- H2: site-wide storage guard ----
 
 const usageRow = async (db, bytes, checkedAt, id = `usage:${checkedAt}`) => {
