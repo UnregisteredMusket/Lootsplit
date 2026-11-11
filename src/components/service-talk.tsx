@@ -1,8 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { coachGroup } from "@/lib/quire/party-groups-journeys";
 import { useCommandId } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { postNotes } from "@/lib/quire/chat";
+import { getCloudTable, getServerCloudTable, queueCommand, subscribeCloudTable } from "@/lib/quire/cloud-client";
+import { shareRumour } from "@/lib/quire/rumour-share";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import type { CloudTable } from "@/lib/quire/cloud";
@@ -1443,24 +1445,34 @@ function Stepper({
 /** Copy a bought rumour into the party chat (owner decision: rumours may be shared). */
 export function ShareRumour({ text, npcName, purseId }: { text: string; npcName: string; purseId: string }) {
   const seat = useSeat();
-  const [state, setState] = useState<"idle" | "busy" | "done" | "failed">("idle");
-  const body = `Rumour from ${npcName}: ${text}`;
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const action = useCommandId(`share-rumour|${purseId}|${npcName}|${text}`);
+  const [state, setState] = useState<"idle" | "busy" | "done" | "pending" | "failed">("idle");
   return (
     <button
       type="button"
       className="npc-talk-chip"
-      disabled={state === "busy" || state === "done"}
+      disabled={state === "busy" || state === "done" || state === "pending"}
       onClick={async () => {
         setState("busy");
         try {
-          await postNotes([{ from: seat.role === "dm" ? "dm" : "player", to: "party", purseId, text: body.length > 500 ? `${body.slice(0, 499)}…` : body }]);
-          setState("done");
+          const outcome = await shareRumour(
+            { joined: cloud.joined, role: seat.role, purseId, npcName, text, commandId: action.commandId },
+            { queueCommand, postNotes },
+          );
+          setState(outcome.status === "pending" ? "pending" : "done");
         } catch {
           setState("failed");
         }
       }}
     >
-      {state === "done" ? "Shared in party chat" : state === "failed" ? "Couldn't share · try again" : "Share in party chat"}
+      {state === "done"
+        ? "Shared in party chat"
+        : state === "pending"
+          ? "Saved as pending · check sync status"
+          : state === "failed"
+            ? "Couldn't share · try again"
+            : "Share in party chat"}
     </button>
   );
 }
