@@ -3,7 +3,7 @@ import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { readTabletopSession } from "@/lib/quire/tabletop";
-import { sessionSwitchCommand } from "@/lib/quire/visibility-center";
+import { ANDROID_PLAYER_DISPLAY_NOTE, sessionSwitchCommand } from "@/lib/quire/visibility-center";
 import { mapType } from "@/lib/quire/map-tiles";
 import type { CampaignMap } from "@/lib/quire/world-schema";
 import { CommandButton } from "./world-tools";
@@ -89,6 +89,11 @@ export function MapSessionBar({ map }: { map?: CampaignMap }) {
           ? "Browsing and preparation do not activate a scene or change a projected display."
           : "Your camera is independent until the DM explicitly shares a view."}
       </p>
+      {dm && import.meta.env.VITE_MOBILE === "true" && (
+        <p className="text-sm text-muted" data-testid="android-player-display-note">
+          {ANDROID_PLAYER_DISPLAY_NOTE}
+        </p>
+      )}
     </section>
   );
 }

@@ -114,6 +114,35 @@ export async function resumeCampaignMembership(db, userId, body, limit = hostedC
   };
 }
 
+/** A deletion refused because the recovery copy is too large to store. */
+export const DELETE_TOO_LARGE =
+  "This campaign's complete recovery copy is too large to store online. Your campaign was not deleted. Download a copy of the campaign from My campaigns to keep it on your device.";
+/** A deletion refused because this account or seat lost access to the campaign meanwhile. */
+export const DELETE_ACCESS_CHANGED =
+  "Your access to this campaign changed (sign-in, membership or seat). Your campaign was not deleted. Sign in again and refresh My campaigns.";
+
+/**
+ * Rows keyed by a deleted campaign's code that nothing reads once its room is gone, each already
+ * held by the deletion's recovery copy (campaign-recovery.mjs `deletionRecoverySql`; map images
+ * are in its campaign file): stored map images, command receipts, the manual-roll policy, roll
+ * history and the deleting DM's encounters with their rolls and awards. Every statement runs only
+ * when the room row no longer exists, so a refused or raced deletion removes nothing. Another
+ * account's encounters under the same code are not in this DM's copy and stay.
+ */
+export function campaignRecordsDeletedStatements(db, code, userId) {
+  const gone = "NOT EXISTS (SELECT 1 FROM campaign_rooms WHERE code=?)";
+  const mine = "SELECT id FROM dm_encounters WHERE code=? AND user_id=?";
+  return [
+    db.prepare(`DELETE FROM campaign_room_images WHERE code=? AND ${gone}`).bind(code, code),
+    db.prepare(`DELETE FROM campaign_room_receipts WHERE code=? AND ${gone}`).bind(code, code),
+    db.prepare(`DELETE FROM play_policies WHERE code=? AND ${gone}`).bind(code, code),
+    db.prepare(`DELETE FROM play_rolls WHERE code=? AND ${gone}`).bind(code, code),
+    db.prepare(`DELETE FROM dm_encounter_rolls WHERE encounter_id IN (${mine}) AND ${gone}`).bind(code, userId, code),
+    db.prepare(`DELETE FROM dm_encounter_awards WHERE encounter_id IN (${mine}) AND ${gone}`).bind(code, userId, code),
+    db.prepare(`DELETE FROM dm_encounters WHERE code=? AND user_id=? AND ${gone}`).bind(code, userId, code),
+  ];
+}
+
 export async function campaignAction(db, userId, body, actor) {
   if (typeof body.code !== "string" || !["rename", "delete", "export"].includes(body.action))
     fail("Invalid campaign action.");
@@ -215,7 +244,7 @@ export async function campaignAction(db, userId, body, actor) {
   const chunked = built.chunked;
   if (chunked && chunked.marker.bytes > BACKUP_MAX_BYTES)
     fail(
-      "Campaign access changed or its complete recovery copy exceeds the supported cloud size. Your campaign was not deleted. Refresh or download your backups.",
+      DELETE_TOO_LARGE,
       409,
     );
   const partStatements = chunked ? backupPartStatements(db, backupId, userId, chunked.parts) : [];
@@ -319,6 +348,9 @@ export async function campaignAction(db, userId, body, actor) {
           "UPDATE play_characters SET campaign_code='',purse_id='',revision=revision+1,updated_at=? WHERE campaign_code=? AND NOT EXISTS(SELECT 1 FROM campaign_rooms WHERE code=?)",
         )
         .bind(Date.now(), body.code, body.code),
+      // Records only this campaign reads, already in the recovery copy (audit 2026-11-10, C3;
+      // owner decision 2026-11-11). Guarded like the sections: removed only once the room is gone.
+      ...campaignRecordsDeletedStatements(db, body.code, userId),
     ]);
   } catch {
     fail(
@@ -334,10 +366,17 @@ export async function campaignAction(db, userId, body, actor) {
     if ((again.replace?.id ?? null) !== (plan.replace?.id ?? null))
       fail("Your online backups changed on another device. Refresh My campaigns and delete again. Your campaign was not deleted.", 409);
     if ((await usedBytes()) + (chunked ? partChars : payloadText.length) > ACCOUNT_BACKUP_BYTES) backupFull();
-    fail(
-      "Campaign access changed or its complete recovery copy exceeds the supported cloud size. Your campaign was not deleted. Refresh or download your backups.",
-      409,
-    );
+    // Name the one cause (audit 2026-11-10, C5): access, a change to the campaign, or size.
+    const access = await db
+      .prepare(
+        `SELECT ${recoveryAccountGuardSql} AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?) AS ok`,
+      )
+      .bind(...accountGuardArgs, userId, room.code, member.seat_id, member.token)
+      .first();
+    if (!access?.ok) fail(DELETE_ACCESS_CHANGED, 409);
+    const current = await db.prepare(`SELECT ${unchanged.sql} AS ok`).bind(...unchanged.args).first();
+    if (!current?.ok) fail("The campaign changed. Refresh before deleting it.", 409);
+    fail(DELETE_TOO_LARGE, 409);
   }
   if (results[2 + partStatements.length + (plan.replace ? 1 : 0)].meta.changes !== 1)
     fail("The campaign changed. Refresh before deleting it.", 409);

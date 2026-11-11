@@ -40,6 +40,13 @@ import type { Purse, Shop } from "./types.ts";
 import { favorMarketSchema, favorRequestsSchema, projectFavorMarket } from "./favor-market-schema.ts";
 
 export const MAX_FACTIONS = 100;
+/**
+ * The campaign's factions together, in UTF-8 bytes of their stored JSON (audit 2026-11-10, F6;
+ * owner decision 2026-11-11): a faction save that would take them past it is refused. New writes
+ * only: factions saved before stay readable, and an edit that doesn't grow them is accepted.
+ */
+export const MAX_FACTIONS_BYTES = 400_000;
+export const FACTIONS_FULL = "This campaign's factions are full (400 KB in total). Shorten descriptions or notes, or have factions control fewer shops (deleted factions are kept as history and still count); nothing was saved.";
 export const MIN_RENOWN = -1000;
 export const MAX_RENOWN = 1000;
 export const MAX_FAVOR = 1_000_000;
@@ -236,6 +243,11 @@ export function defaultFactionDraft(): FactionDraft {
 
 type JournalLike = { factions?: unknown; factionAdjustments?: unknown; market?: unknown } | undefined | null;
 type PartyTable = { purses: Purse[]; journal?: CloudTable["journal"] | null };
+
+/** The stored size of `factions`, in UTF-8 bytes of their JSON. */
+export function factionsBytes(factions: readonly unknown[]): number {
+  return new TextEncoder().encode(JSON.stringify(factions)).length;
+}
 
 /** The stored factions, read leniently: a campaign without them has none. */
 export function readFactions(value: unknown): Faction[] {
@@ -435,6 +447,11 @@ export function applyFactionCommand(
   const current = factions.find((f) => f.id === cmd.factionId);
   const save = () => (journal.factions = factions);
   if (cmd.kind === "faction-save") {
+    const before = factionsBytes(factions);
+    const fits = () => {
+      const after = factionsBytes(factions);
+      if (after > MAX_FACTIONS_BYTES && after > before) throw Error(FACTIONS_FULL);
+    };
     assertDraft(t, cmd.faction);
     const d = cmd.faction;
     const fields = {
@@ -452,6 +469,7 @@ export function applyFactionCommand(
       if (factions.length >= MAX_FACTIONS)
         throw Error(`A campaign keeps at most ${MAX_FACTIONS} factions, deleted ones included.`);
       factions.push(factionSchema.parse({ id: cmd.factionId, ...fields, hidden: true, standing: {}, revision: 0 }));
+      fits();
       save();
       log(`Faction added (hidden from players): ${d.name}`, { dmOnly: true });
       return;
@@ -469,6 +487,7 @@ export function applyFactionCommand(
       revision: current.revision + 1,
     });
     factions[factions.indexOf(current)] = next;
+    fits();
     save();
     log(`Faction edited: ${next.name}`, { dmOnly: true });
     return;

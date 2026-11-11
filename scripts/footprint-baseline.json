@@ -1,10 +1,10 @@
 {
-  "measuredOn": "2026-11-06",
-  "reason": "Archived sessions re-base once a delta would pass 35% of its snapshot (room-reports.mjs REPORT_REBASE_FRACTION): archive per session 61805 -> 30726 bytes. The other values are unchanged from the 2026-11-01 baseline (current main measures within 0.1% of them).",
+  "measuredOn": "2026-11-11",
+  "reason": "Audit 2026-11-10 F6: the reference campaign now also plays world features (three shops of 20 lines, a settlement profile, three factions with a renown change for every character each session, two 20-item shop lists, a market event and a stock swap every fourth session), so growth there can fail this test. Measured on main 8892b7d with that fixture; with the old fixture main measures within 0.1% of the 2026-11-06 values (live 151633, DM view 155494, player view 116887, archive per session 30726). No product change grows storage.",
   "values": {
-    "liveStoredBytes": 151633,
-    "dmViewBytes": 155494,
-    "playerViewBytes": 116887,
-    "archiveBytesPerSession": 30726
+    "liveStoredBytes": 179447,
+    "dmViewBytes": 183321,
+    "playerViewBytes": 129079,
+    "archiveBytesPerSession": 39528
   }
 }

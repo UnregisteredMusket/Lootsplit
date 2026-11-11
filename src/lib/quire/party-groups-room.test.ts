@@ -210,11 +210,12 @@ test("device: an offline player buys only at their own group's place", async () 
   setSeat(DM_SEAT);
   await applyCloudTable(splitFixture());
   setSeat({ ...DM_SEAT, role: "player", purseIds: ["tamsin"] });
-  await assert.rejects(buyFromShop({ stockId: "rope", purseId: "tamsin", quantity: 1 }), /not available at the current location/);
+  // The shared engine's words, as in a shared room (audit 2026-11-10, A8: player-link trades run it).
+  await assert.rejects(buyFromShop({ stockId: "rope", purseId: "tamsin", quantity: 1 }), /This shop isn't where Tamsin Reed's group/);
   await buyFromShop({ stockId: "sword", purseId: "tamsin", quantity: 1 });
   await buyFromShop({ stockId: "sack", purseId: "tamsin", quantity: 1 });
   setSeat({ ...DM_SEAT, role: "player", purseIds: ["brannoc"] });
-  await assert.rejects(buyFromShop({ stockId: "sword", purseId: "brannoc", quantity: 1 }), /not available at the current location/);
+  await assert.rejects(buyFromShop({ stockId: "sword", purseId: "brannoc", quantity: 1 }), /This shop isn't where .*'s group/);
   await buyFromShop({ stockId: "rope", purseId: "brannoc", quantity: 1 });
   setSeat(DM_SEAT);
   const t = await economySnapshot();

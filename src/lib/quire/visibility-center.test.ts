@@ -271,3 +271,25 @@ test("players: the page is DM-only and a player's projection carries no hidden r
   for (const id of ["hidden-npcs", "private-maps", "dm-markers", "dm-pins", "quest-drafts", "hidden-objectives", "dm-quest-lines", "dm-journal"])
     assert.equal(count(player, id), 0, `${id} reached a player's projection`);
 });
+
+// Audit 2026-11-10, E4 (owner decision 2026-11-11): the Android app can't open the TV / player
+// display, so where the toggle is (here, and the Maps session bar) the app says it opens from a
+// browser. The toggle stays and still sends its command; the website shows no such note.
+test("E4: on Android the TV display switch explains it opens from a browser, and still toggles", async () => {
+  const { ANDROID_PLAYER_DISPLAY_NOTE } = await import("./visibility-center.ts");
+  assert.match(ANDROID_PLAYER_DISPLAY_NOTE, /browser/);
+  assert.match(ANDROID_PLAYER_DISPLAY_NOTE, /Player display/);
+  const tv = (android: boolean) =>
+    visibilityCenter(emptyCloudTable(), { android })
+      .flatMap((a) => a.switches)
+      .find((s) => s.id === "tv-display")!;
+  assert.equal(tv(true).note, ANDROID_PLAYER_DISPLAY_NOTE);
+  assert.deepEqual(tv(true).command, tv(false).command, "the toggle is not hidden or changed");
+  assert.equal(tv(false).note, undefined);
+  assert.equal(visibilityCenter(emptyCloudTable()).flatMap((a) => a.switches).find((s) => s.id === "tv-display")!.note, undefined);
+  // The Maps session bar shows the same note in the app (source check: Vite sets VITE_MOBILE).
+  const bar = readFileSync(new URL("../../components/map-session-bar.tsx", import.meta.url), "utf8");
+  assert.match(bar, /ANDROID_PLAYER_DISPLAY_NOTE/);
+  const page = readFileSync(new URL("../../components/visibility-center.tsx", import.meta.url), "utf8");
+  assert.match(page, /visibilityCenter\(table, \{ android: import\.meta\.env\.VITE_MOBILE === "true" \}\)/);
+});

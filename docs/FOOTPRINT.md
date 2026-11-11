@@ -57,7 +57,7 @@ A pull request that adds or changes stored data, or server work on a request pat
 | Live campaign | 4 MB per campaign (existing) | Server refuses larger writes |
 | One feature's share | 10% of the live cap (400 KB) in the reference campaign | Footprint test (`scripts/footprint.test.mjs`) |
 | Growth per pull request | Live size, sync size or archive per session up more than 10% fails unless the baseline is updated in that PR with a reason | Footprint test baseline (`scripts/footprint-baseline.json`) |
-| Reference campaign | A synthetic year of weekly play through the real server code: 6 characters and a party fund, 300 items, 52 sessions of 24 transfers and 2 notes each | `scripts/footprint-fixture.mjs` |
+| Reference campaign | A synthetic year of weekly play through the real server code: 6 characters and a party fund, 300 items, 52 sessions of 24 transfers and 2 notes each; three shops of 20 lines, a settlement profile, three factions with a renown change for every character each session, two 20-item shop lists, and a market event and stock swap every fourth session | `scripts/footprint-fixture.mjs` |
 | Server work per request | No scan of every campaign or whole history on a request path | Guard tests (as the existing ban on direct `campaign_rooms` SQL) |
 | Widget and monitor requests | Under 1.5 s on the server | `widget-served` timing entries (Field monitor) |
 | Monitoring growth | No limit: kept in full | Database size in the daily monitoring report (the weekly summary runs on GitHub without database access) |
@@ -66,9 +66,13 @@ A pull request that adds or changes stored data, or server work on a request pat
 
 ## The reference campaign today
 
-Baseline 2026-11-06 (`scripts/footprint-baseline.json`): stored live campaign 151,633 bytes, DM view
-155,494 bytes, player view 116,887 bytes, archive 30,726 bytes per session (61,805 before re-basing,
-below). Run it with `node --experimental-strip-types scripts/footprint-fixture.mjs` (about 8 seconds).
+Baseline 2026-11-11 (`scripts/footprint-baseline.json`): stored live campaign 179,447 bytes, DM view
+183,321 bytes, player view 129,079 bytes, archive 39,528 bytes per session. The fixture then gained
+the world features (factions, settlements, shop lists, market events; audit 2026-11-10, F6), so
+growth there fails the test too; without them it measured 151,633 / 155,494 / 116,887 bytes and
+30,726 bytes per session (baseline 2026-11-06; 61,805 per session before re-basing, below). Factions
+together are refused past 400 KB on a new save (`MAX_FACTIONS_BYTES`, `factions.ts`; owner decision
+2026-11-11). Run it with `node --experimental-strip-types scripts/footprint-fixture.mjs`.
 Adding about 120 bytes to every item grows the live campaign by 21%, which the test refuses.
 
 Why an archived session cost 62 KB (investigated 2026-11-06): every archived snapshot carries the

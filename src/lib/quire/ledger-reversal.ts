@@ -6,6 +6,7 @@ import { canonicalJson } from "./canonical-json.ts";
 import { holdingSchema } from "./validation.ts";
 import { readArchivedSnapshot } from "./journal.ts";
 import { readEstate } from "./estate-schema.ts";
+import { activeShopList } from "./shop-lists.ts";
 import { estateCapabilities, storageWeight } from "./estate.ts";
 import { hasMerchantPurse, isService, stockCategory } from "./merchant.ts";
 import { fromCopper, spendCoins, toCopper } from "./money.ts";
@@ -289,10 +290,30 @@ function reverseOrdinary(
     if (holding.quantity === quantity) table.holdings = table.holdings.filter(h => h.id !== holding!.id);
     else holding.quantity -= quantity;
   }
-  if (shelf && shelf.quantity !== null) shelf.quantity += quantity;
+  if (shelf && shelf.quantity !== null) shelf.quantity = returnedShelfQuantity(table, shelf, quantity);
   const correctionId = receipt ? command.id + "-trade-0" : undefined;
   appendLedgerVoid(table, line, command.id + "-ledger", at, correctionId);
   if (receipt) appendTradeVoid(table, receipt, correctionId!, command, at);
+}
+
+/**
+ * The shelf after an undone purchase returns `quantity` units (audit 2026-11-10, A9; owner decision
+ * 2026-11-11). A shop-list swap restocks a line fresh from the list, so a purchase made before the
+ * swap must not add its units on top: the undo never raises the shelf above the quantity the shop's
+ * current list gives that line, and never lowers a shelf already at or above it. A line that no
+ * current list describes (no swap, a line added by hand) gets its units back as before.
+ */
+function returnedShelfQuantity(table: CloudTable, shelf: StockLine, quantity: number): number {
+  const current = shelf.quantity!;
+  const listed = activeShopList(table.journal, shelf.shopId)?.items;
+  if (!listed) return current + quantity;
+  const byLine = listed.filter((item) => item.lineId === shelf.id);
+  const matches = byLine.length
+    ? byLine
+    : listed.filter((item) => !item.lineId && item.name.trim().toLowerCase() === shelf.name.trim().toLowerCase());
+  if (!matches.length || matches.some((item) => item.quantity === null)) return current + quantity;
+  const cap = Math.max(...matches.map((item) => item.quantity!));
+  return current >= cap ? current : Math.min(current + quantity, cap);
 }
 
 /** Mutates only the command's private candidate table; callers commit it atomically. */

@@ -114,10 +114,20 @@ export type VisibilityArea = {
 };
 export type VisibilityTable = Pick<CloudTable, "journal" | "purses" | "holdings" | "shops">;
 
+/**
+ * The Android app can't open the TV / player display (a second window or a cast browser tab), so
+ * where its switch is the app says where it opens (audit 2026-11-10, E4; owner decision
+ * 2026-11-11). The switch itself stays: it is a campaign setting the website uses too.
+ */
+export const ANDROID_PLAYER_DISPLAY_NOTE =
+  "In the Android app the TV / player display doesn't open. Open this campaign in a web browser (lootsplitter.com on a computer or tablet connected to the TV; a device campaign needs a copy imported there first), then choose Player display.";
 const onOff = (on: boolean) => (on ? "On" : "Off");
 
 /** Every visibility setting and hidden-record count, grouped by area (DM's full table only). */
-export function visibilityCenter(table: VisibilityTable): VisibilityArea[] {
+export function visibilityCenter(
+  table: VisibilityTable,
+  options: { android?: boolean } = {},
+): VisibilityArea[] {
   const journal = table.journal;
   const world = readWorld(journal?.world);
   const session = readSession(journal);
@@ -286,6 +296,7 @@ export function visibilityCenter(table: VisibilityTable): VisibilityArea[] {
             ? "Disable TV / player display"
             : "Enable optional TV / player display",
           command: sessionSwitchCommand(journal, "tvEnabled"),
+          ...(options.android ? { note: ANDROID_PLAYER_DISPLAY_NOTE } : {}),
           href: "/maps",
           where: "Maps › session bar",
         },

@@ -26,6 +26,12 @@ test("the footprint baseline names its date and reason", () => {
 test("a year of weekly play stays within the footprint baseline", async () => {
   const measured = await measureReferenceCampaign();
   assert.equal(measured.sessions, REFERENCE.sessions);
+  // The world features were played (audit 2026-11-10, F6), not silently refused.
+  assert.equal(measured.world.factions, REFERENCE.factions);
+  assert.ok(measured.world.standing >= REFERENCE.characters, "renown was recorded");
+  assert.equal(measured.world.settlements, 1);
+  assert.ok(measured.world.shopLists >= REFERENCE.shopLists + 1, "a swap saved the original stock");
+  assert.equal(measured.world.marketEvents, Math.ceil(REFERENCE.sessions / REFERENCE.worldEvery));
   const report = Object.entries(baseline.values).map(([key, before]) => {
     const now = measured[key];
     return { key, before, now, change: (now - before) / before };
