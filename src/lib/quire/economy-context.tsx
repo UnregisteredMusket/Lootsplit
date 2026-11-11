@@ -71,6 +71,7 @@ import {
   saveRealm,
   saveShop,
   saveStock,
+  editStockLine,
   sellToShop,
   addListing,
   removeListing,
@@ -109,6 +110,7 @@ import type { Listing, LoanAsk, LoanStatus } from "./market.ts";
 import { presentReceipt } from "./receipt.ts";
 import { DM_SEAT, buildBill, downloadJson, getSeat, readShare, setSeat } from "./table.ts";
 import type { RarityFlags, ShelfDraft } from "./compose.ts";
+import type { StockEdit } from "./stock-edit.ts";
 import { DEFAULT_REALM } from "./scale.ts";
 import { itemDetailsFor } from "./item-details.ts";
 import type {
@@ -155,7 +157,11 @@ type EconomyApi = {
   applyShop: (shop: Shop) => Promise<void>;
   deleteShop: (id: string) => Promise<void>;
   /** Resolves `true` when saved; `false` after a shown error. */
-  updateStock: (line: StockLine) => Promise<boolean>;
+  /**
+   * One field of a stock line from the shop's Edit mode. Refused, changing nothing, when the line
+   * no longer has the value the box showed when editing started (audit 2026-11-10 D3).
+   */
+  editStock: (id: string, edit: StockEdit) => Promise<boolean>;
   addStock: (
     shopId: string,
     name: string,
@@ -872,10 +878,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await removeShop(id);
         }, "Shop removed."),
-      updateStock: (line) =>
+      editStock: (id, edit) =>
         attempt(async () => {
           dmOnly();
-          await saveStock(line);
+          await editStockLine(id, edit);
         }),
       addStock: (shopId, name, copper, quantity) =>
         accept(async (guard) => {
