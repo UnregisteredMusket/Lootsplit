@@ -50,7 +50,7 @@ import { attunementFromNotes, attunementKinds, attunementProblem } from "./attun
 import { usesProblem } from "./item-uses.ts";
 import { itemDetailsProblem } from "./item-details.ts";
 import { isUnidentified, presentedHolding } from "./item-identity.ts";
-import { assertPoolable } from "./loot-claims.ts";
+import { assertPoolable, dropDeletedClaims } from "./loot-claims.ts";
 import {
   coinsSchema,
   validateEconomyRows,
@@ -1092,6 +1092,10 @@ export async function removeHolding(id: string): Promise<void> {
         assertEstateDisposable(table, id);
         removeEstateSite(table, id);
         tx.objectStore("meta").put({ id: "journal", value: table.journal });
+      } else {
+        // A deleted pooled item loses its open claims, as in a shared room (audit A10).
+        const pruned = dropDeletedClaims(journal, { holdingIds: [id] });
+        if (pruned) tx.objectStore("meta").put({ id: "journal", value: pruned });
       }
     }
     tx.objectStore("holdings").delete(id);
@@ -1180,7 +1184,9 @@ export async function removePurse(id: string): Promise<void> {
       throw Error("Resolve this character's property projects before removing its account.");
     for (const h of holdings.filter((h) => h.kind === "property"))
       removeEstateSite({ ...emptyCloudTable(), journal }, h.id);
-    tx.objectStore("meta").put({ id: "journal", value: journal });
+    // The character's claims and claims on its items go with it, as in a shared room (audit A10).
+    const pruned = dropDeletedClaims(journal, { holdingIds: holdings.map((h) => h.id), purseId: id });
+    tx.objectStore("meta").put({ id: "journal", value: pruned ?? journal });
     tx.objectStore("purses").delete(id);
     for (const holding of holdings) tx.objectStore("holdings").delete(holding.id);
     await audit(tx, "Removed account and its holdings", "management", id);

@@ -1899,7 +1899,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   validateBlacksmith(t);
   validateServices(t, execution.preview === true);
   validateDowntimeActivities(t, execution.preview === true);
-  validateLootPool(t);
+  validateLootPool(t, execution.preview === true);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

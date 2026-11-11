@@ -4,7 +4,10 @@
 import "./commands.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyCommand, type Command } from "./commands.ts";
+import "fake-indexeddb/auto";
+import { applyCommand, tablePatch, type Command } from "./commands.ts";
+import { applyCloudTable, economySnapshot, removeHolding, removePurse } from "./economy.ts";
+import { DM_SEAT, setSeat } from "./table.ts";
 import { emptyCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { readJournal } from "./journal.ts";
 import {
@@ -433,4 +436,30 @@ test("Activity keeps the real order when a claim and a resolution share a millis
     "Treasure pool resolved · 1 item to 1 character",
     "Claims marked · 2 changes",
   ]);
+});
+
+// Audit A10: deleting a pooled item or a character on the device left its open claims stored.
+// The shared path drops them after every command (validateLootPool); the device now does too.
+test("deleting a pooled item or a character drops its open claims, on the device and shared", async () => {
+  const marks = marked(campaign(), [
+    ["potion", "aria", "need"],
+    ["potion", "bram", "greed"],
+    ["sword", "aria", "greed"],
+    ["sword", "cass", "need"],
+  ]);
+  const left = (t: CloudTable) => readLootClaims(t).claims.map((c) => `${c.holdingId}:${c.purseId}`).sort();
+  const expected = ["sword:cass"];
+  // Shared: the DM's deletes arrive as patches.
+  const noPotion = { ...marks, holdings: marks.holdings.filter((h) => h.id !== "potion") };
+  let shared = applyCommand(marks, dm, { ...tablePatch(marks, noPotion), id: "del-potion" } as Command);
+  const noAria = { ...shared, purses: shared.purses.filter((p) => p.id !== "aria"), holdings: shared.holdings.filter((h) => h.purseId !== "aria") };
+  shared = applyCommand(shared, dm, { ...tablePatch(shared, noAria), id: "del-aria" } as Command);
+  assert.deepEqual(left(shared), expected);
+  // Device: the same deletes through the device functions.
+  setSeat(DM_SEAT);
+  await applyCloudTable(marks);
+  await removeHolding("potion");
+  await removePurse("aria");
+  const device = await economySnapshot();
+  assert.deepEqual(left(device as CloudTable), expected);
 });
