@@ -46,7 +46,7 @@ export const MAX_FACTIONS = 100;
  * only: factions saved before stay readable, and an edit that doesn't grow them is accepted.
  */
 export const MAX_FACTIONS_BYTES = 400_000;
-export const FACTIONS_FULL = "This campaign's factions are full (400 KB in total). Shorten descriptions or notes, control fewer shops or delete factions you no longer need; nothing was saved.";
+export const FACTIONS_FULL = "This campaign's factions are full (400 KB in total). Shorten descriptions or notes, or have factions control fewer shops (deleted factions are kept as history and still count); nothing was saved.";
 export const MIN_RENOWN = -1000;
 export const MAX_RENOWN = 1000;
 export const MAX_FAVOR = 1_000_000;
