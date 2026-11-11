@@ -16,7 +16,7 @@ export function TableShare() {
     const current = getCloudTable();
     if (!current.joined || current.role !== "dm") throw Error("Start a session before inviting players.");
     if (!current.lastSync) throw Error("Wait for the current session to finish loading before copying its invitation.");
-    const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: current.code, session: current.sessionId, character: id });
+    const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: current.code, session: current.inviteSession || current.sessionId, character: id });
     await copyText(url);
     toast.success("Current session invitation copied.");
   }

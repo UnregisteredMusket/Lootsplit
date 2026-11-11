@@ -44,6 +44,12 @@ export type CloudSeat = {
   name: string;
   role: "dm" | "player";
   purseIds: string[];
+  /**
+   * Server-only (audit 2026-11-10 B4): the departed record (the kicked seat's ID) whose character
+   * this seat took with the DM's fresh invitation. Only such a seat may later be linked to that
+   * kicked account. Views pick seat fields, so it never reaches a client.
+   */
+  reinvited?: string;
 };
 
 export type CloudSeen = { gifts: string[]; sales: string[] };
@@ -73,6 +79,12 @@ export type CloudRoom = {
   monitorProbe?: boolean;
   departed?: Array<CloudSeat & { status: "left" | "dismissed" | "kicked" | "banned"; userId?: string }>;
   invitations?: Record<string, string>;
+  /**
+   * The invitation link's session (audit 2026-11-10 B4): replaced on every kick and ban so a
+   * removed person's link stops working. Absent until the first kick or ban: the link then uses
+   * `sessionId`. Seats and the play session (`sessionId`) are never changed by it.
+   */
+  invitationSession?: string;
   blockedUsers?: Record<string, "kicked" | "banned">;
   drafts?: Record<string, import("./commands.ts").Command[]>;
   /**
