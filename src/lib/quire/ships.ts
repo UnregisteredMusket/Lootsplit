@@ -450,7 +450,8 @@ export function applyShipCommand(t: CloudTable, seat: CloudSeat, cmd: ShipComman
       throw Error("The ship or campaign changed. Review a fresh action.");
   };
   let propertyId = "",
-    summary = "";
+    summary = "",
+    locationId: string | undefined;
   if (cmd.kind === "ship-configure") {
     dm();
     const v = cmd.vessel,
@@ -520,6 +521,8 @@ export function applyShipCommand(t: CloudTable, seat: CloudSeat, cmd: ShipComman
       throw Error("Move stored ships before changing the facility's identity or location.");
     f.facilities = [...f.facilities.filter((x) => x.id !== y.id), structuredClone(y)];
     propertyId = y.propertyId ?? "";
+    // A public facility (no property): its line names it only to players who can see its place.
+    if (!propertyId) locationId = y.locationId;
     summary = `Reviewed ${y.name} storage and shipyard terms.`;
   } else if (cmd.kind === "ship-board-review") {
     dm();
@@ -813,7 +816,9 @@ export function applyShipCommand(t: CloudTable, seat: CloudSeat, cmd: ShipComman
     kind: "management",
     ...(propertyId
       ? { propertyId, purseId: t.holdings.find((h) => h.id === propertyId)?.purseId }
-      : {}),
+      : locationId
+        ? { locationId }
+        : {}),
     summary: summary.slice(0, 500),
   });
 }
