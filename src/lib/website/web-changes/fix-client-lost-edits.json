@@ -1,0 +1,12 @@
+{
+  "title": "Your edits stay put when you switch windows",
+  "summary": "Switching to another window or another seat acting no longer puts back what the DM was typing, saving a form keeps it open with its confirmation, and a failed account check on reload no longer locks you out of your campaign.",
+  "items": [
+    "Item edits (name, notes), a purse's coin amounts and NPC service ticks keep what you typed until you save or cancel.",
+    "Saving NPC barter rules, downtime hours, property, staff, supplier, rent, postal, ship and dock settings keeps the section open and shows that it was recorded.",
+    "If the account check fails when you open or reload the app, your own campaign stays open with a Retry notice and the account is checked again when you reconnect.",
+    "Clear wait in NPC barter activity now says why when it cannot clear.",
+    "Reloading a shared campaign no longer sends Player joined or Mode changed notifications."
+  ],
+  "audience": "dm"
+}

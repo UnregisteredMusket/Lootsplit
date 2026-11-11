@@ -39,7 +39,7 @@ import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEs
 import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { planSaleSplit, MAX_SALE_LOTS, lotLabel, shopSale } from "./sale-split.ts";
-import { creditCoins } from "./coin-split.ts";
+import { creditCoins, isNpc } from "./coin-split.ts";
 import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
 import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
 import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
@@ -75,7 +75,7 @@ import {
   financeMove,
 } from "./finance.ts";
 import { assertMerchantSale, creditMerchant, isService, merchantRefill, merchantShortfall, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
-import { archiveSession } from "./session-records.ts";
+import { archiveSession, projectRecord } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
 import { referencePolicySchema, referencePolicy } from "./reference-access.ts";
@@ -87,6 +87,7 @@ import {
   editLegacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
+import { editedStockFields, staleStockMessage, type StockFields } from "./stock-edit.ts";
 import { assertCoinEditWithinLimit, formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
 import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
 import { readSheets } from "./sheet.ts";
@@ -393,6 +394,26 @@ export type CommandInput = Command extends infer C
  * Without an `id` a fresh one is generated and no duplicate check is possible.
  */
 export type CommandRequest = CommandInput & { id?: string };
+/**
+ * True when a player's own view (projectRecord with the party directory, as roomState sends it)
+ * lists this purse under its real name. `projected` is a player's client previewing on the
+ * table it already received. The ledger, chat and archived sessions name no purse the view
+ * lists, so they are left out of the copy that is projected.
+ */
+function recipientListed(t: CloudTable, seat: CloudSeat, purseId: string, projected: boolean) {
+  const listed = (table: CloudTable) => {
+    const p = table.purses.find((x) => x.id === purseId);
+    return !!p && characterVisible(table, p);
+  };
+  if (projected) return listed(t);
+  const journal = t.journal ? { ...t.journal, reports: [], editReports: [], entries: [] } : t.journal;
+  const view = projectRecord({ ...t, ledger: [], notes: [], journal }, seat, { directory: true });
+  return listed(view) && view.purses.find((x) => x.id === purseId)!.name === t.purses.find((x) => x.id === purseId)?.name;
+}
+/** Players never read this account's balance or name it in chat: NPCs, exchange treasuries, hidden characters. */
+function recipientPrivate(t: CloudTable, p: import("./types.ts").Purse) {
+  return isNpc(t, p) || !!t.journal?.tradeEconomy?.exchanges.some((e) => e.purseId === p.id) || !characterVisible(t, p);
+}
 export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution = {}): CloudTable {
   return applyOwnedCommand(structuredClone(input), seat, raw, execution);
 }
@@ -1430,7 +1451,13 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (h.kind === "property" && h.quantity === 0) removeEstateSite(t, h.id);
   } else if (cmd.kind === "give") {
     own(cmd.fromId);
-    if (cmd.fromId === cmd.toId || !t.purses.some((x) => x.id === cmd.toId))
+    // A player may pay only a purse their own view lists (audit 2026-11-10, B2): a hidden NPC or
+    // exchange treasury is refused exactly as an unknown ID, before anything moves.
+    if (
+      cmd.fromId === cmd.toId ||
+      !t.purses.some((x) => x.id === cmd.toId) ||
+      (seat.role !== "dm" && !recipientListed(t, seat, cmd.toId, execution.preview === true))
+    )
       throw new Error("Choose a different recipient.");
     if (!cmd.copper && !cmd.holdingId) throw new Error("Choose coins or an item to transfer.");
     coins(cmd.fromId, -cmd.copper);
@@ -1472,12 +1499,16 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     }
     log(cmd.fromId, "Transfer sent", -cmd.copper);
     log(cmd.toId, "Transfer received", cmd.copper, null, "-received");
+    // A transfer to an NPC, an exchange treasury or a hidden character posts its note to the DM
+    // only, filed under that account, as coin-split and sale-split do (audit 2026-11-10, B2).
+    const recipient = t.purses.find((p) => p.id === cmd.toId)!;
+    const private_ = recipientPrivate(t, recipient);
     t.notes.push({
       id: cmd.id + "-note",
       at,
       from: seat.role,
-      to: "party",
-      purseId: cmd.fromId,
+      to: private_ ? "dm" : "party",
+      purseId: private_ ? recipient.id : cmd.fromId,
       text: `${seat.name} transferred ${cmd.copper} cp${cmd.holdingId ? " and items" : ""} to ${t.purses.find((p) => p.id === cmd.toId)?.name}.`,
     });
   } else if (cmd.kind === "coin-split") {
@@ -1813,10 +1844,21 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       const current = rows.find((x) => rowId(x) === change.id) ?? null;
       // XP and milestones (protocol 21): an older client's purse rows lack them; keep the stored values.
       if (change.store === "purses" && current) Object.assign(change, keepPurseAdvancement(current, change.before, change.after));
-      if (!same(current, change.before))
+      if (!same(current, change.before)) {
+        // A shop's stock edited from an old screen (sold, repriced or renamed meanwhile; audit
+        // 2026-11-10 D3): say what changed. The device refuses with the same words (editStockLine).
+        const stale =
+          change.store === "stock" && change.before && change.after
+            ? staleStockMessage(
+                current,
+                change.before as StockFields,
+                editedStockFields(change.before as StockFields, change.after as StockFields),
+              )
+            : null;
         throw new Error(
-          `Conflict in ${change.store}. Export your pending changes, then refresh and retry.`,
+          stale ?? `Conflict in ${change.store}. Export your pending changes, then refresh and retry.`,
         );
+      }
       // A pooled lot stays in its party fund until the DM resolves it or takes it out of the
       // pool (loot-pool-set). An older client that drops the marker keeps it pooled.
       if (change.store === "holdings" && current?.pool && change.after !== null) {

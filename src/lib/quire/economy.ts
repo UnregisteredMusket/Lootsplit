@@ -145,6 +145,7 @@ import type {
 } from "./types.ts";
 import type { RarityFlags, ShelfDraft } from "./compose.ts";
 import { requestConfirm } from "./confirm-store.ts";
+import { STOCK_REMOVED, staleStockMessage, type StockEdit } from "./stock-edit.ts";
 
 const ECONOMY = ["purses", "holdings", "shops", "stock", "ledger", "meta"] as const;
 
@@ -848,6 +849,49 @@ export async function saveStock(line: StockLine, assertScope?: () => void): Prom
           after: { copper: line.copper },
         },
       );
+  });
+}
+
+/**
+ * One field of a stock line from the shop's Edit mode (audit 2026-11-10 D3). The edit is refused,
+ * and nothing changes, when the stored line no longer has the value the box showed when the DM
+ * started editing (sold, repriced or renamed elsewhere); every other field keeps its stored value.
+ * In a shared room this runs on the freshly refreshed copy, and the room checks the same baseline
+ * again (`staleStockMessage` in commands.ts), so a stale screen never writes old stock back.
+ */
+export async function editStockLine(
+  id: string,
+  edit: StockEdit,
+  assertScope?: () => void,
+): Promise<void> {
+  if (getSeat().role !== "dm") throw new Error("Only the DM can manage shop stock.");
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
+  await atomic(["stock", "meta"], async (tx) => {
+    const stored = await request<StockLine | undefined>(tx.objectStore("stock").get(id));
+    guard();
+    const current = stored ? normalizeStock(stored) : undefined;
+    const refused = current
+      ? staleStockMessage(current, { ...current, [edit.field]: edit.shown }, [edit.field])
+      : STOCK_REMOVED;
+    if (refused) throw new Error(refused);
+    const line = { ...stored!, [edit.field]: edit.value } as StockLine;
+    if (current!.copper === line.copper && current!.name === line.name && current!.quantity === line.quantity)
+      return;
+    const checked = { ...current!, [edit.field]: edit.value } as StockLine;
+    validateEconomyRows({ purses: [], holdings: [], shops: [], stock: [checked], ledger: [] });
+    tx.objectStore("stock").put(line);
+    if (current!.copper !== line.copper)
+      await audit(tx, `${line.name}: ${current!.copper} cp → ${line.copper} cp`, "prices", undefined, {
+        entity: "stock",
+        entityId: line.id,
+        before: { copper: current!.copper },
+        after: { copper: line.copper },
+      });
   });
 }
 

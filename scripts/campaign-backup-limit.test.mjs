@@ -458,3 +458,25 @@ test("Download a copy (campaign export) is for the linked DM only and leaks no s
     DB.close();
   }
 });
+
+test("over HTTP: a backup above one D1 row is stored in parts, and an unknown entry kind is a 400", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const dm = await signup("edges@example.com");
+    // About 2.4 MB: larger than D1's 2 MB row (audit 2026-11-10 H7), within the 4 MB request limit.
+    const big = { ...payload, ledger: Array.from({ length: 12_000 }, (_, i) => ({ id: `l-${i}`, at: i, purseId: "p", shopId: null, summary: `Rope é漢 ${"oil ".repeat(40)}`, copper: -1, transactionType: "purchase" })) };
+    assert.ok(Buffer.byteLength(JSON.stringify(big)) > 2_000_000);
+    const saved = await call("backup", { name: "Big", payload: big, campaignKey: "device:edges" }, dm.cookie);
+    assert.equal(saved.response.status, 200, JSON.stringify(saved.data));
+    assert.ok((await DB.prepare("SELECT COUNT(*) AS n FROM library_backup_parts WHERE backup_id=?").bind(saved.data.id).first()).n >= 2);
+    assert.deepEqual((await call("read-backup", { id: saved.data.id }, dm.cookie)).data.payload, big);
+    // H10: an Object prototype name is an unknown kind, not a server error.
+    const odd = await call("remove", { kind: "constructor", id: saved.data.id }, dm.cookie);
+    assert.equal(odd.response.status, 400);
+    assert.equal(odd.data.error, "Unknown library entry.");
+    assert.equal((await call("remove", { kind: "backup", id: saved.data.id }, dm.cookie)).response.status, 200);
+    assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM library_backup_parts").first()).n, 0);
+  } finally {
+    DB.close();
+  }
+});

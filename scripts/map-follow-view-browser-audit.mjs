@@ -81,21 +81,23 @@ try {
   await openKeep(p.page, origin);
   await switchTo(p.page, "The Cellar");
   const moved = p.page.locator("[data-sonner-toast]").filter({ hasText: "Your token moved to The Cellar" });
+  // The toast clears itself; the pointer rests on it (which pauses it) from the moment it
+  // appears until Undo, with no click elsewhere in between (audit G4, 2026-11-10).
   await expect(moved).toBeVisible({ timeout: 8000 });
-  await expect(moved).toContainText("Still with the party: same zone (Testville)");
   await moved.hover();
-  // The player's switch beside the toast (mockup frame 4).
+  await expect(moved).toContainText("Still with the party: same zone (Testville)");
+  await p.page.screenshot({ path: `${out}/followed-toast-1280.png` });
+  assert.deepEqual((await mapOf(p.page, "cellar")).tokens.map((t) => t.entityId), ["mira"]);
+  assert.equal((await mapOf(p.page, "keep")).tokens.some((t) => t.entityId === "mira"), false);
+  await moved.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(async () => (await mapOf(p.page, "keep")).tokens.find((t) => t.entityId === "mira")?.column).toBe(12);
+  assert.equal((await mapOf(p.page, "cellar")).tokens.length, 0);
+  // The player's own Follow me switch in map settings (mockup frame 4).
   await p.page.getByRole("button", { name: /All map settings|Map settings/ }).first().click();
   await p.page.locator("#map-settings-players").scrollIntoViewIfNeeded();
   await expect(p.page.getByRole("switch", { name: /Follow me/ })).toBeVisible();
   await p.page.screenshot({ path: `${out}/followed-1280.png` });
   await p.page.keyboard.press("Escape");
-  assert.deepEqual((await mapOf(p.page, "cellar")).tokens.map((t) => t.entityId), ["mira"]);
-  assert.equal((await mapOf(p.page, "keep")).tokens.some((t) => t.entityId === "mira"), false);
-  await moved.hover();
-  await moved.getByRole("button", { name: "Undo" }).click();
-  await expect.poll(async () => (await mapOf(p.page, "keep")).tokens.find((t) => t.entityId === "mira")?.column).toBe(12);
-  assert.equal((await mapOf(p.page, "cellar")).tokens.length, 0);
   // Another place: viewing only.
   await switchTo(p.page, "Saltmarsh Road");
   await expect(p.page.locator("[data-sonner-toast]").filter({ hasText: "This trip takes about 2 days. Ask your DM to plan the journey." })).toBeVisible({ timeout: 8000 });

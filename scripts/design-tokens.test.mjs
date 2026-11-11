@@ -34,6 +34,48 @@ test("hex colours are found outside comments, not in ids or entities", () => {
   assert.deepEqual(hexColours('href="#purse-1" &#123; color: #12345'), []);
 });
 
+// Audit I3 (2026-11-10): issue numbers in comments and prose and a fragment link counted as
+// colours and failed the ratchet three times in 13 days.
+test("in scripts, comments, prose references and link targets are not colours", () => {
+  const script = { script: true };
+  for (const text of [
+    "// Regression for #465",
+    "const a = 1; // Regression for #465",
+    'const note = "see #456";',
+    '<a href="#add">Add</a>',
+    "<Link to='#bad' />",
+    'navigate({ hash: "#fee" });',
+    'text: "Merged #138 · Widget redesign"',
+  ])
+    assert.deepEqual(hexColours(text, script), [], text);
+  // Real colours still count, and the // of a URL does not hide the rest of the line.
+  assert.deepEqual(
+    hexColours(
+      [
+        'const box = { background: "#f3ead7", border: "1px solid #ccc" };',
+        'const css = ".deed{fill:#795438}";',
+        "const shadow = `0 0 4px #000, inset 0 0 0 1px #12345678`;",
+        'const src = "https://example.com/a.png"; const ink = "#2b2118";',
+        '<div className="bg-[#1d1d22]" style={{ color: "#fff" }} />',
+        "const gradient = 'linear-gradient(to right, #abc, #def)';",
+      ].join("\n"),
+      script,
+    ),
+    [
+      "#f3ead7",
+      "#ccc",
+      "#795438",
+      "#000",
+      "#12345678",
+      "#2b2118",
+      "#1d1d22",
+      "#fff",
+      "#abc",
+      "#def",
+    ],
+  );
+});
+
 test("breakpoints must be a token or a token value", () => {
   const css = `@media (max-width: theme(--bp-phone)) {} @media (min-width: 651px) {}
     @media (max-width: 1023.98px) {} @media (orientation: landscape) and (max-height: 500px) {}

@@ -15,7 +15,8 @@ permissions:
   contents: read
 concurrency:
   group: code-health-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push replaces a pull request's scan; every main commit keeps its own (audit G14).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   knip:
     name: Unused files, exports and dependencies (knip)

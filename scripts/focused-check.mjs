@@ -43,6 +43,7 @@ const featureAudits = {
   "loot-fairness": "scripts/loot-fairness-browser-audit.mjs",
   "undo-toasts": "scripts/undo-toasts-browser-audit.mjs",
   "party-inventory": "scripts/party-inventory-browser-audit.mjs",
+  "lost-edits": "scripts/lost-edits-browser-audit.mjs",
   "journey-planner": "scripts/journey-planner-browser-audit.mjs",
   "party-split": "scripts/party-split-browser-audit.mjs",
   "tracker-time": "scripts/tracker-time-browser-audit.mjs",

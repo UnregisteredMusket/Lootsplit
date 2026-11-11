@@ -56,6 +56,24 @@ export function npcController(npc: Npc, seat: Pick<CloudSeat, "role" | "purseIds
     seat.role === "dm" || (!!npc.controllerPurseId && seat.purseIds.includes(npc.controllerPurseId))
   );
 }
+/**
+ * An imported NPC's ID (audit 2026-11-10, B3): a hash of the import command's ID, the NPC's
+ * position and the reviewed document (which players never see), so one visible NPC's ID gives
+ * no way to the others'. The same command always gives the same IDs. NPCs imported before keep
+ * their `<command>-npc-<n>` IDs.
+ */
+export function importedNpcId(commandId: string, index: number, document: unknown) {
+  const text = canonicalJson({ commandId, index, document });
+  const lanes = [0x811c9dc5, 0x01000193 ^ text.length, 0x9e3779b9, 0x85ebca6b];
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    lanes[0] = Math.imul(lanes[0] ^ c, 0x01000193) >>> 0;
+    lanes[1] = Math.imul(lanes[1] ^ (c + i), 0x01000193) >>> 0;
+    lanes[2] = Math.imul(lanes[2] ^ c, 0x5bd1e995) >>> 0;
+    lanes[3] = Math.imul((lanes[3] ^ c) + i, 0x27d4eb2d) >>> 0;
+  }
+  return "npc-" + lanes.map((x) => x.toString(16).padStart(8, "0")).join("");
+}
 export function worldImportFingerprint(t: CloudTable) {
   return canonicalJson({
     npcs: t.journal?.world?.npcs ?? [],
@@ -646,7 +664,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       throw Error("Locations or NPCs changed. Review a fresh import.");
     cmd.document.npcs.forEach((n, i) => {
       const { copper, inventory, ...config } = n;
-      addNpc({ ...config, id: `${cmd.id}-npc-${i}` }, copper, inventory);
+      addNpc({ ...config, id: importedNpcId(cmd.id, i, cmd.document) }, copper, inventory);
     });
     event(`Imported ${cmd.document.npcs.length} non-party NPCs.`);
   } else if (cmd.kind === "npc-save") {
