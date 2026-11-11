@@ -1,0 +1,10 @@
+{
+  "title": "Hidden NPCs can't be found by guessing their ID",
+  "summary": "A player who sends a message or a barter offer to a made-up NPC ID now gets the same answer as for a hidden NPC or one that isn't here, so the answer no longer shows whether a hidden NPC exists.",
+  "items": [
+    "Messages: an unknown, hidden or absent NPC all answer This NPC is not available at the current location.",
+    "Barter offers: an unknown account, a hidden NPC or an absent NPC all answer This NPC is not available for bartering at the current location.",
+    "The DM still sees the detailed reason, such as NPC no longer exists."
+  ],
+  "audience": "players"
+}

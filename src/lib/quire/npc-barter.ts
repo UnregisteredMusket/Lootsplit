@@ -491,6 +491,10 @@ export function applyNpcBarterCommand(
     if (state.attempts.some((a) => a.id === cmd.id)) throw Error("This offer was already made.");
     const npc = npcOf(cmd.npcId);
     if (!npcAvailableHere(npc, t, actingGroups(t, cmd.purseId))) throw Error(notHere(npc));
+    // Before barterEligible, which tells a missing account from a hidden NPC (privacy review of
+    // PR 489): a guessed ID on either side gets this one answer.
+    if (cmd.give.purseId !== cmd.purseId || cmd.ask.purseId !== cmd.npcId)
+      throw Error("The offer's sides don't match this conversation.");
     barterEligible(t, { left: cmd.give, right: cmd.ask });
     const payer = t.purses.find((p) => p.id === cmd.purseId)!;
     if (toCopper(payer.coins) < cmd.give.copper) throw Error("You can't afford those coins right now.");

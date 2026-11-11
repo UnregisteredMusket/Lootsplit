@@ -43,7 +43,7 @@ export function npcAvailableHere(
 ) {
   const market = readMarketLocations(table.journal?.market);
   const s = table.journal?.world?.characterPositions?.find((s) => s.purseId === npc.id);
-  if (!npc.visible || !(s?.visible ?? true)) return false;
+  if (!npcVisible(npc, table)) return false;
   if (s?.inParty) return groups.includes(resolveGroup(table, s.groupId));
   return groups.some((g) => {
     const here = groupPlace(table, g).locationId;
@@ -51,6 +51,18 @@ export function npcAvailableHere(
   });
 }
 export { shopVisible, shopAsking } from "./vendors.ts";
+/** The NPC and its placement are both visible to players. */
+function npcVisible(npc: Npc, table: Pick<CloudTable, "journal">) {
+  const s = table.journal?.world?.characterPositions?.find((s) => s.purseId === npc.id);
+  return npc.visible && (s?.visible ?? true);
+}
+/**
+ * A player gets one refusal whatever the reason an NPC can't be reached: its ID doesn't exist, it
+ * is hidden or it is elsewhere, so a guessed ID can't confirm a hidden NPC (privacy review of
+ * PR 479). The DM keeps the detailed reasons.
+ */
+const NPC_NOT_HERE = "This NPC is not available at the current location.";
+const NPC_NO_BARTER = "This NPC is not available for bartering at the current location.";
 export function npcController(npc: Npc, seat: Pick<CloudSeat, "role" | "purseIds">) {
   return (
     seat.role === "dm" || (!!npc.controllerPurseId && seat.purseIds.includes(npc.controllerPurseId))
@@ -294,25 +306,28 @@ export function recognizedAnchors(
 function participant(t: CloudTable, seat: CloudSeat, id: string) {
   const npc = readWorld(t.journal?.world).npcs.find((n) => n.id === id);
   const p = t.purses.find((p) => p.id === id);
-  if (!p) throw Error("This trade account no longer exists.");
+  const notYours = "Only this participant or the DM can decide their side of the trade.";
+  // A player is told an unknown ID the same as someone else's (hidden NPC included).
+  if (!p) throw Error(seat.role === "dm" ? "This trade account no longer exists." : notYours);
   if (npc ? !npcController(npc, seat) : seat.role !== "dm" && !seat.purseIds.includes(id))
-    throw Error("Only this participant or the DM can decide their side of the trade.");
+    throw Error(notYours);
   return p;
 }
 /** Rechecks both sides of a barter: participants, NPC presence, exact lots, custody and deeds. */
 export function barterEligible(t: CloudTable, trade: Pick<Trade, "left" | "right">) {
   eligible(t, trade);
 }
-function eligible(t: CloudTable, trade: Pick<Trade, "left" | "right">) {
+/** `seat`: who makes the offer; a player is told an unknown account the same as an absent NPC. */
+function eligible(t: CloudTable, trade: Pick<Trade, "left" | "right">, seat?: Pick<CloudSeat, "role">) {
   const w = readWorld(t.journal?.world);
   for (const side of [trade.left, trade.right]) {
     if (!t.purses.some((p) => p.id === side.purseId))
-      throw Error("Trade account no longer exists.");
+      throw Error(seat && seat.role !== "dm" ? NPC_NO_BARTER : "Trade account no longer exists.");
     const npc = w.npcs.find((n) => n.id === side.purseId);
     // Split the party: the NPC must be where the other participant's group is.
     const other = side === trade.left ? trade.right : trade.left;
     if (npc && (!npc.barterAllowed || !npcAvailableHere(npc, t, actingGroups(t, other.purseId))))
-      throw Error("This NPC is not available for bartering at the current location.");
+      throw Error(NPC_NO_BARTER);
     for (const item of side.items) {
       const h = t.holdings.find((h) => h.id === item.holdingId && h.purseId === side.purseId);
       // Item identification: a player offered the item as presented (item-identity.ts).
@@ -754,7 +769,9 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     event("NPC inventory updated.");
   } else if (cmd.kind === "npc-message") {
     const npc = w.npcs.find((n) => n.id === cmd.npcId);
-    if (!npc) throw Error("NPC no longer exists.");
+    if (!npc) throw Error(seat.role === "dm" ? "NPC no longer exists." : NPC_NOT_HERE);
+    // Before any check of the character, so its answer can't tell a hidden NPC from a guess.
+    if (seat.role !== "dm" && !npcVisible(npc, t)) throw Error(NPC_NOT_HERE);
     if (!t.purses.some((p) => p.id === cmd.purseId && p.kind === "character" && !p.nonParty))
       throw Error("Choose an existing party character.");
     if (cmd.asNpc) {
@@ -764,8 +781,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       if (t.purses.find((p) => p.id === cmd.purseId)?.nonParty)
         throw Error("Choose a party character.");
     }
-    if (!npcAvailableHere(npc, t, actingGroups(t, cmd.purseId)))
-      throw Error("This NPC is not available at the current location.");
+    if (!npcAvailableHere(npc, t, actingGroups(t, cmd.purseId))) throw Error(NPC_NOT_HERE);
     const conversationId = `${npc.id}:${cmd.purseId}`;
     let c = w.conversations.find((c) => c.id === conversationId);
     if (!c) {
@@ -800,6 +816,8 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       const other = cmd.actorId === cmd.left.purseId ? cmd.right : cmd.left,
         prior =
           existing && (cmd.actorId === existing.left.purseId ? existing.right : existing.left);
+      // Before the inventory check, so quoting goods can't tell a guessed ID from a hidden NPC.
+      if (!t.purses.some((p) => p.id === other.purseId)) throw Error(NPC_NO_BARTER);
       // A request may quote visible NPC goods or the previously disclosed offer, never private guessed inventory.
       if (
         !w.npcs.some((n) => n.id === other.purseId) &&
@@ -809,7 +827,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       )
         throw Error("Ask the other player to add their own inventory in a counteroffer.");
     }
-    eligible(t, cmd);
+    eligible(t, cmd, seat);
     if (!cmd.left.copper && !cmd.right.copper && !cmd.left.items.length && !cmd.right.items.length)
       throw Error("Offer at least one item, property or some coins.");
     const offer: Trade = {
