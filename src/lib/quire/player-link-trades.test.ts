@@ -131,7 +131,7 @@ test("A8 parity: player-link refusals use the shared engine's words and change n
   const refusals: Array<[CommandInput, () => Promise<void>]> = [
     [{ kind: "buy", stockId: "x", purseId: "a", quantity: 9 }, () => buyFromShop({ stockId: "x", purseId: "a", quantity: 9 })],
     [{ kind: "buy", stockId: "x", purseId: "b", quantity: 1 }, () => buyFromShop({ stockId: "x", purseId: "b", quantity: 1 })],
-    [{ kind: "sell", holdingId: "rope", shopId: "s", quantity: 6 }, (ID) => sellToShop({ holdingId: "rope", shopId: "s", quantity: 6 })],
+    [{ kind: "sell", holdingId: "rope", shopId: "s", quantity: 6 }, () => sellToShop({ holdingId: "rope", shopId: "s", quantity: 6 })],
   ];
   const base = campaign();
   base.holdings.push({ id: "b-rope", purseId: "b", kind: "item", name: "Rope", quantity: 1, unitCopper: 100, notes: "", category: "general" });
