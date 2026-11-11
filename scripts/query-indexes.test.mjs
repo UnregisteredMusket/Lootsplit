@@ -102,3 +102,51 @@ test("0029 serves the history-on-demand lookups from keys and indexes", () => {
   assert.match(plan(db, "DELETE FROM campaign_room_history_ids WHERE code = ? AND hash NOT IN (?,?)"), /USING (COVERING )?INDEX sqlite_autoindex_campaign_room_history_ids_1/);
   db.close();
 });
+
+test("0032 serves the library character reads and the minute monitor cron from indexes (audit F1, F3, F11)", () => {
+  assertAdditiveSql("0032_library_and_monitor_indexes.sql", readFileSync(`${directory}/0032_library_and_monitor_indexes.sql`, "utf8"));
+  const db = schema();
+  const source = (file) => readFileSync(file, "utf8");
+  const accounts = source("cloudflare/accounts.mjs"),
+    journal = source("cloudflare/monitor-journal.mjs"),
+    monitoring = source("cloudflare/monitoring.mjs");
+  // Each query is the Worker's own text, so a later edit to it cannot leave this test behind.
+  const real = (file, sql) => (assert.ok(file.includes(sql), `query not found in source: ${sql}`), sql);
+  // F1 cloudflare/accounts.mjs: one account's character library, newest first.
+  const library = plan(db, real(accounts, "SELECT id, body FROM library_characters WHERE user_id=? ORDER BY updated_at DESC"));
+  assert.match(library, /SEARCH library_characters USING INDEX library_characters_owner \(user_id=\?\)/);
+  assert.doesNotMatch(library, /SCAN library_characters|TEMP B-TREE/);
+  // F1 the character save's per-account count and size limits.
+  const save = plan(
+    db,
+    real(
+      accounts,
+      "INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=? ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at",
+    ),
+  );
+  assert.doesNotMatch(save, /SCAN library_characters/);
+  assert.equal((save.match(/SEARCH library_characters USING (COVERING )?INDEX library_characters_owner \(user_id=\?\)/g) || []).length, 2, save);
+  // F3 monitor-journal.mjs scheduledMonitor: interrupted collections and history recovery read only
+  // the intervals that are not complete, which is a small share of a history kept in full.
+  for (const sql of [
+    "SELECT slot FROM owner_monitor_intervals WHERE outcome<>'complete' AND outcome IN ('collecting','failed') AND slot<? AND (lease_until IS NULL OR lease_until<?) ORDER BY slot LIMIT 2",
+    "SELECT slot,outcome,body FROM owner_monitor_intervals WHERE outcome<>'complete' AND (outcome='missed' OR (outcome='partial' AND COALESCE(json_extract(body,'$.sources.traffic.state'),'unavailable')!='ready' AND COALESCE(json_extract(body,'$.historicalTraffic.state'),'unavailable')!='ready')) AND COALESCE(json_extract(body,'$.historicalTraffic.errorCode'),'')<>'OUTSIDE_RECOVERY_RETENTION' AND COALESCE(json_extract(body,'$.historyRetryAt'),COALESCE(json_extract(body,'$.historyAttemptAt'),0)+?)<=? ORDER BY slot LIMIT 1",
+  ]) {
+    const cron = plan(db, real(journal, sql));
+    assert.match(cron, /USING (COVERING )?INDEX owner_monitor_intervals_open/, sql);
+    // Walking the partial index in slot order is the point: it holds only unfinished rows.
+    assert.doesNotMatch(cron, /SCAN owner_monitor_intervals(?! USING (COVERING )?INDEX owner_monitor_intervals_open)|INTEGER PRIMARY KEY|TEMP B-TREE/, sql);
+  }
+  // F11 the latest stored daily report for a timezone (every tick after report time).
+  const reports = plan(db, real(journal, "SELECT day FROM owner_monitor_reports WHERE timezone=? ORDER BY day DESC LIMIT 1"));
+  assert.match(reports, /USING COVERING INDEX owner_monitor_reports_timezone_day \(timezone=\?\)/);
+  assert.doesNotMatch(reports, /TEMP B-TREE/);
+  // F11 the last day of site administration events.
+  const audit = plan(db, real(journal, "SELECT action,created_at,id FROM site_audit WHERE created_at>=? ORDER BY created_at,id LIMIT 500"));
+  assert.match(audit, /USING INDEX site_audit_created \(created_at>\?\)/);
+  assert.doesNotMatch(audit, /TEMP B-TREE/);
+  // F11 monitoring.mjs: members online in the last 5 minutes and 24 hours.
+  real(monitoring, "(SELECT COUNT(*) FROM member_profiles WHERE last_online >= ?) AS active5m");
+  assert.match(plan(db, "SELECT COUNT(*) FROM member_profiles WHERE last_online >= ?"), /USING COVERING INDEX member_profiles_last_online \(last_online>\?\)/);
+  db.close();
+});
