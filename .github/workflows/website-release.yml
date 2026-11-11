@@ -56,7 +56,9 @@ jobs:
           github-token: ${{ github.token }}
       - name: Validate the exact verified artifact
         run: node scripts/release-artifact.mjs verify
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium for Playwright
+        timeout-minutes: 12
+        uses: ./.github/actions/playwright-chromium
       # A release whose commit is no longer the head of main is superseded: it stops here, before
       # migrations and deploy, exactly as before, but ends success instead of a false failure.
       # Every production step below is guarded on this output; only a real deploy reaches

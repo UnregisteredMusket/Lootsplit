@@ -33,6 +33,23 @@ export function parseDryRun(output) {
   return null;
 }
 
+/**
+ * Without package lists (a fresh runner whose apt-get update cannot reach the archive), apt's
+ * simulation names each requested package it does not have installed as unlocatable. Returns those
+ * packages, or null when the output has any other error (then nothing is known).
+ */
+export function unlocatable(output) {
+  const errors = output.split("\n").filter((line) => /^E: /.test(line));
+  if (!errors.length) return null;
+  const missing = [];
+  for (const line of errors) {
+    const match = /^E: (?:Unable to locate package (\S+)|Package '([^']+)' has no installation candidate)\s*$/.exec(line);
+    if (!match) return null;
+    missing.push(match[1] ?? match[2]);
+  }
+  return checked(missing);
+}
+
 /** True when every package is an optional font package (fonts-*, xfonts-*). */
 export function fontsOnly(packages) {
   return packages.length > 0 && packages.every((name) => /^(fonts|xfonts)-/.test(name));
@@ -72,8 +89,13 @@ function main() {
   const cli = join(dirname(require.resolve("playwright/package.json")), "cli.js");
   const node = process.execPath;
   const sudo = process.getuid?.() === 0 ? [] : ["sudo"];
-  const apt = (...args) => [
+  // `timeout` runs inside sudo: killing sudo alone leaves apt-get holding the lists lock, and the
+  // retry then fails on the lock instead of the mirror (2026-11-11, Ubuntu 26 runners).
+  const apt = (seconds, ...args) => [
     ...sudo,
+    "timeout",
+    "--kill-after=10",
+    String(seconds - 15),
     "env",
     "DEBIAN_FRONTEND=noninteractive",
     "apt-get",
@@ -89,7 +111,7 @@ function main() {
   let libraries = 0;
   const update = () => {
     if (updated) return;
-    const [cmd, ...args] = apt("update");
+    const [cmd, ...args] = apt(120, "update");
     libraries += bounded("apt-get update", cmd, args, { seconds: 120 });
     updated = true;
   };
@@ -103,7 +125,21 @@ function main() {
   let check = dryRun();
   // The simulation needs current package lists; refresh them once and ask again.
   if (!check.parsed) {
-    update();
+    try {
+      update();
+    } catch (error) {
+      // The archive is unreachable (2026-11-11: every runner, for hours). Without lists apt still
+      // names the packages that are not installed; when those are only optional fonts, the
+      // headless shell runs on the image's own fonts, as it does after a failed font install.
+      const absent = unlocatable(check.text);
+      if (!absent || !fontsOnly(absent)) throw error;
+      console.log(`::warning title=Chromium install::Package archive unreachable; optional font packages skipped: ${absent.join(" ")}`);
+      const shell = bounded("headless shell", node, [cli, "install", "--only-shell", "chromium"], { seconds: 120 });
+      console.log(
+        `::notice title=Chromium install::System libraries: ${absent.length} missing, all optional fonts (${absent.join(" ")}); archive unreachable, continued without them. Headless shell ${process.env.CHROMIUM_CACHE_HIT === "true" ? "restored from cache" : "downloaded"}, ready in ${shell}s.`,
+      );
+      return;
+    }
     check = dryRun();
   }
   if (!check.parsed) throw Error(`Unrecognized Playwright dependency check: ${check.text.trim().slice(0, 600)}`);
@@ -119,9 +155,21 @@ function main() {
     total = packages.length;
   }
   let fontGap = "";
+  let archiveDown = false;
   if (missing.length) {
-    update();
-    const [cmd, ...args] = apt("install", "-y", "--no-install-recommends", "--fix-missing", ...missing);
+    try {
+      update();
+    } catch (error) {
+      // The archive is unreachable (2026-11-11: every runner image, for hours). When only optional
+      // fonts are missing, continue on the image's own fonts, as after a failed font install.
+      if (!fontsOnly(missing)) throw error;
+      archiveDown = true;
+      fontGap = ` (package archive unreachable; font packages skipped)`;
+      console.log(`::warning title=Chromium install::Package archive unreachable; optional font packages skipped: ${missing.join(" ")}`);
+    }
+  }
+  if (missing.length && !archiveDown) {
+    const [cmd, ...args] = apt(180, "install", "-y", "--no-install-recommends", "--fix-missing", ...missing);
     try {
       libraries += bounded("apt-get install", cmd, args, { seconds: 180 });
     } catch (first) {
