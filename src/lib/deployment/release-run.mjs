@@ -55,5 +55,8 @@ export function releaseRunOutcome(jobs) {
   return "not-deployed";
 }
 
-/** Whether an outcome means the run's commit went live (audited or not). */
+/**
+ * Whether an outcome means the run's commit went live (audited or not).
+ * @param {string} outcome
+ */
 export const isDeployedOutcome = (outcome) => outcome === "deployed" || outcome === "live-unaudited";
