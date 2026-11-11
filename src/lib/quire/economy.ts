@@ -61,6 +61,7 @@ import { CATALOG_REVISION, PREVIOUS_LIST, starterCatalog } from "./catalog-seed.
 import { quireDb, activeDatabaseName } from "./db.ts";
 import { guessRarity } from "./extract.ts";
 import {
+  assertCoinEditWithinLimit,
   charismaOffPercent,
   emptyCoins,
   formatCopper,
@@ -2156,6 +2157,7 @@ export async function setCoins(
       );
     if (options.before && !sameCoins(purse.coins, options.before))
       throw new Error("These coins changed. Review the purse and try again.");
+    assertCoinEditWithinLimit(purse.coins, next);
     const delta = toCopper(next) - toCopper(purse.coins);
     if (!Number.isSafeInteger(delta))
       throw new Error(

@@ -87,7 +87,7 @@ import {
   editLegacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
-import { formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
+import { assertCoinEditWithinLimit, formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
 import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
 import { readSheets } from "./sheet.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
@@ -1006,6 +1006,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const p = t.purses.find((x) => x.id === cmd.purseId);
     if (!p) throw new Error("This account no longer exists.");
     if (!sameCoins(p.coins, cmd.before)) throw new Error("These coins changed. Review the purse and try again.");
+    assertCoinEditWithinLimit(p.coins, cmd.coins);
     const delta = toCopper(cmd.coins) - toCopper(p.coins);
     p.coins = { cp: cmd.coins.cp, sp: cmd.coins.sp, ep: cmd.coins.ep, gp: cmd.coins.gp, pp: cmd.coins.pp };
     if (delta !== 0)
