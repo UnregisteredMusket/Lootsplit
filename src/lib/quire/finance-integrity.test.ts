@@ -404,8 +404,12 @@ test("coin validation rejects aggregate overflow but preserves exactly represent
   assert.equal(toCopper(largest), Number.MAX_SAFE_INTEGER);
   assert.equal(toCopper(spendCoins(largest, 1)!), Number.MAX_SAFE_INTEGER - 1);
   assert.equal(coinsSchema.safeParse({ ...largest, cp: largest.cp + 1 }).success, false);
+  // A legacy balance above today's limit (a DM coin edit can no longer set one: audit A6).
   await applyCloudTable(fixture());
-  await setCoins("a", largest);
+  await assert.rejects(setCoins("a", largest), /largest supported balance/);
+  const legacy = fixture();
+  legacy.purses[0].coins = largest;
+  await applyCloudTable(legacy);
   const before = await economySnapshot();
   await assert.rejects(postCopper("a", 1, "Overflow"), /Insufficient funds/);
   await assert.rejects(setCoins("a", t.purses[0].coins), /exactly representable/);

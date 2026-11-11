@@ -60,7 +60,6 @@ for (const file of [
   },
 };
 
-const coins = (c: Partial<Purse["coins"]>) => ({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0, ...c });
 
 function campaign(): CloudTable {
   return {
@@ -116,7 +115,7 @@ test("a loan or payment request whose ID already exists is refused; one row stay
   await assert.rejects(submitCommands({ code: dm.code, token: bram.token, batchId: "x2", commands: [{ ...request, purseId: "bram" }] }));
   const t = (await roomState(dm)).table;
   assert.equal(t.loans.filter((l) => l.id === "loan-1").length, 1);
-  assert.equal(t.journal!.requests.filter((r) => r.id === "req-1").length, 1);
+  assert.equal(t.journal!.requests.filter((r: { id: string }) => r.id === "req-1").length, 1);
   // The engine refuses too (the device runs the same command), whatever the receipts say.
   const dmSeat: CloudSeat = { id: "dm", token: "", name: "DM", role: "dm", purseIds: [] };
   assert.throws(() => applyCommand(t, dmSeat, { ...loan, purseId: "bram" }), /already identifies/);
