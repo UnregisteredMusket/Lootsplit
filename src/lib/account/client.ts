@@ -74,7 +74,7 @@ async function accountRequestCore<T>(
     await disconnectOwnerWidget(localStorage.getItem(TOKEN) || "");
   const headers = new Headers();
   headers.set("accept", "application/json");
-  headers.set("x-lootsplit-tabletop", "33");
+  headers.set("x-lootsplit-tabletop", "34");
   if (body !== undefined) headers.set("content-type", "application/json");
   if (captcha) headers.set("x-captcha-response", captcha);
   // Once per page: drop a token restored from another installation before it is ever sent.

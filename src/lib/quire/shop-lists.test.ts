@@ -330,7 +330,7 @@ test("older clients: whole-journal writes keep the stored library; drafts with s
   assert.deepEqual(preserveJournalMetadata(old, t.journal!).shopLists, t.journal!.shopLists);
   const forged = { ...t.journal, shopLists: { lists: [] } };
   assert.deepEqual(preserveJournalMetadata(forged, t.journal!).shopLists, t.journal!.shopLists);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, SHOP_LISTS_PROTOCOL);
+  assert.ok(CURRENT_TABLETOP_PROTOCOL >= SHOP_LISTS_PROTOCOL);
   const draft = JSON.stringify([save("w1", "winter", winter)]);
   const value = { table: t, draft };
   assert.throws(() => tabletopResponse(value, SETTLEMENT_LIMITS_PROTOCOL), /updated website/);

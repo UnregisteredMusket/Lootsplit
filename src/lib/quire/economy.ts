@@ -15,7 +15,7 @@ import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, creditMerchant, isService, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
-import { applyCommand, applyCommandBatch, commandSchema, type CommandRequest } from "./commands.ts";
+import { applyCommand, applyCommandBatch, assertExpectedPrice, commandSchema, PRICE_CHANGED, same, type BuyExpect, type CommandRequest, type SellExpect } from "./commands.ts";
 import { actionDigest, commandIdentity } from "./command-identity.ts";
 import { ensureCityExchanges } from "./city-exchanges.ts";
 import { canonicalJson } from "./canonical-json.ts";
@@ -1404,6 +1404,8 @@ export async function buyFromShop(
     stockId: string;
     purseId: string;
     quantity: number;
+    /** The unit price and item name the seat showed (protocol 34): any difference is refused. */
+    expect?: BuyExpect;
   },
   options: TradeOptions = {},
 ): Promise<void> {
@@ -1413,6 +1415,7 @@ export async function buyFromShop(
     stockId: input.stockId,
     purseId: input.purseId,
     quantity,
+    ...(input.expect ? { expect: input.expect } : {}),
   };
   // Device campaigns run the authoritative shared command (review P3c).
   if (getSeat().role !== "player")
@@ -1428,6 +1431,8 @@ export async function buyFromShop(
     await assertPlayerTrade(tx, input.purseId);
     const stock = await request<StockLine | undefined>(tx.objectStore("stock").get(input.stockId));
     if (!stock) throw new Error("That item is no longer in the shop.");
+    // As the shared `buy`: a line reused for another item is refused before anything else.
+    if (input.expect && input.expect.name !== stock.name) throw Error(PRICE_CHANGED);
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(stock.shopId));
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!shop || !purse) throw new Error("Choose an account and a shop.");
@@ -1450,10 +1455,12 @@ export async function buyFromShop(
     const score = await charismaOf(purse, tx);
     // The same market events and faction standing the shared `buy` command applies.
     const everyone = await request<Purse[]>(tx.objectStore("purses").getAll());
-    const cost = shopBuyBreakdown(shop, stock.copper, score, quantity, {
+    const priced = shopBuyBreakdown(shop, stock.copper, score, quantity, {
       events: lineEvents(journal, shop, stock),
       factions: factionEffects(journal, everyone, shop),
-    }).total;
+    });
+    assertExpectedPrice(input.expect, priced.unit, stock.name);
+    const cost = priced.total;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
     // Each purchase is a separate lot. A matching name does not identify the
@@ -1532,6 +1539,8 @@ export async function sellToShop(
     holdingId: string;
     shopId: string;
     quantity: number;
+    /** The unit payout the seat showed (protocol 34): any difference is refused. */
+    expect?: SellExpect;
   },
   options: TradeOptions = {},
 ): Promise<void> {
@@ -1541,6 +1550,7 @@ export async function sellToShop(
     holdingId: input.holdingId,
     shopId: input.shopId,
     quantity,
+    ...(input.expect ? { expect: input.expect } : {}),
   };
   // Device campaigns run the authoritative shared command (review P3c).
   if (getSeat().role !== "player")
@@ -1602,6 +1612,7 @@ export async function sellToShop(
     // Capped at what this shop charges this seller for the item (audit A1), Charisma included.
     const priced = shopSale(holding, shop, quantity, journal, everyone, "player", await sheetsFor(purse, tx));
     if (priced.refused) throw Error(priced.refused);
+    assertExpectedPrice(input.expect, priced.unit);
     const paid = priced.total;
     if (!Number.isSafeInteger(paid)) throw new Error("That sale amount is invalid.");
     // Merchant purse: paid from it or the sale is refused, as in the shared command.
@@ -1870,6 +1881,8 @@ export async function buyListing(
     listingId: string;
     purseId: string;
     quantity: number;
+    /** The listing as the market board showed it: a changed listing is refused, as in the room. */
+    before?: Listing;
   },
   options: TradeOptions = {},
 ): Promise<void> {
@@ -1879,6 +1892,7 @@ export async function buyListing(
     listingId: input.listingId,
     purseId: input.purseId,
     quantity,
+    ...(input.before ? { before: input.before } : {}),
   };
   const shared = { ...command, ...(options.commandId ? { id: options.commandId } : {}) };
   // Device campaigns run the authoritative shared command (review P3c); so do
@@ -1896,6 +1910,8 @@ export async function buyListing(
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     const listing = listings.find((item) => item.id === input.listingId);
     if (!listing) throw new Error("That listing is gone.");
+    if (input.before && !same(listing, input.before))
+      throw Error("This listing changed. Review its current price and details before buying.");
     if (listing.status && listing.status !== "available")
       throw Error("This property is not currently for sale.");
     {

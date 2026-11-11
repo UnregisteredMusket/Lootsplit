@@ -1,3 +1,9 @@
+# Expected prices on Buy and Sell — November 11, 2026 (audit 2026-11-10 C2; owner decision: refuse on any mismatch)
+
+- **Commands.** `buy` may carry `expect: { unit, name }` and `sell` `expect: { unit }`: the unit price in whole copper (and the stock line's name) the seat showed. `commands.ts` refuses any difference with "The price changed. Review it again; nothing was charged." (`PRICE_CHANGED`, `assertExpectedPrice`); the sale compares the final unit payout `shopSale` computes. The name is checked first, so a shop-list swap that reuses a line ID for another item is refused even at the same price. The device runs the same check (DM device through the shared command; the player link's `buyFromShop`/`sellToShop`).
+- **Screens.** The shop's Buy row and Sell form send what they showed; the market board's listing purchase sends `before` (the listing as shown), checked by the existing `listing` rule, now also on the player link's `buyListing`. Sell and split already carried `expect.proceeds`.
+- **Protocol 34.** Optional field; protocol 33 and older apps send none and are charged at the current price as before. Their `buy`/`sell` schemas were never strict, so drafts carrying `expect` parse on every protocol and no draft is refused.
+
 # Alternative shop lists — November 10, 2026 (owner request and answers)
 
 - **Library.** `journal.shopLists` (`src/lib/quire/shop-lists.ts`, shapes in `shop-lists-schema.ts`): `lists` (id, name ≤ 80, optional note ≤ 500, items with a stock line's shape: name, copper, baseCopper, quantity or null, notes, rarity, optional category, service, commodityId/tradeExchangeId and the `lineId` it was saved from) and `active` (shop ID → the list last swapped in). Limits: 60 lists, 200 items per list, 2,000 items and 200 KB in all.

@@ -1,0 +1,10 @@
+{
+  "title": "Buy and Sell refuse a price that changed after you saw it",
+  "summary": "In a shared room, a purchase or sale is checked against the price your screen showed. If the DM repriced the item, cut what the shop pays or swapped its stock in the meantime, nothing is charged and you're asked to review the new price.",
+  "items": [
+    "The message reads: The price changed. Review it again; nothing was charged.",
+    "Market listings bought from the market board are checked the same way.",
+    "Android 1.19.0 and older apps keep buying and selling at the current price, as before."
+  ],
+  "audience": "everyone"
+}

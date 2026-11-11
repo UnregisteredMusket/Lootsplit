@@ -80,7 +80,8 @@ function Listings() {
                 listing={listing}
                 purses={mine}
                 onBuy={(purseId, quantity, commandId) =>
-                  buyListing(listing.id, purseId, quantity, { commandId })
+                  // The listing as shown: a changed price or listing is refused, nothing charged.
+                  buyListing(listing.id, purseId, quantity, { commandId, before: listing })
                 }
               />
             )}

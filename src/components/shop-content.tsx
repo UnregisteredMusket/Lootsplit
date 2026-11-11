@@ -507,7 +507,9 @@ function StockRow({
   const [qty, setQty] = useState("1");
   const oneTap = !!sellToName;
   const pending = useRef(false);
-  // One command ID per purchase, reused if the same purchase is retried.
+  // One command ID per purchase, reused if the same purchase is retried. It stays the same when
+  // the shown price changes: a retry after an uncertain result is then refused as a different
+  // action instead of charged twice, and a refused stale purchase stored nothing under it.
   const action = useCommandId(`${purseId}|${oneTap ? "1" : qty}`);
   const asked = oneTap ? 1 : Number(qty);
   const [busy, setBusy] = useState(false),
@@ -557,7 +559,8 @@ function StockRow({
       let settle = 0;
       try {
         const commandId = action.commandId;
-        const outcome = await buy(line.id, purseId, asked, { commandId });
+        // The price and item shown: a reprice or a swapped line is refused with nothing charged.
+        const outcome = await buy(line.id, purseId, asked, { commandId, expect: { unit, name: line.name } });
         action.renew();
         const done = mutationNotice(outcome, oneTap ? `Sold 1 to ${sellToName}.` : "Purchase recorded.");
         setNotice(done);
@@ -913,7 +916,8 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
         setNotice("");
         try {
           const commandId = action.commandId;
-          const result = await sell(holding.id, shopId, asked, { commandId });
+          // The payout shown: a changed rate or price is refused with nothing sold.
+          const result = await sell(holding.id, shopId, asked, { commandId, expect: { unit: unitOffer } });
           action.renew();
           const done = mutationNotice(result, "Sale recorded.");
           setNotice(done);
