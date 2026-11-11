@@ -99,7 +99,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium for Playwright
+        timeout-minutes: 12
+        uses: ./.github/actions/playwright-chromium
       - name: Start disposable development server
         timeout-minutes: 3
         run: |
