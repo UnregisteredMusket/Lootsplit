@@ -15,7 +15,7 @@ import { playSound } from "./sound.ts";
 import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
 import { type Journal } from "./journal.ts";
-import { type CommandRequest } from "./commands.ts";
+import { type BuyExpect, type CommandRequest, type SellExpect } from "./commands.ts";
 import { newCommandId, type CommandOptions } from "./command-id.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { purchaseUndoable, showActionReceipt } from "./action-receipt.ts";
@@ -243,17 +243,19 @@ type EconomyApi = {
   ) => Promise<string | null>;
   // Money and item actions take `{ commandId }`: one ID per user action, reused
   // on retry, so a repeated submit is applied once (see command-id.ts).
+  // `expect` (protocol 34): the unit price (and, buying, the item name) the screen showed; the
+  // server and the device refuse any difference with nothing charged.
   buy: (
     stockId: string,
     purseId: string,
     quantity: number,
-    options?: CommandOptions,
+    options?: CommandOptions & { expect?: BuyExpect },
   ) => Promise<EconomyMutationOutcome>;
   sell: (
     holdingId: string,
     shopId: string,
     quantity: number,
-    options?: CommandOptions,
+    options?: CommandOptions & { expect?: SellExpect },
   ) => Promise<EconomyMutationOutcome>;
   // These resolve to `true` once the change is accepted and `false` when it
   // was refused (the error is already shown as a toast), so a form can keep
@@ -328,7 +330,8 @@ type EconomyApi = {
     listingId: string,
     purseId: string,
     quantity: number,
-    options?: CommandOptions,
+    /** `before`: the listing as the board showed it; a changed listing is refused. */
+    options?: CommandOptions & { before?: Listing },
   ) => Promise<EconomyMutationOutcome>;
   askLoan: (purseId: string, copper: number, note: string) => Promise<EconomyMutationOutcome>;
   /** Resolves `true` when the decision was recorded; `false` after a shown error. */
@@ -1016,12 +1019,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }),
       buy: (stockId, purseId, quantity, options = {}) =>
         getCloudWatch().joined
-          ? acceptCommand({ kind: "buy", stockId, purseId, quantity, ...idOf(options) })
+          ? acceptCommand({ kind: "buy", stockId, purseId, quantity, ...(options.expect ? { expect: options.expect } : {}), ...idOf(options) })
           : accept(async () => {
               ownPurse(purseId);
               const line = stock.find((item) => item.id === stockId);
               if (line) ownShop(line.shopId);
-              await buyFromShop({ stockId, purseId, quantity }, options);
+              await buyFromShop({ stockId, purseId, quantity, ...(options.expect ? { expect: options.expect } : {}) }, options);
             }, "Purchase recorded.", true),
       sell: (holdingId, shopId, quantity, options = {}) =>
         getCloudWatch().joined ||
@@ -1032,12 +1035,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               h.reservedFor ||
               journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
         )
-          ? acceptCommand({ kind: "sell", holdingId, shopId, quantity, ...idOf(options) })
+          ? acceptCommand({ kind: "sell", holdingId, shopId, quantity, ...(options.expect ? { expect: options.expect } : {}), ...idOf(options) })
           : accept(async () => {
               ownShop(shopId);
               const holding = holdings.find((item) => item.id === holdingId);
               if (holding) ownPurse(holding.purseId);
-              await sellToShop({ holdingId, shopId, quantity }, options);
+              await sellToShop({ holdingId, shopId, quantity, ...(options.expect ? { expect: options.expect } : {}) }, options);
             }, "Sale recorded.", true),
       // A shared room records these as DM-only commands (`set-coins`, `post`), so a retried
       // command ID applies once there too; the device keeps its receipt-guarded writes.
@@ -1277,10 +1280,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }, "Listing removed."),
       buyListing: (listingId, purseId, quantity, options = {}) =>
         getCloudWatch().joined || listings.some((l) => l.id === listingId && l.estateTemplateKey)
-          ? acceptCommand({ kind: "listing", listingId, purseId, quantity, ...idOf(options) })
+          ? acceptCommand({ kind: "listing", listingId, purseId, quantity, ...(options.before ? { before: options.before } : {}), ...idOf(options) })
           : accept(async () => {
               ownPurse(purseId);
-              await buyListing({ listingId, purseId, quantity }, options);
+              await buyListing({ listingId, purseId, quantity, ...(options.before ? { before: options.before } : {}) }, options);
             }, "Purchase recorded."),
       askLoan: (purseId, copper, note) =>
         getCloudWatch().joined

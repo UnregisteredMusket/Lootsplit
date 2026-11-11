@@ -111,6 +111,17 @@ const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
   qty = amount.min(1).max(100000);
 const base = { id };
+/** A `buy` or `sell` whose price (or, for a purchase, item) differs from what the seat showed. */
+export const PRICE_CHANGED = "The price changed. Review it again; nothing was charged.";
+const buyExpectSchema = z.object({ unit: amount, name: z.string().max(2000) }).strict(),
+  sellExpectSchema = z.object({ unit: amount }).strict();
+export type BuyExpect = z.infer<typeof buyExpectSchema>;
+export type SellExpect = z.infer<typeof sellExpectSchema>;
+/** The expected-price check shared by the room engine and the player link (economy.ts). */
+export function assertExpectedPrice(expect: { unit: number; name?: string } | undefined, unit: number, name?: string): void {
+  if (!expect) return;
+  if (expect.unit !== unit || (expect.name !== undefined && expect.name !== name)) throw Error(PRICE_CHANGED);
+}
 export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("reference-policy"), before: referencePolicySchema, policy: referencePolicySchema }).strict(),
   ledgerVoidCommandSchema,
@@ -267,8 +278,11 @@ export const commandSchema = z.discriminatedUnion("kind", [
       .max(100000)
       .regex(/^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/art\/[a-z0-9-]+\.webp)$/),
   }),
-  z.object({ ...base, kind: z.literal("buy"), stockId: id, purseId: id, quantity: qty }),
-  z.object({ ...base, kind: z.literal("sell"), holdingId: id, shopId: id, quantity: qty }),
+  // `expect` (tabletop protocol 34; audit 2026-11-10, C2): the unit price the seat showed, in whole
+  // copper, and for a purchase the item's name. Any difference is refused (PRICE_CHANGED); older
+  // apps send none and are charged as before.
+  z.object({ ...base, kind: z.literal("buy"), stockId: id, purseId: id, quantity: qty, expect: buyExpectSchema.optional() }),
+  z.object({ ...base, kind: z.literal("sell"), holdingId: id, shopId: id, quantity: qty, expect: sellExpectSchema.optional() }),
   z.object({ ...base, kind: z.literal("listing"), listingId: id, purseId: id, quantity: qty, before: listingSchema.optional() }),
   z.object({
     ...base,
@@ -1288,6 +1302,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const s = t.stock.find((x) => x.id === cmd.stockId),
       shop = t.shops.find((x) => x.id === s?.shopId);
     if (!s || !shop) throw new Error("Item or shop no longer exists.");
+    // A shop-list swap can reuse this line's ID for another item: refused before anything else.
+    if (cmd.expect && cmd.expect.name !== s.name) throw Error(PRICE_CHANGED);
     if (seat.role === "player" && !shopVisible(shop, t, actingGroups(t, cmd.purseId, seat.purseIds))) throw Error(notHere(cmd.purseId, "This shop"));
     if (shop.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
     if (shop.closed) throw new Error("This shop is closed.");
@@ -1297,7 +1313,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const events = lineEvents(journal, shop, s);
     // Factions controlling the shop, by the party's tier (factions.ts), in the same pipeline.
     const factions = factionEffects(journal, t.purses, shop);
-    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events, factions }).total;
+    const priced = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events, factions });
+    const cost = priced.total;
+    assertExpectedPrice(cmd.expect, priced.unit, s.name);
     // An older app showed the price without them: refused rather than charged a price it never saw.
     if (execution.marketEventsUnsupported && events.length && cost !== shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { factions }).total)
       throw Error(OLD_CLIENT_EVENT_PRICE);
@@ -1424,6 +1442,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const settlementLimit = seller === "dm" ? undefined : settlementSaleLimit(journal, s);
     const priced = shopSale(h, s, cmd.quantity, journal, t.purses, seller);
     if (priced.refused) throw Error(priced.refused);
+    // The final unit payout shopSale computes (every cap included) against what the seat showed.
+    assertExpectedPrice(cmd.expect, priced.unit);
     const paid = priced.total;
     if (execution.settlementLimitsUnsupported && settlementLimit && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events, factions }).total)
       throw Error(OLD_CLIENT_SETTLEMENT_PRICE);
