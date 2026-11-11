@@ -47,7 +47,7 @@ test("browser jobs install Chromium through the cached, separately bounded step"
   const action = readFileSync(".github/actions/playwright-chromium/action.yml", "utf8");
   for (const use of action.matchAll(/uses: (\S+)/g)) assert.match(use[1], /@[0-9a-f]{40}$/, "actions pinned by SHA");
   assert.match(action, /key: playwright-headless-shell-.*steps\.version\.outputs\.playwright/);
-  for (const name of ["verify.yml", "player-reference-audit.yml", "android-widget.yml"]) {
+  for (const name of ["verify.yml", "player-reference-audit.yml", "android-widget.yml", "website-release.yml", "verify-live.yml", "product-screenshots.yml", "code-health.yml"]) {
     const workflow = readFileSync(`.github/workflows/${name}`, "utf8");
     assert.doesNotMatch(workflow, /playwright install --with-deps/, name);
     const steps = [...workflow.matchAll(/- name: Install Chromium for Playwright\n\s+timeout-minutes: (\d+)\n\s+uses: \.\/\.github\/actions\/playwright-chromium/g)];
