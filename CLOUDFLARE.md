@@ -29,7 +29,11 @@ existing `ACCOUNT_SECRET`. Never recreate the Worker or database to release code
    no Vite build or Worker bundling in the deploy job; secrets are preserved by Wrangler.
 6. Production checks match `/assets/release-identity.json` to the source commit, exercise
    desktop/mobile entry, and run the read-only public website audit. Screenshots,
-   previous deployment identity and results are retained as Actions artifacts.
+   previous deployment identity and results are retained as Actions artifacts. If the deploy
+   succeeded but a live audit fails (audit G6, owner decision 2026-11-11), the commit stays
+   live: `Record live deployment` still runs, adds a `Live, unaudited` error annotation, and
+   the run ends red. Readers classify it `live-unaudited` (`src/lib/deployment/release-run.mjs`):
+   the changelog counts it as deployed and the owner monitor shows it deployed and failed.
 
 A single `lootsplit-production` concurrency group serializes deployments; active
 uploads are never cancelled. Queued older commits fail the current-main check inside
@@ -105,8 +109,14 @@ Preflight then repeats the exact-equality check. Any failure stops the job befor
 `wrangler deploy`: the running Worker keeps serving, and because applied SQL is additive it
 stays compatible with that Worker. Fix forward with a new migration; rerun the release only
 after reading the annotation and `production-migrations.json`. The `lootsplit-production`
-concurrency group (shared with the standby backup) serializes this with every other
-production writer; PR and verification runs only ever use local D1.
+concurrency group serializes this with every other production writer; PR and verification
+runs only ever use local D1. The encrypted backup has its own group, `lootsplit-backup`
+(audit G10: a shared group let a queued backup cancel a pending deploy). A running D1 export
+blocks every other database request, so `scripts/production-lane.mjs` keeps them apart: a
+release waits (up to 15 minutes, before its current-main check) while a backup's export step
+runs, and a backup waits (up to 25 minutes) while a release runs. The backup validates the
+snapshot against the migrations of the live commit from `/assets/release-identity.json`, read
+from git (audit G13), so a merged but undeployed migration no longer fails it.
 
 Keep applied migration files immutable: a filename ledger cannot detect someone modifying
 already-applied SQL. Test all migrations on local D1 with the complete release suite (CI does).

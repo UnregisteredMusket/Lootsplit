@@ -31,7 +31,7 @@ import {
   type CloudSeat,
   type CloudTable,
 } from "./cloud.ts";
-import { archiveSession, projectRecord } from "./session-records.ts";
+import { archiveSession, hiddenShopNames, projectRecord, seatVisibleShops } from "./session-records.ts";
 import { projectIdentities, redactIdentity, tableSecrets } from "./item-identity.ts";
 import { playerLedgerLine, playerTable } from "./player-view.ts";
 import { HistoryNeeded, runOnWorkingSet } from "./history-window.server.ts";
@@ -967,6 +967,8 @@ async function historyProjector(table: CloudTable, seat: CloudSeat, code: string
         }),
       };
   const line = dm ? () => true : playerLedgerLine(table, seat);
+  const renamed = dm ? null : hiddenShopNames(table, seatVisibleShops(table, visible));
+  const shopNames = (l: CloudTable["ledger"][number]) => (renamed ? renamed(l) : l);
   const readNote = (note: Pick<CloudTable["notes"][number], "to" | "purseId" | "recipientId">) =>
     canReadNote(note as CloudTable["notes"][number], visible);
   const ledgerPurses = dm
@@ -988,7 +990,9 @@ async function historyProjector(table: CloudTable, seat: CloudSeat, code: string
     )
   ).slice(0, 32);
   return {
-    ledger: (lines) => redactIdentity(lines.filter(line), secrets),
+    // A DM's trade at a shop hidden from this player names it "a merchant" (B1 follow-up). A page
+    // loaded while the shop was visible keeps its name: the player saw it then.
+    ledger: (lines) => redactIdentity(lines.filter(line).map(shopNames), secrets),
     notes: (notes) => redactIdentity(notes.filter((note) => readNote(note)), secrets),
     visible: (list, keys) => {
       if (!keys) return true;

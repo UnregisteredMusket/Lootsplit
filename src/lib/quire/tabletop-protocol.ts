@@ -247,8 +247,19 @@ export const SETTLEMENT_LIMITS_PROTOCOL = 32;
  * protocol 32 and older to finish on the updated website.
  */
 export const SHOP_LISTS_PROTOCOL = 33;
+/**
+ * Protocol 34 (2026-11-11, expected prices; audit 2026-11-10, C2): `buy` may carry
+ * `expect: { unit, name }` and `sell` `expect: { unit }`, the unit price in whole copper (and the
+ * item's name) the seat showed. The server refuses any difference ("The price changed. Review it
+ * again; nothing was charged."), so a DM reprice, a buy-rate cut or a shop-list swap that reuses a
+ * stock line's ID is never charged silently. The field is optional: protocol 33 and older apps
+ * send none and are charged as before. Their `buy` and `sell` schemas were never strict, so a
+ * staged draft carrying `expect` parses on every protocol (the field is stripped) and no draft is
+ * refused; nothing in the stored table changes.
+ */
+export const EXPECTED_PRICE_PROTOCOL = 34;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = SHOP_LISTS_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = EXPECTED_PRICE_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 

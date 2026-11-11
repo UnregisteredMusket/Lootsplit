@@ -588,19 +588,31 @@ export function workerErrorCheck(traffic, intervals = []) {
 export const STORAGE_ATTENTION_BYTES = 1_000_000_000;
 export const STORAGE_REVIEW_BYTES = 2_500_000_000;
 /**
- * The "Database storage" diagnostic from the newest hourly Cloudflare usage reading: amber at 1 GB,
- * with a review note at 2.5 GB. An unavailable reading is an explicit gap marked as a coverage limit,
- * so it never sets the status by itself (the usage log already reports its own gaps).
+ * Site-wide storage guard (audit 2026-11-10 H2, owner decision 2026-11-11): at 80% of the 5 GB
+ * included, new account backups and character uploads are refused (storage-guard.mjs); play and
+ * campaign saves continue, using the remaining 1 GB.
  */
-export function storageCheck(usage) {
+export const STORAGE_GUARD_BYTES = 4_000_000_000;
+/** The database size in a usage reading, or null when it is missing or unusable. */
+export function storageBytes(usage) {
   const metric =
     usage?.state === "ready" && Array.isArray(usage.data?.metrics)
       ? usage.data.metrics.find((m) => m?.key === "d1StorageBytes")
       : null;
   const bytes = metric?.state === "ready" ? metric.current?.value : null;
+  return Number.isSafeInteger(bytes) && bytes >= 0 ? bytes : null;
+}
+/**
+ * The "Database storage" diagnostic from the newest hourly Cloudflare usage reading: amber at 1 GB,
+ * with a review note at 2.5 GB, red at the 4 GB guard (uploads are being refused). An unavailable
+ * reading is an explicit gap marked as a coverage limit, so it never sets the status by itself (the
+ * usage log already reports its own gaps).
+ */
+export function storageCheck(usage) {
+  const bytes = storageBytes(usage);
   const impact =
     "Storage grows with players; the footprint rules in docs/FOOTPRINT.md keep it predictable.";
-  if (!Number.isSafeInteger(bytes) || bytes < 0)
+  if (bytes === null)
     return {
       state: "unavailable",
       symptom: "The database size is unavailable in the latest Cloudflare usage reading.",
@@ -610,6 +622,16 @@ export function storageCheck(usage) {
       extra: { required: false, coverageLimit: true, storageBytes: null },
     };
   const size = `${(bytes / 1e9).toFixed(2)} GB`;
+  if (bytes >= STORAGE_GUARD_BYTES)
+    return {
+      state: "error",
+      symptom: `The database is ${size}, past the 4 GB storage guard: new account backups and character uploads are refused (play and campaign saves continue).`,
+      impact: "Players cannot save new online backups or upload account characters until storage is reduced.",
+      action:
+        "Review what is growing (weekly summary storage section) and the footprint options in docs/FOOTPRINT.md; uploads resume once the hourly reading is below 4 GB.",
+      errorCode: "STORAGE_GUARD",
+      extra: { storageBytes: bytes, storageCheckedAt: usage.checkedAt ?? null, brief: size },
+    };
   const review = bytes >= STORAGE_REVIEW_BYTES;
   const attention = bytes >= STORAGE_ATTENTION_BYTES;
   return {

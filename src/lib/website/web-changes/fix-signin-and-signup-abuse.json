@@ -1,0 +1,11 @@
+{
+  "title": "Sign-in waits apply per network, and abuse limits on accounts",
+  "audience": "everyone",
+  "summary": "Wrong passwords sent from someone else's network no longer make you wait to sign in, and the account service now limits scripted sign-ups and protects shared storage.",
+  "items": [
+    "The wait after repeated wrong passwords now applies only to the network they came from, so a stranger can no longer keep you out of your account. Heavy guessing from many networks still slows everyone else down.",
+    "The Android app, which has no human check, allows 5 new accounts a day and 20 sign-ins an hour from one network. The website is unchanged.",
+    "Sign-up tells one network only a few times a day that an email already has an account.",
+    "If online storage is nearly full, new online backups and account characters pause with a clear message; play and campaign saves always continue."
+  ]
+}

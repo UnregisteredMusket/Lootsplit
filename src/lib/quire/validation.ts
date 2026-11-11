@@ -117,6 +117,7 @@ const ledger = z.object({
     .optional(),
   loot: lootLedgerSchema.optional(),
   award: awardTagSchema.optional(),
+  hiddenShop: z.literal(true).optional(),
   transactionType: z
     .enum(["transfer", "purchase", "sale", "loan", "payment", "adjustment", "void"])
     .optional(),

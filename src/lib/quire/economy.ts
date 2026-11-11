@@ -11,7 +11,7 @@ import { favorKinds } from "./favor-market.ts";
 import { randomTradeRoll, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
-import { applyCommand, applyCommandBatch, commandSchema, type CommandRequest } from "./commands.ts";
+import { applyCommand, applyCommandBatch, commandSchema, same, type BuyExpect, type CommandRequest, type SellExpect } from "./commands.ts";
 import { actionDigest, commandIdentity } from "./command-identity.ts";
 import { ensureCityExchanges } from "./city-exchanges.ts";
 import { canonicalJson } from "./canonical-json.ts";
@@ -612,6 +612,8 @@ export async function repriceShop(shop: Shop): Promise<void> {
       "prices",
       undefined,
       change.change,
+      // Hidden activity lines (audit 2026-11-10 B1): the shop the line names, as the room records it.
+      { shopId: normalized.id },
     );
   await done;
 }
@@ -817,6 +819,7 @@ export async function saveShop(shop: Shop): Promise<void> {
           sellRate: shop.sellRate,
         },
       },
+      { shopId: shop.id },
     );
   });
 }
@@ -844,6 +847,7 @@ export async function saveStock(line: StockLine, assertScope?: () => void): Prom
           before: { copper: before.copper },
           after: { copper: line.copper },
         },
+        { shopId: line.shopId },
       );
   });
 }
@@ -887,7 +891,7 @@ export async function editStockLine(
         entityId: line.id,
         before: { copper: current!.copper },
         after: { copper: line.copper },
-      });
+      }, { shopId: line.shopId });
   });
 }
 
@@ -924,6 +928,9 @@ export async function addShelfStock(shopId: string, rows: ShelfDraft[]): Promise
         tx,
         `Added ${added} catalog items to ${shop.name}; existing stock preserved`,
         "management",
+        undefined,
+        undefined,
+        { shopId: shop.id },
       );
     return added;
   });
@@ -1284,8 +1291,12 @@ function logLine(
 
 async function charismaOf(purse: Purse, tx: IDBTransaction): Promise<number | null> {
   // The same rule as the shared command engine (`charismaFor`); sheets load only when needed.
-  if (purse.kind === "party" || purse.sheet) return charismaFor(purse, []);
-  return charismaFor(purse, readSheets(await request(tx.objectStore("meta").get("sheets"))));
+  return charismaFor(purse, await sheetsFor(purse, tx));
+}
+/** The sheets `charismaFor` needs for `purse` (none when its Charisma is on the purse). */
+async function sheetsFor(purse: Purse, tx: IDBTransaction) {
+  if (purse.kind === "party" || purse.sheet) return [];
+  return readSheets(await request(tx.objectStore("meta").get("sheets")));
 }
 
 async function atomic<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
@@ -1395,6 +1406,8 @@ export async function buyFromShop(
     stockId: string;
     purseId: string;
     quantity: number;
+    /** The unit price and item name the seat showed (protocol 34): any difference is refused. */
+    expect?: BuyExpect;
   },
   options: TradeOptions = {},
 ): Promise<void> {
@@ -1403,6 +1416,7 @@ export async function buyFromShop(
     stockId: input.stockId,
     purseId: input.purseId,
     quantity: tradeQuantity(input.quantity),
+    ...(input.expect ? { expect: input.expect } : {}),
     ...(options.commandId ? { id: options.commandId } : {}),
   });
 }
@@ -1412,6 +1426,8 @@ export async function sellToShop(
     holdingId: string;
     shopId: string;
     quantity: number;
+    /** The unit payout the seat showed (protocol 34): any difference is refused. */
+    expect?: SellExpect;
   },
   options: TradeOptions = {},
 ): Promise<void> {
@@ -1420,6 +1436,7 @@ export async function sellToShop(
     holdingId: input.holdingId,
     shopId: input.shopId,
     quantity: tradeQuantity(input.quantity),
+    ...(input.expect ? { expect: input.expect } : {}),
     ...(options.commandId ? { id: options.commandId } : {}),
   });
 }
@@ -1642,6 +1659,8 @@ export async function buyListing(
     listingId: string;
     purseId: string;
     quantity: number;
+    /** The listing as the market board showed it: a changed listing is refused, as in the room. */
+    before?: Listing;
   },
   options: TradeOptions = {},
 ): Promise<void> {
@@ -1651,6 +1670,7 @@ export async function buyListing(
     listingId: input.listingId,
     purseId: input.purseId,
     quantity,
+    ...(input.before ? { before: input.before } : {}),
   };
   const shared = { ...command, ...(options.commandId ? { id: options.commandId } : {}) };
   // Device campaigns run the authoritative shared command (review P3c); so do
@@ -1668,6 +1688,8 @@ export async function buyListing(
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     const listing = listings.find((item) => item.id === input.listingId);
     if (!listing) throw new Error("That listing is gone.");
+    if (input.before && !same(listing, input.before))
+      throw Error("This listing changed. Review its current price and details before buying.");
     if (listing.status && listing.status !== "available")
       throw Error("This property is not currently for sale.");
     {
@@ -2746,7 +2768,7 @@ async function audit(
   kind: "prices" | "management",
   purseId?: string,
   change?: Journal["events"][number]["change"],
-  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly">,
+  extra?: Pick<Journal["events"][number], "lootPool" | "dmOnly" | "shopId">,
 ) {
   const store = tx.objectStore("meta");
   const row = await request<{ value: unknown } | undefined>(store.get("journal"));

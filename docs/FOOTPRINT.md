@@ -61,7 +61,7 @@ A pull request that adds or changes stored data, or server work on a request pat
 | Server work per request | No scan of every campaign or whole history on a request path | Guard tests (as the existing ban on direct `campaign_rooms` SQL) |
 | Widget and monitor requests | Under 1.5 s on the server | `widget-served` timing entries (Field monitor) |
 | Monitoring growth | No limit: kept in full | Database size in the daily monitoring report (the weekly summary runs on GitHub without database access) |
-| Database size | Amber at 1 GB, review at 2.5 GB (5 GB included) | Field monitor "Database storage" check |
+| Database size | Amber at 1 GB, review at 2.5 GB (5 GB included); at 4 GB new account backups and character uploads are refused and the check turns red (never play or campaign saves; a missing or stale reading does not block) | Field monitor "Database storage" check; `cloudflare/storage-guard.mjs` |
 | Worker CPU | Amber when the cycle's use runs ahead of its pace | Cloudflare usage gauge |
 
 ## The reference campaign today

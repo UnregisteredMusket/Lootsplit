@@ -3,14 +3,14 @@
  * 2026-11-03). One pure planner, used by the shared `sale-split` command (commands.ts, also run
  * offline through executeLocalCommand) and by the dialog's preview: price the chosen party-fund
  * items at one open shop exactly as Sell to shop does (value × today's market events × faction standing × buy rate,
- * rounded to whole copper per unit), then plan an even split of the proceeds with the coin-split planner. Nothing is sold
+ * rounded to whole copper per unit, never above the shop's own price for it), then plan an even split of the proceeds with the coin-split planner. Nothing is sold
  * unless the split is also valid, so a sale is never left unsplit.
  */
 import { planCoinSplit, partyFunds, type CoinSplitPlan, type SplitRule, type SplitTable } from "./coin-split.ts";
 import { assertCarried } from "./custody.ts";
 import { assertMerchantSale, hasMerchantPurse, merchantShortfall, revealPurse } from "./merchant.ts";
 import { knownUnitCopper, presentedHolding } from "./item-identity.ts";
-import { shopSellBreakdown, type PriceBreakdown } from "./price-breakdown.ts";
+import { charismaFor, shopSellBreakdown, type PriceBreakdown } from "./price-breakdown.ts";
 import { saleEvents } from "./market-events.ts";
 import { factionEffects } from "./factions.ts";
 import { settlementSaleLimit } from "./settlements.ts";
@@ -18,7 +18,9 @@ import type { Holding, Shop } from "./types.ts";
 
 export const MAX_SALE_LOTS = 50;
 
-export type SaleSplitTable = SplitTable & { holdings: Holding[]; shops: Shop[] };
+export type SaleSplitTable = SplitTable & { holdings: Holding[]; shops: Shop[]; sheets?: SaleSheets };
+/** Character sheets, for the seller's Charisma (`charismaFor`). */
+export type SaleSheets = Parameters<typeof charismaFor>[1];
 
 export type SaleSplitInput = {
   fundId: string;
@@ -59,21 +61,33 @@ export type SaleSplitPlan = {
  * from the settlement cap (owner decision 2026-11-10): `actor` "dm" pays the full payout with a
  * `warning`; the shop's own per-item limit and purse still apply. The actor comes from the seat
  * (the shared engine's seat role, the device's own seat), never from a command field.
+ *
+ * The payout is capped at what the same shop would charge the seller (the owner of the item's
+ * purse, with their Charisma from `purses`/`sheets`) for the item now (audit A1, owner decision
+ * 2026-11-11): buying and selling back never makes money. The cap applies to the DM too.
  */
 export function shopSale(
-  h: Pick<Holding, "unitCopper" | "category" | "unidentified">,
+  h: Pick<Holding, "unitCopper" | "category" | "unidentified"> & { purseId?: string },
   shop: Shop,
   quantity: number,
   journal?: SaleSplitTable["journal"],
   purses: SaleSplitTable["purses"] = [],
   actor: "dm" | "player" = "player",
+  sheets?: SaleSheets,
 ): PriceBreakdown {
   return shopSellBreakdown(shop, h.unitCopper, quantity, h, {
     events: saleEvents(journal, shop, h),
     factions: factionEffects(journal, purses, shop),
     settlementLimit: settlementSaleLimit(journal, shop),
     ...(actor === "dm" ? { settlementExempt: true } : {}),
+    seller: { cha: sellerCharisma(h.purseId, purses, sheets) },
   });
+}
+
+/** The seller's Charisma, by the same rule as buying (commands.ts `score`); null for a party fund. */
+export function sellerCharisma(purseId: string | undefined, purses: SaleSplitTable["purses"], sheets?: SaleSheets): number | null {
+  if (!purseId) return null;
+  return charismaFor(purses.find((p) => p.id === purseId) ?? { id: purseId, kind: "character" }, sheets);
 }
 
 /**
@@ -82,7 +96,7 @@ export function shopSale(
  * unidentified item is priced at its presented value and category, never its true ones.
  */
 export function unitSalePrice(
-  h: Pick<Holding, "unitCopper" | "category" | "unidentified">,
+  h: Pick<Holding, "unitCopper" | "category" | "unidentified"> & { purseId?: string },
   shop: Shop,
   /** The campaign journal: today's market events change the payout (market-events.ts). */
   journal?: SaleSplitTable["journal"],
@@ -90,8 +104,10 @@ export function unitSalePrice(
   purses: SaleSplitTable["purses"] = [],
   /** The DM is exempt from the settlement cap (`shopSale`). */
   actor: "dm" | "player" = "player",
+  /** Character sheets, for the seller's Charisma in the cap (`shopSale`). */
+  sheets?: SaleSheets,
 ): number {
-  return shopSale(h, shop, 1, journal, purses, actor).unit;
+  return shopSale(h, shop, 1, journal, purses, actor, sheets).unit;
 }
 
 /**
@@ -107,6 +123,7 @@ export function projectMerchantPurse(
   holdings: Holding[],
   journal?: SaleSplitTable["journal"],
   purses: SaleSplitTable["purses"] = [],
+  sheets?: SaleSheets,
 ): Shop {
   if (!hasMerchantPurse(shop) || shop.showPurse) return shop;
   const projected: Shop = { ...shop, purseLimited: true, merchantAffords: {} };
@@ -117,7 +134,7 @@ export function projectMerchantPurse(
     } catch {
       continue;
     }
-    const sale = shopSale(h, shop, 1, journal, purses, "player");
+    const sale = shopSale(h, shop, 1, journal, purses, "player", sheets);
     if (sale.refused || sale.unit < 1) continue;
     projected.merchantAffords![h.id] =
       sale.unit * h.quantity <= shop.merchantPurse ? "all" : sale.unit <= shop.merchantPurse ? "some" : "none";
@@ -137,6 +154,7 @@ export function saleProblem(
   actor: "dm" | "player",
   journal?: SaleSplitTable["journal"],
   purses: SaleSplitTable["purses"] = [],
+  sheets?: SaleSheets,
 ): string | null {
   if (h.kind !== "item" || h.deed || h.property) return "Sell properties one at a time with Sell to shop.";
   if (h.pool && actor !== "dm")
@@ -148,7 +166,7 @@ export function saleProblem(
     return error instanceof Error ? error.message : "This item can't be sold here.";
   }
   if (h.equipped) return "Unequip this item before selling it.";
-  const sale = shopSale(h, shop, 1, journal, purses, actor);
+  const sale = shopSale(h, shop, 1, journal, purses, actor, sheets);
   // Settlement limits (S2): above the place's per-item limit, with "refuse" chosen (never the DM).
   if (sale.refused) return sale.refused;
   if (sale.unit < 1) return `${shop.name} pays nothing for this item.`;
@@ -184,9 +202,9 @@ export function planSaleSplit(
     if (!h || h.purseId !== fund.id) throw Error(`An item is no longer in ${fund.name}. Review the sale again.`);
     if (!Number.isSafeInteger(lot.quantity) || lot.quantity < 1) throw Error("Sell a whole number of each item.");
     if (lot.quantity > h.quantity) throw Error(`Only ${h.quantity} × ${h.name} ${h.quantity === 1 ? "is" : "are"} in ${fund.name}.`);
-    const problem = saleProblem(h, shop, options.actor, t.journal, t.purses);
+    const problem = saleProblem(h, shop, options.actor, t.journal, t.purses, t.sheets);
     if (problem) throw Error(`${h.name}: ${problem}`);
-    const sale = shopSale(h, shop, 1, t.journal, t.purses, options.actor);
+    const sale = shopSale(h, shop, 1, t.journal, t.purses, options.actor, t.sheets);
     const unitPaid = sale.unit;
     lots.push({
       holdingId: h.id,

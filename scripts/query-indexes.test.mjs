@@ -126,6 +126,16 @@ test("0032 serves the library character reads and the minute monitor cron from i
   );
   assert.doesNotMatch(save, /SCAN library_characters/);
   assert.equal((save.match(/SEARCH library_characters USING (COVERING )?INDEX library_characters_owner \(user_id=\?\)/g) || []).length, 2, save);
+  // The same save while the storage guard refuses uploads (audit 2026-11-10 H2) also reads the
+  // profile being replaced, by its primary key.
+  const guarded = plan(
+    db,
+    real(
+      accounts,
+      "INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=? AND COALESCE((SELECT LENGTH(body) FROM library_characters WHERE id=? AND user_id=?),-1)>=? ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at",
+    ),
+  );
+  assert.doesNotMatch(guarded, /SCAN library_characters/, guarded);
   // F3 monitor-journal.mjs scheduledMonitor: interrupted collections and history recovery read only
   // the intervals that are not complete, which is a small share of a history kept in full.
   for (const sql of [
@@ -148,5 +158,17 @@ test("0032 serves the library character reads and the minute monitor cron from i
   // F11 monitoring.mjs: members online in the last 5 minutes and 24 hours.
   real(monitoring, "(SELECT COUNT(*) FROM member_profiles WHERE last_online >= ?) AS active5m");
   assert.match(plan(db, "SELECT COUNT(*) FROM member_profiles WHERE last_online >= ?"), /USING COVERING INDEX member_profiles_last_online \(last_online>\?\)/);
+  db.close();
+});
+
+test("the storage guard's request-path read of the newest usage reading uses an index (audit 2026-11-10 H2)", () => {
+  const db = schema();
+  const journal = readFileSync("cloudflare/monitor-journal.mjs", "utf8");
+  const sql =
+    "SELECT body FROM owner_monitor_logs WHERE source='cloudflare-usage' ORDER BY observed_at DESC,sequence DESC LIMIT 1";
+  assert.ok(journal.includes(sql), "latestUsage query text");
+  const usage = plan(db, sql);
+  assert.match(usage, /SEARCH owner_monitor_logs USING INDEX owner_monitor_logs_source \(source=\?\)/);
+  assert.doesNotMatch(usage, /SCAN owner_monitor_logs|TEMP B-TREE/);
   db.close();
 });
