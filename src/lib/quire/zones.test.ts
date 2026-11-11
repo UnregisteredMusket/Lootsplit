@@ -218,7 +218,7 @@ test("privacy and protocol 18: hidden maps never show; older clients get no zone
   const old = tableForProtocol(t, 17).journal!.world!;
   assert.equal(old.zoneRequests, undefined);
   for (const draft of [[{ kind: "zone-vote" }], [{ kind: "zone-save" }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 17), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 17), /unfinished actions/);
 });
 
 // ——— Privacy review 2026-10-29 (part B), regression tests ———
