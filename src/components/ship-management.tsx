@@ -4,6 +4,7 @@ import { routeDistance } from "@/lib/quire/map-tiles";
 import { setVoyageRouteDraft, voyageRouteDraft } from "@/lib/quire/voyage-route-draft";
 import { AppLink } from "./app-link";
 import { useState } from "react";
+import { useFormDraft } from "@/lib/quire/use-form-draft";
 import { useSeat } from "@/lib/quire/seat";
 import {
   readFleet,
@@ -149,7 +150,7 @@ export function ShipManagement({ holding: h }: { holding: Holding }) {
       )}
       {dm && (
         <Fold title={s ? "DM ship settings" : "Configure this property as a ship"}>
-          <ShipSettings key={JSON.stringify(s)} holding={h} before={s ?? null} />
+          <ShipSettings key={h.id} holding={h} before={s ?? null} />
         </Fold>
       )}
       {yards.map((y) => (
@@ -163,7 +164,7 @@ export function ShipManagement({ holding: h }: { holding: Holding }) {
             {formatCopper(y.yardCopper)} per day. Own ships avoid rental fees; maintenance, wages,
             materials and labor still apply.
           </p>
-          {dm && <FacilityEditor key={JSON.stringify(y)} before={y} />}
+          {dm && <FacilityEditor key={y.id} before={y} />}
         </Fold>
       ))}
     </section>
@@ -188,26 +189,35 @@ function ShipName({ holding: h }: { holding: Holding }) {
   );
 }
 function ShipSettings({ holding: h, before }: { holding: Holding; before: Vessel | null }) {
-  const [draft, set] = useState<Vessel>(
-    before ?? {
-      ...defaultShip(),
-      propertyId: h.id,
-      mode: "docked",
-      facilityId: null,
-      installed: [],
-      arrearsCopper: 0,
-      expenseRemainder: 0,
-      dmNotes: "",
-    },
-  );
-  const [components, setComponents] = useState(JSON.stringify(draft.stats.components, null, 2)),
-    [upgrades, setUpgrades] = useState(JSON.stringify(draft.upgrades, null, 2)),
-    [materials, setMaterials] = useState(JSON.stringify(draft.repairMaterials, null, 2));
+  const vessel: Vessel = before ?? {
+    ...defaultShip(),
+    propertyId: h.id,
+    mode: "docked",
+    facilityId: null,
+    installed: [],
+    arrearsCopper: 0,
+    expenseRemainder: 0,
+    dmNotes: "",
+  };
+  // Keyed by the property, not the ship record: saving keeps the form and its notice, and a
+  // reload never replaces what is being typed (audit 2026-11-10 D5).
+  const form = useFormDraft({
+    vessel,
+    components: JSON.stringify(vessel.stats.components, null, 2),
+    upgrades: JSON.stringify(vessel.upgrades, null, 2),
+    materials: JSON.stringify(vessel.repairMaterials, null, 2),
+  });
+  const { vessel: draft, components, upgrades, materials } = form.value;
+  const set = (next: (d: Vessel) => Vessel) => form.set((f) => ({ ...f, vessel: next(f.vessel) }));
+  const setComponents = (components: string) => form.set((f) => ({ ...f, components }));
+  const setUpgrades = (upgrades: string) => form.set((f) => ({ ...f, upgrades }));
+  const setMaterials = (materials: string) => form.set((f) => ({ ...f, materials }));
   const stats = (key: keyof Vessel["stats"], value: string | number) =>
     set((d) => ({ ...d, stats: { ...d.stats, [key]: value } }));
   return (
     <ActionForm
       title="Review ship settings"
+      onRecorded={form.settle}
       command={() => ({
         kind: "ship-configure",
         before,
@@ -1050,7 +1060,7 @@ export function ShipyardWorkshop() {
         .filter((y) => !y.propertyId)
         .map((y) => (
           <Fold title={y.name} key={y.id}>
-            <FacilityEditor key={JSON.stringify(y)} before={y} />
+            <FacilityEditor key={y.id} before={y} />
           </Fold>
         ))}
     </Fold>
@@ -1059,28 +1069,32 @@ export function ShipyardWorkshop() {
 function FacilityEditor({ before }: { before: ShipFacility | null }) {
   const t = useEstateTable(),
     market = readMarketLocations(t.journal?.market),
-    [draft, set] = useState<ShipFacility>(
-      before ?? {
-        id: uid(),
-        propertyId: null,
-        name: "Commercial shipyard",
-        locationId: market.currentLocationId ?? "",
-        public: true,
-        accessPurseIds: [],
-        slots: 4,
-        maxLengthFeet: 200,
-        maxDimensions: "DM-reviewed ship sizes",
-        dockCopper: 0,
-        dryCopper: 0,
-        yardCopper: 0,
-        repair: true,
-        upgrades: true,
-      },
-    );
+    // A new facility keeps one ID; an existing one is keyed by its ID, not its content, so saving
+    // keeps the form and its notice (audit 2026-11-10 D5).
+    [fresh] = useState<ShipFacility>(() => ({
+      id: uid(),
+      propertyId: null,
+      name: "Commercial shipyard",
+      locationId: market.currentLocationId ?? "",
+      public: true,
+      accessPurseIds: [],
+      slots: 4,
+      maxLengthFeet: 200,
+      maxDimensions: "DM-reviewed ship sizes",
+      dockCopper: 0,
+      dryCopper: 0,
+      yardCopper: 0,
+      repair: true,
+      upgrades: true,
+    })),
+    form = useFormDraft<ShipFacility>(before ?? fresh),
+    draft = form.value,
+    set = form.set;
   return (
     <ActionForm
       title="Review dock / shipyard"
       command={() => ({ kind: "ship-facility", before, facility: facilitySchema.parse(draft) })}
+      onRecorded={form.settle}
     >
       <Field label="Facility name">
         <TextInput

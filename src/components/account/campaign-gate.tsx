@@ -23,6 +23,13 @@ import { useUnmatchedRoute } from "@/lib/website/not-found-route";
 import { drawsBeforeAccountCheck, isGatePublicPath } from "@/lib/website/public-gate";
 import { DeviceRecovery } from "./device-recovery";
 import { roomLifecycleLabels } from "@/lib/quire/room-state";
+import {
+  gateAccess,
+  identityFailure,
+  UNCHECKED_NOTICE,
+  UNCHECKED_SIGNED_OUT_NOTICE,
+  type IdentityCheck,
+} from "@/lib/account/gate-access";
 
 /**
  * Resolve identity before providers open any campaign storage. Never erase legacy saves.
@@ -70,39 +77,63 @@ export function CampaignGate({
   const [allowed, setAllowed] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // The account check did not finish (audit 2026-11-10 D1): a notice with Retry, and another check
+  // when the device reconnects or the window regains focus. Only a positive "no session" signs
+  // the device out of its campaign.
+  const [unchecked, setUnchecked] = useState(false);
+  const [noticeHidden, setNoticeHidden] = useState(false);
+  useEffect(() => {
+    if (!unchecked) return;
+    let last = Date.now();
+    const recheck = () => setIdentityEpoch((x) => x + 1);
+    const onFocus = () => {
+      // Window focus fires often; at most one check every 15 s (the sign-in limit is per address).
+      if (Date.now() - last < 15000) return;
+      last = Date.now();
+      recheck();
+    };
+    window.addEventListener("online", recheck);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("online", recheck);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [unchecked]);
   useEffect(() => {
     let active = true;
 
     void (async () => {
       pinCampaignContext();
       let next: AccountLibrary | null = null;
+      let check: IdentityCheck;
       try {
         const session = await accountRequest<{ user: { id: string } } | null>("auth/get-session");
-        if (session?.user) next = await accountRequest<AccountLibrary>("library");
-      } catch {
-        if (navigator.onLine) {
-          if (active)
-            setError(
-              "Your account could not be checked. Reconnect and retry before opening a campaign.",
-            );
-        }
+        if (session?.user) {
+          next = await accountRequest<AccountLibrary>("library");
+          check = { kind: "signed-in", userId: next.user.id };
+        } else check = { kind: "signed-out" };
+      } catch (e) {
+        check = identityFailure(e);
       }
       if (!active) return;
       const id = activeCampaignId();
       const owner = localStorage.getItem(`quire.owner.${id}`);
       const ticket = sessionStorage.getItem("lootsplit.player.reconnect.v1");
-      const offlineOwner =
-        !navigator.onLine && owner && owner === localStorage.getItem("lootsplit.offline-owner");
-      if (next) {
-        sessionStorage.setItem("lootsplit.verified-account", next.user.id);
-        localStorage.setItem("lootsplit.offline-owner", next.user.id);
-      } else if (offlineOwner) sessionStorage.setItem("lootsplit.verified-account", owner!);
-      else if (navigator.onLine) {
-        sessionStorage.removeItem("lootsplit.verified-account");
-        localStorage.removeItem("lootsplit.offline-owner");
-      }
+      const access = gateAccess({
+        check,
+        owner,
+        marker: localStorage.getItem("lootsplit.offline-owner"),
+      });
+      if (access.verified) sessionStorage.setItem("lootsplit.verified-account", access.verified);
+      else if (access.verified === null) sessionStorage.removeItem("lootsplit.verified-account");
+      if (access.marker) localStorage.setItem("lootsplit.offline-owner", access.marker);
+      else if (access.marker === null) localStorage.removeItem("lootsplit.offline-owner");
       refreshRecoveryVisibility();
-      const owned = !!(next && owner === next.user.id) || !!offlineOwner;
+      const owned = access.owned;
+      setUnchecked(access.unchecked);
+      // A dismissed notice stays hidden through later failed re-checks of this page.
+      if (!access.unchecked) setNoticeHidden(false);
+      setError(access.unchecked && !owned ? UNCHECKED_SIGNED_OUT_NOTICE : "");
       setEphemeralCampaign(!!ticket || !owned);
       if (!owned || ticket)
         setSeat({
@@ -135,7 +166,27 @@ export function CampaignGate({
     invitation ||
     path === "/share"
   )
-    return children;
+    // One shape whether or not the notice shows, so the campaign never remounts under it.
+    return (
+      <>
+        {allowed && unchecked && !noticeHidden ? (
+          <div
+            role="status"
+            aria-label="Account check"
+            className="fixed inset-x-2 bottom-2 z-50 mx-auto flex max-w-xl flex-wrap items-center gap-2 rounded-md border border-border bg-elevated p-3 text-sm shadow-lg"
+          >
+            <p className="min-w-0 flex-1">{UNCHECKED_NOTICE}</p>
+            <Button variant="secondary" onClick={() => setIdentityEpoch((x) => x + 1)}>
+              Retry
+            </Button>
+            <Button variant="ghost" onClick={() => setNoticeHidden(true)}>
+              Dismiss
+            </Button>
+          </div>
+        ) : null}
+        {children}
+      </>
+    );
   async function resume(member: AccountLibrary["members"][number]) {
     setBusy(true);
     setError("");
@@ -232,6 +283,11 @@ export function CampaignGate({
         </>
       )}
       {error && <p role="alert">{error}</p>}
+      {unchecked && (
+        <Button variant="secondary" onClick={() => setIdentityEpoch((x) => x + 1)}>
+          Retry
+        </Button>
+      )}
     </main>
   );
 }
