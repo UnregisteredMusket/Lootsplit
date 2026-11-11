@@ -4,7 +4,7 @@
   "items": [
     "After a kick or ban, Share join link and Copy session code give the new link at once; the old one stops working.",
     "Seated players keep playing with nothing to do.",
-    "A banned account cannot join or link a seat again, signed in or not; a kicked player rejoins through Copy fresh invitation."
+    "A banned account cannot join or link a seat again, signed in or not; a kicked player rejoins through Copy fresh invitation, signed in or not."
   ],
   "audience": "dm"
 }

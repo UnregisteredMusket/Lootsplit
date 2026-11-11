@@ -7,7 +7,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { linkAccountSeat } from "../cloudflare/accounts.mjs";
+import { resumeCampaignMembership } from "../cloudflare/account-campaigns.mjs";
 import {
+  closeRoom,
   joinRoom,
   manageRoom,
   openRoom,
@@ -186,5 +188,66 @@ test("a signed-in kicked account rejoining with the DM's fresh invitation still 
     });
     // Joined through the invitation: the restriction is lifted, so linking works again.
     await linkAccountSeat(DB, "kicked-user", { code: dm.code, token: back.token, name: "Game" });
+  });
+});
+
+test("reopening a closed room invalidates a link rotated by a kick, as it does any older link", async () => {
+  await withDb(async (DB) => {
+    const dm = await openRoom({ name: "DM", table: table(), userId: "dm-user" });
+    const first = (await roomState({ code: dm.code, token: dm.token, tabletopProtocol: 33 })).sessionId;
+    const target = await joinRoom({ code: dm.code, purseId: "mira", name: "K", userId: "kicked-user", sessionId: first });
+    await joinRoom({ code: dm.code, purseId: "ash", name: "Guest", sessionId: first });
+    const rotated = (await manageRoom({ code: dm.code, token: dm.token, action: "kick", seatId: target.seatId })).sessionId;
+    assert.notEqual(rotated, first);
+    await closeRoom({ code: dm.code, token: dm.token });
+    const { revision } = await DB.prepare("SELECT revision FROM campaign_rooms WHERE code=?").bind(dm.code).first();
+    await resumeCampaignMembership(DB, "dm-user", { code: dm.code, reopen: true, revision }, 5);
+    const reopened = await roomState({ code: dm.code, token: dm.token, tabletopProtocol: 33 });
+    assert.ok(reopened.sessionId && reopened.sessionId !== rotated && reopened.sessionId !== first);
+    for (const old of [first, rotated])
+      await assert.rejects(
+        joinRoom({ code: dm.code, purseId: "tam", name: "Old link", sessionId: old }),
+        /invitation has expired/,
+      );
+    await assert.rejects(previewRoom(dm.code, rotated), /invitation has expired/);
+    await joinRoom({ code: dm.code, purseId: "tam", name: "New link", sessionId: reopened.sessionId });
+  });
+});
+
+test("a kicked person who rejoins signed out with the DM's fresh invitation can link that seat; nobody else's", async () => {
+  await withDb(async (DB) => {
+    const dm = await openRoom({ name: "DM", table: table(), userId: "dm-user" });
+    const first = (await roomState({ code: dm.code, token: dm.token, tabletopProtocol: 33 })).sessionId;
+    const target = await joinRoom({ code: dm.code, purseId: "mira", name: "K", userId: "kicked-user", sessionId: first });
+    await manageRoom({ code: dm.code, token: dm.token, action: "kick", seatId: target.seatId });
+    const invited = await manageRoom({ code: dm.code, token: dm.token, action: "invite", seatId: target.seatId });
+    const invitation = invited.departed.find((s) => s.id === target.seatId).invitation;
+    // Another character joined with the current link, signed out: not the re-invited seat.
+    const other = await joinRoom({ code: dm.code, purseId: "kael", name: "Other", sessionId: invited.sessionId });
+    await assert.rejects(
+      linkAccountSeat(DB, "kicked-user", { code: dm.code, token: other.token, name: "Game" }),
+      /fresh invitation/,
+    );
+    // The re-invited character, joined signed out with the DM's fresh invitation.
+    const back = await joinRoom({ code: dm.code, purseId: "mira", name: "K", sessionId: invited.sessionId, invitation });
+    await linkAccountSeat(DB, "kicked-user", { code: dm.code, token: back.token, name: "Game" });
+    const state = await roomState({ code: dm.code, token: back.token, tabletopProtocol: 33 });
+    assert.equal(state.userId, "kicked-user");
+    const { body } = await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(dm.code).first();
+    assert.equal(JSON.parse(body).blockedUsers?.["kicked-user"], undefined, "the kick restriction is lifted");
+  });
+});
+
+test("a banned account cannot link even the seat of its former character", async () => {
+  await withDb(async (DB) => {
+    const dm = await openRoom({ name: "DM", table: table(), userId: "dm-user" });
+    const first = (await roomState({ code: dm.code, token: dm.token, tabletopProtocol: 33 })).sessionId;
+    const target = await joinRoom({ code: dm.code, purseId: "mira", name: "B", userId: "banned-user", sessionId: first });
+    const banned = await manageRoom({ code: dm.code, token: dm.token, action: "ban", seatId: target.seatId });
+    const guest = await joinRoom({ code: dm.code, purseId: "kael", name: "Guest", sessionId: banned.sessionId });
+    await assert.rejects(
+      linkAccountSeat(DB, "banned-user", { code: dm.code, token: guest.token, name: "Game" }),
+      /banned/,
+    );
   });
 });
