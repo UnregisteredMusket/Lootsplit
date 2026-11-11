@@ -2,6 +2,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { validateWebsiteChangelog } from "./website-changelog.mjs";
 import { appVersion, releasedVersionDecision } from "./android-release-skip.mjs";
+import { androidReleaseState, ghApi } from "./android-release-lookup.mjs";
 // --skip-released-unchanged: a push that did not change APP_VERSION (for example a
 // workflow-only edit) may finish successfully without publishing when that version is
 // already released. Manual runs and version changes keep the hard "already released" failure.
@@ -34,10 +35,13 @@ if (code <= previousCode)
   throw Error("Increase Android versionCode for a newly distributed update.");
 const repo = process.env.GITHUB_REPOSITORY;
 if (!repo) throw Error("Release validation requires GitHub Actions context.");
-const releases = JSON.parse(
-  execFileSync("gh", ["api", `repos/${repo}/releases?per_page=100`], { encoding: "utf8" }),
-);
-if (releases.some((r) => r.tag_name === `android-v${version}`)) {
+// Looked up by tag, never from the first page of releases (audit G8).
+const { released, publishedTags } = androidReleaseState({
+  api: ghApi(execFileSync),
+  repo,
+  version,
+});
+if (released) {
   const decision = releasedVersionDecision({
     optIn: skipReleasedUnchanged,
     eventName: process.env.GITHUB_EVENT_NAME,
@@ -57,8 +61,8 @@ if (releases.some((r) => r.tag_name === `android-v${version}`)) {
     "This version already has a release. Increase both versions; do not overwrite released APKs.",
   );
 }
-for (const release of releases.filter((r) => /^android-v/.test(r.tag_name))) {
-  const previous = execFileSync("git", ["show", `${release.tag_name}:android/app/build.gradle`], {
+for (const tag of publishedTags) {
+  const previous = execFileSync("git", ["show", `${tag}:android/app/build.gradle`], {
     encoding: "utf8",
   });
   const oldCode = Number(previous.match(/versionCode (\d+)/)?.[1]);
