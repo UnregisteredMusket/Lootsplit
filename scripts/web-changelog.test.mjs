@@ -202,6 +202,42 @@ test("a superseded release (success, nothing deployed) never stamps a note live"
   );
 });
 
+test("a deploy whose live audit failed (live, unaudited) still stamps its notes live (audit G6)", async () => {
+  // b's first run failed before deploying, its second deployed but the live audit failed.
+  const candidates = deploys.map(({ deployRunId, ...d }) => ({
+    ...d,
+    runs: [{ id: deployRunId, attempt: 1, conclusion: "success" }],
+  }));
+  candidates[1].runs = [
+    { id: 41, attempt: 1, conclusion: "failure" },
+    { id: 42, attempt: 1, conclusion: "failure" },
+    { id: 22, attempt: 1, conclusion: "success" },
+  ];
+  const outcomes = { 21: "deployed", 41: null, 42: "live-unaudited", 22: "superseded", 23: "deployed" };
+  const notes = [
+    { path: "n/one.json", note: note("One"), commit: "n1", pr: 301 },
+    { path: "n/two.json", note: note("Two"), commit: "n2", pr: 302 },
+  ];
+  const contains = containsBy({ n1: 0, n2: 1 });
+  const confirmed = await confirmDeploys({
+    notes,
+    deploys: candidates,
+    contains,
+    outcome: async (run) => outcomes[run.id],
+  });
+  assert.deepEqual(
+    confirmed.slice(0, 2).map((d) => [d.sha[0], d.deployRunId]),
+    [
+      ["a", 21],
+      ["b", 42],
+    ],
+  );
+  const two = stampNotes({ notes, deploys: confirmed, contains }).find((e) =>
+    e.notes.includes("n/two.json"),
+  );
+  assert.equal(two.commit, "b".repeat(40), "Two went live with b, unaudited");
+});
+
 test("a single-PR group links its pull request; nothing is published without a deploy", () => {
   const notes = [{ path: "n/one.json", note: note("One"), commit: "n1", pr: 301 }];
   const [entry] = stampNotes({ notes, deploys, contains: containsBy({ n1: 2 }) });

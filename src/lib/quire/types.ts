@@ -189,6 +189,11 @@ export type LedgerLine = {
   loot?: import("./loot-claims-schema.ts").LootLedgerLink;
   /** Encounter award (phase 3): the award receipt and the value the DM reviewed. Absent on older lines. */
   award?: import("./award-tag.ts").AwardTag;
+  /**
+   * Hidden activity lines (B1 follow-up): the DM traded at a shop this purse's players could not
+   * see. Players read the shop as "a merchant" while it stays out of their view (session-records.ts).
+   */
+  hiddenShop?: true;
   id: string;
   at: number;
   purseId: string;

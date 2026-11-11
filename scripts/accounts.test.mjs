@@ -9,6 +9,11 @@ import {
 } from "../cloudflare/accounts.mjs";
 import { closeRoom, roomState } from "../src/lib/quire/cloud.server.ts";
 import { WIDGET_SESSION_AGENT } from "../cloudflare/monitor-journal.mjs";
+import { signinKey, signinNetwork } from "../cloudflare/signin-throttle.mjs";
+import {
+  APP_CREDENTIAL_LIMITS,
+  DUPLICATE_SIGNUP_REPLIES_PER_DAY,
+} from "../cloudflare/credential-limits.mjs";
 const origin = "http://localhost:8080";
 function setup() {
   const DB = localAccountDb();
@@ -18,8 +23,8 @@ function setup() {
     ACCOUNT_ORIGIN: origin,
   };
   let ip = 0;
-  const call = async (path, body, cookie = "", requestOrigin = origin) => {
-    const headers = { origin: requestOrigin, "cf-connecting-ip": `192.0.2.${++ip}` };
+  const call = async (path, body, cookie = "", requestOrigin = origin, address = null) => {
+    const headers = { origin: requestOrigin, "cf-connecting-ip": address ?? `192.0.2.${++ip}` };
     if (cookie) headers.cookie = cookie;
     if (body !== undefined) headers["content-type"] = "application/json";
     const response = await handleAccounts(
@@ -51,6 +56,11 @@ function setup() {
   };
   return { DB, env, call, signup };
 }
+/**
+ * Clears Better Auth's own per-IP limiter (3 sign-ins or sign-ups per 10 s), so a test that sends
+ * several from one network sees only Lootsplitter's limits.
+ */
+const clearAuthLimiter = (DB) => DB.prepare('DELETE FROM "rateLimit"').run();
 test("a DM can reopen both saved campaigns from independent signed-in devices without restoring old player access", async () => {
   const { DB, env, call, signup } = setup();
   globalThis.__env__ = env;
@@ -266,8 +276,10 @@ test("failed sign-ins slow one email down, the same way for unknown emails, and 
   globalThis.__env__ = env;
   try {
     await signup("throttle@example.com");
-    const tries = async (email, password = "not the right password at all") => {
-      const r = await call("auth/sign-in/email", { email, password });
+    // One network (audit 2026-11-10 H3: the wait is keyed on the email plus the network).
+    const tries = async (email, password = "not the right password at all", address = "192.0.2.250") => {
+      await clearAuthLimiter(DB);
+      const r = await call("auth/sign-in/email", { email, password }, "", origin, address);
       return {
         status: r.response.status,
         data: r.data,
@@ -286,21 +298,128 @@ test("failed sign-ins slow one email down, the same way for unknown emails, and 
     );
     // No enumeration signal: identical statuses, bodies and waits for a registered address.
     assert.deepEqual(unknown, known);
-    // The right password waits too, but only until the wait ends.
+    // The right password waits too on that network, but only until the wait ends...
     assert.equal((await tries("throttle@example.com", "a long unique test password")).status, 429);
+    // ...and never on another network (audit 2026-11-10 H3).
+    const elsewhere = await tries("throttle@example.com", "a long unique test password", "198.51.100.33");
+    assert.equal(elsewhere.status, 200, JSON.stringify(elsewhere.data));
     await DB.prepare("UPDATE signin_throttle SET blocked_until=0").run();
     const ok = await tries("throttle@example.com", "a long unique test password");
     assert.equal(ok.status, 200, JSON.stringify(ok.data));
-    assert.equal(
-      (await DB.prepare("SELECT count(*) AS n FROM signin_throttle").first()).n,
-      1,
-      "only the unknown address keeps its count",
+    const keys = (await DB.prepare("SELECT key FROM signin_throttle").all()).results.map((r) => r.key);
+    assert.ok(
+      !keys.includes(await signinKey("throttle@example.com", signinNetwork("192.0.2.250"), env.ACCOUNT_SECRET)),
+      "a successful sign-in clears that network's count",
+    );
+    assert.ok(
+      keys.includes(await signinKey("no-such-account@example.com", signinNetwork("192.0.2.250"), env.ACCOUNT_SECRET)),
+      "the unknown address keeps its count",
     );
   } finally {
     delete globalThis.__env__;
     DB.close();
   }
 });
+test("app-origin sign-ups and sign-ins have a small per-network allowance; the website keeps its own (audit 2026-11-10 H1)", async () => {
+  const { DB, env, call, signup } = setup();
+  globalThis.__env__ = env;
+  try {
+    const app = "https://localhost";
+    const phoneWifi = "203.0.113.40";
+    const appSignup = async (email, address = phoneWifi) =>
+      (await clearAuthLimiter(DB), call("auth/sign-up/email", { email, password: "a long unique test password", name: "App" }, "", app, address));
+    for (let i = 0; i < APP_CREDENTIAL_LIMITS.signUpsPerDay; i++) {
+      const r = await appSignup(`app-${i}@example.com`);
+      assert.equal(r.response.status, 200, JSON.stringify(r.data));
+    }
+    const refused = await appSignup("app-extra@example.com");
+    assert.equal(refused.response.status, 429);
+    assert.match(refused.data.error, /accounts in the app today/);
+    assert.ok(Number(refused.response.headers.get("retry-after")) > 0);
+    assert.equal(refused.response.headers.get("access-control-allow-origin"), app);
+    assert.equal(await DB.prepare("SELECT 1 FROM user WHERE email='app-extra@example.com'").first(), null);
+    // The website from the same network, and the app from another network, still sign up.
+    await clearAuthLimiter(DB);
+    const web = await call("auth/sign-up/email", { email: "web@example.com", password: "a long unique test password", name: "Web" }, "", origin, phoneWifi);
+    assert.equal(web.response.status, 200, JSON.stringify(web.data));
+    assert.equal((await appSignup("app-elsewhere@example.com", "203.0.113.41")).response.status, 200);
+    // App sign-ins: the hourly allowance, then a refusal that names the website.
+    await signup("app-signin@example.com");
+    const appSignin = async () => (
+      await clearAuthLimiter(DB),
+      call("auth/sign-in/email", { email: "app-signin@example.com", password: "a long unique test password" }, "", app, phoneWifi)
+    );
+    for (let i = 0; i < APP_CREDENTIAL_LIMITS.signInsPerHour; i++)
+      assert.equal((await appSignin()).response.status, 200);
+    const late = await appSignin();
+    assert.equal(late.response.status, 429);
+    assert.match(late.data.error, /sign in on lootsplitter\.com/);
+  } finally {
+    delete globalThis.__env__;
+    DB.close();
+  }
+});
+
+test("sign-up tells one network that an email is registered only a few times a day (audit 2026-11-10 H5)", async () => {
+  const { DB, env, call, signup } = setup();
+  globalThis.__env__ = env;
+  try {
+    await signup("registered@example.com");
+    const probe = "192.0.2.230";
+    const attempt = async (email) => (
+      await clearAuthLimiter(DB),
+      call("auth/sign-up/email", { email, password: "a long unique test password", name: "Probe" }, "", origin, probe)
+    );
+    for (let i = 0; i < DUPLICATE_SIGNUP_REPLIES_PER_DAY; i++)
+      assert.equal((await attempt("registered@example.com")).response.status, 422);
+    const registered = await attempt("registered@example.com");
+    const unregistered = await attempt("unregistered@example.com");
+    assert.equal(registered.response.status, 429);
+    assert.deepEqual(unregistered.data, registered.data, "the same reply whether or not the email is registered");
+    assert.equal(unregistered.response.status, 429);
+    assert.match(registered.data.error, /Too many sign-up attempts from this network today/);
+    assert.equal(await DB.prepare("SELECT 1 FROM user WHERE email='unregistered@example.com'").first(), null);
+    // New accounts from the same network before the cap never used it up.
+    const fresh = await call("auth/sign-up/email", { email: "fresh@example.com", password: "a long unique test password", name: "Fresh" }, "", origin, "192.0.2.231");
+    assert.equal(fresh.response.status, 200, JSON.stringify(fresh.data));
+  } finally {
+    delete globalThis.__env__;
+    DB.close();
+  }
+});
+
+test("the storage guard refuses new backups, characters and map images through the API, never reads (audit 2026-11-10 H2)", async () => {
+  const { DB, env, call, signup } = setup();
+  globalThis.__env__ = env;
+  try {
+    const dm = await signup("guard-api@example.com");
+    const kept = await call("character", { name: "Kept" }, dm.cookie);
+    assert.equal(kept.response.status, 200);
+    const now = Date.now();
+    await DB.prepare("INSERT OR IGNORE INTO owner_monitor_registry(id,body,registered_at) VALUES('cloudflare-usage','{}',0)").run();
+    await DB.prepare("INSERT INTO owner_monitor_logs(id,source,observed_at,collected_at,summary,body) VALUES('usage:guard','cloudflare-usage',?,?,'usage',?)")
+      .bind(now, now, JSON.stringify({ usage: { state: "ready", checkedAt: now, data: { metrics: [{ key: "d1StorageBytes", state: "ready", current: { value: 4_200_000_000 } }] } } }))
+      .run();
+    const payload = { kind: "quire", version: 2, purses: [], holdings: [], ledger: [], shops: [], stock: [] };
+    for (const [path, body] of [
+      ["backup", { name: "Guarded", payload }],
+      ["character", { name: "Guarded" }],
+      ["map-assets", { request: { action: "begin", manifest: { id: "x" } } }],
+    ]) {
+      const r = await call(path, body, dm.cookie);
+      assert.equal(r.response.status, 507, `${path}: ${JSON.stringify(r.data)}`);
+      assert.match(r.data.error, /online storage is nearly full/);
+    }
+    const library = await call("library", undefined, dm.cookie);
+    assert.equal(library.response.status, 200);
+    assert.deepEqual(library.data.characters.map((c) => c.name), ["Kept"]);
+    assert.equal((await call("remove", { kind: "character", id: kept.data.id }, dm.cookie)).response.status, 200);
+  } finally {
+    delete globalThis.__env__;
+    DB.close();
+  }
+});
+
 test("recovery rotates the key, revokes sessions and rejects replay", async () => {
   const { DB, call, signup } = setup();
   try {

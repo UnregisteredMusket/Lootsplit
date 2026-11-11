@@ -450,7 +450,8 @@ export function applyJourneyCommand(
   seat: Pick<CloudSeat, "role" | "purseIds">,
   cmd: JourneyCommand,
   at: number,
-  event: (summary: string, purseId?: string) => void,
+  /** `subject`: the place a DM's line names (hidden activity lines, audit 2026-11-10 B1). */
+  event: (summary: string, purseId?: string, subject?: { locationId?: string }) => void,
 ) {
   const dm = seat.role === "dm";
   const world = t.journal!.world!;
@@ -570,6 +571,8 @@ export function applyJourneyCommand(
       stopped: `Journey to ${to} stopped on the road`,
     }[next.status as "proposed"] ?? `Journey to ${to} saved`,
     !dm ? next.requestedBy : undefined,
+    // A player's own request stays theirs; the DM's line names a place players may not know.
+    dm && next.destinationLocationId ? { locationId: next.destinationLocationId } : undefined,
   );
 }
 

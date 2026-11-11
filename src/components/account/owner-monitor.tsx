@@ -35,6 +35,8 @@ type Run = {
   commit: string | null;
   url: string;
   deployment: boolean;
+  /** Deployed and serving, but its live audit did not pass (audit G6). */
+  unaudited?: boolean;
 };
 type ActivityEvent = {
   id: string;
@@ -539,6 +541,7 @@ export function OwnerMonitor() {
                           development.latestDeployment.conclusion ||
                           development.latestDeployment.status
                         ).replaceAll("_", " ")}
+                        {development.latestDeployment.unaudited ? " · live, unaudited" : ""}
                       </b>
                     </a>
                   )}

@@ -76,7 +76,7 @@ import {
 } from "./finance.ts";
 import { assertMerchantSale, creditMerchant, isService, merchantRefill, merchantShortfall, payFromMerchant, revealPurse, stockCategory } from "./merchant.ts";
 import { archiveSession, projectRecord } from "./session-records.ts";
-import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
+import { readJournal, preserveJournalMetadata, eventSubject, type EventSubject, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
 import { referencePolicySchema, referencePolicy } from "./reference-access.ts";
 import { artworkSchema } from "./artwork.ts";
@@ -111,6 +111,17 @@ const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
   qty = amount.min(1).max(100000);
 const base = { id };
+/** A `buy` or `sell` whose price (or, for a purchase, item) differs from what the seat showed. */
+export const PRICE_CHANGED = "The price changed. Review it again; nothing was charged.";
+const buyExpectSchema = z.object({ unit: amount, name: z.string().max(2000) }).strict(),
+  sellExpectSchema = z.object({ unit: amount }).strict();
+export type BuyExpect = z.infer<typeof buyExpectSchema>;
+export type SellExpect = z.infer<typeof sellExpectSchema>;
+/** The expected-price check shared by the room engine and the player link (economy.ts). */
+export function assertExpectedPrice(expect: { unit: number; name?: string } | undefined, unit: number, name?: string): void {
+  if (!expect) return;
+  if (expect.unit !== unit || (expect.name !== undefined && expect.name !== name)) throw Error(PRICE_CHANGED);
+}
 export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("reference-policy"), before: referencePolicySchema, policy: referencePolicySchema }).strict(),
   ledgerVoidCommandSchema,
@@ -267,8 +278,11 @@ export const commandSchema = z.discriminatedUnion("kind", [
       .max(100000)
       .regex(/^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/art\/[a-z0-9-]+\.webp)$/),
   }),
-  z.object({ ...base, kind: z.literal("buy"), stockId: id, purseId: id, quantity: qty }),
-  z.object({ ...base, kind: z.literal("sell"), holdingId: id, shopId: id, quantity: qty }),
+  // `expect` (tabletop protocol 34; audit 2026-11-10, C2): the unit price the seat showed, in whole
+  // copper, and for a purchase the item's name. Any difference is refused (PRICE_CHANGED); older
+  // apps send none and are charged as before.
+  z.object({ ...base, kind: z.literal("buy"), stockId: id, purseId: id, quantity: qty, expect: buyExpectSchema.optional() }),
+  z.object({ ...base, kind: z.literal("sell"), holdingId: id, shopId: id, quantity: qty, expect: sellExpectSchema.optional() }),
   z.object({ ...base, kind: z.literal("listing"), listingId: id, purseId: id, quantity: qty, before: listingSchema.optional() }),
   z.object({
     ...base,
@@ -453,6 +467,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     kind: "management" | "prices" | "request" | "session" = "management",
     purseId?: string,
     change?: NonNullable<CloudTable["journal"]>["events"][number]["change"],
+    /** The shop, place, listing or NPC the line names (hidden activity lines, audit 2026-11-10 B1). */
+    subject?: EventSubject,
   ) => {
     if (cmd.kind === "patch" && cmd.changes.some((c) => c.store === "journal")) return;
     journal.events.push({
@@ -462,6 +478,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       kind,
       ...(purseId ? { purseId } : {}),
       ...(change ? { change } : {}),
+      ...(subject ? eventSubject(subject) : {}),
     });
   };
   if (seat.role !== "dm" && cmd.kind === "character") {
@@ -535,6 +552,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
                 ? "loan"
                 : "payment",
     });
+  // Hidden activity lines (B1 follow-up): the DM may trade for a purse at a shop its players
+  // can't see (players can't). The line is kept whole; players read the shop as "a merchant".
+  const markHiddenShop = (line: CloudTable["ledger"][number], shop: import("./types.ts").Shop, purseId: string) => {
+    if (!shopVisible(shop, t, actingGroups(t, purseId))) line.hiddenShop = true;
+  };
   const score = (purseId: string) =>
     charismaFor(t.purses.find((p) => p.id === purseId) ?? { id: purseId, kind: "character" }, t.sheets);
   const finance = () => (journal.finance ??= readFinance());
@@ -563,8 +585,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyQuestCommand(t, seat, cmd as QuestCommand, at);
   } else if (journeyKinds.has(cmd.kind)) {
     journal.world = readWorld(journal.world);
-    applyJourneyCommand(t, seat, cmd as JourneyCommand, at, (summary, purseId) =>
-      event(summary, "management", purseId),
+    applyJourneyCommand(t, seat, cmd as JourneyCommand, at, (summary, purseId, subject) =>
+      event(summary, "management", purseId, undefined, subject),
     );
   } else if (partyGroupKinds.has(cmd.kind)) {
     applyPartyGroupCommand(t, seat, cmd as PartyGroupCommand, at, (summary, purseId, dmOnly) =>
@@ -639,6 +661,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       cmd.after
         ? `Listing saved: ${cmd.after.name}`
         : `Listing removed: ${current?.name || cmd.listingId}`,
+      "management",
+      undefined,
+      undefined,
+      { listingId: cmd.listingId },
     );
   } else if (cmd.kind === "property-profile") {
     dm();
@@ -683,7 +709,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (!same({ locationId: shop.locationId ?? null, image: shop.image ?? null }, cmd.before)) throw Error("This shop's location or image changed elsewhere. Refresh before saving.");
     if (cmd.locationId) shop.locationId = cmd.locationId; else delete shop.locationId;
     if (cmd.image) shop.image = cmd.image; else delete shop.image;
-    event(`Shop location and image saved: ${shop.name}`);
+    event(`Shop location and image saved: ${shop.name}`, "management", undefined, undefined, { shopId: shop.id });
   } else if (cmd.kind === "market-location") {
     dm();
     const market = readMarketLocations(journal.market);
@@ -725,7 +751,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // Settlement tiers: a removed place, or one that is no longer a city or town, keeps no profile.
     if ((!cmd.after || !settlementKind(cmd.after)) && dropSettlementProfile(journal, cmd.locationId))
       journal.events.push({ id: cmd.id + "-event-" + journal.events.length, at, summary: `Settlement profile cleared: ${current?.name ?? "a removed place"}`, kind: "management", dmOnly: true });
-    event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
+    event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed", "management", undefined, undefined, cmd.after ? { locationId: cmd.locationId } : undefined);
   } else if (cmd.kind === "party-location" && cmd.groupId && cmd.groupId !== MAIN_GROUP) {
     dm();
     applyGroupLocation(
@@ -805,7 +831,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       shop.schedule = { ...cmd.schedule, lastRestockDay: f.day };
       shop.closed = !shop.schedule.openDays.includes(f.day % shop.schedule.cycleDays);
     } else delete shop.schedule;
-    event(`Shop schedule ${cmd.schedule ? "updated" : "disabled"}: ${shop.name}`);
+    event(`Shop schedule ${cmd.schedule ? "updated" : "disabled"}: ${shop.name}`, "management", undefined, undefined, { shopId: shop.id });
   } else if (cmd.kind === "property-plan") {
     const f = editableFinance();
     const holding = t.holdings.find((h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
@@ -1270,7 +1296,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       if (line.quantity! + cmd.quantity > 100000) throw new Error("Stock quantity is too large.");
       line.quantity! += cmd.quantity;
     }
-    event(`Restocked ${shop.name}: +${cmd.quantity} per finite stock line`);
+    event(`Restocked ${shop.name}: +${cmd.quantity} per finite stock line`, "management", undefined, undefined, { shopId: shop.id });
     // The DM's Restock also refills a merchant purse to its refill amount (DM-only event).
     const refill = merchantRefill(shop);
     if (refill) {
@@ -1288,6 +1314,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const s = t.stock.find((x) => x.id === cmd.stockId),
       shop = t.shops.find((x) => x.id === s?.shopId);
     if (!s || !shop) throw new Error("Item or shop no longer exists.");
+    // A shop-list swap can reuse this line's ID for another item: refused before anything else.
+    if (cmd.expect && cmd.expect.name !== s.name) throw Error(PRICE_CHANGED);
     if (seat.role === "player" && !shopVisible(shop, t, actingGroups(t, cmd.purseId, seat.purseIds))) throw Error(notHere(cmd.purseId, "This shop"));
     if (shop.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
     if (shop.closed) throw new Error("This shop is closed.");
@@ -1297,7 +1325,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const events = lineEvents(journal, shop, s);
     // Factions controlling the shop, by the party's tier (factions.ts), in the same pipeline.
     const factions = factionEffects(journal, t.purses, shop);
-    const cost = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events, factions }).total;
+    const priced = shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { events, factions });
+    const cost = priced.total;
+    assertExpectedPrice(cmd.expect, priced.unit, s.name);
     // An older app showed the price without them: refused rather than charged a price it never saw.
     if (execution.marketEventsUnsupported && events.length && cost !== shopBuyBreakdown(shop, s.copper, score(cmd.purseId), cmd.quantity, { factions }).total)
       throw Error(OLD_CLIENT_EVENT_PRICE);
@@ -1341,6 +1371,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         };
     if (purchasedHolding) t.holdings.push(purchasedHolding);
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
+    markHiddenShop(t.ledger[t.ledger.length - 1]!, shop, cmd.purseId);
     const purchase = t.ledger[t.ledger.length - 1];
     purchase.purchase = { stockId: s.id, quantity: cmd.quantity, holding: structuredClone(purchasedHolding) };
     const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: s.id, purseId: cmd.purseId, direction: "buy", quantity: cmd.quantity, copper: cost });
@@ -1422,8 +1453,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // old-client checks below compare without it.
     const seller = seat.role === "dm" ? "dm" : "player";
     const settlementLimit = seller === "dm" ? undefined : settlementSaleLimit(journal, s);
-    const priced = shopSale(h, s, cmd.quantity, journal, t.purses, seller);
+    const priced = shopSale(h, s, cmd.quantity, journal, t.purses, seller, t.sheets);
     if (priced.refused) throw Error(priced.refused);
+    // The final unit payout shopSale computes (every cap included) against what the seat showed.
+    assertExpectedPrice(cmd.expect, priced.unit);
     const paid = priced.total;
     if (execution.settlementLimitsUnsupported && settlementLimit && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events, factions }).total)
       throw Error(OLD_CLIENT_SETTLEMENT_PRICE);
@@ -1441,6 +1474,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
     log(h.purseId, `Sold ${cmd.quantity} ${shown.name} to ${s.name}`, paid, s.id);
+    markHiddenShop(t.ledger[t.ledger.length - 1]!, s, h.purseId);
     const linked = t.stock.find(
       (line) => line.shopId === s.id && line.commodityId === shown.commodityId && shown.commodityId,
     );
@@ -1642,6 +1676,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       throw Error("The sale or split changed (prices, items, the party fund or recipients moved). Review it again.");
     // Merchant purse: the whole sale is paid from it or nothing is sold (never half a sale).
     merchantPays(shop, plan.proceeds);
+    const fundSeesShop = shopVisible(shop, t, actingGroups(t, fund.id));
     // The sale: the fund receives each lot's price (keeping its own coins), one sale line per lot.
     fund.coins = creditCoins(fund.coins, plan.proceeds);
     for (const [i, lot] of plan.lots.entries()) {
@@ -1656,6 +1691,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         summary: `Sold ${lot.quantity} ${lot.name} to ${shop.name}`,
         copper: lot.paid,
         transactionType: "sale",
+        ...(fundSeesShop ? {} : { hiddenShop: true as const }),
       });
       const shown = presentedHolding(h);
       const linked = t.stock.find((line) => line.shopId === shop.id && line.commodityId === shown.commodityId && shown.commodityId);
@@ -1679,6 +1715,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       `Sold ${items} to ${shop.name} and split ${formatCopper(plan.proceeds)} from ${fund.name} among ${plan.split.n}`,
       "management",
       fund.id,
+      undefined,
+      // A shop the fund's players could not see: they read it as "a merchant" (session-records.ts).
+      fundSeesShop ? undefined : { shopId: shop.id },
     );
     const receipt = journal.events[journal.events.length - 1]!;
     receipt.split = {
@@ -1821,6 +1860,10 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
           change.after === null
             ? "Shop removed"
             : `Shop updated: ${(change.after as { name: string }).name}`,
+          "management",
+          undefined,
+          undefined,
+          change.after === null ? undefined : { shopId: change.id },
         );
       if (
         change.store === "stock" &&
@@ -1838,6 +1881,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
             before: { copper: (change.before as { copper: number }).copper },
             after: { copper: (change.after as { copper: number }).copper },
           },
+          { shopId: (change.after as { shopId: string }).shopId },
         );
       const rows = (t[change.store] ?? []) as any[];
       const rowId = (x: any) => (change.store === "sheets" ? x.purseId : x.id);

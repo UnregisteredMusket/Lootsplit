@@ -1,0 +1,11 @@
+{
+  "title": "Activity no longer names shops and places players can't see",
+  "audience": "everyone",
+  "summary": "The DM's edits, restocks, schedules and price changes for a shop, stock line, place or property listing now reach a player's Activity only while that player can see it.",
+  "items": [
+    "A vendor in another town, a hidden black-market vendor, an unrevealed place or a listing elsewhere stays out of a player's Activity, price-change history, archived sessions and CSV export.",
+    "When the party reaches that place, or the DM reveals the vendor, its lines appear for players.",
+    "When the DM buys or sells for a character or party fund at a shop its players can't see, players keep every line and receipt, with the shop named only as \"a merchant\".",
+    "The DM still sees every line. Older lines that can't be matched to their shop or place now show to the DM only."
+  ]
+}
