@@ -1100,22 +1100,24 @@ export async function submitCommands(input: {
       refuseOldClientGroupActions(room.table, commands);
     }
     const key = seat.id + ":" + input.batchId;
-    // Receipts for this batch, its actions and the seat's staged actions (room-store.server.ts).
-    const commandReceipts = await lookupReceipts(room, "command", [
-      ...new Set([
-        ...commands.map((c) => seat.id + ":" + c.id),
-        ...(room.drafts?.[seat.id] ?? []).map((c) => seat.id + ":" + c.id),
-      ]),
+    // Receipts for this batch's actions and the seat's staged actions, under every seat, in one
+    // indexed query (room-store.server.ts). This seat's own receipts decide as before. The same
+    // action applied under another seat (a player who left and rejoined has a new seat ID) is
+    // treated as this seat's own receipt, so it is never applied twice (audit A2). Only an exact
+    // content match counts: another seat's receipt with different or unknown content is ignored and
+    // the action is new, so no seat can block another's action IDs by committing something else
+    // under them first (review of PR 488).
+    const byId = await lookupCommandIdReceipts(room, [
+      ...new Set([...commands.map((c) => c.id), ...(room.drafts?.[seat.id] ?? []).map((c) => c.id)]),
     ]);
-    // The same action applied under another seat (a player who left and rejoined has a new seat
-    // ID) is treated as this seat's own receipt, so it is never applied twice (audit A2). Only an
-    // exact content match counts: another seat's receipt with different or unknown content is
-    // ignored and the action is new, so no seat can block another's action IDs by committing
-    // something else under them first (review of PR 488).
+    const commandReceipts = new Map<string, string | undefined>();
+    for (const list of byId.values())
+      for (const r of list) if (r.key.startsWith(seat.id + ":")) commandReceipts.set(r.key, r.hash);
     const adopted = new Set<string>();
-    const elsewhere = await lookupCommandIdReceipts(
-      room,
-      commands.filter((c) => !commandReceipts.has(seat.id + ":" + c.id)).map((c) => c.id),
+    const elsewhere = new Map(
+      commands
+        .filter((c) => !commandReceipts.has(seat.id + ":" + c.id))
+        .map((c) => [c.id, (byId.get(c.id) ?? []).filter((r) => !r.key.startsWith(seat.id + ":"))] as const),
     );
     for (const command of commands) {
       let match: string | undefined;

@@ -568,7 +568,7 @@ export async function lookupReceipts(
 /**
  * Command receipts for these action IDs under any seat of the room, by action ID (audit A2): a
  * player who left and rejoined has a new seat ID, so a seat-keyed lookup alone let an old action
- * apply again. Uses the partial index on the action ID part of the key (migration 0032), so it
+ * apply again. Uses the partial index on the action ID part of the key (migration 0033), so it
  * finds every receipt, including those written before it, without a second row per action.
  */
 export async function lookupCommandIdReceipts(
