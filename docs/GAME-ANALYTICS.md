@@ -19,8 +19,8 @@ The original website strip is reused; app navigation and financial UI are unchan
   Unknown untyped entries are counted as unclassified rather than guessed to be spending.
 - Money remains integer copper (100 cp = 1 gp). Unsafe numeric totals fail instead of rounding.
 - Totals follow the current saved ledger: voids, imports, restores and room deletion can reduce
-  them. They are not a permanently increasing lifetime telemetry counter. Cached server snapshots
-  can be up to one minute old; the page fetches on mount. A failed fetch displays unavailable,
+  them. They are not a permanently increasing lifetime telemetry counter. The public total is the
+  latest collection's (about every 30 minutes, see below); the page fetches on mount. A failed fetch displays unavailable,
   never a fabricated zero. A long scan is an observational rollup, not an atomic cross-room snapshot.
 
 ## Reusable package
@@ -45,10 +45,14 @@ No metric claims to track unrecorded combat, attendance, or play time.
 - `publicGameMetrics` is the explicit publication allowlist. Adding an internal metric never
   publishes it. Future approved public widgets should extend this function deliberately.
 
-The server reads in bounded pages and caches per database/isolate for one minute. It introduces
-no new financial writes, database migrations, analytics collection service or backup fields.
-For significantly larger room populations, replace the read-time rollup with transactionally
-maintained aggregates while keeping the same API and accounting tests.
+Counting happens only in collections: the scheduled owner-monitor collection every 30 minutes and
+owner reads (monitor, widget; cached per database/isolate for one minute). A collection keeps each
+campaign's figures in `game_analytics_cache` with the revision they were counted at (migration
+0031), recounts only changed campaigns, and stores the site totals in the row `SITE-TOTALS`
+(a code with "-" never names a campaign). The public route reads only that row (audit F4,
+2026-11-10): no public request lists or reads campaigns or their history. Before the first
+collection, or after an `ANALYTICS_VERSION` change until the next one, it answers 503 and the page
+shows unavailable, never zero. It introduces no new financial writes or backup fields.
 
 ## Verification
 

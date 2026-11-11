@@ -1,0 +1,9 @@
+{
+  "title": "Lighter pages: the website loads less code before it draws",
+  "summary": "Every page, the public website included, no longer downloads the whole Help guide and the full SRD icon list up front. Help and the home page load their own parts, and item icons fetch their artwork table when an icon first appears.",
+  "items": [
+    "Icons draw at once with their family or category artwork and switch to the item's, spell's or creature's own artwork a moment later.",
+    "The public gold-spent total on the home page is now recounted about every half hour in the background instead of on each visit."
+  ],
+  "audience": "everyone"
+}

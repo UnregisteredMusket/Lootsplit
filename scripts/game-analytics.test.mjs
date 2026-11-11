@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
-import { publicAnalytics, ownerAnalytics } from "../cloudflare/game-analytics.mjs";
+import { collect, publicAnalytics, ownerAnalytics } from "../cloudflare/game-analytics.mjs";
 
 test("public analytics aggregates multiple pages and publishes only spending", async () => {
   const db = localAccountDb();
@@ -28,6 +28,7 @@ test("public analytics aggregates multiple pages and publishes only spending", a
         .bind(String(i).padStart(4, "0"), JSON.stringify(body))
         .run();
     }
+    await collect(db);
     const result = await publicAnalytics(db);
     assert.deepEqual(result.metrics, { spentCopper: 12423 });
     assert.deepEqual(Object.keys(result).sort(), ["asOf", "metrics", "scope", "version"]);
@@ -51,6 +52,7 @@ test("public analytics aggregates multiple pages and publishes only spending", a
 test("empty database is zero; database errors never become fabricated zero totals", async () => {
   const db = localAccountDb();
   try {
+    await collect(db);
     assert.equal((await publicAnalytics(db)).metrics.spentCopper, 0);
   } finally {
     db.close();
@@ -65,7 +67,6 @@ test("empty database is zero; database errors never become fabricated zero total
 });
 
 test("running totals: unchanged campaigns are not reread, and the totals equal a full recount", async () => {
-  const { collect } = await import("../cloudflare/game-analytics.mjs");
   const db = localAccountDb();
   const room = (copper) => JSON.stringify({ seats: [], table: { ledger: [{ id: "l1", purseId: "p", copper, transactionType: "purchase", summary: "" }], purses: [], holdings: [] } });
   const put = (code, revision, copper) =>
@@ -90,7 +91,7 @@ test("running totals: unchanged campaigns are not reread, and the totals equal a
     assert.equal(fourth.recounted, 0);
     assert.equal(fourth.sharedCampaigns, 59);
     assert.equal(fourth.metrics.spentCopper, 6050);
-    assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM game_analytics_cache").first()).n, 59);
+    assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM game_analytics_cache WHERE code<>'SITE-TOTALS'").first()).n, 59);
     // An unreadable or older-version cache row is recounted, never trusted.
     await db.prepare("UPDATE game_analytics_cache SET metrics='{broken' WHERE code='R001'").run();
     await db.prepare("UPDATE game_analytics_cache SET analytics_version=0 WHERE code='R002'").run();
@@ -102,6 +103,66 @@ test("running totals: unchanged campaigns are not reread, and the totals equal a
     const sixth = await collect(db);
     assert.equal(sixth.sharedCampaigns, 58);
     assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM game_analytics_cache WHERE code='R003'").first()).n, 0);
+  } finally {
+    db.close();
+  }
+});
+
+/** Records every SQL statement the code under test prepares on the D1 stand-in. */
+function recording(db) {
+  const statements = [];
+  return {
+    statements,
+    db: new Proxy(db, {
+      get(target, key) {
+        if (key === "prepare")
+          return (sql) => {
+            statements.push(sql);
+            return target.prepare(sql);
+          };
+        const value = target[key];
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }),
+  };
+}
+
+test("the public statistics read sums the collected totals and reads no campaign or history", async () => {
+  const db = localAccountDb();
+  const room = (copper) =>
+    JSON.stringify({ seats: [{ token: "SECRET" }], table: { ledger: [{ id: "l1", purseId: "p", copper, transactionType: "purchase", summary: "" }], purses: [], holdings: [] } });
+  try {
+    for (let i = 0; i < 5; i++)
+      await db.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES (?,1,?)").bind(`ROOM${i}`, room(-100)).run();
+    // The scheduled owner-monitor collection (every 30 minutes) maintains the totals.
+    const collected = await collect(db, 1_700_000_000_000);
+    // A campaign changes after the collection: the public figure stays at the collected total until
+    // the next collection instead of recounting on the request path.
+    await db.prepare("UPDATE campaign_rooms SET revision=2, body=? WHERE code='ROOM0'").bind(room(-900)).run();
+    const { db: watched, statements } = recording(db);
+    const result = await publicAnalytics(watched);
+    assert.deepEqual(result.metrics, { spentCopper: collected.metrics.spentCopper });
+    assert.equal(result.metrics.spentCopper, 500);
+    assert.equal(result.scope, "current-shared-campaigns");
+    assert.ok(Number.isSafeInteger(result.asOf) && result.asOf > 0);
+    assert.ok(statements.length > 0 && statements.length <= 2, `one bounded read, got ${statements.length}`);
+    for (const sql of statements) {
+      assert.doesNotMatch(sql, /campaign_room|report|history|archive/i, `public read touched campaign data: ${sql}`);
+      assert.doesNotMatch(sql, /^\s*(INSERT|UPDATE|DELETE)/i, `public read wrote: ${sql}`);
+    }
+    // The next collection picks the change up.
+    await collect(db);
+    assert.equal((await publicAnalytics(db)).metrics.spentCopper, 1300);
+  } finally {
+    db.close();
+  }
+});
+
+test("before any collection the public figure is unavailable, never a fabricated zero", async () => {
+  const db = localAccountDb();
+  try {
+    await db.prepare("INSERT INTO campaign_rooms (code,revision,body) VALUES ('ROOM1',1,'{}')").run();
+    await assert.rejects(publicAnalytics(db), { status: 503 });
   } finally {
     db.close();
   }

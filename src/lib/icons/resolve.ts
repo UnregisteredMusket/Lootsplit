@@ -1,4 +1,4 @@
-import data from "./catalog.json" with { type: "json" };
+import core from "./catalog-core.json" with { type: "json" };
 export type IconEntry = {
   id?: string;
   key?: string;
@@ -14,15 +14,51 @@ export type IconEntry = {
   facts?: string[];
 };
 type Spec = { icon: string; category: string };
-type Catalog = {
+/** SRD record artwork and visual name aliases: about 410 KB, loaded on demand (`loadIconCatalog`). */
+export type IconLookup = {
   records: Record<string, Spec>;
   names: Record<string, Record<string, Spec>>;
+};
+type Core = {
   categories: Record<string, Record<string, string>>;
   ui: Record<string, string>;
   defaults: Record<string, string>;
   rules: Record<string, string[][]>;
 };
-const catalog: Catalog = data;
+/**
+ * Categories, UI symbols, defaults and family rules (about 17 KB) are always here. The SRD record
+ * and name tables load on demand so every page, public ones included, does not carry them (audit
+ * F5, 2026-11-10). Until they arrive an icon resolves by family, category or kind: the same
+ * artwork set, upgraded to the record's own icon once loaded.
+ */
+const catalog: Core = core;
+let lookup: IconLookup | null = null;
+let loading: Promise<IconLookup> | null = null;
+const listeners = new Set<() => void>();
+/** The record and name tables, if loaded. */
+export const iconLookup = () => lookup;
+/** Loads the record and name tables once; a failed load (offline) can be retried later. */
+export function loadIconCatalog(): Promise<IconLookup> {
+  loading ??= import("./catalog-lookup.ts").then(
+    (module) => {
+      lookup = module.default;
+      for (const listener of listeners) listener();
+      return module.default;
+    },
+    (error: unknown) => {
+      loading = null;
+      throw error;
+    },
+  );
+  return loading;
+}
+/** Subscribe to the tables arriving (for useSyncExternalStore). */
+export function subscribeIconCatalog(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 const get = <T>(map: Record<string, T> | undefined, key: string): T | undefined =>
   map && Object.hasOwn(map, key) ? map[key] : undefined;
 const normalize = (v = "") =>
@@ -112,8 +148,14 @@ function result(icon: string, category = "", matchedBy = "category") {
 /** Visual matching only. Never uses names to modify identities, prices, or rules. */
 export function resolveFantasyIcon(
   entry: IconEntry = {},
-  options: { categoryOnly?: boolean; ui?: string } = {},
+  options: {
+    categoryOnly?: boolean;
+    ui?: string;
+    /** Record and name tables to use; defaults to the loaded ones (none before `loadIconCatalog`). */
+    lookup?: IconLookup | null;
+  } = {},
 ) {
+  const tables = options.lookup === undefined ? lookup : options.lookup;
   if (options.ui)
     return result(get(catalog.ui, options.ui) || catalog.defaults.items, "", "navigation");
   let kind = entry.kind === "item" || !entry.kind ? "items" : entry.kind;
@@ -135,7 +177,7 @@ export function resolveFantasyIcon(
       key = source[2];
     }
   }
-  let spec = get(catalog.records, `${kind}:${key}`);
+  let spec = get(tables?.records, `${kind}:${key}`);
   const facts = entry.facts || [];
   const fact = (label: string) =>
     facts.find((f) => f.startsWith(`${label}: `))?.slice(label.length + 2) || "";
@@ -154,8 +196,8 @@ export function resolveFantasyIcon(
   // The name index only chooses artwork for legacy/custom records, never an SRD identity.
   if (!options.categoryOnly && n) {
     spec =
-      get(catalog.names[kind], n) ||
-      (kind === "items" ? get(catalog.names.magicitems, n) : undefined);
+      get(tables?.names[kind], n) ||
+      (kind === "items" ? get(tables?.names.magicitems, n) : undefined);
     if (spec) return result(spec.icon, spec.category, "name");
     // Plural custom names ("Arrows", "Torches") match their singular family ("arrow", "torch").
     const singular = n

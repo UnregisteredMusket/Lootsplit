@@ -9,8 +9,11 @@ The uniform black square background was removed from each SVG for CSS alpha-mask
 rendering. Artist geometry remains intact. Attribution, original license and
 per-icon author/source URLs are public beside the assets and linked from Resources.
 
-src/lib/icons/catalog.json contains records, visual name aliases, generic categories,
-UI symbols and family rules. src/lib/icons/resolve.ts selects artwork without any
+src/lib/icons/catalog-core.json contains generic categories, UI symbols, defaults and
+family rules (always bundled); src/lib/icons/catalog.json contains SRD records and visual
+name aliases, loaded on demand by `loadIconCatalog` (audit F5, 2026-11-10). Until it
+arrives an icon shows its family or category artwork; server render and hydration always
+use that placeholder so they match. src/lib/icons/resolve.ts selects artwork without any
 state writes. Known source identity wins, followed by visual name/family matching,
 then generic category/kind fallback. Name matching never claims a source identity.
 

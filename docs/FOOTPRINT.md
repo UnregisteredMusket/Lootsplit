@@ -82,7 +82,7 @@ session would reach about 18 KB but need a reader release before any writer stor
 
 ## Improvements worth making (optional, in order)
 
-1. Done (#406): game statistics are running totals (`game_analytics_cache`, migration 0031); a collection rereads only campaigns whose revision changed.
+1. Done (#406): game statistics are running totals (`game_analytics_cache`, migration 0031); a collection rereads only campaigns whose revision changed. The public statistics route reads only the stored totals row (audit F4, 2026-11-10).
 2. Measure the minute timer's jobs and skip work when nothing changed.
 3. Check that finished session journals leave live campaign data (the largest campaign held 1.7 MB of
    journal in its live row on 2026-11-01).

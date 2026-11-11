@@ -1,8 +1,7 @@
 import type { HelpGroup } from "./content";
 import { SUPPORT_EMAIL } from "../website/contact.ts";
 
-export const PLAYER_DESCRIPTION =
-  "Play your assigned character, manage permitted inventory and requests, read shared records, and stay connected to your party.";
+export { PLAYER_DESCRIPTION } from "./descriptions.ts";
 export const PLAYER_HELP_GROUPS: HelpGroup[] = [
   {
     id: "start",

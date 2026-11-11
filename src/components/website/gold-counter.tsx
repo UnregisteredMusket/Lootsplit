@@ -85,7 +85,9 @@ export function GoldSpentCounter({
           Local-only saves, private cloud backups, unsubmitted actions and owner Test campaigns are
           excluded. This total can decrease after a valid reversal or campaign deletion.
         </p>
-        <p>Snapshots are cached for up to a minute; this page reads one snapshot when opened.</p>
+        <p>
+          The total is recounted about every half hour; this page reads the latest count when opened.
+        </p>
         <p>
           {snapshot?.scope === "current-shared-campaigns"
             ? "Returned scope: current shared campaigns."
