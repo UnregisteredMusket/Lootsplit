@@ -1,4 +1,4 @@
-import { WelcomePage } from "@/components/website/site";
+import { WelcomePage } from "@/components/website/welcome-page";
 import { createFileRoute } from "@tanstack/react-router";
 import { homeStructuredData, publicPageHead } from "@/lib/deployment/public-urls.mjs";
 

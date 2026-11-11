@@ -6,7 +6,7 @@ import { AppNotifications } from "@/components/app-notifications";
 import { CampaignLoadingHost } from "@/components/campaign-loading";
 import { RouteLoading } from "@/components/route-loading";
 import { DialogHost } from "@/components/confirm-dialog";
-import { APP_DESCRIPTION } from "@/lib/help/content";
+import { APP_DESCRIPTION } from "@/lib/help/descriptions";
 import { MemberActivity } from "@/components/account/activity";
 import {
   createRootRoute,

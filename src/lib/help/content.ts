@@ -2,8 +2,9 @@ import { ROOM_LIMIT_TEXT, ROOM_TOTAL_LIMIT_TEXT } from "../quire/room-size.ts";
 import { SUPPORT_EMAIL } from "../website/contact.ts";
 import { CAMPAIGN_BACKUP_LIMIT } from "../account/campaign-backups.ts";
 
-export const APP_DESCRIPTION =
-  "Manage tabletop campaigns with character sheets, shared funds, inventory, shops, encounters, and DM-approved downtime finances. Play locally or in shared rooms, with account-owned campaigns, guest invitations and backups.";
+// The one-line descriptions live in a small module so the root route's page description does not
+// load the whole Help guide on every page (audit F5, 2026-11-10).
+export { APP_DESCRIPTION } from "./descriptions.ts";
 export type HelpTopic = {
   id: string;
   title: string;

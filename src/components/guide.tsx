@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "@/components/ui";
 import { APP_VERSION } from "@/lib/quire/version";
-import { APP_DESCRIPTION } from "@/lib/help/content";
-import { PLAYER_DESCRIPTION } from "@/lib/help/player-content";
+import { APP_DESCRIPTION, PLAYER_DESCRIPTION } from "@/lib/help/descriptions";
 import { useSeat } from "@/lib/quire/seat";
 import { HelpContent } from "./help-content";
 

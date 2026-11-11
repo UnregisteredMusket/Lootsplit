@@ -1,5 +1,18 @@
-import type { CSSProperties } from "react";
-import { resolveFantasyIcon, type IconEntry } from "@/lib/icons/resolve";
+import { useEffect, useSyncExternalStore, type CSSProperties } from "react";
+import {
+  iconLookup,
+  loadIconCatalog,
+  resolveFantasyIcon,
+  subscribeIconCatalog,
+  type IconEntry,
+} from "@/lib/icons/resolve";
+
+/**
+ * The SRD icon tables load on demand (audit F5). The server render and hydration use none
+ * (`getServerSnapshot`), so both draw the same family/category icon; the record's own icon replaces
+ * it once the tables arrive. Later renders use them straight away.
+ */
+const serverLookup = () => null;
 export function FantasyIcon({
   entry,
   ui,
@@ -13,7 +26,13 @@ export function FantasyIcon({
   className?: string;
   size?: number;
 }) {
-  const icon = resolveFantasyIcon(entry, { ui, categoryOnly });
+  const lookup = useSyncExternalStore(subscribeIconCatalog, iconLookup, serverLookup);
+  // UI symbols and category-only icons never need the record tables.
+  const needsLookup = !ui && !categoryOnly;
+  useEffect(() => {
+    if (needsLookup && !iconLookup()) loadIconCatalog().catch(() => {});
+  }, [needsLookup]);
+  const icon = resolveFantasyIcon(entry, { ui, categoryOnly, lookup });
   return (
     <span
       aria-hidden="true"
