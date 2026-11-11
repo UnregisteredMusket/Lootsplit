@@ -44,6 +44,12 @@ export type CloudSeat = {
   name: string;
   role: "dm" | "player";
   purseIds: string[];
+  /**
+   * Server-only (audit 2026-11-10 B4): the departed record (the kicked seat's ID) whose character
+   * this seat took with the DM's fresh invitation. Only such a seat may later be linked to that
+   * kicked account. Views pick seat fields, so it never reaches a client.
+   */
+  reinvited?: string;
 };
 
 export type CloudSeen = { gifts: string[]; sales: string[] };

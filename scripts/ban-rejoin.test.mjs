@@ -251,3 +251,26 @@ test("a banned account cannot link even the seat of its former character", async
     );
   });
 });
+
+test("party permission on another seat does not let a kicked account link it", async () => {
+  await withDb(async (DB) => {
+    const withParty = () => ({
+      ...table(),
+      purses: [...table().purses, { id: "party", name: "Party", kind: "party", coins }],
+    });
+    const dm = await openRoom({ name: "DM", table: withParty(), userId: "dm-user" });
+    const first = (await roomState({ code: dm.code, token: dm.token, tabletopProtocol: 33 })).sessionId;
+    const target = await joinRoom({ code: dm.code, purseId: "mira", name: "K", userId: "kicked-user", sessionId: first });
+    await manageRoom({ code: dm.code, token: dm.token, action: "permission", seatId: target.seatId, allowParty: true });
+    const kicked = await manageRoom({ code: dm.code, token: dm.token, action: "kick", seatId: target.seatId });
+    // The new link reached the kicked person; they join signed out as another character.
+    const other = await joinRoom({ code: dm.code, purseId: "ash", name: "Anon", sessionId: kicked.sessionId });
+    await manageRoom({ code: dm.code, token: dm.token, action: "permission", seatId: other.seatId, allowParty: true });
+    await assert.rejects(
+      linkAccountSeat(DB, "kicked-user", { code: dm.code, token: other.token, name: "Game" }),
+      /fresh invitation/,
+    );
+    const { body } = await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(dm.code).first();
+    assert.equal(JSON.parse(body).blockedUsers?.["kicked-user"], "kicked", "the kick stays in force");
+  });
+});

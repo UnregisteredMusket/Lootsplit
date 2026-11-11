@@ -375,6 +375,9 @@ export async function joinRoom(input: {
     if (previous) claimed.seat.id = previous.id;
     if (input.invitation && room.invitations?.[input.purseId] !== input.invitation)
       throw Error("This invitation has expired.");
+    // A kicked character taken with the DM's fresh invitation (checked above): remember which
+    // departed record it re-invites, so a signed-out rejoin can later be linked to that account.
+    if (restriction?.status === "kicked") claimed.seat.reinvited = restriction.id;
     if (input.userId && claimed.room.blockedUsers) delete claimed.room.blockedUsers[input.userId];
     if (claimed.room.invitations) delete claimed.room.invitations[input.purseId];
     const next = { ...claimed.room, revision: claimed.room.revision + 1 };

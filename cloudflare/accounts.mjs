@@ -289,20 +289,18 @@ export async function linkAccountSeat(db, userId, body, limit = hostedCampaignLi
   )
     fail("This seat belongs to another account.", 409);
   // Audit 2026-11-10 B4: a kicked or banned account cannot take a seat by joining signed out and
-  // linking it afterwards. A banned account never links. A kicked account may link only the seat
-  // of a character it was kicked from: joinRoom seats such a character only with the DM's fresh
-  // invitation, so that seat is the DM's re-invitation, and linking it lifts the restriction as
-  // a signed-in rejoin does.
+  // linking it afterwards. A banned account never links. A kicked account may link only a seat
+  // joinRoom marked as the DM's fresh invitation for that account's own kicked character
+  // (`reinvited`: the departed record's ID; never inferred from shared purses such as the party
+  // fund), and linking it lifts the restriction as a signed-in rejoin does.
   const blocked = room.blockedUsers?.[userId];
   if (blocked === "banned") fail("You are banned from this campaign.", 403);
   const reinvited =
     blocked === "kicked" &&
     seat.role === "player" &&
+    typeof seat.reinvited === "string" &&
     (room.departed || []).some(
-      (s) =>
-        s.userId === userId &&
-        s.status === "kicked" &&
-        s.purseIds.some((id) => seat.purseIds.includes(id)),
+      (s) => s.id === seat.reinvited && s.userId === userId && s.status === "kicked",
     );
   if (blocked === "kicked" && !reinvited)
     fail(
