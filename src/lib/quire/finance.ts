@@ -15,7 +15,7 @@ import { previewSmith } from "./blacksmith-time.ts";
 import { previewServices, serviceQuoteSchema } from "./services-time.ts";
 import { deliverLetters } from "./services-courier.ts";
 import type { CloudTable } from "./cloud.ts";
-import { toCopper, fromCopper, spendCoins, formatCopper } from "./money.ts";
+import { toCopper, spendCoins, formatCopper } from "./money.ts";
 import { creditCoins } from "./coin-split.ts";
 import { creditMerchant } from "./merchant.ts";
 import {
