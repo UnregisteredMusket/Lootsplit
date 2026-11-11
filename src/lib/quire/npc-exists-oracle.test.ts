@@ -111,3 +111,39 @@ test("a player acting as a guessed ID gets one answer for a hidden NPC and an un
   assert.equal(actAs(UNKNOWN, sam), actAs(HIDDEN, sam));
   assert.equal(actAs(UNKNOWN, dm), "This trade account no longer exists.");
 });
+
+// Check order (privacy review of PR 489): the NPC check comes before any check of the character.
+test("a player gets one answer whatever character a message to a guessed ID names", () => {
+  const as = (npcId: string, purseId: string) =>
+    refusal(() =>
+      run(
+        partyFixture(),
+        { kind: "npc-message", npcId, purseId, asNpc: false, text: "Hello" } as never,
+        sam,
+      ),
+    );
+  for (const purseId of ["zzz", "tamsin"])
+    assert.equal(as(UNKNOWN, purseId), as(HIDDEN, purseId), purseId);
+  assert.equal(as(HIDDEN, "zzz"), "This NPC is not available at the current location.");
+});
+
+test("an NPC barter offer naming a guessed account gets one answer on either side", () => {
+  const barter = (side: "give" | "ask", purseId: string) =>
+    refusal(() =>
+      run(
+        partyFixture(),
+        {
+          kind: "npc-barter-offer",
+          npcId: "ilse",
+          purseId: "brannoc",
+          give: { purseId: side === "give" ? purseId : "brannoc", copper: 10, items: [] },
+          ask: { purseId: side === "ask" ? purseId : "ilse", copper: 0, items: [] },
+          reply: "persuade",
+        } as never,
+        sam,
+      ),
+    );
+  for (const side of ["give", "ask"] as const)
+    assert.equal(barter(side, UNKNOWN), barter(side, HIDDEN), side);
+  assert.equal(barter("ask", HIDDEN), "The offer's sides don't match this conversation.");
+});

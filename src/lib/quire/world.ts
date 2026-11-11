@@ -770,11 +770,12 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
   } else if (cmd.kind === "npc-message") {
     const npc = w.npcs.find((n) => n.id === cmd.npcId);
     if (!npc) throw Error(seat.role === "dm" ? "NPC no longer exists." : NPC_NOT_HERE);
+    // Before any check of the character, so its answer can't tell a hidden NPC from a guess.
+    if (seat.role !== "dm" && !npcVisible(npc, t)) throw Error(NPC_NOT_HERE);
     if (!t.purses.some((p) => p.id === cmd.purseId && p.kind === "character" && !p.nonParty))
       throw Error("Choose an existing party character.");
     if (cmd.asNpc) {
-      if (!npcController(npc, seat))
-        throw Error(npcVisible(npc, t) ? "Only the configured NPC controller can respond." : NPC_NOT_HERE);
+      if (!npcController(npc, seat)) throw Error("Only the configured NPC controller can respond.");
     } else {
       participant(t, seat, cmd.purseId);
       if (t.purses.find((p) => p.id === cmd.purseId)?.nonParty)
