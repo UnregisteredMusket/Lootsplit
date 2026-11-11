@@ -88,7 +88,7 @@ import {
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { editedStockFields, staleStockMessage, type StockFields } from "./stock-edit.ts";
-import { formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
+import { assertCoinEditWithinLimit, formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
 import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
 import { readSheets } from "./sheet.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
@@ -1027,6 +1027,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const p = t.purses.find((x) => x.id === cmd.purseId);
     if (!p) throw new Error("This account no longer exists.");
     if (!sameCoins(p.coins, cmd.before)) throw new Error("These coins changed. Review the purse and try again.");
+    assertCoinEditWithinLimit(p.coins, cmd.coins);
     const delta = toCopper(cmd.coins) - toCopper(p.coins);
     p.coins = { cp: cmd.coins.cp, sp: cmd.coins.sp, ep: cmd.coins.ep, gp: cmd.coins.gp, pp: cmd.coins.pp };
     if (delta !== 0)
@@ -1238,6 +1239,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     );
   } else if (cmd.kind === "payment-request") {
     const p = own(cmd.purseId);
+    // One row per ID: a duplicate would stay pending for good (decisions find the first; audit A2).
+    if (journal.requests.some((r) => r.id === cmd.id))
+      throw new Error("That payment request ID already identifies a different request.");
     journal.requests.push({
       id: cmd.id,
       at,
@@ -1714,6 +1718,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     });
   } else if (cmd.kind === "loan") {
     const p = own(cmd.purseId);
+    // One row per ID, as the device's askLoan already requires (audit A2).
+    if (t.loans.some((l) => l.id === cmd.id))
+      throw new Error("That loan request ID already identifies a different request.");
     t.loans.push({
       id: cmd.id,
       at,
@@ -1940,7 +1947,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   validateBlacksmith(t);
   validateServices(t, execution.preview === true);
   validateDowntimeActivities(t, execution.preview === true);
-  validateLootPool(t);
+  validateLootPool(t, execution.preview === true);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

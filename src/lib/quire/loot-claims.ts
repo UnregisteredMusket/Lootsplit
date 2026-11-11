@@ -632,6 +632,24 @@ export function assertPoolable(t: LootTable, h: Holding): void {
   if (h.equipped) throw Error("Unequip this item before putting it in the treasure pool.");
 }
 
+/**
+ * The device's deletes (removeHolding, removePurse): drop open claims on the deleted lots and by
+ * the deleted character, as validateLootPool does after every shared command (audit A10).
+ * Returns the journal to save, or null when nothing changed.
+ */
+export function dropDeletedClaims<J extends object>(
+  journal: J,
+  removed: { holdingIds?: Iterable<string>; purseId?: string },
+): J | null {
+  const raw = (journal as { lootClaims?: unknown }).lootClaims;
+  if (!raw) return null;
+  const state = lootClaimsSchema.parse(raw);
+  const holdings = new Set(removed.holdingIds ?? []);
+  const kept = state.claims.filter((c) => !holdings.has(c.holdingId) && c.purseId !== removed.purseId);
+  if (kept.length === state.claims.length) return null;
+  return { ...journal, lootClaims: { ...state, claims: kept } };
+}
+
 function dropClaims(t: LootTable, holdingId: string) {
   const state = readLootClaims(t);
   if (!state.claims.some((c) => c.holdingId === holdingId)) return;
@@ -642,9 +660,12 @@ function dropClaims(t: LootTable, holdingId: string) {
 /**
  * Invariants after every command: a pooled lot stays an unequipped physical item in a party
  * fund, and open claims refer only to lots still in the pool (a lot the DM deleted or took out
- * loses its open claims; their history stays in the journal events).
+ * loses its open claims; their history stays in the journal events) and to characters that
+ * still exist (a deleted character's claims go with it, audit A10). A player's preview runs on a
+ * projected table that may leave other characters out, so it keeps claims by characters it
+ * cannot see; the room re-validates the full table.
  */
-export function validateLootPool(t: LootTable): void {
+export function validateLootPool(t: LootTable, preview = false): void {
   for (const h of t.holdings) {
     if (!h.pool) continue;
     const p = t.purses.find((x) => x.id === h.purseId);
@@ -655,7 +676,10 @@ export function validateLootPool(t: LootTable): void {
   if (!raw) return;
   const state = readLootClaims(t);
   const pooled = new Set(t.holdings.filter((h) => h.pool).map((h) => h.id));
-  const kept = state.claims.filter((c) => pooled.has(c.holdingId));
+  const purses = new Set(t.purses.map((p) => p.id));
+  const kept = state.claims.filter(
+    (c) => pooled.has(c.holdingId) && (preview || purses.has(c.purseId)),
+  );
   if (kept.length !== state.claims.length) {
     state.claims = kept;
     (t.journal as { lootClaims?: LootClaims }).lootClaims = state;
@@ -709,9 +733,13 @@ export function projectLoot(
     const lots = new Set(projected.holdings.filter((h) => h.pool).map((h) => h.id));
     const pointer = state.rotation?.lastPurseId;
     journal.lootClaims = {
-      claims: state.claims.filter(
-        (c) => seat.purseIds.includes(c.purseId) || (inParty && lots.has(c.holdingId) && shown(c.purseId)),
-      ),
+      // Another character's claim shows its choice, never the action ID that made it (a known ID
+      // let a seat predict and block related action IDs: review of PR 488). The stand-in is stable.
+      claims: state.claims
+        .filter(
+          (c) => seat.purseIds.includes(c.purseId) || (inParty && lots.has(c.holdingId) && shown(c.purseId)),
+        )
+        .map((c) => (seat.purseIds.includes(c.purseId) ? c : { ...c, commandId: `claim-${hash(c.commandId)}` })),
       ...(inParty && pointer && playerCharacter(table, pointer) ? { rotation: { lastPurseId: pointer } } : {}),
     };
   }

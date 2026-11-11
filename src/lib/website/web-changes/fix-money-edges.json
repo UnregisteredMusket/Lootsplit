@@ -1,0 +1,14 @@
+{
+  "title": "Shared rumours reach the party, and coin edges add up",
+  "summary": "Several small money fixes from the November audit: rumours shared in party chat now reach everyone in a shared room, and merchant warnings, loans and smith prices match what is actually paid.",
+  "items": [
+    "Share in party chat on a bought rumour now sends it to everyone in a shared room, not only to your own screen.",
+    "A merchant's \"can't afford\" warning now uses the price you are paid, including market events, faction standing and a town's sale cap.",
+    "Loans, repayments and exchange trades add coins on top of the ones you hold: platinum and electrum are no longer changed into gold.",
+    "A repayment you cannot afford now says so, instead of mentioning the coin limit.",
+    "Smith prices with a decimal multiplier are exact: 90 cp of labour at ×1.1 is 99 cp, not 100.",
+    "A DM coin edit above the largest supported balance (10,000,000,000 gp) is refused, so downtime keeps working.",
+    "Deleting a pooled item or a character on a device also removes its open treasure-pool claims, as in a shared room."
+  ],
+  "audience": "everyone"
+}

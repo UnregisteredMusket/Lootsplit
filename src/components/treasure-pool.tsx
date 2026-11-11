@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { requestConfirm } from "@/lib/quire/confirm-store";
 import { LedgerArt } from "@/components/ledger-art";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
+import { subCommandId } from "@/lib/quire/command-id";
 import { useSeat } from "@/lib/quire/seat";
 import { usePrefs } from "@/lib/quire/prefs";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -309,7 +310,7 @@ function ClaimAllPass({ t, lots, options, dm }: { t: LootTable; lots: Holding[];
             for (const [i, { h, p }] of todo.entries()) {
               const refusal = await economy.lootClaim(
                 { holdingId: h.id, purseId: p.id, choice: "pass", before: null },
-                { commandId: `${action.commandId}-${i}` },
+                { commandId: subCommandId(action.commandId, String(i)) },
               );
               if (refusal) {
                 toast.error(`${h.name}: ${refusal}`);
@@ -356,7 +357,7 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
     try {
       const refusal = await economy.lootClaim(
         { holdingId: h.id, purseId: who.id, choice, before: current?.choice ?? null },
-        { commandId: `${action.commandId}-${choice}` },
+        { commandId: subCommandId(action.commandId, choice) },
       );
       if (refusal) setError(refusal);
       else action.renew();

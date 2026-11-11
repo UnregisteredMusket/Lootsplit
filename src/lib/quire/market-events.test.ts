@@ -685,3 +685,23 @@ test("hardening: stored adjustments never price the DM's or the server's copy; i
   const opened = (await roomState({ code: dm.code, token: dm.token })).table;
   assert.equal("marketAdjustments" in opened.journal!, false);
 });
+
+// Audit I1: the player's "can the merchant afford this?" projection used its own price formula
+// (value × buy rate) and ignored market events, so a sale the server accepted showed as
+// unaffordable (×0.5) and one it refused showed no warning (×2).
+test("a hidden merchant purse is judged at the event price players are actually paid", () => {
+  const glut: MarketEvent = { id: "glut", name: "Grain glut", scope: { kind: "realm" }, category: "provisions", permille: 500, startDay: 5, endDay: 20 };
+  const shortage: MarketEvent = { ...glut, id: "shortage", name: "Grain shortage", permille: 2000 };
+  const sell = { id: "sell-1", kind: "sell" as const, holdingId: "sack", shopId: "baker", quantity: 1 };
+  // ×0.5: 333 × 0.5 × 50% = 83 cp. A 100 cp purse pays for one sack, not all four.
+  let t = withEvents(goods(campaign()), glut);
+  t.shops = t.shops.map((s) => (s.id === "baker" ? { ...s, merchantPurse: 100 } : s));
+  assert.equal(unitSalePrice(t.holdings.find((h) => h.id === "sack")!, baker, t.journal, t.purses), 83);
+  assert.equal(projectRecord(t, ariaSeat).shops.find((s) => s.id === "baker")!.merchantAffords!.sack, "some");
+  applyCommand(t, ariaSeat, sell);
+  // ×2: 333 cp each. A 300 cp purse cannot pay for one.
+  t = withEvents(goods(campaign()), shortage);
+  t.shops = t.shops.map((s) => (s.id === "baker" ? { ...s, merchantPurse: 300 } : s));
+  assert.equal(projectRecord(t, ariaSeat).shops.find((s) => s.id === "baker")!.merchantAffords!.sack, "none");
+  assert.throws(() => applyCommand(t, ariaSeat, sell), /can't afford/);
+});

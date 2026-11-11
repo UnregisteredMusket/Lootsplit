@@ -556,3 +556,13 @@ test("tiers: the S1 helpers still read the ladder with the new fields", () => {
   const t = sized();
   assert.deepEqual(settlementTiers(settlementsOf(t)).map((x) => x.name).slice(0, 2), ["Thorp", "Hamlet"]);
 });
+
+// Audit I1: the player's hidden-purse projection priced lots without the settlement cap.
+test("a hidden merchant purse is judged at the capped payout players are actually paid", () => {
+  const t = capped("pay-limit");
+  t.shops = t.shops.map((s) => (s.id === "drink" ? { ...s, merchantPurse: 120_000 } : s));
+  // 1,500 gp capped to 1,000 gp: one crown fits 1,200 gp, two don't.
+  assert.equal(shopSale(t.holdings[0]!, drink, 1, t.journal, t.purses).unit, 100_000);
+  assert.equal(projectRecord(t, ariaSeat).shops.find((s) => s.id === "drink")!.merchantAffords!.crown, "some");
+  applyCommand(t, ariaSeat, sell("cap-1", "crown", 1));
+});

@@ -8,6 +8,7 @@ import {
   updateRoom,
   keepStoredBody,
   roomImageSources,
+  lookupCommandIdReceipts,
   lookupReceipts,
   recentAcknowledged,
   roomReadVersion,
@@ -1099,13 +1100,63 @@ export async function submitCommands(input: {
       refuseOldClientGroupActions(room.table, commands);
     }
     const key = seat.id + ":" + input.batchId;
-    // Receipts for this batch, its actions and the seat's staged actions (room-store.server.ts).
-    const commandReceipts = await lookupReceipts(room, "command", [
-      ...new Set([
-        ...commands.map((c) => seat.id + ":" + c.id),
-        ...(room.drafts?.[seat.id] ?? []).map((c) => seat.id + ":" + c.id),
-      ]),
+    // Receipts for this batch's actions and the seat's staged actions, under every seat, in one
+    // indexed query (room-store.server.ts). This seat's own receipts decide as before. The same
+    // action applied under another seat (a player who left and rejoined has a new seat ID) is
+    // treated as this seat's own receipt, so it is never applied twice (audit A2). Only an exact
+    // content match counts: another seat's receipt with different or unknown content is ignored and
+    // the action is new, so no seat can block another's action IDs by committing something else
+    // under them first (review of PR 488).
+    const byId = await lookupCommandIdReceipts(room, [
+      ...new Set([...commands.map((c) => c.id), ...(room.drafts?.[seat.id] ?? []).map((c) => c.id)]),
     ]);
+    const commandReceipts = new Map<string, string | undefined>();
+    for (const list of byId.values())
+      for (const r of list) if (r.key.startsWith(seat.id + ":")) commandReceipts.set(r.key, r.hash);
+    // Only a receipt from a seat that has left the room and held one of this seat's characters
+    // (or the same account) counts: the same player rejoining. A receipt from a seat still here is
+    // ignored, so the action runs under its own authorization and a guessed copy of another seat's
+    // action gets the same answer as any other (privacy review of PR 488).
+    const present = new Set(room.seats.map((s) => s.id));
+    const predecessor = (seatId: string) => {
+      if (present.has(seatId)) return false;
+      const gone = room.departed?.find((d) => d.id === seatId);
+      return (
+        !!gone &&
+        (gone.purseIds.some((id) => seat.purseIds.includes(id)) ||
+          (!!gone.userId && gone.userId === seat.userId))
+      );
+    };
+    const adopted = new Set<string>();
+    const elsewhere = new Map(
+      commands
+        .filter((c) => !commandReceipts.has(seat.id + ":" + c.id))
+        .map(
+          (c) =>
+            [
+              c.id,
+              (byId.get(c.id) ?? []).filter(
+                (r) => !r.key.startsWith(seat.id + ":") && predecessor(r.key.slice(0, r.key.indexOf(":"))),
+              ),
+            ] as const,
+        ),
+    );
+    for (const command of commands) {
+      let match: string | undefined;
+      for (const receipt of elsewhere.get(command.id) ?? []) {
+        if (!receipt.hash) continue;
+        if (
+          receipt.hash === hashes.get(command.id) ||
+          (!receipt.hash.startsWith("v2:") && receipt.hash === (await digest(JSON.stringify(command))))
+        ) {
+          match = receipt.hash;
+          break;
+        }
+      }
+      if (match === undefined) continue;
+      commandReceipts.set(seat.id + ":" + command.id, match);
+      adopted.add(command.id);
+    }
     const batchReceipt = await lookupReceipts(room, "batch", [key]);
     for (const command of commands) {
       const previous = commandReceipts.get(seat.id + ":" + command.id);
@@ -1309,6 +1360,10 @@ export async function submitCommands(input: {
       seen.add(key);
       if (!input.stage) receipts.push({ kind: "command", key, hash: hashes.get(command.id)! });
     }
+    // An adopted action (applied under an earlier seat) is acknowledged to this seat as well.
+    if (!input.stage)
+      for (const id of adopted)
+        receipts.push({ kind: "command", key: seat.id + ":" + id, hash: commandReceipts.get(seat.id + ":" + id) });
     if (!input.stage) receipts.push({ kind: "batch", key, hash: batchHash });
     for (const report of table.journal?.reports || [])
       if (!room.table.journal?.reports?.some((r) => r.id === report.id))

@@ -439,3 +439,24 @@ test("offline deletion and backup validation protect open commissions atomically
   assert.equal(t.journal!.blacksmith!.orders[0].status, "cancelled");
   assert.equal(t.journal!.blacksmith!.orders[0].terms.makerName, "Aster");
 });
+test("a decimal price multiplier is exact whole copper: 90 cp labour × 1.1 is 99 cp, not 100 (audit A7)", () => {
+  const t = smithFixture(),
+    d = smithDesign(t);
+  d.engraving = "";
+  const p = t.journal!.blacksmith!.profiles[0];
+  p.priceMultiplier = 0;
+  const free = smithQuote(t, "forge", "hero", d).terms.costCopper;
+  p.priceMultiplier = 1;
+  const labour = smithQuote(t, "forge", "hero", d).terms.costCopper - free;
+  p.items[0].laborCopper -= labour - 90;
+  p.priceMultiplier = 1.1;
+  const q = smithQuote(t, "forge", "hero", d);
+  assert.equal(q.terms.costCopper - free, 99);
+  // Quote and charge agree.
+  const starting = toCopper(t.purses[0].coins);
+  const after = order(t, d);
+  assert.equal(toCopper(after.purses[0].coins), starting - q.terms.costCopper);
+  // Still rounds a true fraction up, and value and rarity multipliers are exact too.
+  p.priceMultiplier = 1.15;
+  assert.equal(smithQuote(t, "forge", "hero", d).terms.costCopper - free, 104);
+});

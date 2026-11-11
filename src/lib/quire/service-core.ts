@@ -21,6 +21,26 @@ export function money(n: number, message = "Price or value exceeds the supported
 }
 
 /**
+ * Whole copper × a decimal multiplier (a smith's price, value or rarity multiplier), rounded up,
+ * in exact integer maths. Floating point made 90 × 1.1 = 99.00000000000001 and charged 100 cp
+ * (audit A7). The multiplier is read as the decimal the DM entered (its shortest form), so
+ * quote and charge, which both call this, agree.
+ */
+export function scaledCopper(copper: number, multiplier: number, message?: string) {
+  if (!Number.isSafeInteger(copper) || copper < 0 || !Number.isFinite(multiplier) || multiplier < 0)
+    return money(copper * multiplier, message);
+  const m = /^(\d+)(?:\.(\d+))?(?:e([+-]\d+))?$/.exec(String(multiplier));
+  if (!m) return money(copper * multiplier, message);
+  const fraction = m[2] ?? "";
+  const exponent = Number(m[3] ?? 0) - fraction.length;
+  const digits = BigInt(m[1] + fraction);
+  const product = BigInt(copper) * digits;
+  if (exponent >= 0) return money(Number(product * 10n ** BigInt(exponent)), message);
+  const divisor = 10n ** BigInt(-exponent);
+  return money(Number((product + divisor - 1n) / divisor), message);
+}
+
+/**
  * The purse is physically at `locationId` (or somewhere inside it). A character on individual
  * downtime or aboard a sailing ship is away; other purses follow the party's Market location.
  */

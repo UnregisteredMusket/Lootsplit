@@ -47,7 +47,14 @@ export function applySmithCommand(t: CloudTable, seat: CloudSeat, cmd: SmithComm
     }
   } else if (cmd.kind === "smith-order") {
     own(cmd.purseId);
-    const q = smithQuote(t, cmd.shopId, cmd.purseId, cmd.design);
+    let q = smithQuote(t, cmd.shopId, cmd.purseId, cmd.design);
+    // Apps before PR 488 (Android 1.19 and older, protocol 31 and below, and cached website
+    // bundles) quote with floating-point rounding; their reviewed quote is accepted and charged
+    // exactly as shown (audit A7). Current apps quote, and are charged, the exact price.
+    if (q.before !== cmd.before) {
+      const legacy = smithQuote(t, cmd.shopId, cmd.purseId, cmd.design, { legacyRounding: true });
+      if (legacy.before === cmd.before) q = legacy;
+    }
     if (q.before !== cmd.before)
       throw Error(
         "The commission quote changed. Review the new price, materials and work days before ordering.",

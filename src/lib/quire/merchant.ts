@@ -8,8 +8,6 @@ export function isService(item: Pick<Holding, "notes"> & { service?: boolean }) 
 /** The largest merchant purse (10,000,000,000 gp), within the finance quote's money bound. */
 export const MAX_MERCHANT_PURSE = 1e12;
 
-type Sellable = Pick<Holding, "notes" | "unitCopper" | "unidentified"> & { category?: string; service?: boolean };
-
 /** The shop's buy list (`acceptedCategories`, or its own category) takes this item at its normal rate. */
 export function onBuyList(item: Pick<Holding, "category" | "unidentified">, shop: Shop): boolean {
   if (shop.acceptAnyCategory || shop.category === "mixed") return true;
@@ -35,27 +33,6 @@ export function assertMerchantSale(item: Pick<Holding, "notes" | "category" | "u
   throw Error(
     "This merchant does not buy that item category. Ask the DM to configure an exception.",
   );
-}
-
-/**
- * What the shop pays for one unit, in whole copper: value × buy rate rounded (the Sell to shop
- * rule), then the off-list percentage (rounded down) for categories outside the buy list, then
- * the shop's per-item purchase limit. Old shops without these fields pay exactly as before.
- */
-export function merchantUnitOffer(item: Sellable, shop: Shop): number {
-  item = forSale(item);
-  const base = Math.max(0, Math.round(item.unitCopper * shop.buyRate));
-  const listed = onBuyList(item, shop) ? base : Math.floor((base * offListPercent(shop)) / 100);
-  return shop.purchaseLimit === undefined ? listed : Math.min(listed, shop.purchaseLimit);
-}
-
-/** The per-item purchase limit lowered this item's price. */
-export function purchaseLimited(item: Sellable, shop: Shop): boolean {
-  if (shop.purchaseLimit === undefined) return false;
-  item = forSale(item);
-  const base = Math.max(0, Math.round(item.unitCopper * shop.buyRate));
-  const listed = onBuyList(item, shop) ? base : Math.floor((base * offListPercent(shop)) / 100);
-  return listed > shop.purchaseLimit;
 }
 
 /** A finite merchant purse is set (unset means unlimited, the behaviour before merchant purses). */
@@ -120,30 +97,6 @@ export const MERCHANT_PURSE_PRESETS = [
   { wealth: "rich", label: "Wealthy (1,000 gp)", copper: 100_000 },
   { wealth: "princely", label: "Princely (10,000 gp)", copper: 1_000_000 },
 ] as const;
-
-/**
- * Player projection of a shop's purse (session-records.ts): unless the DM shows it, the amount
- * and refill are removed and only whether the merchant can afford each readable lot remains.
- */
-export function projectMerchantPurse(shop: Shop, holdings: Holding[]): Shop {
-  if (!hasMerchantPurse(shop) || shop.showPurse) return shop;
-  const projected: Shop = { ...shop, purseLimited: true, merchantAffords: {} };
-  for (const h of holdings) {
-    if (h.kind !== "item") continue;
-    try {
-      assertMerchantSale(h, shop);
-    } catch {
-      continue;
-    }
-    const unit = merchantUnitOffer(h, shop);
-    if (unit < 1) continue;
-    projected.merchantAffords![h.id] =
-      unit * h.quantity <= shop.merchantPurse ? "all" : unit <= shop.merchantPurse ? "some" : "none";
-  }
-  delete projected.merchantPurse;
-  delete projected.merchantPurseRefill;
-  return projected;
-}
 
 /**
  * What the sell form says before confirming, for any seat: null when the sale fits. Uses the

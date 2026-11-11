@@ -5,6 +5,7 @@ import {
   money as serviceMoney,
   npcAtShop,
   presentAt,
+  scaledCopper as serviceScaled,
   quoteFingerprint,
 } from "./service-core.ts";
 import {
@@ -21,6 +22,8 @@ function unique(keys: string[], label: string) {
 }
 const money = (n: number) =>
   serviceMoney(n, "Smith price or value exceeds the supported copper range.");
+const scaledCopper = (copper: number, multiplier: number) =>
+  serviceScaled(copper, multiplier, "Smith price or value exceeds the supported copper range.");
 /** Kept under its original name; the rule now lives in service-core (`presentAt`). */
 export function smithHere(t: Table, locationId: string, purseId: string) {
   return presentAt(t, locationId, purseId);
@@ -45,7 +48,18 @@ export function smithAvailability(t: Table, p: SmithProfile, purseId: string) {
     return "Visit the forge with the paying character and materials first.";
   return "";
 }
-export function smithQuote(t: Table, shopId: string, purseId: string, design: SmithDesign) {
+export function smithQuote(
+  t: Table,
+  shopId: string,
+  purseId: string,
+  design: SmithDesign,
+  /**
+   * The floating-point rounding apps before PR 488 quoted with (90 cp × 1.1 = 100 cp; audit A7).
+   * The server accepts an order reviewed at either price and charges the one the player saw.
+   */
+  options: { legacyRounding?: boolean } = {},
+) {
+  const legacy = options.legacyRounding === true;
   const profile = t.journal?.blacksmith?.profiles.find((p) => p.shopId === shopId);
   if (!profile) throw Error("The DM must configure this forge's services first.");
   const unavailable = smithAvailability(t, profile, purseId);
@@ -75,7 +89,9 @@ export function smithQuote(t: Table, shopId: string, purseId: string, design: Sm
     const material = profile.materials.find((m) => m.materialKey === choice?.materialKey);
     if (!choice || !option || !material || !part.materialKeys.includes(material.materialKey))
       throw Error(`Choose an offered style and material for ${part.name}.`);
-    const valueCopper = money(material.unitCopper * material.rarityMultiplier * part.quantity);
+    const valueCopper = legacy
+      ? money(material.unitCopper * material.rarityMultiplier * part.quantity)
+      : scaledCopper(money(material.unitCopper * part.quantity), material.rarityMultiplier);
     materialValue = money(materialValue + valueCopper);
     if (!choice.holdingId) suppliedValue = money(suppliedValue + valueCopper);
     else {
@@ -117,15 +133,15 @@ export function smithQuote(t: Table, shopId: string, purseId: string, design: Sm
       throw Error("The offered inventory lot cannot supply all selected components.");
   }
   const engraving = design.engraving.trim();
-  const labor = money(
-    (item.laborCopper + partFees + (engraving ? profile.engravingCopper : 0)) *
-      profile.priceMultiplier,
-  );
+  const laborBase = money(item.laborCopper + partFees + (engraving ? profile.engravingCopper : 0));
+  const labor = legacy
+    ? money(laborBase * profile.priceMultiplier)
+    : scaledCopper(laborBase, profile.priceMultiplier);
   const costCopper = money(item.baseCopper + suppliedValue + labor + (enchantment?.copper ?? 0));
-  const valueCopper = money(
-    (item.baseCopper + materialValue + partFees) * profile.valueMultiplier +
-      (enchantment?.valueCopper ?? 0),
-  );
+  const valueBase = money(item.baseCopper + materialValue + partFees);
+  const valueCopper = legacy
+    ? money(valueBase * profile.valueMultiplier + (enchantment?.valueCopper ?? 0))
+    : money(scaledCopper(valueBase, profile.valueMultiplier) + (enchantment?.valueCopper ?? 0));
   const workDays = Math.max(
     1,
     Math.ceil(

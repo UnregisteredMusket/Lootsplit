@@ -565,6 +565,41 @@ export async function lookupReceipts(
   }
   return found;
 }
+/**
+ * Command receipts for these action IDs under any seat of the room, by action ID (audit A2): a
+ * player who left and rejoined has a new seat ID, so a seat-keyed lookup alone let an old action
+ * apply again. Uses the partial index on the action ID part of the key (migration 0033), so it
+ * finds every receipt, including those written before it, without a second row per action.
+ */
+export async function lookupCommandIdReceipts(
+  room: CloudRoom,
+  ids: string[],
+): Promise<Map<string, Array<{ key: string; hash: string | undefined }>>> {
+  const found = new Map<string, Array<{ key: string; hash: string | undefined }>>();
+  const wanted = new Set(ids);
+  if (!wanted.size) return found;
+  const idOf = (key: string) => key.slice(key.indexOf(":") + 1);
+  const add = (key: string, hash: string | undefined) => {
+    const list = found.get(idOf(key)) ?? [];
+    if (!list.some((r) => r.key === key)) list.push({ key, hash });
+    found.set(idOf(key), list);
+  };
+  for (const r of bodyReceipts(room)) if (r.kind === "command" && wanted.has(idOf(r.key))) add(r.key, r.hash);
+  const db = database();
+  const ask = [...wanted];
+  // D1 binds at most 100 parameters per query: code + up to 90 IDs per lookup.
+  for (let i = 0; db && i < ask.length; i += 90) {
+    const chunk = ask.slice(i, i + 90);
+    const rows = await db
+      .prepare(
+        `SELECT key, hash FROM campaign_room_receipts WHERE code=? AND kind='command' AND substr(key, instr(key, ':') + 1) IN (${chunk.map(() => "?").join(",")})`,
+      )
+      .bind(room.code, ...chunk)
+      .all<{ key: string; hash: string | null }>();
+    for (const row of rows.results) add(row.key, row.hash ?? undefined);
+  }
+  return found;
+}
 /** How many of a seat's latest action IDs each view acknowledges (a device holds at most 100 pending). */
 export const ACKNOWLEDGED_LIMIT = 500;
 /** The seat's most recent committed action IDs, newest first (without the seat prefix). */

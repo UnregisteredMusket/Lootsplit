@@ -5,7 +5,8 @@ import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { exchangeBreakdown } from "./price-breakdown.ts";
-import { fromCopper, toCopper } from "./money.ts";
+import { fromCopper, spendCoins, toCopper } from "./money.ts";
+import { creditCoins } from "./coin-split.ts";
 import { clampRealm, pressureFor, scalePrice, SEASON_NAMES } from "./scale.ts";
 import { globalMarketCity, locationPath, readMarketLocations } from "./shop-locations.ts";
 import { canAccessEstate, physicallyHere, storageWeight, weightFits } from "./estate.ts";
@@ -384,7 +385,10 @@ function move(
 ) {
   const purse = table.purses.find((p) => p.id === purseId);
   if (!purse) throw Error("The exchange account is missing.");
-  purse.coins = fromCopper(money(toCopper(purse.coins) + delta));
+  money(toCopper(purse.coins) + delta);
+  // Exact change out, coins added on top in: platinum and electrum are never changed into gold
+  // (audit A4, the rule `coins()` in commands.ts follows).
+  purse.coins = delta < 0 ? spendCoins(purse.coins, -delta)! : creditCoins(purse.coins, delta);
   if (delta)
     table.ledger.push({ id, purseId, copper: delta, at, summary, shopId: null, transactionType });
 }

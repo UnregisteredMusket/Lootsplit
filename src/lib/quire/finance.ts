@@ -15,7 +15,8 @@ import { previewSmith } from "./blacksmith-time.ts";
 import { previewServices, serviceQuoteSchema } from "./services-time.ts";
 import { deliverLetters } from "./services-courier.ts";
 import type { CloudTable } from "./cloud.ts";
-import { toCopper, fromCopper, spendCoins, formatCopper } from "./money.ts";
+import { toCopper, spendCoins, formatCopper } from "./money.ts";
+import { creditCoins } from "./coin-split.ts";
 import { creditMerchant } from "./merchant.ts";
 import {
   applyJourney,
@@ -405,8 +406,16 @@ export function financeMove(
 ) {
   const p = table.purses.find((p) => p.id === purseId);
   if (!p) throw Error("Finance account no longer exists.");
-  safe(toCopper(p.coins) + delta);
-  p.coins = delta < 0 ? spendCoins(p.coins, -delta)! : fromCopper(toCopper(p.coins) + delta);
+  const held = toCopper(p.coins);
+  // Insufficient funds is not the coin limit (audit A5): name the shortfall.
+  if (Number.isSafeInteger(held) && held + delta < 0)
+    throw Error(
+      `Insufficient funds: ${p.name} holds only ${formatCopper(held)}, not ${formatCopper(-delta)}.`,
+    );
+  safe(held + delta);
+  // A credit adds coins on top of those held, as `coins()` in commands.ts does: platinum and
+  // electrum are never changed into gold (audit A4).
+  p.coins = delta < 0 ? spendCoins(p.coins, -delta)! : creditCoins(p.coins, delta);
   if (delta)
     table.ledger.push({
       id,

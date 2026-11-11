@@ -145,3 +145,34 @@ test("differential: the device's receipt-guarded writes match the shared command
     assert.deepEqual(line(deviceTable, id), line(roomTable, id), id);
   }
 });
+
+// Audit A6: a coin edit past the 1,000,000,000,000 cp balance limit broke downtime campaign-wide.
+test("a coin edit past the balance limit is refused shared and on the device; lowering a legacy balance is allowed", async () => {
+  const { dm } = await room();
+  const host = (await roomState(dm)).table;
+  const huge = coins({ gp: 20_000_000_000 });
+  await assert.rejects(
+    submitCommands({ ...dm, batchId: "huge", commands: [{ id: "huge", kind: "set-coins", purseId: "aria", before: purse(host, "aria").coins, coins: huge }] }),
+    /largest supported balance/,
+  );
+  assert.deepEqual(purse((await roomState(dm)).table, "aria").coins, purse(host, "aria").coins);
+  setSeat(DM_SEAT);
+  await applyCloudTable(host);
+  await assert.rejects(setCoins("aria", huge, undefined, { commandId: "huge-device" }), /largest supported balance/);
+  assert.deepEqual(purse(await economySnapshot(), "aria").coins, purse(host, "aria").coins);
+  // A legacy purse already past the limit can be lowered (still above it) on both paths.
+  const legacy = campaign();
+  purse(legacy, "aria").coins = coins({ gp: 30_000_000_000 });
+  const lower = coins({ gp: 25_000_000_000 });
+  const { applyCommand } = await import("./commands.ts");
+  const dmSeat = { id: "dm", token: "", name: "DM", role: "dm" as const, purseIds: [] };
+  const lowered = applyCommand(legacy, dmSeat, { id: "lower", kind: "set-coins", purseId: "aria", before: purse(legacy, "aria").coins, coins: lower });
+  assert.deepEqual(purse(lowered, "aria").coins, lower);
+  assert.throws(
+    () => applyCommand(legacy, dmSeat, { id: "raise", kind: "set-coins", purseId: "aria", before: purse(legacy, "aria").coins, coins: coins({ gp: 31_000_000_000 }) }),
+    /largest supported balance/,
+  );
+  await applyCloudTable(legacy);
+  await setCoins("aria", lower, undefined, { commandId: "lower-device" });
+  assert.deepEqual(purse(await economySnapshot(), "aria").coins, lower);
+});

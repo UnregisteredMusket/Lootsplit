@@ -118,13 +118,14 @@ function changeCoins(table: CloudTable, purseId: string, delta: number, limit = 
   const total = toCopper(purse.coins) + delta;
   if (!Number.isSafeInteger(total) || total < 0 || total > limit)
     throw Error("That account cannot cover reversing this line, or its balance would exceed the supported limit.");
+  // Coins are added on top of those held at either limit: platinum and electrum are never
+  // changed into gold (audit A4).
   const paid = fromCopper(Math.max(0, delta));
-  const coins = delta < 0 ? spendCoins(purse.coins, -delta) :
-    limit === Number.MAX_SAFE_INTEGER ? {
-      cp: purse.coins.cp + paid.cp, sp: purse.coins.sp + paid.sp,
-      ep: purse.coins.ep + paid.ep, gp: purse.coins.gp + paid.gp,
-      pp: purse.coins.pp + paid.pp,
-    } : fromCopper(total);
+  const coins = delta < 0 ? spendCoins(purse.coins, -delta) : {
+    cp: purse.coins.cp + paid.cp, sp: purse.coins.sp + paid.sp,
+    ep: purse.coins.ep + paid.ep, gp: purse.coins.gp + paid.gp,
+    pp: purse.coins.pp + paid.pp,
+  };
   if (!coins) throw Error("That account cannot cover reversing this line.");
   purse.coins = coins;
 }

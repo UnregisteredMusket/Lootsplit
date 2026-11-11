@@ -293,3 +293,18 @@ export function exchangeCoins(
   const after = { ...coins, [from]: coins[from] - used, [to]: coins[to] + got };
   return toCopper(after) === toCopper(coins) && Number.isSafeInteger(toCopper(after)) ? { after, used, got } : null;
 }
+
+/** The largest balance the shared engine supports (commands.ts `coins()`, `creditCoins`, finance). */
+export const MAX_BALANCE_COPPER = 1e12;
+/**
+ * The DM's direct coin edit (`set-coins`, shared and device): refused above the balance limit,
+ * which otherwise made every later downtime fail (audit A6). Lowering an older balance that is
+ * already above the limit stays allowed, so such a purse can be repaired.
+ */
+export function assertCoinEditWithinLimit(before: Coins, next: Coins): void {
+  const total = toCopper(next);
+  if (total > MAX_BALANCE_COPPER && !(total < toCopper(before)))
+    throw new Error(
+      "That is more than the largest supported balance (1,000,000,000,000 cp, 10,000,000,000 gp). Enter a smaller amount.",
+    );
+}
