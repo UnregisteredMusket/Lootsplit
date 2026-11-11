@@ -1,0 +1,9 @@
+{
+  "title": "Selling an item back to a shop never pays more than the shop charges",
+  "audience": "everyone",
+  "summary": "Good faction standing made some shops pay more for an item than they charged for it, so buying and selling back made money. A shop now pays at most what it would charge that character for the same item.",
+  "items": [
+    "Sell to shop, Sell & split and player links all follow the cap; the price you'd pay includes market events, faction standing and your Charisma.",
+    "Why this payout? shows the cap as its own line when it lowers the payout. Nothing changes where a shop already paid less than its price."
+  ]
+}

@@ -322,7 +322,8 @@ export function shopBuyBreakdown(
  * (`settlementExempt`) neither, only a `warning`.
  */
 export function shopSellBreakdown(
-  shop: Pick<Shop, "buyRate"> & Partial<Pick<Shop, "acceptAnyCategory" | "acceptedCategories" | "category" | "offListPercent" | "purchaseLimit">>,
+  shop: Pick<Shop, "buyRate"> &
+    Partial<Pick<Shop, "acceptAnyCategory" | "acceptedCategories" | "category" | "offListPercent" | "purchaseLimit" | "sellRate" | "blackMarket" | "blackMarketPremium">>,
   unitCopper: number,
   quantity = 1,
   item?: { category?: string; unidentified?: import("./item-identity.ts").Unidentified },
@@ -339,6 +340,15 @@ export function shopSellBreakdown(
      * one item and its merchant purse are not part of this and still apply.
      */
     settlementExempt?: boolean;
+    /**
+     * Audit 2026-11-10, A1 (owner decision 2026-11-11): the payout for one unit never exceeds
+     * what this shop would charge this seller for the same item right now (`shopBuyBreakdown`
+     * with the same market events, faction standing, markup and the seller's Charisma), so buying
+     * and selling back can never make money. `cha` is the seller's (null for a party fund). Every
+     * sale path passes it through `shopSale`; leaving it out prices without the cap (only the
+     * older-app comparisons in commands.ts do, to recompute what an older app showed).
+     */
+    seller?: { cha: number | null };
   } = {},
 ): PriceBreakdown {
   // Item identification: an unidentified item is priced at its presented value and category, so
@@ -370,6 +380,20 @@ export function shopSellBreakdown(
   if (shop.purchaseLimit !== undefined && unit > shop.purchaseLimit) {
     factors.push({ key: "purchase-limit", label: `Pays at most ${cp(shop.purchaseLimit)} for one item`, copper: shop.purchaseLimit - unit });
     unit = shop.purchaseLimit;
+  }
+  // The shop's own price to this seller caps the payout (A1); events and factions as above.
+  if (options.seller) {
+    const charge = shopBuyBreakdown(
+      { sellRate: shop.sellRate ?? 1, blackMarket: shop.blackMarket, blackMarketPremium: shop.blackMarketPremium },
+      unitCopper,
+      options.seller.cha,
+      1,
+      { events, factions },
+    ).unit;
+    if (unit > charge) {
+      factors.push({ key: "asking-cap", label: `Capped at what this shop charges the seller for it (${cp(charge)})`, copper: charge - unit });
+      unit = charge;
+    }
   }
   // Settlement limits (S2): the most a shop in this place pays for one item.
   const limit = options.settlementLimit;

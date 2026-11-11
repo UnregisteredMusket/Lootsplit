@@ -831,7 +831,7 @@ function MerchantTerms({ shop, dm, limit }: { shop: Shop; dm: boolean; limit?: S
 }
 
 function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingId?: string }) {
-  const { holdings, sell, shops, journal, purses } = useEconomy();
+  const { holdings, sell, shops, journal, purses, sheets } = useEconomy();
   const closed = shops.find((s) => s.id === shopId)?.closed;
   const turnLocked = turnIsLocked();
   const seat = useSeat();
@@ -877,7 +877,7 @@ function SellBox({ shopId, initialHoldingId }: { shopId: string; initialHoldingI
     // and sees a warning instead; the server decides the exemption from the seat.
     sale =
       holding && shop
-        ? shopSale(holding, shop, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, journal, purses, seat.role === "dm" ? "dm" : "player")
+        ? shopSale(holding, shop, Number.isSafeInteger(asked) && asked > 0 ? asked : 1, journal, purses, seat.role === "dm" ? "dm" : "player", sheets)
         : null,
     refused = !eligibility && sale?.refused ? sale.refused : "",
     capWarning = !eligibility && sale?.warning ? sale.warning : "",

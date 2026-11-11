@@ -1422,7 +1422,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // old-client checks below compare without it.
     const seller = seat.role === "dm" ? "dm" : "player";
     const settlementLimit = seller === "dm" ? undefined : settlementSaleLimit(journal, s);
-    const priced = shopSale(h, s, cmd.quantity, journal, t.purses, seller);
+    const priced = shopSale(h, s, cmd.quantity, journal, t.purses, seller, t.sheets);
     if (priced.refused) throw Error(priced.refused);
     const paid = priced.total;
     if (execution.settlementLimitsUnsupported && settlementLimit && paid !== shopSellBreakdown(s, h.unitCopper, cmd.quantity, h, { events, factions }).total)
