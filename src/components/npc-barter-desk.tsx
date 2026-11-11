@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useFormDraft } from "@/lib/quire/use-form-draft";
 import { showDice } from "@/lib/dice/dice-events";
 import { useSeat } from "@/lib/quire/seat";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
@@ -70,14 +71,17 @@ export function NpcBarterDesk({ table }: { table: CloudTable }) {
         keep the trading table below.
       </p>
       {dm && <NpcBarterQueue table={table} />}
-      {dm && <NpcBarterRulesForm key={state.revision} rules={state.rules} revision={state.revision} />}
+      {dm && <NpcBarterRulesForm rules={state.rules} revision={state.revision} />}
       <NpcBarterHistory table={table} />
     </section>
   );
 }
 
 function NpcBarterRulesForm({ rules, revision }: { rules: BarterRules; revision: number }) {
-  const [draft, setDraft] = useState(rules);
+  // Not keyed by the revision: saving keeps the section open with its notice (audit D5).
+  const form = useFormDraft(rules),
+    draft = form.value,
+    setDraft = form.set;
   const num = (key: keyof BarterRules, label: string, min: number, max: number, hint?: string) => (
     <label>
       {label}
@@ -107,7 +111,8 @@ function NpcBarterRulesForm({ rules, revision }: { rules: BarterRules; revision:
     <Fold title="NPC barter rules" hint={`${modeLabel[rules.mode]} · ${stanceLabel[rules.stance]}`}>
       <CommandForm
         label="Save barter rules"
-        dirty={JSON.stringify(draft) !== JSON.stringify(rules)}
+        dirty={form.dirty}
+        onDone={form.settle}
         submit={() => ({ kind: "npc-barter-rules", revision, rules: draft })}
       >
         <label>
@@ -364,9 +369,12 @@ function NpcBarterActivity({ table }: { table: CloudTable }) {
   const pages = Math.max(1, Math.ceil(all.length / 50));
   const rows = all.slice(page * 50, page * 50 + 50);
   const { commandOutcome } = useEconomy();
+  // Clear wait used to fail silently (audit 2026-11-10 D7): say why, and which attempt.
+  const [clearError, setClearError] = useState("");
   if (!all.length) return null;
   return (
     <Fold title="NPC barter activity" hint={`${all.length} attempts · DM only`}>
+      {clearError && <p role="alert">{clearError}</p>}
       <div className="scroll">
         <table className="npc-barter-table">
           <thead>
@@ -401,9 +409,14 @@ function NpcBarterActivity({ table }: { table: CloudTable }) {
                   {attemptFailed(a) && (
                     <Button
                       variant="ghost"
-                      onClick={() =>
-                        void commandOutcome({ kind: "npc-barter-clear-wait", attemptId: a.id, revision: a.revision, id: `clear-${a.id}-${a.revision}` }).catch(() => undefined)
-                      }
+                      onClick={() => {
+                        setClearError("");
+                        void commandOutcome({ kind: "npc-barter-clear-wait", attemptId: a.id, revision: a.revision, id: `clear-${a.id}-${a.revision}` }).catch((e) =>
+                          setClearError(
+                            `The wait for ${characterName(table, a.purseId)} was not cleared: ${e instanceof Error ? e.message : "try again."}`,
+                          ),
+                        );
+                      }}
                     >
                       Clear wait
                     </Button>
@@ -470,7 +483,10 @@ function NpcBarterHistory({ table }: { table: CloudTable }) {
 export function NpcBarterConfigForm({ npc, table }: { npc: Npc; table: CloudTable }) {
   const rules = readNpcBarter(readWorld(table.journal?.world)).rules;
   const before: NpcBarterConfig | null = npc.barter ?? null;
-  const [draft, setDraft] = useState<NpcBarterConfig>(npc.barter ?? {});
+  // Keyed by the NPC, not its config: saving keeps the section open with its notice (audit D5).
+  const form = useFormDraft<NpcBarterConfig>(npc.barter ?? {}),
+    draft = form.value,
+    setDraft = form.set;
   const categories = Array.from(
     new Set([
       "provisions",
@@ -504,7 +520,8 @@ export function NpcBarterConfigForm({ npc, table }: { npc: Npc; table: CloudTabl
       )}
       <CommandForm
         label={`Save ${npc.name} barter answers`}
-        dirty={JSON.stringify(clean(draft)) !== JSON.stringify(before)}
+        dirty={form.dirty && JSON.stringify(clean(draft)) !== JSON.stringify(before)}
+        onDone={form.settle}
         submit={() => ({ kind: "npc-barter-npc", npcId: npc.id, before, config: clean(draft) })}
       >
         <label>

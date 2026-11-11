@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
+import { useFormDraft } from "@/lib/quire/use-form-draft";
 import {
   readDowntimeActivities,
   type TrainingRequest,
@@ -100,7 +101,6 @@ export function DowntimeActivities({
           )}
           {dm && (
             <HourSettings
-              key={JSON.stringify(state.settings)}
               settings={state.settings}
               locked={locked}
             />
@@ -489,17 +489,21 @@ function HourSettings({
   settings: { hoursPerDay: number; trainingHoursPerDay: number };
   locked: boolean;
 }) {
-  const [daily, setDaily] = useState(String(settings.hoursPerDay)),
-    [training, setTraining] = useState(String(settings.trainingHoursPerDay));
+  // Not keyed by the settings: saving keeps the section open with its notice (audit D5).
+  const form = useFormDraft({
+    daily: String(settings.hoursPerDay),
+    training: String(settings.trainingHoursPerDay),
+  });
+  const { daily, training } = form.value;
+  const setDaily = (daily: string) => form.set((d) => ({ ...d, daily }));
+  const setTraining = (training: string) => form.set((d) => ({ ...d, training }));
   return (
     <Fold title="DM downtime hour settings">
       <CommandForm
         label="Save downtime hour settings"
         submitDisabled={locked}
-        dirty={
-          daily !== String(settings.hoursPerDay) ||
-          training !== String(settings.trainingHoursPerDay)
-        }
+        dirty={form.dirty}
+        onDone={form.settle}
         submit={() => ({
           kind: "downtime-settings",
           before: settings,

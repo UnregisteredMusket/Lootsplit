@@ -819,7 +819,15 @@ function PurseCard({ purse }: { purse: Purse }) {
   const cloud = getCloudTable();
   const readOnly = seat.role === "player" || (cloud.joined && !cloud.mine);
   const dollars = useDollarText();
-  const [coins, setCoins] = useState(purse.coins);
+  // The coin inputs show the purse's saved coins until the DM edits one; only then do they hold
+  // their own draft, which ends once the purse matches it (saved here, or the same values arrive).
+  // A reload on window focus or another seat's action must not put back what is being typed
+  // (audit 2026-11-10 D4), and an outside change shows at once while nothing is being edited.
+  const [draft, setDraft] = useState<Coins | null>(null);
+  if (draft && sameCoins(draft, purse.coins)) setDraft(null);
+  const coins = draft ?? purse.coins;
+  const setCoins = (next: Coins | ((current: Coins) => Coins)) =>
+    setDraft((current) => (typeof next === "function" ? next(current ?? purse.coins) : next));
   const purseDollars = dollars(toCopper(purse.coins));
   const worth = toCopper(coins);
   const worthNote = explainPurse(coins);
@@ -832,10 +840,6 @@ function PurseCard({ purse }: { purse: Purse }) {
     next.ep !== coins.ep ||
     next.gp !== coins.gp ||
     next.pp !== coins.pp;
-
-  useEffect(() => {
-    setCoins(purse.coins);
-  }, [purse.coins]);
 
   return (
     <section className="rounded-xl border border-lead/25 bg-elevated p-4">

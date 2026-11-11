@@ -223,3 +223,29 @@ test("server changed-seat rejection precedes all local writes", async () => {
   assert.equal(h.values.get(h.key), before);
   assert.equal(h.selected(), false);
 });
+test("actual resume saves the room's play session (audit 2026-11-10 C4)", async () => {
+  // resumeTable publishes the saved session before the first room response; without it the
+  // feature screens keyed by session remounted when that response arrived.
+  const remote = {
+    code: "TEST",
+    seatId: "dm",
+    sessionId: "play-7",
+    seats: [{ id: "dm", role: "dm", name: "Synthetic DM", pending: 0, allowParty: false }],
+    purseIds: [],
+    shopIds: [],
+    revision: 3,
+    turn: 0,
+    mine: true,
+    who: "Synthetic DM",
+    live: true,
+    table: emptyCloudTable(),
+    acknowledged: [],
+    draft: "[]",
+  };
+  const h = harness({ cached: saved, remote });
+  await h.resume();
+  assert.equal(JSON.parse(h.values.get(h.key)!).sessionId, "play-7");
+  const older = harness({ cached: saved });
+  await older.resume();
+  assert.equal("sessionId" in JSON.parse(older.values.get(older.key)!), false, "a room without one saves none");
+});

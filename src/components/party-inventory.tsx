@@ -860,32 +860,40 @@ function BulkGive({
 
 /** Edit an item's name, category and notes: an explicit Save, then a toast. */
 function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: () => void }) {
+  return (
+    <Modal
+      open={holding !== null}
+      onOpenChange={(open) => !open && onClose()}
+      title={holding ? `Edit ${holding.name}` : "Edit item"}
+    >
+      {/* Keyed by the item: the form starts from the item once when it opens. A campaign reload
+          (window focus, another seat's action) builds a new catalog array and a new holding object,
+          and must not put back what the DM is typing (audit 2026-11-10 D2). */}
+      {holding ? <EditHoldingForm key={holding.id} holding={holding} onClose={onClose} /> : null}
+    </Modal>
+  );
+}
+
+function EditHoldingForm({ holding, onClose }: { holding: Holding; onClose: () => void }) {
   const { updateHolding, catalog } = useEconomy();
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [notes, setNotes] = useState("");
-  const [tracked, setTracked] = useState(false);
-  const [maxUses, setMaxUses] = useState("");
+  const [name, setName] = useState(holding.name);
+  const [category, setCategory] = useState(
+    () => holding.category || inventoryCategory(holding, catalog),
+  );
+  const [notes, setNotes] = useState(holding.notes);
+  const [tracked, setTracked] = useState(!!holding.uses);
+  const [maxUses, setMaxUses] = useState(holding.uses ? String(holding.uses.max) : "1");
   const [startUses, setStartUses] = useState("");
-  const [whenEmpty, setWhenEmpty] = useState<HoldingUses["whenEmpty"]>("remove");
+  const [whenEmpty, setWhenEmpty] = useState<HoldingUses["whenEmpty"]>(
+    holding.uses?.whenEmpty ?? "remove",
+  );
   // Attunement (loot phase 5): whether the item requires it, and the requirement's text.
-  const [requires, setRequires] = useState(false);
-  const [requirement, setRequirement] = useState("");
+  const [requires, setRequires] = useState(!!holding.requiresAttunement);
+  const [requirement, setRequirement] = useState(
+    holding.requiresAttunement ?? "Requires attunement",
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    if (!holding) return;
-    setName(holding.name);
-    setCategory(holding.category || inventoryCategory(holding, catalog));
-    setNotes(holding.notes);
-    setTracked(!!holding.uses);
-    setMaxUses(holding.uses ? String(holding.uses.max) : "1");
-    setStartUses("");
-    setWhenEmpty(holding.uses?.whenEmpty ?? "remove");
-    setRequires(!!holding.requiresAttunement);
-    setRequirement(holding.requiresAttunement ?? "Requires attunement");
-    setError("");
-  }, [holding, catalog]);
   const wholeUses = (text: string, min: number) => {
     const n = Number(text);
     return text.trim() !== "" && Number.isInteger(n) && n >= min && n <= MAX_USES ? n : null;
@@ -902,171 +910,163 @@ function EditHolding({ holding, onClose }: { holding: Holding | null; onClose: (
     return { current: h.uses ? Math.min(h.uses.current, max) : start!, max, whenEmpty };
   }
   return (
-    <Modal
-      open={holding !== null}
-      onOpenChange={(open) => !open && onClose()}
-      title={holding ? `Edit ${holding.name}` : "Edit item"}
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (saving) return;
+        if (!name.trim()) {
+          setError("Enter a name.");
+          return;
+        }
+        const uses = nextUses(holding);
+        if (typeof uses === "string") {
+          setError(uses);
+          return;
+        }
+        setSaving(true);
+        setError("");
+        try {
+          const next: Holding = { ...holding, name: name.trim(), notes };
+          const trimmed = category.trim();
+          if (trimmed && trimmed !== holding.kind) next.category = trimmed;
+          else if (!trimmed) delete next.category;
+          if (uses) next.uses = uses;
+          else delete next.uses;
+          if (requires && holding.kind === "item")
+            next.requiresAttunement = requirement.trim().slice(0, 200) || "Requires attunement";
+          else delete next.requiresAttunement;
+          if (await updateHolding(next)) {
+            toast.success(`Saved ${next.name}.`);
+            onClose();
+          } else setError("Not saved. Your changes are still here.");
+        } finally {
+          setSaving(false);
+        }
+      }}
     >
-      {holding ? (
-        <form
-          className="flex flex-col gap-3"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (saving) return;
-            if (!name.trim()) {
-              setError("Enter a name.");
-              return;
-            }
-            const uses = nextUses(holding);
-            if (typeof uses === "string") {
-              setError(uses);
-              return;
-            }
-            setSaving(true);
-            setError("");
-            try {
-              const next: Holding = { ...holding, name: name.trim(), notes };
-              const trimmed = category.trim();
-              if (trimmed && trimmed !== holding.kind) next.category = trimmed;
-              else if (!trimmed) delete next.category;
-              if (uses) next.uses = uses;
-              else delete next.uses;
-              if (requires && holding.kind === "item")
-                next.requiresAttunement = requirement.trim().slice(0, 200) || "Requires attunement";
-              else delete next.requiresAttunement;
-              if (await updateHolding(next)) {
-                toast.success(`Saved ${next.name}.`);
-                onClose();
-              } else setError("Not saved. Your changes are still here.");
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          <Field label="Name">
-            <TextInput
-              aria-label="Item name"
-              value={name}
-              maxLength={200}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <Field label="Inventory category" hint="Groups and filters use it.">
-            <TextInput
-              aria-label={`Category for ${holding.name}`}
-              value={category}
-              maxLength={80}
-              onChange={(e) => setCategory(e.target.value)}
-            />
-          </Field>
-          <label className="text-sm">
-            Notes & source
-            <textarea
-              aria-label="Item notes"
-              className="mt-1 min-h-24 w-full rounded-sm border border-border bg-subtle p-3 text-fg"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </label>
-          {holding.kind === "item" ? (
-            holding.attuned ? (
-              <p className="text-sm text-muted">
-                {holding.requiresAttunement}. Its character is attuned to it; end the attunement
-                (⋯ menu) before changing this.
-              </p>
-            ) : (
-              <>
-                <Switch
-                  checked={requires}
-                  onChange={setRequires}
-                  label="Requires attunement"
-                  hint="Its character can then attune to it (3 items each unless you change the limit)."
-                />
-                {requires ? (
-                  <Field label="Attunement requirement" hint="For example: Requires attunement: by a wizard.">
-                    <TextInput
-                      aria-label={`Attunement requirement for ${holding.name}`}
-                      value={requirement}
-                      maxLength={200}
-                      onChange={(e) => setRequirement(e.target.value)}
-                    />
-                  </Field>
-                ) : null}
-              </>
-            )
-          ) : null}
-          {holding.kind === "item" ? (
-            <fieldset className="flex flex-col gap-3 rounded-sm border border-border p-3">
-              <legend className="px-1 text-sm font-medium">Charges or uses</legend>
-              <Switch
-                checked={tracked}
-                onChange={setTracked}
-                label="Track uses"
-                hint="For wands, potions, scrolls and kits: Use spends one, Recharge refills."
-              />
-              {tracked ? (
-                <>
-                  <Field label="Maximum uses" hint={`Whole number, 1 to ${MAX_USES}, for each item.`}>
-                    <TextInput
-                      aria-label={`Maximum uses for ${holding.name}`}
-                      inputMode="numeric"
-                      value={maxUses}
-                      onChange={(e) => setMaxUses(e.target.value)}
-                    />
-                  </Field>
-                  {holding.uses ? (
-                    <p className="text-sm text-muted">
-                      Uses left: {holding.uses.current} of {holding.uses.max}. Change them with
-                      Recharge, so the change has a receipt.
-                    </p>
-                  ) : (
-                    <Field label="Uses left now" hint="Leave empty to start full.">
-                      <TextInput
-                        aria-label={`Uses left for ${holding.name}`}
-                        inputMode="numeric"
-                        value={startUses}
-                        onChange={(e) => setStartUses(e.target.value)}
-                      />
-                    </Field>
-                  )}
-                  <Segmented
-                    label="When the last use is spent"
-                    value={whenEmpty}
-                    onChange={setWhenEmpty}
-                    options={[
-                      { value: "remove", label: "Remove the item" },
-                      { value: "keep", label: "Keep it at 0" },
-                    ]}
-                  />
-                  <p className="text-sm text-muted">
-                    {whenEmpty === "remove"
-                      ? "A consumable: the last use removes it (one of a stack; the next starts full)."
-                      : "Rechargeable: it stays at 0 uses until you recharge it."}
-                  </p>
-                </>
-              ) : null}
-            </fieldset>
-          ) : null}
+      <Field label="Name">
+        <TextInput
+          aria-label="Item name"
+          value={name}
+          maxLength={200}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </Field>
+      <Field label="Inventory category" hint="Groups and filters use it.">
+        <TextInput
+          aria-label={`Category for ${holding.name}`}
+          value={category}
+          maxLength={80}
+          onChange={(e) => setCategory(e.target.value)}
+        />
+      </Field>
+      <label className="text-sm">
+        Notes & source
+        <textarea
+          aria-label="Item notes"
+          className="mt-1 min-h-24 w-full rounded-sm border border-border bg-subtle p-3 text-fg"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+      </label>
+      {holding.kind === "item" ? (
+        holding.attuned ? (
           <p className="text-sm text-muted">
-            Quantity and value change through Give, Sell, the treasure pool or the character sheet,
-            so every change has a receipt.
+            {holding.requiresAttunement}. Its character is attuned to it; end the attunement
+            (⋯ menu) before changing this.
           </p>
-          {error ? (
-            <p role="alert" className="text-sm">
-              {error}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </Button>
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </form>
+        ) : (
+          <>
+            <Switch
+              checked={requires}
+              onChange={setRequires}
+              label="Requires attunement"
+              hint="Its character can then attune to it (3 items each unless you change the limit)."
+            />
+            {requires ? (
+              <Field label="Attunement requirement" hint="For example: Requires attunement: by a wizard.">
+                <TextInput
+                  aria-label={`Attunement requirement for ${holding.name}`}
+                  value={requirement}
+                  maxLength={200}
+                  onChange={(e) => setRequirement(e.target.value)}
+                />
+              </Field>
+            ) : null}
+          </>
+        )
       ) : null}
-    </Modal>
+      {holding.kind === "item" ? (
+        <fieldset className="flex flex-col gap-3 rounded-sm border border-border p-3">
+          <legend className="px-1 text-sm font-medium">Charges or uses</legend>
+          <Switch
+            checked={tracked}
+            onChange={setTracked}
+            label="Track uses"
+            hint="For wands, potions, scrolls and kits: Use spends one, Recharge refills."
+          />
+          {tracked ? (
+            <>
+              <Field label="Maximum uses" hint={`Whole number, 1 to ${MAX_USES}, for each item.`}>
+                <TextInput
+                  aria-label={`Maximum uses for ${holding.name}`}
+                  inputMode="numeric"
+                  value={maxUses}
+                  onChange={(e) => setMaxUses(e.target.value)}
+                />
+              </Field>
+              {holding.uses ? (
+                <p className="text-sm text-muted">
+                  Uses left: {holding.uses.current} of {holding.uses.max}. Change them with
+                  Recharge, so the change has a receipt.
+                </p>
+              ) : (
+                <Field label="Uses left now" hint="Leave empty to start full.">
+                  <TextInput
+                    aria-label={`Uses left for ${holding.name}`}
+                    inputMode="numeric"
+                    value={startUses}
+                    onChange={(e) => setStartUses(e.target.value)}
+                  />
+                </Field>
+              )}
+              <Segmented
+                label="When the last use is spent"
+                value={whenEmpty}
+                onChange={setWhenEmpty}
+                options={[
+                  { value: "remove", label: "Remove the item" },
+                  { value: "keep", label: "Keep it at 0" },
+                ]}
+              />
+              <p className="text-sm text-muted">
+                {whenEmpty === "remove"
+                  ? "A consumable: the last use removes it (one of a stack; the next starts full)."
+                  : "Rechargeable: it stays at 0 uses until you recharge it."}
+              </p>
+            </>
+          ) : null}
+        </fieldset>
+      ) : null}
+      <p className="text-sm text-muted">
+        Quantity and value change through Give, Sell, the treasure pool or the character sheet,
+        so every change has a receipt.
+      </p>
+      {error ? (
+        <p role="alert" className="text-sm">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 

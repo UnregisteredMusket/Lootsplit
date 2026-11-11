@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useFormDraft } from "@/lib/quire/use-form-draft";
 import { useSeat } from "@/lib/quire/seat";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useWorldTable } from "@/lib/quire/use-world-table";
@@ -682,14 +683,19 @@ function OfferEditor({
 
 /** NPC record: which service kinds this NPC offers. The forge keeps its own checkbox. */
 export function NpcServicesToggle({ npc, table: t }: { npc: Npc; table: CloudTable }) {
-  const [kinds, setKinds] = useState<ServiceKind[]>(npc.services ?? []);
-  useEffect(() => setKinds(npc.services ?? []), [npc.services]);
+  // Every reload (window focus, another seat's action) parses a new `services` array: an effect
+  // that copied it into state put back the saved ticks before Save (audit 2026-11-10 D6). The
+  // ticks follow the record only while nothing is being edited.
+  const form = useFormDraft<ServiceKind[]>(npc.services ?? []),
+    kinds = form.value,
+    setKinds = form.set;
   const providers = readServices(t.journal?.services).providers.filter((p) => p.npcId === npc.id);
   if (!providers.length && !npc.services?.length) return null;
   return (
     <CommandForm
       label={`Save ${npc.name} service permissions`}
-      dirty={canonicalJson(kinds) !== canonicalJson(npc.services ?? [])}
+      dirty={form.dirty && canonicalJson(kinds) !== canonicalJson(npc.services ?? [])}
+      onDone={form.settle}
       submit={() => ({ kind: "npc-save", before: npc, npc: { ...npc, services: serviceKinds.filter((k) => kinds.includes(k)) } }) as never}
     >
       <p>Services this NPC provides. Turning a kind off locks it in conversation; orders and history are kept.</p>

@@ -6,6 +6,7 @@ import {
 } from "./ship-management";
 import { SearchSelect } from "@/components/search-select";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useFormDraft } from "@/lib/quire/use-form-draft";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -214,7 +215,7 @@ export function PropertyOperations({ holding: h }: { holding: Holding }) {
       {setup && <OperationsSetup key={setup.templateKey ?? ""} need={setup} state={state} />}
       {dm && (
         <Fold title="Property settings & permissions">
-          <SiteSettings key={JSON.stringify(site)} holding={h} state={state} />
+          <SiteSettings key={h.id} holding={h} state={state} />
         </Fold>
       )}
       {site && (
@@ -245,7 +246,7 @@ export function PropertyOperations({ holding: h }: { holding: Holding }) {
           {estateCapabilities(state, site).has("rental") && (
             <Fold title="Rent & operating finances">
               <Rental
-                key={JSON.stringify(state.rentals.find((r) => r.propertyId === h.id))}
+                key={h.id}
                 holding={h}
                 site={site}
                 state={state}
@@ -338,7 +339,8 @@ function OperationsSetup({ need, state }: { need: EstateSetupNeed; state: Estate
 function SiteSettings({ holding: h, state }: { holding: Holding; state: Estate }) {
   const before = state.sites.find((s) => s.propertyId === h.id) ?? null,
     { purses } = useEconomy();
-  const [site, setSite] = useState<EstateSite>(
+  // Keyed by the property, not its settings: saving keeps the form and its notice (audit D5).
+  const form = useFormDraft<EstateSite>(
     before ?? {
       propertyId: h.id,
       templateKey: state.templates[0]?.key ?? "",
@@ -350,12 +352,14 @@ function SiteSettings({ holding: h, state }: { holding: Holding; state: Estate }
       notes: "",
     },
   );
-  const patch = (p: Partial<EstateSite>) => setSite((s) => ({ ...s, ...p }));
+  const site = form.value;
+  const patch = (p: Partial<EstateSite>) => form.set((s) => ({ ...s, ...p }));
   return (
     <ActionForm
       title="Property settings"
       disabled={!state.templates.length}
       command={() => ({ kind: "estate-site", before, site })}
+      onRecorded={form.settle}
     >
       {!state.templates.length && (
         <p>
@@ -634,9 +638,9 @@ function WithdrawalRequests({
     <>
       {requests.map((r) =>
         dm && r.status === "pending" ? (
-          <WithdrawalReviewCard key={JSON.stringify(r)} request={r} />
+          <WithdrawalReviewCard key={r.id} request={r} />
         ) : (
-        <article className="estate-record" key={JSON.stringify(r)}>
+        <article className="estate-record" key={r.id}>
           <h4>
             Withdrawal: {r.quantity} ×{" "}
             {t.holdings.find((h) => h.id === r.holdingId)?.name ?? "Stored item"} · {r.status}
@@ -753,7 +757,7 @@ function Projects({
       {state.jobs
         .filter((j) => j.propertyId === h.id)
         .map((j) => (
-          <JobCard key={JSON.stringify(j)} job={j} />
+          <JobCard key={j.id} job={j} />
         ))}
       <ActionForm
         title="Plan property work"
@@ -857,8 +861,12 @@ function Projects({
 export function JobCard({ job: j, review = false }: { job: EstateJob; review?: boolean }) {
   const dm = useSeat().role === "dm",
     [reason, setReason] = useState(""),
-    [stage, setStage] = useState(j.stage),
-    [progress, setProgress] = useState(j.progress / 100),
+    // Keyed by the job's ID, not its content: a save or another seat's progress keeps the open
+    // sections and notices, and the correction follows the job until the DM edits it (audit D5).
+    correction = useFormDraft({ stage: j.stage, progress: j.progress / 100 }),
+    { stage, progress } = correction.value,
+    setStage = (stage: number) => correction.set((c) => ({ ...c, stage })),
+    setProgress = (progress: number) => correction.set((c) => ({ ...c, progress })),
     [action, setAction] = useState<"complete" | "adjust">("adjust");
   const closed = ["completed", "cancelled", "denied"].includes(j.status);
   return (
@@ -923,6 +931,7 @@ export function JobCard({ job: j, review = false }: { job: EstateJob; review?: b
                 progress: Math.round(progress * 100),
                 reason,
               })}
+              onRecorded={correction.settle}
             >
               <Field label="Correction action">
                 <Select value={action} onChange={(e) => setAction(e.target.value as typeof action)}>
@@ -958,13 +967,16 @@ export function JobCard({ job: j, review = false }: { job: EstateJob; review?: b
 }
 function JobPlanEditor({ job: before }: { job: EstateJob }) {
   const { purses } = useEconomy(),
-    [job, setJob] = useState(before);
+    form = useFormDraft(before),
+    job = form.value,
+    setJob = form.set;
   return (
     <details>
       <summary>Edit work allocations & checks</summary>
       <ActionForm
         title={`Work allocation: ${before.name}`}
         command={() => ({ kind: "estate-job", before, job })}
+        onRecorded={form.settle}
       >
         <NumberField
           label="Paid workers"
@@ -1007,14 +1019,17 @@ function JobPlanEditor({ job: before }: { job: EstateJob }) {
   );
 }
 function StaffContractEditor({ contract: before }: { contract: Estate["staff"][number] }) {
-  const [contract, setContract] = useState(before),
-    patch = (p: Partial<typeof contract>) => setContract((c) => ({ ...c, ...p }));
+  // Keyed by the contract's ID, not its terms: saving keeps this open with its notice (audit D5).
+  const form = useFormDraft(before),
+    contract = form.value,
+    patch = (p: Partial<typeof contract>) => form.set((c) => ({ ...c, ...p }));
   return (
     <details>
       <summary>Edit contract, wages & delegated authority</summary>
       <ActionForm
         title={`Contract terms: ${before.name}`}
         command={() => ({ kind: "estate-staff", before, staff: contract })}
+        onRecorded={form.settle}
       >
         <Field label="Employee name">
           <TextInput
@@ -1124,7 +1139,7 @@ function Staff({ holding: h, state }: { holding: Holding; state: Estate }) {
                 : ""}
             </p>
             <p>{c.notes}</p>
-            {dm && <StaffContractEditor key={JSON.stringify(c)} contract={c} />}
+            {dm && <StaffContractEditor key={c.id} contract={c} />}
             {dm && (
               <div className="estate-actions">
                 {(
@@ -1249,7 +1264,8 @@ function Rental({
   const dm = useSeat().role === "dm",
     before = state.rentals.find((r) => r.propertyId === h.id) ?? null,
     defaults = estateTemplates(state, site).find((t) => t.rental)?.rental;
-  const [rent, setRent] = useState(
+  // Keyed by the property, not the agreement: saving keeps the form and its notice (audit D5).
+  const form = useFormDraft(
     before ?? {
       propertyId: h.id,
       tenant: "",
@@ -1261,7 +1277,8 @@ function Rental({
       notes: "",
     },
   );
-  const patch = (p: Partial<typeof rent>) => setRent((r) => ({ ...r, ...p }));
+  const rent = form.value;
+  const patch = (p: Partial<typeof rent>) => form.set((r) => ({ ...r, ...p }));
   if (!dm)
     return (
       <p>
@@ -1275,6 +1292,7 @@ function Rental({
     <ActionForm
       title="Rental agreement"
       command={() => ({ kind: "estate-rent", before, rental: rent })}
+      onRecorded={form.settle}
     >
       <Field label="Tenant / household">
         <TextInput value={rent.tenant} onChange={(e) => patch({ tenant: e.target.value })} />
@@ -1317,7 +1335,10 @@ function Rental({
   );
 }
 function SupplierTerms({ supplier }: { supplier: Estate["suppliers"][number] }) {
-  const [draft, setDraft] = useState(supplier);
+  // Keyed by the supplier's ID, not its terms: saving keeps this open with its notice (audit D5).
+  const form = useFormDraft(supplier),
+    draft = form.value,
+    setDraft = form.set;
   const t = useEstateTable(),
     state = readEstate(t.journal?.propertyOperations);
   return (
@@ -1328,6 +1349,7 @@ function SupplierTerms({ supplier }: { supplier: Estate["suppliers"][number] }) 
       <ActionForm
         title="Edit reviewed supplier terms"
         command={() => ({ kind: "estate-supplier", before: supplier, supplier: draft })}
+        onRecorded={form.settle}
       >
         <Field label="Supplier stock">
           <SearchSelect
@@ -1437,7 +1459,7 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
       {dm && (
         <>
           {suppliers.map((supplier) => (
-            <SupplierTerms key={JSON.stringify(supplier)} supplier={supplier} />
+            <SupplierTerms key={supplier.id} supplier={supplier} />
           ))}
           <ActionForm
             title="Approve a material supplier"
@@ -2120,7 +2142,7 @@ export function EstateWorkshop() {
         </p>
         <ShipyardWorkshop />
         <TemplateWorkshop key={state.templates.map((t) => t.key).join(",")} state={state} />
-        <PostalSettings key={JSON.stringify(state.postal)} state={state} />
+        <PostalSettings state={state} />
         <EstateImporter />
       </Fold>
     </section>
@@ -2478,12 +2500,16 @@ function RecipeBuilder({ template, state }: { template: EstateTemplate; state: E
 }
 function PostalSettings({ state }: { state: Estate }) {
   const { shops } = useEconomy(),
-    [postal, setPostal] = useState(state.postal);
+    // Not keyed by the rules: saving keeps the section open with its notice (audit D5).
+    form = useFormDraft(state.postal),
+    postal = form.value,
+    setPostal = form.set;
   return (
     <Fold title="City post offices & delivery rules">
       <ActionForm
         title="Postal rules"
         command={() => ({ kind: "estate-postal", before: state.postal, postal })}
+        onRecorded={form.settle}
       >
         <CopperField
           label="Postage per letter (copper)"
