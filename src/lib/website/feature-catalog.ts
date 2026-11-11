@@ -3,10 +3,18 @@ import type { ProductShot } from "./product-shots";
 /**
  * The public Features page catalog (owner request 2026-10-23: major and minor features, accurate
  * and detailed). Compiled from the code on main and checked against the in-app Help; keep it in
- * step when a feature ships or changes. `dm` marks tools only the Dungeon Master uses.
+ * step when a feature ships or changes. `dm` marks tools only the Dungeon Master uses. `help` is
+ * the ID of the Dungeon Master guide topic that explains the feature; the page links to it, and
+ * `feature-catalog.test.ts` checks every ID and that each Help topic has an entry or a reason.
  */
-export type MajorFeature = { title: string; summary: string; details: string[]; dm?: boolean };
-export type MinorFeature = { title: string; text: string; dm?: boolean };
+export type MajorFeature = {
+  title: string;
+  summary: string;
+  details: string[];
+  dm?: boolean;
+  help?: string;
+};
+export type MinorFeature = { title: string; text: string; dm?: boolean; help?: string };
 export type FeatureArea = {
   id: string;
   chip: string;
@@ -35,6 +43,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Give coins or items between purses; retries never pay twice",
           "Optional real-money estimates, shown for comparison only",
         ],
+        help: "currency",
       },
       {
         title: "Even coin split",
@@ -46,6 +55,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Preview shows every share and checks nothing is created or lost",
           "Save the leftover rule as the campaign default",
         ],
+        help: "currency",
       },
       {
         title: "Treasure pool claims",
@@ -57,6 +67,44 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Preview shows every outcome; all selected items move once, with one receipt",
           "Each item keeps a claim and resolution history",
         ],
+        help: "currency",
+      },
+      {
+        title: "Fairness ledger",
+        summary:
+          "Party → Fairness adds up the loot each character has received, campaign to date or for one session.",
+        details: [
+          "Counts coin splits, encounter awards and treasure pool items at their recorded value",
+          "Shows each character's gap against the party average; tap a total for its receipts",
+          "Read-only: worked out from existing receipts, nothing is stored or moved",
+          "Treasure pool resolutions can use Favour whoever is behind",
+        ],
+        help: "currency",
+      },
+      {
+        title: "Sell & split",
+        summary:
+          "Sell items from a party fund at an open shop and split the proceeds evenly among chosen characters in one action.",
+        details: [
+          "The shop pays its usual buy rate, in whole copper per unit",
+          "Leftover copper follows the same rules as a coin split",
+          "Review shows what leaves the fund and each share; all of it happens or none of it",
+          "One Activity row opens to the sale lines and the shares",
+        ],
+        help: "currency",
+      },
+      {
+        title: "Unidentified items",
+        summary:
+          "Mark an item unidentified with the name, description and value players see until you identify it.",
+        details: [
+          "Set it on an existing item, when adding loot, or in an encounter's loot review",
+          "Inventories, sheets, receipts, Activity and the player display show only what players see",
+          "Shops buy it at the value players see; with no value, nobody can sell it",
+          "Identify reveals the true item to everyone, or a sage can identify it for a fee",
+        ],
+        dm: true,
+        help: "currency",
       },
       {
         title: "Activity ledger",
@@ -68,6 +116,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Property deeds keep their original purchase receipt",
           "Players see their own history and their party's lines",
         ],
+        help: "currency",
       },
       {
         title: "Bank and loans",
@@ -79,6 +128,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Players request loans or spending; the DM approves in Review Inbox",
           "Internal lenders use existing campaign purses",
         ],
+        help: "loans",
       },
     ],
     minor: [
@@ -90,6 +140,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
       {
         title: "My Finances",
         text: "Players see their own loans, recurring charges and payment history.",
+        help: "loans",
       },
       {
         title: "Party companion funds",
@@ -103,10 +154,17 @@ export const FEATURE_AREAS: FeatureArea[] = [
       {
         title: "Item details",
         text: "Quantities, values, weight, equipped state, notes, categories and search for every holding.",
+        help: "characters",
+      },
+      {
+        title: "Ledger CSV export",
+        text: "Download every ledger line and activity event of the campaign, archived sessions included, as a spreadsheet; players get only their own view.",
+        help: "modes",
       },
       {
         title: "Property deeds",
         text: "A filled deed image is attached to each purchased property and follows it.",
+        help: "property-operations",
       },
     ],
   },
@@ -127,6 +185,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "The sheet, purse and inventory share one character record",
           "Export a sheet or draft; saves are revision-checked across devices",
         ],
+        help: "characters",
       },
       {
         title: "Sheet import",
@@ -138,6 +197,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Player imports into a campaign wait for DM review",
           "Campaign coins and items are never duplicated by a reimport",
         ],
+        help: "characters",
       },
       {
         title: "Dice and rolls",
@@ -149,6 +209,31 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Pen & Paper mode records physical totals when the DM allows it",
           "Rolls never apply damage or conditions automatically",
         ],
+        help: "rolls",
+      },
+      {
+        title: "XP and milestones",
+        summary:
+          "Award XP or milestones to chosen characters, split evenly or in full, and see who is ready to level up.",
+        details: [
+          "Even splits give every character the same whole number; you choose who gets any remainder",
+          "Encounter loot reviews suggest XP from the defeated enemies",
+          "Sheets show Ready to level up at the SRD 5.2.1 thresholds",
+          "Levels never change by themselves; Set level to … fills in the sheet's draft",
+        ],
+        help: "characters",
+      },
+      {
+        title: "Attunement",
+        summary:
+          "Track which magic items each character is attuned to, with a limit of 3 per character by default.",
+        details: [
+          "Open5e magic items carry their attunement requirement; set it on any other item",
+          "Set a character's limit from 0 to 10",
+          "Attunement ends when the item leaves the character",
+          "Each change is an Activity entry for that character",
+        ],
+        help: "characters",
       },
       {
         title: "Player Home",
@@ -159,6 +244,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Inventory puts searchable item cards first",
           "Downtime and training requests are reachable from Home",
         ],
+        help: "menus",
       },
       {
         title: "Placement and permissions",
@@ -170,6 +256,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Hide a character or share an NPC sheet read-only",
         ],
         dm: true,
+        help: "permissions",
       },
     ],
     minor: [
@@ -184,6 +271,23 @@ export const FEATURE_AREAS: FeatureArea[] = [
       {
         title: "Charisma pricing",
         text: "Charisma above 10 lowers shop prices by 1% per point, up to 20%.",
+        help: "currency",
+      },
+      {
+        title: "Charges and uses",
+        text: "Track uses on wands, potions and kits: Use spends one, the last use removes the item or leaves it at 0, and only the DM recharges.",
+        help: "characters",
+      },
+      {
+        title: "3D dice",
+        text: "Dice are thrown on screen for each roll and land on the recorded result; on by default, off with reduced motion.",
+        help: "rolls",
+      },
+      {
+        title: "Split the party",
+        text: "Divide the party into up to six groups at different places; shops and NPCs follow each character's group.",
+        dm: true,
+        help: "split-party",
       },
       {
         title: "Retry sheet load",
@@ -217,6 +321,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Open and closed states, restocks, search and rarity filters",
           "Share a shop's stock list as a PDF",
         ],
+        help: "economy",
       },
       {
         title: "Trade Exchanges",
@@ -228,6 +333,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Commodity board with search, stock bars and recorded price charts",
           "Every city gets an empty, editable exchange",
         ],
+        help: "economy",
       },
       {
         title: "Trading & Barter",
@@ -239,6 +345,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Both sides change in one step; history is kept",
           "Inventories stay private until offered",
         ],
+        help: "barter",
       },
       {
         title: "NPC barter conversations",
@@ -250,6 +357,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Per-NPC stance, wanted goods and ten dialogue lines",
           "Caps, cooldowns and a DM queue limit exploits",
         ],
+        help: "npc-barter",
       },
       {
         title: "Temple, workshop and inn",
@@ -266,6 +374,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Stables board your animals; a coach booking becomes a party journey with its fare",
           "Tailors make clothes; fences, banks and hiring agents open the Sell tab, a loan request or a staff contract",
         ],
+        help: "npc-services",
       },
       {
         title: "Blacksmith commissions",
@@ -277,6 +386,46 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Materials come from smith stock or the buyer's carried items",
           "Finished items wait at the forge for one-time collection",
         ],
+        help: "blacksmith-services",
+      },
+      {
+        title: "Merchant purses",
+        summary:
+          "Give a shop a purse in coin: what it pays for items comes out of it, and what characters buy goes in.",
+        details: [
+          "A sale the purse can't cover is refused whole before anyone confirms",
+          "Optional refill when the shop restocks; it never refills by itself",
+          "Cap the most a shop pays for one item, and buy other categories at a lower rate",
+          "Players see only that the merchant can't afford an item, unless you show the purse",
+        ],
+        dm: true,
+        help: "economy",
+      },
+      {
+        title: "Market events",
+        summary:
+          "Named, timed price changes such as a blight or a harvest festival, for the whole realm, one place or one shop.",
+        details: [
+          "Multiply prices of all items or one category by 0.1 to 10",
+          "Start day and length in Session Time days",
+          "Shop sale and buy prices change; stored prices are never rewritten",
+          "Players see open events by name, or only as Other adjustments when secret",
+        ],
+        dm: true,
+        help: "economy",
+      },
+      {
+        title: "Settlement sizes",
+        summary:
+          "Give each city or town a size, from Thorp to Metropolis, that sets new shops' wealth and optional limits.",
+        details: [
+          "Pathfinder's eight sizes, or five simple steps; rename any size",
+          "New shops there start with the size's wealth, plus an optional purse and refill",
+          "Optional per-item sale cap: shops refuse items worth more, or pay the limit",
+          "Generated stock of new shops stops at the size's rarest; shops already open are not changed",
+        ],
+        dm: true,
+        help: "settlement-tiers",
       },
     ],
     minor: [
@@ -284,16 +433,30 @@ export const FEATURE_AREAS: FeatureArea[] = [
         title: "Black-market vendors",
         text: "Hidden vendors with a price premium, revealed or hidden during play.",
         dm: true,
+        help: "black-market",
       },
       {
         title: "Shop schedules",
         text: "Opening days and scheduled restocks on the in-game calendar.",
         dm: true,
+        help: "dm-feature-screens",
       },
       {
         title: "Price modifiers",
         text: "Season, shortages, war, plague, roads, scarcity and inflation, with preview and repricing.",
         dm: true,
+        help: "economy",
+      },
+      {
+        title: "Why this price?",
+        text: "Shop, market, property, exchange and barter prices open a breakdown: list price, markup, Charisma, market events and factions, in whole copper.",
+        help: "currency",
+      },
+      {
+        title: "Shop lists",
+        text: "Save up to 60 named stock lists of up to 200 items and swap a shop's stock to one; the replaced stock is saved so you can swap back.",
+        dm: true,
+        help: "shop-lists",
       },
       {
         title: "Market readout",
@@ -349,6 +512,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Import NPCs from reviewed JSON",
           "Train with an NPC during downtime",
         ],
+        help: "location-npcs",
       },
       {
         title: "Property",
@@ -360,6 +524,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Building projects, staff contracts, tenants and upkeep",
           "Send letters with instructions from a city post office",
         ],
+        help: "property-operations",
       },
       {
         title: "Ships and shipyards",
@@ -371,6 +536,31 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Voyages advance only with approved downtime, optionally along a map route",
           "DM can teleport a ship with its cargo and passengers",
         ],
+        help: "ships",
+      },
+      {
+        title: "Factions and Favor",
+        summary:
+          "Guilds, cults and houses that judge the party: each character has renown from −1000 to 1000 with each faction.",
+        details: [
+          "Seven tiers from Vilified to Idolized; rename them and move where they start",
+          "The party's tier changes prices at the shops and places a faction controls",
+          "Renown gained earns Favor, which players spend in the faction's favor market",
+          "Factions stay hidden until revealed; players see only their own characters' standing",
+        ],
+        help: "factions",
+      },
+      {
+        title: "Quests",
+        summary:
+          "A quest log you write and reveal to the whole party or chosen characters, with objectives, a chronicle and map areas.",
+        details: [
+          "Hidden objectives and DM notes are never sent to players' devices",
+          "Mark objectives done or failed; players see Quest updated",
+          "Tie quests and objectives to places, map pins and radius areas",
+          "Rewards are words; optional renown rewards apply when the quest is completed",
+        ],
+        help: "quests",
       },
     ],
     minor: [
@@ -391,6 +581,12 @@ export const FEATURE_AREAS: FeatureArea[] = [
         title: "Hidden NPCs",
         text: "Keep NPCs out of player view until you reveal them.",
         dm: true,
+        help: "location-npcs",
+      },
+      {
+        title: "Favor market",
+        text: "Players ask to spend Favor on a faction's favors, items, secrets or services; nothing is spent until the DM approves.",
+        help: "favor-market",
       },
       {
         title: "Ship and shipyard presets",
@@ -421,6 +617,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "New maps stay private until you share them",
           "Search maps and places from the map",
         ],
+        help: "campaign-maps",
       },
       {
         title: "Place cards",
@@ -453,6 +650,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Players may move only their own tokens, if the DM allows",
           "Ship tokens carry the characters aboard",
         ],
+        help: "online-tabletop",
       },
       {
         title: "Journey planner",
@@ -464,6 +662,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Type a route instead of drawing it, or use the keyboard",
           "Draw a ship voyage route and send it to the voyage request",
         ],
+        help: "campaign-maps",
       },
       {
         title: "Fog, walls and vision",
@@ -540,6 +739,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Export and import encounter drafts as JSON",
         ],
         dm: true,
+        help: "encounters",
       },
       {
         title: "Initiative tracker",
@@ -582,6 +782,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "DM-only markers, notes and stat blocks are excluded",
         ],
         dm: true,
+        help: "player-display",
       },
     ],
     minor: [
@@ -628,6 +829,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Covers property work, voyages, smith orders and market seasons",
         ],
         dm: true,
+        help: "downtime",
       },
       {
         title: "Hourly downtime and training",
@@ -659,6 +861,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Travel and rest grant no labor unless you enable it",
         ],
         dm: true,
+        help: "session-clock",
       },
       {
         title: "Recurring finances",
@@ -670,6 +873,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Pause or edit any schedule",
         ],
         dm: true,
+        help: "loans",
       },
       {
         title: "Review Inbox",
@@ -680,6 +884,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Property projects, hires, boarding and voyages wait here too",
         ],
         dm: true,
+        help: "review-inbox",
       },
     ],
     minor: [
@@ -697,6 +902,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
         title: "Financial Settings",
         text: "Price modifiers, shop defaults and every recurring schedule on one screen.",
         dm: true,
+        help: "dm-feature-screens",
       },
       {
         title: "Review Reports",
@@ -725,6 +931,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Turn-based keeps actions as a draft until you end your turn",
           "Failed or offline actions stay pending for retry",
         ],
+        help: "modes",
       },
       {
         title: "Rooms and invitations",
@@ -735,6 +942,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Invitations expire when the session ends",
           "Signed-in players keep their campaigns in My account",
         ],
+        help: "modes",
       },
       {
         title: "Chat and alerts",
@@ -743,6 +951,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Chat works outside transaction turns",
           "Optional browser push for new messages, without message text",
         ],
+        help: "notifications",
       },
       {
         title: "Room control",
@@ -753,6 +962,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Close the room and revoke all access",
         ],
         dm: true,
+        help: "permissions",
       },
       {
         title: "Journal and session reports",
@@ -771,8 +981,26 @@ export const FEATURE_AREAS: FeatureArea[] = [
         text: "Everyone's rolls in one campaign log.",
       },
       {
+        title: "Session recaps",
+        text: "A recap of each session's loot, purchases, travel and downtime, worked out from its records; the DM can edit it and share it in the Journal.",
+        help: "downtime",
+      },
+      {
+        title: "Preview as player",
+        text: "See the app read-only exactly as one character's player sees it.",
+        dm: true,
+        help: "preview-as-player",
+      },
+      {
+        title: "What players can see",
+        text: "Every visibility setting on one page, with counts of hidden records and links to them.",
+        dm: true,
+        help: "visibility-center",
+      },
+      {
         title: "Connection & recovery",
         text: "See pending changes, retry, or export them before leaving.",
+        help: "recovery",
       },
       {
         title: "Party fund access",
@@ -787,10 +1015,12 @@ export const FEATURE_AREAS: FeatureArea[] = [
       {
         title: "Multiple campaigns",
         text: "Each campaign keeps separate characters, purses, shops and history.",
+        help: "first-campaign",
       },
       {
         title: "Find a group",
         text: "Opt-in community profiles and a directory of DMs and players looking to play.",
+        help: "find-a-group",
       },
     ],
   },
@@ -810,6 +1040,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Players get read-only lookup the DM can limit",
           "Saved results work offline",
         ],
+        help: "references",
       },
       {
         title: "Private PDF books",
@@ -861,6 +1092,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
       {
         title: "Themes",
         text: "Adventurer’s Ledger (light) and Ironbound Dragon (dark), saved per device.",
+        help: "appearance",
       },
       {
         title: "Custom colors",
@@ -895,6 +1127,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Install as a shortcut where the browser allows",
           "Wide screens use the full monitor width",
         ],
+        help: "desktop",
       },
       {
         title: "Android app",
@@ -904,6 +1137,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Save or share exports through Android",
           "Website features arrive with each signed update",
         ],
+        help: "android",
       },
       {
         title: "Split view and windows",
@@ -914,6 +1148,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Drag the divider or use the keyboard; panes swap and close",
           "Each window keeps its own screen and campaign",
         ],
+        help: "split-view",
       },
       {
         title: "Optional accounts",
@@ -934,12 +1169,14 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Cloud restores create a new local campaign",
           "Private PDFs are never included in cloud backups",
         ],
+        help: "backups",
       },
     ],
     minor: [
       {
         title: "Bug reports",
         text: "Report a bug from My account, with optional diagnostics you preview.",
+        help: "bugs",
       },
       {
         title: "Diagnostics download",

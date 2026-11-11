@@ -57,6 +57,21 @@ function Gallery({ area }: { area: FeatureArea }) {
   );
 }
 
+/** Opens the Help topic that explains a feature. Every `help` ID is a Dungeon Master guide topic
+ * (feature-catalog.test.ts), which public Help opens for a topic link without `?guide=`. */
+function HelpLink({ topic, title }: { topic: string; title: string }) {
+  return (
+    <Link
+      className="ls-text-link ls-feature-help"
+      to="/help"
+      hash={topic}
+      aria-label={`How it works: ${title}`}
+    >
+      How it works
+    </Link>
+  );
+}
+
 function MajorCard({
   feature,
   open,
@@ -93,6 +108,7 @@ function MajorCard({
           <li key={d}>{d}</li>
         ))}
       </ul>
+      {feature.help && <HelpLink topic={feature.help} title={feature.title} />}
     </details>
   );
 }
@@ -351,6 +367,7 @@ export function FeaturesPage() {
                             </>
                           )}
                           <span className="ls-feature-minor-text">{f.text}</span>
+                          {f.help && <HelpLink topic={f.help} title={f.title} />}
                         </li>
                       ))}
                     </ul>

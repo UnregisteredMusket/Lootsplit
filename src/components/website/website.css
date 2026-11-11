@@ -2462,6 +2462,14 @@
   flex-basis: 100%;
   color: var(--paper-muted);
 }
+/* "How it works": the Help topic for a feature (minimum 44 px target from .ls-text-link). */
+.ls-feature-help {
+  font-size: 14px;
+  color: var(--paper-link);
+}
+.ls-feature-card .ls-feature-help {
+  margin: -8px 16px 6px;
+}
 @media (max-width: 860px) {
   .ls-feature-panel-head {
     grid-template-columns: minmax(0, 1fr);
