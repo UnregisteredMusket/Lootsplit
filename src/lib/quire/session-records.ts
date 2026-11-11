@@ -792,14 +792,15 @@ export function eventSubjectVisible(
   table: Pick<CloudTable, "stock">,
   visible: { shops: Set<string>; locations: Set<string>; listings: Set<string>; npcs: Set<string> },
 ) {
+  let stockShops: Map<string, string> | undefined;
   return (e: JournalEvent): false | { shopId?: string } => {
     let shopId = e.shopId;
     if (!shopId && e.change?.entityId) {
       if (e.change.entity === "shop") shopId = e.change.entityId;
       else if (e.change.entity === "stock") {
-        const line = table.stock.find((l) => l.id === e.change!.entityId);
-        if (!line) return false;
-        shopId = line.shopId;
+        stockShops ??= new Map(table.stock.map((l) => [l.id, l.shopId]));
+        shopId = stockShops.get(e.change.entityId);
+        if (!shopId) return false;
       }
     }
     if (shopId && !visible.shops.has(shopId)) return false;
