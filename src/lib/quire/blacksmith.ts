@@ -5,6 +5,7 @@ import {
   money as serviceMoney,
   npcAtShop,
   presentAt,
+  scaledCopper as serviceScaled,
   quoteFingerprint,
 } from "./service-core.ts";
 import {
@@ -21,6 +22,8 @@ function unique(keys: string[], label: string) {
 }
 const money = (n: number) =>
   serviceMoney(n, "Smith price or value exceeds the supported copper range.");
+const scaledCopper = (copper: number, multiplier: number) =>
+  serviceScaled(copper, multiplier, "Smith price or value exceeds the supported copper range.");
 /** Kept under its original name; the rule now lives in service-core (`presentAt`). */
 export function smithHere(t: Table, locationId: string, purseId: string) {
   return presentAt(t, locationId, purseId);
@@ -75,7 +78,7 @@ export function smithQuote(t: Table, shopId: string, purseId: string, design: Sm
     const material = profile.materials.find((m) => m.materialKey === choice?.materialKey);
     if (!choice || !option || !material || !part.materialKeys.includes(material.materialKey))
       throw Error(`Choose an offered style and material for ${part.name}.`);
-    const valueCopper = money(material.unitCopper * material.rarityMultiplier * part.quantity);
+    const valueCopper = scaledCopper(money(material.unitCopper * part.quantity), material.rarityMultiplier);
     materialValue = money(materialValue + valueCopper);
     if (!choice.holdingId) suppliedValue = money(suppliedValue + valueCopper);
     else {
@@ -117,13 +120,13 @@ export function smithQuote(t: Table, shopId: string, purseId: string, design: Sm
       throw Error("The offered inventory lot cannot supply all selected components.");
   }
   const engraving = design.engraving.trim();
-  const labor = money(
-    (item.laborCopper + partFees + (engraving ? profile.engravingCopper : 0)) *
-      profile.priceMultiplier,
+  const labor = scaledCopper(
+    money(item.laborCopper + partFees + (engraving ? profile.engravingCopper : 0)),
+    profile.priceMultiplier,
   );
   const costCopper = money(item.baseCopper + suppliedValue + labor + (enchantment?.copper ?? 0));
   const valueCopper = money(
-    (item.baseCopper + materialValue + partFees) * profile.valueMultiplier +
+    scaledCopper(money(item.baseCopper + materialValue + partFees), profile.valueMultiplier) +
       (enchantment?.valueCopper ?? 0),
   );
   const workDays = Math.max(
