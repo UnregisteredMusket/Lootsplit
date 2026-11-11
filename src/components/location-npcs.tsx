@@ -127,7 +127,7 @@ export function LocationNpcs() {
               )}
               {dm && <NpcServicesToggle npc={n} table={t as unknown as CloudTable} />}
               {dm && n.barterAllowed && (
-                <NpcBarterConfigForm key={JSON.stringify(n.barter ?? null)} npc={n} table={t} />
+                <NpcBarterConfigForm key={n.id} npc={n} table={t} />
               )}
             </details>
           </article>

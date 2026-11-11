@@ -21,6 +21,21 @@ const errors = [];
 const warnings = [];
 const overlay = (page, state) => page.locator(`.dice-roll-overlay[data-${state}="true"]`);
 const total = (text) => Number(/: (-?\d+)/.exec(text ?? "")?.[1]);
+/**
+ * The caption of the next throw this page settles. Settled dice clear themselves after 2.6 s, so
+ * it is armed before the click and caught even if the dice clear before it is read (audit G3).
+ */
+const settledCaption = (page) => {
+  const seen = page
+    .waitForFunction(
+      () => document.querySelector('.dice-roll-overlay[data-settled="true"] .dice-roll-caption span')?.textContent,
+      null,
+      { polling: 100, timeout: 45000 },
+    )
+    .then((handle) => handle.jsonValue());
+  seen.catch(() => {}); // reported where it is awaited
+  return seen;
+};
 
 async function sheet(context) {
   const page = await context.newPage();
@@ -38,9 +53,9 @@ async function sheet(context) {
 
 async function trayRoll(page, formula) {
   await page.getByLabel("Dice formula", { exact: true }).fill(formula);
+  const settledSaw = settledCaption(page);
   await page.getByRole("button", { name: "Roll dice", exact: true }).click();
-  await overlay(page, "settled").waitFor();
-  const caption = await page.locator(".dice-roll-caption span").textContent();
+  const caption = await settledSaw;
   const written = await page.locator("form p[role=status]").textContent();
   assert.equal(total(caption), total(written), `${formula}: caption "${caption}" vs "${written}"`);
   return caption;
@@ -53,11 +68,13 @@ try {
     const page = await sheet(context);
     for (const formula of ["1d20+3", "1d100", "2d6+1", "1d4", "1d8", "1d10", "1d12"]) {
       const caption = await trayRoll(page, formula);
-      if (formula === "1d100") assert.match(caption, /\(\d+\)$/);
-      await page.screenshot({ path: `${out}/${width}-${formula.replace(/\W/g, "_")}.png` });
+      // Close dice straight after the settled caption is read: a slow screenshot first could
+      // outlive the 2.6 s settled state and take the button with it (audit G3, 2026-11-10).
       await page.getByRole("button", { name: "Close dice", exact: true }).click();
       await overlay(page, "open").waitFor({ state: "detached" }).catch(() => {});
       assert.equal(await overlay(page, "open").count(), 0, "Close dice clears the dice");
+      if (formula === "1d100") assert.match(caption, /\(\d+\)$/);
+      await page.screenshot({ path: `${out}/${width}-${formula.replace(/\W/g, "_")}.png` });
     }
     // The page stays usable while dice are in the air: a second roll replaces the first.
     await page.getByLabel("Dice formula", { exact: true }).fill("3d6");
@@ -70,9 +87,9 @@ try {
     assert.equal(await overlay(page, "open").count(), 0, "Escape clears the dice");
     // Advantage from a quick roll: two d20s, the caption brackets the one discarded.
     await page.locator(".quick-roll select").first().selectOption("advantage");
+    const advantageSaw = settledCaption(page);
     await page.locator(".quick-roll button").first().click();
-    await overlay(page, "settled").waitFor();
-    const adv = await page.locator(".dice-roll-caption span").textContent();
+    const adv = await advantageSaw;
     assert.match(adv ?? "", /\(\d+\) \+ \d+|\d+ \+ \(\d+\)/, adv);
     assert.match(adv ?? "", /advantage\)$/);
     assert.equal(total(adv), Number((await page.locator(".quick-roll output").first().textContent())?.split(" ")[0]));

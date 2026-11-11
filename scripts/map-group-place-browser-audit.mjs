@@ -65,11 +65,12 @@ try {
       await expect(page.locator(".map-token.ghost.preview")).toHaveCount(4);
       await page.screenshot({ path: `${out}/place-party-${width}.png` });
       await page.mouse.click(target.x, target.y);
-      await expect.poll(async () => [(await token(page, "mira-token")).column, (await token(page, "mira-token")).row]).toEqual([13, 11]);
-      assert.deepEqual([(await token(page, "bram-token")).column, (await token(page, "bram-token")).row], [14, 12]);
-      // One action with Undo: everyone goes back.
+      // One action with Undo: everyone goes back. The pointer rests on the self-clearing toast
+      // (pausing it) before any other wait (audit G4, 2026-11-10).
       const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Placed 4 on The Old Keep" });
       await toast.hover();
+      await expect.poll(async () => [(await token(page, "mira-token")).column, (await token(page, "mira-token")).row]).toEqual([13, 11]);
+      assert.deepEqual([(await token(page, "bram-token")).column, (await token(page, "bram-token")).row], [14, 12]);
       await toast.getByRole("button", { name: "Undo", exact: true }).click();
       await expect.poll(async () => (await token(page, "mira-token")).column).toBe(12);
       // Line with spacing, rotated: a vertical line.

@@ -17,8 +17,6 @@ const browser = await chromium.launch({
 });
 const errors = [];
 const total = (text) => Number(/: (-?\d+)/.exec(text ?? "")?.[1]);
-const caption = (page) => page.locator(".dice-roll-caption span");
-const settled = (page) => page.locator('.dice-roll-overlay[data-settled="true"]');
 /** The caption of the next throw this page settles, caught even if it clears before it is read. */
 const settledCaption = (page) => {
   const seen = page
@@ -86,11 +84,12 @@ try {
   // The DM's screen and the TV display throw the same roll at about the same time, and settled
   // dice clear after 2.6 s, so both are watched from the click: waiting for the DM first missed a
   // TV throw that settled and cleared earlier (main a192290 and PR #468, 2026-11-10, line 82).
+  // The roller's own settled caption is watched from the click as well (audit G3, 2026-11-10).
+  const playerSaw = settledCaption(player);
   const dmSaw = settledCaption(dm);
   const tvSaw = settledCaption(tv);
   await player.locator(".quick-roll button").first().click();
-  await settled(player).waitFor();
-  const own = await caption(player).textContent();
+  const own = await playerSaw;
   const recorded = Number((await player.locator(".quick-roll output").first().textContent())?.split(" ")[0]);
   assert.equal(total(own), recorded, `player caption ${own}`);
   assert.equal(await dmSaw, own, "the DM sees the player's roll");
@@ -102,11 +101,13 @@ try {
   await player.keyboard.press("Escape");
 
   // A second player roll arrives while the DM's dice are closed: thrown once, not replayed.
+  // Both settled captions are watched from the click: waiting for the player's first let the
+  // DM's throw settle and clear before its wait began (audit G3, 2026-11-10).
+  const playerSecond = settledCaption(player);
+  const dmSecond = settledCaption(dm);
   await player.locator(".quick-roll button").first().click();
-  await settled(player).waitFor();
-  const second = await caption(player).textContent();
-  await settled(dm).waitFor();
-  assert.equal(await caption(dm).textContent(), second);
+  const second = await playerSecond;
+  assert.equal(await dmSecond, second);
   await dm.keyboard.press("Escape");
   await dm.waitForTimeout(5000);
   assert.equal(await dm.locator('.dice-roll-overlay[data-open="true"]').count(), 0, "not thrown twice");
@@ -116,8 +117,9 @@ try {
   await navigateApplication(dm, origin + "/characters");
   await dm.locator(".quick-roll button").first().waitFor();
   const tvOpen = tv.locator('.dice-roll-overlay[data-open="true"]');
+  const dmOwn = settledCaption(dm);
   await dm.locator(".quick-roll button").first().click();
-  await settled(dm).waitFor();
+  assert.ok(await dmOwn, "the DM's own roll settles on the DM's screen");
   await tv.waitForTimeout(4000);
   assert.equal(await tvOpen.count(), 0, "the DM's own roll never reaches the TV display");
   await dm.keyboard.press("Escape");

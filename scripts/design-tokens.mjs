@@ -32,12 +32,38 @@ export function typeScale(css) {
   );
 }
 
-/** Raw hex colours (#rgb, #rgba, #rrggbb, #rrggbbaa) outside comments. */
-export function hexColours(text) {
-  const code = text.replace(/\/\*[\s\S]*?\*\//g, "");
-  return [
-    ...code.matchAll(/(?<![\w&$/-])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])/gi),
-  ].map((m) => m[0]);
+/** CSS words that can stand before a colour after a space ("1px solid #ccc"). */
+const COLOUR_KEYWORDS = new Set([
+  "solid",
+  "dashed",
+  "dotted",
+  "double",
+  "groove",
+  "ridge",
+  "inset",
+  "outset",
+]);
+
+/**
+ * Raw hex colours (#rgb, #rgba, #rrggbb, #rrggbbaa) outside comments. In scripts (`.ts`/`.tsx`,
+ * `{ script: true }`) `//` comments are skipped too (a whole-line comment or one after whitespace,
+ * so the `//` of a URL is not one), and two kinds of `#` that are not colours are not counted
+ * (audit I3, 2026-11-10): a link target (`href="#add"`, `to="#…"`, `hash: "#…"`) and a reference
+ * after a plain word in prose ("see #456", "Merged #138"); a CSS keyword such as `solid` before a
+ * colour still counts.
+ */
+export function hexColours(text, { script = false } = {}) {
+  let code = text.replace(/\/\*[\s\S]*?\*\//g, "");
+  if (script) code = code.replace(/(^|\s)\/\/.*$/gm, "$1");
+  return [...code.matchAll(/(?<![\w&$/-])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])/gi)]
+    .filter((m) => {
+      if (!script) return true;
+      const before = code.slice(Math.max(0, m.index - 40), m.index);
+      if (/\b(?:href|to|hash)\s*[=:]\s*\{?\s*["'`]$/.test(before)) return false;
+      const word = /(?:^|[^\w-])([A-Za-z]+) $/.exec(before)?.[1];
+      return !word || COLOUR_KEYWORDS.has(word.toLowerCase());
+    })
+    .map((m) => m[0]);
 }
 
 /**
@@ -88,7 +114,9 @@ export function collect() {
     breakpoints = {};
   for (const file of files("src").sort()) {
     const text = readFileSync(join(root, file), "utf8");
-    const colours = COLOUR_SOURCES.has(file) ? [] : hexColours(text);
+    const colours = COLOUR_SOURCES.has(file)
+      ? []
+      : hexColours(text, { script: /\.tsx?$/.test(file) });
     if (colours.length) hex[file] = colours.length;
     if (file.endsWith(".css")) {
       const found = arbitraryBreakpoints(text, tokens);

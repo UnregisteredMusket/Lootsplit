@@ -1,0 +1,11 @@
+{
+  "title": "Hidden NPCs stay unnamed in transfers and barter replies",
+  "audience": "everyone",
+  "summary": "A Give to a hidden NPC, an NPC or an exchange treasury no longer posts the recipient's name to party chat, and players can't pay accounts they can't see. Barter replies never name an NPC a player can't see.",
+  "items": [
+    "The DM's Give to an NPC, an exchange treasury or a hidden character posts its chat note to the DM only; transfers between party characters still show in party chat.",
+    "A player's Give to an account they can't see is refused like an unknown recipient, and nothing moves.",
+    "Asking a hidden, distant or unknown NPC for a barter quote or making an offer answers only \"This NPC is no longer here.\"",
+    "Newly imported NPCs get IDs that can't be guessed from one another. NPCs already in a campaign keep theirs."
+  ]
+}
