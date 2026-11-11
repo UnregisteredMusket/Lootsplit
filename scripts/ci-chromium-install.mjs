@@ -155,8 +155,20 @@ function main() {
     total = packages.length;
   }
   let fontGap = "";
+  let archiveDown = false;
   if (missing.length) {
-    update();
+    try {
+      update();
+    } catch (error) {
+      // The archive is unreachable (2026-11-11: every runner image, for hours). When only optional
+      // fonts are missing, continue on the image's own fonts, as after a failed font install.
+      if (!fontsOnly(missing)) throw error;
+      archiveDown = true;
+      fontGap = ` (package archive unreachable; font packages skipped)`;
+      console.log(`::warning title=Chromium install::Package archive unreachable; optional font packages skipped: ${missing.join(" ")}`);
+    }
+  }
+  if (missing.length && !archiveDown) {
     const [cmd, ...args] = apt(180, "install", "-y", "--no-install-recommends", "--fix-missing", ...missing);
     try {
       libraries += bounded("apt-get install", cmd, args, { seconds: 180 });
