@@ -1620,6 +1620,21 @@ export async function collectPerformance(db, now, fetcher = fetch) {
     pendingRuns: Array.isArray(state.pending) ? state.pending.length : null,
   };
 }
+// True when an earlier collection already logged the oldest run on this page (GitHub run ids
+// increase with creation). Workflow log ids start `workflow:<run id>:`; the range stays on the
+// unique id index.
+async function runSeenBefore(db, runs) {
+  const ids = runs.map((r) => r.id).filter(Number.isSafeInteger);
+  if (!ids.length) return false;
+  const oldest = Math.min(...ids);
+  const found = await rows(
+    db,
+    "SELECT 1 FROM owner_monitor_logs WHERE id>=? AND id<? LIMIT 1",
+    `workflow:${oldest}:`,
+    `workflow:${oldest};`,
+  );
+  return found.length > 0;
+}
 async function collectOtherLogs(env, snapshot, now) {
   const db = env.DB;
   for (const id of ["development", "diagnostics", "devices", "room-storage", "campaign-limit"])
@@ -1632,6 +1647,12 @@ async function collectOtherLogs(env, snapshot, now) {
   const source = snapshot.development;
   if (source?.state === "ready") {
     const runs = source.data.runs || [];
+    // GitHub returns at most one page (100 runs) and this repository always fills it, so a full
+    // page alone is no evidence of missed runs (audit G7). Runs were missed only when the oldest
+    // fetched run was never recorded by an earlier collection: then everything between that
+    // collection's newest run and this page's oldest is unaccounted for. Checked before this
+    // collection's runs are stored; one lookup by the unique log id.
+    const missed = runs.length >= 100 && !(await runSeenBefore(db, runs));
     await bulkLogs(
       db,
       runs
@@ -1646,15 +1667,15 @@ async function collectOtherLogs(env, snapshot, now) {
         })),
       now,
     );
-    const summary = `Checked ${runs.length} recent GitHub workflow runs. ${runs.length >= 100 ? "History is bounded to 100 runs; older event coverage may be incomplete." : "Available recent run metadata was collected."}`;
+    const summary = `Checked ${runs.length} recent GitHub workflow runs. ${missed ? "More runs started since the previous collection than one page holds; the runs in between were missed." : runs.length >= 100 ? "This page overlaps the previous collection, so no runs were missed." : "Available recent run metadata was collected."}`;
     await attest(
       db,
       "workflows",
       source.checkedAt,
       summary,
       now,
-      runs.length >= 100
-        ? "GitHub history reached the 100-run collection bound; older events may be missing."
+      missed
+        ? "GitHub history reached the 100-run collection bound; runs between collections were missed and older events may be missing."
         : null,
     );
     await attest(
@@ -1663,8 +1684,8 @@ async function collectOtherLogs(env, snapshot, now) {
       source.checkedAt,
       summary,
       now,
-      runs.length >= 100
-        ? "GitHub history reached the 100-run collection bound; older recovery events may be missing."
+      missed
+        ? "GitHub history reached the 100-run collection bound; runs between collections were missed and older recovery events may be missing."
         : null,
     );
   }

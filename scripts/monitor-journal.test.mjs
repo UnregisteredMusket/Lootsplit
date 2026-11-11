@@ -1399,3 +1399,64 @@ test("a queued refresh that keeps failing stops at the attempt cap, records the 
     base.close();
   }
 });
+
+test("GitHub workflow coverage is a gap only when runs were actually missed between collections", async () => {
+  // Audit G7 (2026-11-10): the repository always returns a full page of 100 runs, so a gap that
+  // depended on the page being full was shown every day and hid a real missed-check gap.
+  const DB = localAccountDb(),
+    env = { DB, OWNER_MONITOR_GITHUB: "false" };
+  const runsFrom = (first, at) =>
+    Array.from({ length: 100 }, (_, i) => {
+      const id = first + 99 - i; // newest first, as GitHub lists them
+      return {
+        id,
+        name: "Verify preserved functionality",
+        status: "completed",
+        conclusion: "success",
+        branch: "main",
+        event: "push",
+        url: `https://github.com/example/lootsplit/actions/runs/${id}`,
+        startedAt: at - (99 - i) * 60000,
+        updatedAt: at - (99 - i) * 60000,
+      };
+    });
+  const gapAt = async (slot) => {
+    const row = await DB.prepare("SELECT body FROM owner_monitor_logs WHERE id=?")
+      .bind(`coverage:workflows:${Math.floor(slot / INTERVAL)}`)
+      .first();
+    const recovery = await DB.prepare("SELECT body FROM owner_monitor_logs WHERE id=?")
+      .bind(`coverage:recovery:${Math.floor(slot / INTERVAL)}`)
+      .first();
+    assert.ok(row && recovery, "both coverage records are written");
+    assert.equal(
+      Boolean(JSON.parse(recovery.body).coverageGap),
+      Boolean(JSON.parse(row.body).coverageGap),
+    );
+    return JSON.parse(row.body).coverageGap;
+  };
+  const collect = async (slot, runs) => {
+    const snapshot = reading();
+    snapshot.development = {
+      state: "ready",
+      checkedAt: slot,
+      data: { runs, active: [], openPulls: [] },
+    };
+    await collectInterval(env, "owner", slot, { now: slot, collector: async () => snapshot });
+  };
+  try {
+    // First collection: nothing earlier to overlap with, so older runs may be missing.
+    await collect(instant, runsFrom(1000, instant));
+    assert.match(await gapAt(instant), /may be missing/);
+    // Next collection: 100 runs again, overlapping the previous page — nothing was missed.
+    await collect(instant + INTERVAL, runsFrom(1040, instant + INTERVAL));
+    assert.equal(await gapAt(instant + INTERVAL), null);
+    // More than 100 runs since the last collection: the oldest fetched run was never seen.
+    await collect(instant + 2 * INTERVAL, runsFrom(1300, instant + 2 * INTERVAL));
+    assert.match(await gapAt(instant + 2 * INTERVAL), /missed/);
+    // A short history (under one page) is complete.
+    await collect(instant + 3 * INTERVAL, runsFrom(5000, instant + 3 * INTERVAL).slice(0, 40));
+    assert.equal(await gapAt(instant + 3 * INTERVAL), null);
+  } finally {
+    DB.close();
+  }
+});
