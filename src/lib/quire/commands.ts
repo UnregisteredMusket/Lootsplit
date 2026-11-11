@@ -87,6 +87,7 @@ import {
   editLegacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
+import { editedStockFields, staleStockMessage, type StockFields } from "./stock-edit.ts";
 import { formatCopper, fromCopper, toCopper, spendCoins, sameCoins, exchangeSummary } from "./money.ts";
 import { charismaFor, listingBreakdown, shopBuyBreakdown, shopSellBreakdown } from "./price-breakdown.ts";
 import { readSheets } from "./sheet.ts";
@@ -1806,10 +1807,21 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       const current = rows.find((x) => rowId(x) === change.id) ?? null;
       // XP and milestones (protocol 21): an older client's purse rows lack them; keep the stored values.
       if (change.store === "purses" && current) Object.assign(change, keepPurseAdvancement(current, change.before, change.after));
-      if (!same(current, change.before))
+      if (!same(current, change.before)) {
+        // A shop's stock edited from an old screen (sold, repriced or renamed meanwhile; audit
+        // 2026-11-10 D3): say what changed. The device refuses with the same words (editStockLine).
+        const stale =
+          change.store === "stock" && change.before && change.after
+            ? staleStockMessage(
+                current,
+                change.before as StockFields,
+                editedStockFields(change.before as StockFields, change.after as StockFields),
+              )
+            : null;
         throw new Error(
-          `Conflict in ${change.store}. Export your pending changes, then refresh and retry.`,
+          stale ?? `Conflict in ${change.store}. Export your pending changes, then refresh and retry.`,
         );
+      }
       // A pooled lot stays in its party fund until the DM resolves it or takes it out of the
       // pool (loot-pool-set). An older client that drops the marker keeps it pooled.
       if (change.store === "holdings" && current?.pool && change.after !== null) {

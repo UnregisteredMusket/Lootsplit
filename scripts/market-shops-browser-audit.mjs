@@ -5,7 +5,8 @@
 // edited row shows its cost/afterward sentence; DM "Sell to" mode buys exactly once per tap
 // (double tap and a reload mid-way); modern "$" prices are on for a fresh DM seat, off for a
 // fresh player seat and kept when chosen; Edit renders below its toggle with one Save bar; a
-// player's first Buy button is on the first screen at 390×844. Never targets a real campaign.
+// player's first Buy button is on the first screen at 390×844; Edit's stock boxes follow a sale
+// and reprice from another tab and never write stale stock back (audit D3). Never targets a real campaign.
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -241,6 +242,60 @@ try {
       .poll(async () => (await rows(page, "shops")).find((s) => s.id === "lantern").name)
       .toBe("The Brass Lantern");
     await expect(bar).toContainText("All changes saved");
+
+    // Stale stock boxes (audit 2026-11-10 D3): with Edit open here, another tab sells a hooded
+    // lantern and reprices it. The boxes follow; tabbing through the row writes nothing back, and
+    // an edit typed before the next sale arrives is refused with what changed.
+    if (width === 1280) {
+      const lantern = async () => (await rows(page, "stock")).find((l) => l.id === "good-1");
+      const other = await context.newPage();
+      other.on("pageerror", (e) => errors.push(`other tab: ${e.message}`));
+      await openApplication(other, origin + "/market");
+      const elsewhere = (copper) =>
+        other.evaluate(async (copper) => {
+          const economy = await import("/src/lib/quire/economy.ts");
+          const { announceWorkspaceChange } = await import("/src/lib/quire/workspace-events.ts");
+          await economy.executeLocalCommand({ id: crypto.randomUUID(), kind: "buy", stockId: "good-1", purseId: "bram", quantity: 1 });
+          const line = (await economy.economySnapshot()).stock.find((l) => l.id === "good-1");
+          if (copper !== null) await economy.saveStock({ ...line, copper });
+          announceWorkspaceChange();
+        }, copper);
+      const first = await lantern();
+      const goodIndex = () =>
+        page.locator('input[aria-label="Good"]').evaluateAll((inputs) => inputs.findIndex((i) => i.value === "Lantern, hooded"));
+      const row = page.locator('li:has(> input[aria-label="Good"])').nth(await goodIndex());
+      const qtyBox = row.getByLabel("Quantity, blank if unlimited", { exact: true });
+      const priceBox = row.getByLabel("Price", { exact: true });
+      await expect(qtyBox).toHaveValue(String(first.quantity));
+      await expect(priceBox).toHaveValue("5 gp");
+      await elsewhere(600);
+      await expect.poll(async () => [(await lantern()).quantity, (await lantern()).copper]).toEqual([first.quantity - 1, 600]);
+      await expect(qtyBox).toHaveValue(String(first.quantity - 1));
+      await expect(priceBox).toHaveValue("6 gp");
+      await row.getByLabel("Good", { exact: true }).focus();
+      for (let i = 0; i < 3; i++) await page.keyboard.press("Tab");
+      await page.waitForTimeout(1500);
+      let books = await lantern();
+      assert.deepEqual([books.name, books.quantity, books.copper], ["Lantern, hooded", first.quantity - 1, 600], "tabbing through writes nothing back");
+      // Typed against 5 left; another lantern sells before the box is left: refused, nothing written.
+      await qtyBox.fill("9");
+      await elsewhere(null);
+      await expect.poll(async () => (await lantern()).quantity).toBe(first.quantity - 2);
+      await page.waitForTimeout(800);
+      await expect(qtyBox).toHaveValue("9");
+      await page.keyboard.press("Tab");
+      await expect(page.getByText(`Lantern, hooded changed while you were editing: quantity is now ${first.quantity - 2}.`, { exact: false }).first()).toBeVisible();
+      books = await lantern();
+      assert.deepEqual([books.quantity, books.copper], [first.quantity - 2, 600], "a stale typed edit is refused");
+      await expect(qtyBox).toHaveValue(String(first.quantity - 2));
+      // Typed against the current value: saved.
+      await qtyBox.fill("12");
+      await page.keyboard.press("Tab");
+      await expect.poll(async () => (await lantern()).quantity).toBe(12);
+      await expect(qtyBox).toHaveValue("12");
+      assert.equal((await lantern()).copper, 600, "a quantity edit keeps the price");
+      await other.close();
+    }
 
     // A player seat on the same device: $ off by default, Visit, first Buy on the first screen.
     await page.evaluate(async () => {
