@@ -7,6 +7,7 @@ import {
   SIGNIN_THROTTLE,
   signinDelay,
   signinKey,
+  signinNetwork,
   reserveSigninAttempt,
   throttledSignin,
 } from "../cloudflare/signin-throttle.mjs";
@@ -25,8 +26,8 @@ function clock(start = 1_800_000_000_000) {
   let now = start;
   return { now: () => now, advance: (ms) => (now += ms) };
 }
-async function attempt(db, time, email, password = "a wrong password") {
-  const response = await throttledSignin(db, email, fakeSignin(email, password), time.now);
+async function attempt(db, time, email, password = "a wrong password", ip = null) {
+  const response = await throttledSignin(db, email, fakeSignin(email, password), time.now, ip);
   return {
     status: response.status,
     body: await response.text(),
@@ -63,8 +64,9 @@ test("repeated wrong passwords slow one account down without locking it", async 
   // ...and works as soon as it ends, which also clears the count.
   time.advance(30_000);
   assert.equal((await attempt(db, time, "hero@example.com", "the right password")).status, 200);
-  const rows = await db.prepare("SELECT count(*) AS n FROM signin_throttle").first();
-  assert.equal(rows.n, 0);
+  // The network's wait is cleared; the email-wide count (no wait of its own) ends a day later.
+  const rows = await db.prepare("SELECT key,blocked_until FROM signin_throttle").all();
+  assert.deepEqual(rows.results.map((r) => ({ ...r })), [{ key: await signinKey("hero@example.com"), blocked_until: 0 }]);
   for (let i = 0; i < 5; i++)
     assert.equal((await attempt(db, time, "hero@example.com")).status, 401);
 });
@@ -107,7 +109,12 @@ test("registered and unregistered addresses get identical replies", async () => 
   const keys = await db.prepare("SELECT key FROM signin_throttle ORDER BY key").all();
   assert.deepEqual(
     keys.results.map((r) => r.key).sort(),
-    [await signinKey("hero@example.com"), await signinKey("nobody@example.com")].sort(),
+    [
+      await signinKey("hero@example.com"),
+      await signinKey("nobody@example.com"),
+      await signinKey("hero@example.com", signinNetwork(null)),
+      await signinKey("nobody@example.com", signinNetwork(null)),
+    ].sort(),
   );
   assert.ok(keys.results.every((r) => !r.key.includes("example")));
 });
@@ -178,4 +185,76 @@ test("requests without a usable email go straight to Better Auth", async () => {
     assert.equal(response.status, 400);
     assert.equal(called, 1);
   }
+});
+
+// Audit 2026-11-10 H3: the wait was keyed on the email alone, so an outsider sending one wrong
+// password as each wait ended kept the owner from signing in (288 of 288 correct attempts failed).
+test("H3: wrong passwords from one network never stop the right password from another", async () => {
+  const db = localAccountDb();
+  const time = clock();
+  const attacker = "203.0.113.7";
+  const owner = "198.51.100.20";
+  for (let i = 0; i <= SIGNIN_THROTTLE.freeFailures; i++)
+    await attempt(db, time, "hero@example.com", "a wrong password", attacker);
+  // One wrong password as each wait ends (288 of them), with the owner signing in each time.
+  for (let round = 0; round < 288; round++) {
+    let wrong = await attempt(db, time, "hero@example.com", "a wrong password", attacker);
+    if (wrong.status === 429) {
+      time.advance(Number(wrong.retry) * 1000);
+      wrong = await attempt(db, time, "hero@example.com", "a wrong password", attacker);
+    }
+    assert.equal(wrong.status, 401);
+    const right = await attempt(db, time, "Hero@Example.com", "the right password", owner);
+    assert.equal(right.status, 200, `round ${round}: ${right.body}`);
+    time.advance(60_000);
+  }
+  // The attacker's own network is still slowed down.
+  const slowed = await attempt(db, time, "hero@example.com", "a wrong password", attacker);
+  assert.equal(slowed.status, 429);
+});
+
+test("H3: addresses in one IPv6 /64 share a wait; another network does not", async () => {
+  const db = localAccountDb();
+  const time = clock();
+  for (let i = 0; i < 5; i++)
+    await attempt(db, time, "hero@example.com", "a wrong password", `2001:db8:1:2::${i + 1}`);
+  const sameNetwork = await attempt(db, time, "hero@example.com", "the right password", "2001:db8:1:2:ffff::9");
+  assert.equal(sameNetwork.status, 429);
+  const elsewhere = await attempt(db, time, "hero@example.com", "the right password", "2001:db8:1:3::1");
+  assert.equal(elsewhere.status, 200);
+  assert.equal(signinNetwork("2001:DB8:1:2::1"), signinNetwork("2001:db8:0001:0002:ffff:ffff:ffff:ffff"));
+  assert.equal(signinNetwork("::ffff:203.0.113.7"), "203.0.113.7");
+  assert.notEqual(signinNetwork("203.0.113.7"), signinNetwork("203.0.113.8"));
+  assert.equal(signinNetwork(null), signinNetwork(""));
+});
+
+test("H3: past the email-wide ceiling every network waits from its first failure, but a clean network still signs in", async () => {
+  const db = localAccountDb();
+  const time = clock();
+  // A distributed attack: one wrong password from each of many networks.
+  for (let i = 0; i < SIGNIN_THROTTLE.emailCeiling; i++) {
+    const r = await attempt(db, time, "hero@example.com", "a wrong password", `10.${i >> 8}.${i & 255}.1`);
+    assert.equal(r.status, 401);
+    time.advance(1000);
+  }
+  const fresh = "10.200.0.1";
+  assert.equal((await attempt(db, time, "hero@example.com", "a wrong password", fresh)).status, 401);
+  const next = await attempt(db, time, "hero@example.com", "a wrong password", fresh);
+  assert.equal(next.status, 429, "no free failures while the address is under attack");
+  assert.match(next.body, /Wait 30 seconds/);
+  // The owner, from a network with no failures, signs in at once.
+  assert.equal((await attempt(db, time, "hero@example.com", "the right password", "198.51.100.20")).status, 200);
+  // Under attack the longest wait is SIGNIN_THROTTLE.pressedMaxDelayMs.
+  for (let i = 0; i < 12; i++) {
+    const r = await attempt(db, time, "hero@example.com", "a wrong password", fresh);
+    if (r.status === 429) time.advance(Number(r.retry) * 1000);
+  }
+  const capped = await attempt(db, time, "hero@example.com", "a wrong password", fresh);
+  if (capped.status === 429) assert.ok(Number(capped.retry) * 1000 <= SIGNIN_THROTTLE.pressedMaxDelayMs);
+  assert.equal(signinDelay(1, true), SIGNIN_THROTTLE.baseDelayMs);
+  assert.equal(signinDelay(50, true), SIGNIN_THROTTLE.pressedMaxDelayMs);
+  // A day after the last failure the address is no longer under attack.
+  time.advance(SIGNIN_THROTTLE.resetAfterMs + 1);
+  for (let i = 0; i < SIGNIN_THROTTLE.freeFailures; i++)
+    assert.equal((await attempt(db, time, "hero@example.com", "a wrong password", "10.201.0.1")).status, 401);
 });

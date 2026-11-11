@@ -56,6 +56,8 @@ import { ownerMonitor } from "./owner-monitor.mjs";
 import { monitorApi } from "./monitor-journal.mjs";
 import { throttledSignin } from "./signin-throttle.mjs";
 import { captchaConfig, verifyCaptcha } from "./turnstile.mjs";
+import { appCredentialAllowance, limitedSignup } from "./credential-limits.mjs";
+import { assertStorageOpen, STORAGE_GUARD_MESSAGE, storageGuard } from "./storage-guard.mjs";
 import {
   assertActive,
   touchMember,
@@ -377,6 +379,10 @@ export async function handleAccounts(request, env, context = null) {
         ? null
         : ((await getSession().catch(() => null))?.user?.id ?? null);
       await rateLimit(env, request, limitedUser);
+      // The app skips the human check, so its sign-ups, sign-ins and recovery-key resets get a
+      // much smaller allowance per network (audit 2026-11-10 H1; credential-limits.mjs).
+      if (native)
+        await appCredentialAllowance(env.DB, path, request.headers.get("cf-connecting-ip"));
       // Turnstile on sign-up, sign-in and recovery-key reset (website only; see turnstile.mjs).
       await verifyCaptcha(env, request, {
         path,
@@ -398,10 +404,19 @@ export async function handleAccounts(request, env, context = null) {
           headers: request.headers,
           body: JSON.stringify(body),
         });
-        // Per-account throttle on top of the per-IP limits (audit S05).
+        const ip = request.headers.get("cf-connecting-ip");
+        // Per-account throttle on top of the per-IP limits (audit S05), keyed on the email and
+        // the network (audit 2026-11-10 H3).
         if (path === "/api/account/auth/sign-in/email") {
           const signIn = request;
-          return cors(await throttledSignin(env.DB, body?.email, () => auth.handler(signIn)));
+          return cors(
+            await throttledSignin(env.DB, body?.email, () => auth.handler(signIn), Date.now, ip),
+          );
+        }
+        // A few "already registered" replies per network a day (audit 2026-11-10 H5).
+        if (path === "/api/account/auth/sign-up/email") {
+          const signUp = request;
+          return cors(await limitedSignup(env.DB, body?.email, ip, () => auth.handler(signUp)));
         }
       }
       return cors(await auth.handler(request));
@@ -685,55 +700,13 @@ export async function handleAccounts(request, env, context = null) {
       return cors(json(await saveLibraryBackup(db, userId, body)));
     if (path === "/api/account/read-backup" && request.method === "POST")
       return cors(json({ payload: await readLibraryBackup(db, userId, body, tabletopHeader(request)) }));
-    if (path === "/api/account/character" && request.method === "POST") {
-      const profile = {
-        name: text(body.name),
-        description: typeof body.description === "string" ? body.description.slice(0, 2000) : "",
-        portrait: "",
-      };
-      if (body.portrait) {
-        if (
-          typeof body.portrait !== "string" ||
-          body.portrait.length > 500000 ||
-          !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.portrait)
-        )
-          fail("Choose a PNG, JPEG or WebP portrait below 350 KB.");
-        profile.portrait = body.portrait;
-      }
-      const id = body.id ? text(body.id) : crypto.randomUUID();
-      const serialized = JSON.stringify(profile);
-      // Counts and bytes exclude the profile being replaced, so editing never hits the limit
-      // unless the edited profile itself makes the account exceed it.
-      const saved = await db
-        .prepare(
-          "INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=? ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at",
-        )
-        .bind(
-          id,
-          userId,
-          serialized,
-          Date.now(),
-          userId,
-          id,
-          LIBRARY_LIMITS.characters,
-          userId,
-          id,
-          serialized.length,
-          LIBRARY_LIMITS.characterBytes,
-        )
-        .run();
-      if (!saved.meta.changes)
-        fail(
-          `Your account character storage is full (up to ${LIBRARY_LIMITS.characters} characters or ${LIBRARY_LIMITS.characterBytes / 1_000_000} MB). Remove a character you no longer need, then save again.`,
-          413,
-        );
-      return cors(json({ id }));
-    }
+    if (path === "/api/account/character" && request.method === "POST")
+      return cors(json(await saveLibraryCharacter(db, userId, body)));
     if (path === "/api/account/remove" && request.method === "POST")
       return cors(json(await removeLibraryEntry(db, userId, body)));
     fail("Not found.", 404);
   } catch (error) {
-    return cors(
+    const response = cors(
       json(
         {
           error: error.status
@@ -745,7 +718,66 @@ export async function handleAccounts(request, env, context = null) {
         error.status || 500,
       ),
     );
+    if (error.status === 429 && error.retryAfter)
+      response.headers.set("retry-after", String(error.retryAfter));
+    return response;
   }
+}
+
+/**
+ * Save a character profile to the account library (`/api/account/character`). While the
+ * site-wide storage guard is refusing uploads (storage-guard.mjs), a new character or an edit that
+ * makes one larger is refused; an edit that does not grow it still saves.
+ * @param {any} db @param {string} userId @param {any} body
+ */
+export async function saveLibraryCharacter(db, userId, body) {
+  const profile = {
+    name: text(body.name),
+    description: typeof body.description === "string" ? body.description.slice(0, 2000) : "",
+    portrait: "",
+  };
+  if (body.portrait) {
+    if (
+      typeof body.portrait !== "string" ||
+      body.portrait.length > 500000 ||
+      !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.portrait)
+    )
+      fail("Choose a PNG, JPEG or WebP portrait below 350 KB.");
+    profile.portrait = body.portrait;
+  }
+  const id = body.id ? text(body.id) : crypto.randomUUID();
+  const serialized = JSON.stringify(profile);
+  // While the storage guard refuses uploads, only an existing profile at least as large is saved.
+  const guarded = (await storageGuard(db)).state === "refusing";
+  // Counts and bytes exclude the profile being replaced, so editing never hits the limit
+  // unless the edited profile itself makes the account exceed it.
+  const saved = await db
+    .prepare(
+      `INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=?${guarded ? " AND COALESCE((SELECT LENGTH(body) FROM library_characters WHERE id=? AND user_id=?),-1)>=?" : ""} ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at`,
+    )
+    .bind(
+      id,
+      userId,
+      serialized,
+      Date.now(),
+      userId,
+      id,
+      LIBRARY_LIMITS.characters,
+      userId,
+      id,
+      serialized.length,
+      LIBRARY_LIMITS.characterBytes,
+      ...(guarded ? [id, userId, serialized.length] : []),
+    )
+    .run();
+  if (!saved.meta.changes) {
+    if (guarded) fail(STORAGE_GUARD_MESSAGE, 507);
+    fail(
+      `Your account character storage is full (up to ${LIBRARY_LIMITS.characters} characters or ${LIBRARY_LIMITS.characterBytes / 1_000_000} MB). Remove a character you no longer need, then save again.`,
+      413,
+    );
+  }
+  return { id };
 }
 
 /**
@@ -767,6 +799,8 @@ export async function saveLibraryBackup(db, userId, body) {
     fail("Invalid campaign backup.");
   if (payload.books?.length || payload.articles?.length)
     fail("Private PDFs must stay on your device.");
+  // Site-wide storage guard (audit 2026-11-10 H2): no new online backups past the guard share.
+  await assertStorageOpen(db);
   await validateBackupMapAssets(db, userId, payload);
   const id = crypto.randomUUID();
   const serialized = JSON.stringify(payload);
