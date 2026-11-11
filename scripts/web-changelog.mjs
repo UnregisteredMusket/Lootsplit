@@ -15,8 +15,9 @@
 // compiled into the artifact (Vite define), so the release job deploys them unchanged and
 // never writes to the repository.
 //
-// `freeze` (run in an ordinary PR, any time) moves notes that are already live into the
-// committed history, src/lib/website/web-releases.json, which keeps the API window short.
+// `freeze` (run in an ordinary PR, any time; needs GH_TOKEN and full history, no CI run ID) moves
+// notes that are already live into the committed history, src/lib/website/web-releases.json,
+// which keeps the API window short. The main build warns when more than FREEZE_DUE are pending.
 import { execFileSync } from "node:child_process";
 import {
   appendFileSync,
@@ -305,6 +306,26 @@ function countSummary(changes) {
   return `${changes.length} changes: ${parts.join(", ")}.`;
 }
 
+/** Pending notes above which the main build asks for a freeze (about three weeks of changes). */
+export const FREEZE_DUE = 60;
+
+/**
+ * The index of the first deploy (oldest first) that contains `commit`, or -1. Deploys are commits
+ * on main, whose history is linear, so once one contains a note every later one does: a binary
+ * search asks git about log2(deploys) of them instead of all of them (audit G5, 2026-11-10: the
+ * per-pair scan took 171 s of the web build's 240 s at 311 deploys).
+ */
+export function firstContaining(deploys, commit, contains) {
+  let low = 0,
+    high = deploys.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (contains(deploys[middle].sha, commit)) high = middle;
+    else low = middle + 1;
+  }
+  return low < deploys.length ? low : -1;
+}
+
 /**
  * Group notes by the deploy that first carried them.
  *
@@ -320,7 +341,7 @@ export function stampNotes({ notes, deploys, contains, current = null }) {
   const groups = new Map();
   for (const item of notes) {
     const deploy =
-      deploys.find((candidate) => contains(candidate.sha, item.commit)) ??
+      deploys[firstContaining(deploys, item.commit, contains)] ??
       (current ? { ...current, deployRunId: null, current: true } : null);
     if (!deploy) continue;
     const day = utcDay(deploy.date);
@@ -399,7 +420,7 @@ export async function confirmDeploys({ notes, deploys, contains, outcome }) {
   for (;;) {
     const used = new Set();
     for (const item of notes) {
-      const index = list.findIndex((d) => contains(d.sha, item.commit));
+      const index = firstContaining(list, item.commit, contains);
       const at = index < 0 ? list.length : index; // the current build follows the last deploy
       if (index >= 0) used.add(list[index]);
       if (at > 0) used.add(list[at - 1]);
@@ -480,7 +501,7 @@ export function noteCommits(notes, root = ".") {
  * Build-time entries. mode "release" (main build) reads deploys from GitHub and fails on any
  * error; mode "preview" stamps every note as if HEAD were live, for local review only.
  */
-export async function collectEntries({ mode, root = "." }) {
+export async function collectEntries({ mode, root = ".", runId = process.env.GITHUB_RUN_ID }) {
   const notes = readNotes(root);
   if (!notes.length || !mode) return [];
   const head = git(["rev-parse", "HEAD"], root);
@@ -493,11 +514,16 @@ export async function collectEntries({ mode, root = "." }) {
       current: { sha: head, date: headDate, verifyRunId: "preview" },
     }).map((entry) => ({ ...entry, id: `preview-${entry.id}` }));
   if (mode !== "release") throw new Error(`Unknown LOOTSPLIT_WEB_CHANGELOG mode: ${mode}`);
-  const runId = process.env.GITHUB_RUN_ID;
   if (!runId)
     throw new Error("Release stamping runs only in the main verification build (GITHUB_RUN_ID).");
   if (git(["rev-parse", "--is-shallow-repository"], root) === "true")
     throw new Error("Stamping the website changelog needs full history (checkout fetch-depth: 0).");
+  // Freeze is a manual step (a pull request made by a workflow would not start verification), so
+  // the main build says when it is due rather than letting the window grow unnoticed (audit G5).
+  if (notes.length > FREEZE_DUE && process.env.GITHUB_ACTIONS)
+    console.log(
+      `::warning title=Website changelog::${notes.length} notes are pending; run "node scripts/web-changelog.mjs freeze" in a pull request.`,
+    );
   const located = noteCommits(notes, root);
   const missing = located.filter((item) => !item.commit);
   if (missing.length)
@@ -585,7 +611,9 @@ export function forPage(entry) {
 
 /** Move notes that are already live into the committed history and delete them. */
 async function freeze(root = ".") {
-  const live = await collectEntries({ mode: "release", root }).catch((error) => {
+  // The build in progress is left out below, so a local run needs no CI run ID (it only names the
+  // unsettled "current" entry, which is never frozen).
+  const live = await collectEntries({ mode: "release", root, runId: "freeze" }).catch((error) => {
     throw new Error(`freeze needs GitHub access and full history: ${error.message}`);
   });
   const settled = live.filter(

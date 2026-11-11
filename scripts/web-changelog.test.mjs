@@ -311,3 +311,50 @@ test("a release groups its changes by audience and headlines only the first thre
   const [single] = stampNotes({ notes: notes.slice(1, 2), deploys, contains: () => true });
   assert.equal(single.summary, "Dm one summary.");
 });
+
+test("stamping 200 notes against 300 deploys asks git under 2,500 times (audit G5)", async () => {
+  // Main is linear, so a deploy contains a note exactly when it is at or after the note's first
+  // containing deploy: the first one is found by binary search, not by asking every deploy.
+  const many = Array.from({ length: 300 }, (_, i) => ({
+    sha: i.toString(16).padStart(40, "0"),
+    date: new Date(Date.UTC(2026, 9, 1) + i * 3_600_000).toISOString(),
+    verifyRunId: 1000 + i,
+    runs: [{ id: 5000 + i, attempt: 1 }],
+  }));
+  const position = new Map(many.map((d, i) => [d.sha, i]));
+  const first = new Map();
+  const notes = Array.from({ length: 200 }, (_, n) => {
+    first.set(`n${n}`, n < 190 ? n + 100 : 300); // the last ten are in no deploy yet
+    return { path: `n/${n}.json`, note: note(`Note ${n}`), commit: `n${n}`, pr: 400 + n };
+  });
+  let asked = 0;
+  const memo = new Map();
+  const contains = (deploySha, noteCommit) => {
+    const key = `${noteCommit} ${deploySha}`;
+    if (!memo.has(key)) {
+      asked++; // one git process per distinct question, as in collectEntries
+      memo.set(key, position.get(deploySha) >= first.get(noteCommit));
+    }
+    return memo.get(key);
+  };
+  const confirmed = await confirmDeploys({
+    notes,
+    deploys: many,
+    contains,
+    outcome: async () => "deployed",
+  });
+  const entries = stampNotes({
+    notes,
+    deploys: confirmed,
+    contains,
+    current: { sha: "f".repeat(40), date: "2026-11-11T00:00:00Z", verifyRunId: 9 },
+  });
+  assert.ok(asked < 2500, `asked git ${asked} times`);
+  // Entries group a day's deploys, so each note is checked by the day it went live.
+  const day = new Map(entries.flatMap((e) => e.notes.map((p) => [p, e.date])));
+  assert.equal(day.get("n/0.json"), many[100].date.slice(0, 10));
+  assert.equal(day.get("n/189.json"), many[289].date.slice(0, 10));
+  assert.equal(day.get("n/195.json"), "2026-11-11", "not deployed yet: the current build");
+  const late = entries.find((e) => e.notes.includes("n/195.json"));
+  assert.equal(late.commit, "f".repeat(40));
+});
