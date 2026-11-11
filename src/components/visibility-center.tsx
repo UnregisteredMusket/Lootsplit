@@ -30,7 +30,7 @@ export function VisibilityCenter() {
     { ready } = useEconomy();
   // The route is DM-only; this is a second guard (a player's device holds only its own view).
   if (!dm || preview) return <p>This screen is available to the campaign DM.</p>;
-  const areas = visibilityCenter(table);
+  const areas = visibilityCenter(table, { android: import.meta.env.VITE_MOBILE === "true" });
   const hidden = areas.reduce((n, a) => n + a.counts.reduce((m, c) => m + c.count, 0), 0);
   return (
     <div className="visibility-center" data-testid="visibility-center">
