@@ -8,7 +8,8 @@ on:
 permissions:
   contents: read
   actions: read
-# All website publishers must use this group. Never cancel an active upload.
+# All website publishers must use this group. Never cancel an active upload. The database backup
+# has its own group (standby-backup.yml) and coordinates through scripts/production-lane.mjs.
 concurrency:
   group: lootsplit-production
   cancel-in-progress: false
@@ -24,15 +25,16 @@ jobs:
       github.repository == 'UnregisteredMusket/Lootsplit'
     runs-on: ubuntu-latest
     environment: production
-    # Deploy plus live audits of two origins (lootsplitter.com + workers.dev) since #214.
-    timeout-minutes: 25
+    # Deploy plus live audits of two origins (lootsplitter.com + workers.dev) since PR 214, plus up
+    # to 15 minutes waiting for a running database backup export (scripts/production-lane.mjs).
+    timeout-minutes: 40
     # A job's permissions replace the workflow defaults, so list everything this job uses.
     permissions:
       contents: read
       # download-artifact from the verification run.
       actions: read
       # recovery-step.mjs telemetry (production-migrations, production-preflight, website-deploy,
-      # website-live-audit) authenticates with a GitHub OIDC token.
+      # website-live-audit, website-browser-audit) authenticates with a GitHub OIDC token.
       id-token: write
     env:
       RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -62,6 +64,13 @@ jobs:
       # Every production step below is guarded on this output; only a real deploy reaches
       # "Record live deployment", which readers use to tell deployments apart
       # (src/lib/deployment/release-run.mjs). Migrations and preflight still assert current main.
+      # The backup has its own concurrency group (audit G10); a running D1 export blocks every
+      # database request, so wait for it before migrating (scripts/production-lane.mjs). Runs
+      # before the current-main check, so a long wait cannot turn a newer main into a failure.
+      - name: Wait for a running database backup export
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/production-lane.mjs wait-for-backup-export
       - name: Check the release commit is still the head of main
         id: current
         env:
@@ -78,6 +87,7 @@ jobs:
           CLOUDFLARE_D1_MIGRATION_TOKEN: ${{ secrets.CLOUDFLARE_D1_MIGRATION_TOKEN }}
         run: node scripts/recovery-step.mjs production-migrations 300 node scripts/production-migrations.mjs
       - name: Check current main, existing bindings and applied migrations; deploy without rebuild
+        id: deploy
         if: steps.current.outputs.superseded != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -100,8 +110,11 @@ jobs:
           FAILURE_REPORT_EMAIL: ${{ secrets.FAILURE_REPORT_EMAIL }}
           FAILURE_REPORT_FROM: ${{ secrets.FAILURE_REPORT_FROM }}
         run: node scripts/failure-report.mjs --check-config
+      # Once the deploy succeeded the commit is serving: audit it even if a policy check above
+      # failed. Both audits are recovery steps, so a failure leaves an annotation (audit G6).
       - name: Verify deployed identity and read-only desktop/mobile website behavior
-        if: steps.current.outputs.superseded != 'true'
+        id: audit
+        if: ${{ !cancelled() && steps.current.outputs.superseded != 'true' && steps.deploy.outcome == 'success' }}
         env:
           EXPECTED_RELEASE_SHA: ${{ env.RELEASE_SHA }}
           AUDIT_ORIGIN: https://lootsplitter.com
@@ -110,14 +123,24 @@ jobs:
           AUDIT_LEGACY_ORIGINS: "https://lootsplit.oliverstorie2017.workers.dev"
         run: |
           node scripts/recovery-step.mjs website-live-audit 180 node scripts/live-audit-origins.mjs scripts/live-release-audit.mjs
-          node scripts/live-audit-origins.mjs scripts/website-browser-audit.mjs
-      # Runs only when this commit was deployed and every live audit passed. Its success is the
-      # deployment marker the web changelog and owner monitor read; never rename or unguard it
-      # without updating src/lib/deployment/release-run.mjs (scripts/release-run.test.mjs).
+          node scripts/recovery-step.mjs website-browser-audit 600 node scripts/live-audit-origins.mjs scripts/website-browser-audit.mjs
+      # Runs whenever this commit was deployed. Its success is the deployment marker the web
+      # changelog and owner monitor read (src/lib/deployment/release-run.mjs); never rename or
+      # unguard it without updating that file and scripts/release-run.test.mjs. Owner decision for
+      # audit G6 (2026-11-11): a deployed commit whose live audit did not pass stays live, is
+      # recorded as deployed and flagged "live, unaudited"; the run still ends red because the
+      # audit step failed. Nothing is rolled back.
       - name: Record live deployment
-        if: steps.current.outputs.superseded != 'true'
+        if: ${{ always() && steps.current.outputs.superseded != 'true' && steps.deploy.outcome == 'success' }}
+        env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
         run: |
-          printf 'Deployed and live-audited: `%s`\n\n' "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$AUDIT_OUTCOME" = "success" ]; then
+            printf 'Deployed and live-audited: `%s`\n\n' "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error title=Live, unaudited::$RELEASE_SHA is deployed and serving, but its read-only live audit did not pass (audit step: $AUDIT_OUTCOME). It stays live. Read the website-live-audit or website-browser-audit annotation, then fix forward; a rollback is the owner's call."
+            printf 'Deployed, **live, unaudited**: `%s` (live audit: %s). The commit is serving; read the audit annotation.\n\n' "$RELEASE_SHA" "$AUDIT_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Record release result
         if: always()
         env:

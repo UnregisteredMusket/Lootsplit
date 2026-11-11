@@ -5,9 +5,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   CURRENT_MAIN_STEP,
+  LIVE_AUDIT_STEP,
   LIVE_RELEASE_STEP,
   RELEASE_JOB,
   RELEASE_WORKFLOW_PATH,
+  isDeployedOutcome,
   releaseRunOutcome,
 } from "../src/lib/deployment/release-run.mjs";
 import { releaseCurrency } from "./release-current.mjs";
@@ -48,16 +50,28 @@ test("only the live-release step proves a deployment; superseded and failed runs
     ),
     "superseded",
   );
-  // A real failure after the check (migrations rejected, deploy or live audit failed).
+  // A real failure before the deploy finished (migrations rejected, deploy failed).
   assert.equal(
     releaseRunOutcome(
       job("failure", [
         [CURRENT_MAIN_STEP, "success"],
-        ["Verify deployed identity and read-only desktop/mobile website behavior", "failure"],
+        ["Check current main, existing bindings and applied migrations; deploy without rebuild", "failure"],
+        [LIVE_AUDIT_STEP, "skipped"],
         [LIVE_RELEASE_STEP, "skipped"],
       ]),
     ),
     "not-deployed",
+  );
+  // Before audit G6 the marker only ran after the audit passed.
+  assert.equal(
+    releaseRunOutcome(
+      job("success", [
+        [CURRENT_MAIN_STEP, "success"],
+        [LIVE_AUDIT_STEP, "success"],
+        [LIVE_RELEASE_STEP, "success"],
+      ]),
+    ),
+    "deployed",
   );
   assert.equal(releaseRunOutcome(job("failure", [[CURRENT_MAIN_STEP, "failure"]])), "not-deployed");
   assert.equal(
@@ -73,6 +87,22 @@ test("only the live-release step proves a deployment; superseded and failed runs
   // Unknown shapes are unknown, never "deployed".
   assert.equal(releaseRunOutcome(null), null);
   assert.equal(releaseRunOutcome([{ name: "other", conclusion: "success", steps: [] }]), null);
+});
+
+test("a deployed commit whose live audit failed is recorded live, unaudited; the run stays red (audit G6)", () => {
+  for (const audit of ["failure", "cancelled", "skipped"]) {
+    const outcome = releaseRunOutcome(
+      job("failure", [
+        [CURRENT_MAIN_STEP, "success"],
+        [LIVE_AUDIT_STEP, audit],
+        [LIVE_RELEASE_STEP, "success"],
+      ]),
+    );
+    assert.equal(outcome, "live-unaudited");
+    assert.equal(isDeployedOutcome(outcome), true);
+  }
+  assert.equal(isDeployedOutcome("deployed"), true);
+  for (const outcome of ["superseded", "not-deployed", null]) assert.equal(isDeployedOutcome(outcome), false);
 });
 
 test("the workflow checks current main before every production step and marks real deploys last", () => {
@@ -96,7 +126,7 @@ test("the workflow checks current main before every production step and marks re
   assert.match(steps[check], /\n {8}id: current\n/);
   assert.match(steps[check], /node scripts\/release-current\.mjs/);
   assert.doesNotMatch(steps[check], /\n {8}if:/, "the check itself always runs");
-  const guard = "\n        if: steps.current.outputs.superseded != 'true'\n";
+  const guard = /\n {8}if: (?:\$\{\{ [^\n]*)?steps\.current\.outputs\.superseded != 'true'/;
   const production = [
     /production-migrations\.mjs/,
     /production-preflight\.mjs/,
@@ -108,14 +138,29 @@ test("the workflow checks current main before every production step and marks re
   for (const pattern of production) {
     const i = index(pattern);
     assert.ok(i > check, `${pattern} runs after the current-main check`);
-    assert.ok(steps[i].includes(guard), `${pattern} is skipped for a superseded release`);
+    assert.match(steps[i], guard, `${pattern} is skipped for a superseded release`);
   }
+  // Both live audits are recovery steps (a failure leaves an annotation) and run once the deploy
+  // succeeded, whatever happened in between (audit G6).
+  const deploy = index(/wrangler deploy/);
+  assert.match(steps[deploy], /\n {8}id: deploy\n/);
+  const audit = index(new RegExp(`^name: ${LIVE_AUDIT_STEP}\n`));
+  assert.match(steps[audit], /\n {8}id: audit\n/);
+  assert.match(steps[audit], /!cancelled\(\) && [^\n]*steps\.deploy\.outcome == 'success'/);
+  for (const script of ["live-release-audit", "website-browser-audit"])
+    assert.match(steps[audit], new RegExp(`node scripts/recovery-step\\.mjs [a-z-]+ \\d+ node scripts/live-audit-origins\\.mjs scripts/${script}\\.mjs`));
+  assert.equal(audit, index(/website-browser-audit\.mjs/));
   // The hard stale-release assertions stay as a backstop.
   for (const file of ["scripts/production-migrations.mjs", "scripts/production-preflight.mjs"])
     assert.match(readFileSync(file, "utf8"), /assertCurrentMain\(releaseSha/);
   const marker = index(new RegExp(`^name: ${LIVE_RELEASE_STEP}\\n`));
-  assert.ok(steps[marker].includes(guard));
-  assert.doesNotMatch(steps[marker], /always\(\)|continue-on-error/);
+  // Runs whenever the deploy succeeded (even after a failed audit), never for a superseded release,
+  // and flags an unaudited deployment with an error annotation; it never fails or is skipped on error.
+  assert.match(steps[marker], guard);
+  assert.match(steps[marker], /if: \$\{\{ always\(\) && steps\.current\.outputs\.superseded != 'true' && steps\.deploy\.outcome == 'success' \}\}/);
+  assert.match(steps[marker], /AUDIT_OUTCOME: \$\{\{ steps\.audit\.outcome \}\}/);
+  assert.match(steps[marker], /::error title=Live, unaudited::/);
+  assert.doesNotMatch(steps[marker], /continue-on-error|exit 1/);
   for (const pattern of production)
     assert.ok(index(pattern) < marker, `the live-release marker follows ${pattern}`);
   assert.equal(steps.filter((s) => s.startsWith(`name: ${LIVE_RELEASE_STEP}\n`)).length, 1);

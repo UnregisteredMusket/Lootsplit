@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { requireMainVerification } from "./android-main-verification.mjs";
+import { readFileSync } from "node:fs";
+import { requireMainVerification, requireOnMain } from "./android-main-verification.mjs";
 
 const sha = "a".repeat(40);
 const passed = {
@@ -15,7 +16,8 @@ const passed = {
   conclusion: "success",
 };
 const gate = { name: "verify", status: "completed", conclusion: "success" };
-function fixture({ runs = [passed], head = sha, jobs = [gate] } = {}) {
+// GitHub compare `sha...main`: identical (main's head), ahead (main moved on), behind/diverged (not on main).
+function fixture({ runs = [passed], compare = "identical", jobs = [gate] } = {}) {
   let clock = 0;
   const paths = [];
   return {
@@ -27,7 +29,7 @@ function fixture({ runs = [passed], head = sha, jobs = [gate] } = {}) {
     },
     api: async (path) => {
       paths.push(path);
-      if (path === "/git/ref/heads/main") return { object: { sha: head } };
+      if (path === `/compare/${sha}...main`) return { status: compare };
       if (path.includes("/jobs?")) return { jobs };
       return { workflow_runs: typeof runs === "function" ? runs(clock) : runs };
     },
@@ -41,8 +43,16 @@ test("Android waits for the exact independent main run and its latest-attempt ga
   assert.equal(await requireMainVerification(input), 100);
   assert.ok(input.paths.includes("/actions/runs/100/attempts/2/jobs?per_page=100"));
 });
-test("stale source, failed latest runs and skipped/missing preservation gates refuse signing", async () => {
-  await assert.rejects(requireMainVerification(fixture({ head: "b".repeat(40) })), /current main/);
+test("a merge during the release does not fail it: the release is pinned to its own commit (audit G9)", async () => {
+  assert.equal(await requireMainVerification(fixture({ compare: "ahead" })), 100);
+  assert.equal(await requireOnMain(fixture({ compare: "ahead" })), "ahead");
+  assert.equal(await requireOnMain(fixture()), "identical");
+});
+test("off-main source, failed latest runs and skipped/missing preservation gates refuse signing", async () => {
+  for (const compare of ["behind", "diverged", null]) {
+    await assert.rejects(requireMainVerification(fixture({ compare })), /not on main/);
+    await assert.rejects(requireOnMain(fixture({ compare })), /not on main/);
+  }
   await assert.rejects(
     requireMainVerification(
       fixture({ runs: [passed, { ...passed, id: 101, conclusion: "failure" }] }),
@@ -72,4 +82,9 @@ test("PR, fork, other-workflow and old-commit passes cannot authorize Android pu
 test("missing or unfinished main verification expires without accepting a partial pass", async () => {
   for (const runs of [[], [{ ...passed, status: "in_progress" }]])
     await assert.rejects(requireMainVerification(fixture({ runs })), /ten minutes/);
+});
+test("signing and publishing re-check the pinned commit is on main, not that it is main's head", () => {
+  const workflow = readFileSync(".github/workflows/android-release.yml", "utf8");
+  assert.doesNotMatch(workflow, /git\/ref\/heads\/main/);
+  assert.equal(workflow.match(/node scripts\/android-main-verification\.mjs --on-main/g)?.length, 2);
 });
