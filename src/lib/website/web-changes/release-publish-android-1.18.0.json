@@ -1,9 +1,0 @@
-{
-  "title": "Android 1.18.0 download with 3D dice and factions",
-  "audience": "android",
-  "summary": "The website's Android download is now version 1.18.0, with 3D dice, factions and the fixes made since 1.17.0.",
-  "items": [
-    "Downloads offers Android 1.18.0 with its checksum; install it over the existing app. Saved campaigns, sign-in and placed widgets are kept.",
-    "The app now includes 3D dice for players and the DM, factions with renown, Favor and favor markets, quest renown rewards, coin handling that matches the website and the rewritten help text."
-  ]
-}

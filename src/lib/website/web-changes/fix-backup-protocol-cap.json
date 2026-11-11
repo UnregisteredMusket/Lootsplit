@@ -1,8 +1,0 @@
-{
-  "title": "Online backups with map tokens and zones restore again",
-  "summary": "The current website could refuse its own online backups, saying they needed “the updated website”, once they held newer map data such as token sizes, hidden grids, follow view or zones. They now restore.",
-  "items": [
-    "Older apps still get the same clear message instead of a backup they can't read."
-  ],
-  "audience": "everyone"
-}

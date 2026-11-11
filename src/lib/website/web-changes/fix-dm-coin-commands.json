@@ -1,9 +1,0 @@
-{
-  "title": "DM coin edits in shared campaigns apply exactly once",
-  "summary": "In a shared campaign, the DM's coin edits and ledger postings (including Party payments) now apply exactly once, even if the connection drops and the button is pressed again.",
-  "items": [
-    "A coin edit made from coins that changed meanwhile is refused with “These coins changed.” instead of overwriting the newer balance.",
-    "Device campaigns work exactly as before."
-  ],
-  "audience": "dm"
-}
