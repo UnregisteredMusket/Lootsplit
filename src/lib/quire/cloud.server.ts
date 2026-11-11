@@ -1107,16 +1107,31 @@ export async function submitCommands(input: {
         ...(room.drafts?.[seat.id] ?? []).map((c) => seat.id + ":" + c.id),
       ]),
     ]);
-    // The same action ID applied under another seat (a player who left and rejoined has a new
-    // seat ID): treated as this seat's own receipt, so it is never applied twice (audit A2).
+    // The same action applied under another seat (a player who left and rejoined has a new seat
+    // ID) is treated as this seat's own receipt, so it is never applied twice (audit A2). Only an
+    // exact content match counts: another seat's receipt with different or unknown content is
+    // ignored and the action is new, so no seat can block another's action IDs by committing
+    // something else under them first (review of PR 488).
     const adopted = new Set<string>();
     const elsewhere = await lookupCommandIdReceipts(
       room,
       commands.filter((c) => !commandReceipts.has(seat.id + ":" + c.id)).map((c) => c.id),
     );
-    for (const [id, receipt] of elsewhere) {
-      commandReceipts.set(seat.id + ":" + id, receipt.hash);
-      adopted.add(id);
+    for (const command of commands) {
+      let match: string | undefined;
+      for (const receipt of elsewhere.get(command.id) ?? []) {
+        if (!receipt.hash) continue;
+        if (
+          receipt.hash === hashes.get(command.id) ||
+          (!receipt.hash.startsWith("v2:") && receipt.hash === (await digest(JSON.stringify(command))))
+        ) {
+          match = receipt.hash;
+          break;
+        }
+      }
+      if (match === undefined) continue;
+      commandReceipts.set(seat.id + ":" + command.id, match);
+      adopted.add(command.id);
     }
     const batchReceipt = await lookupReceipts(room, "batch", [key]);
     for (const command of commands) {

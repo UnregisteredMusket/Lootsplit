@@ -574,27 +574,29 @@ export async function lookupReceipts(
 export async function lookupCommandIdReceipts(
   room: CloudRoom,
   ids: string[],
-): Promise<Map<string, { key: string; hash: string | undefined }>> {
-  const found = new Map<string, { key: string; hash: string | undefined }>();
+): Promise<Map<string, Array<{ key: string; hash: string | undefined }>>> {
+  const found = new Map<string, Array<{ key: string; hash: string | undefined }>>();
   const wanted = new Set(ids);
   if (!wanted.size) return found;
   const idOf = (key: string) => key.slice(key.indexOf(":") + 1);
-  for (const r of bodyReceipts(room))
-    if (r.kind === "command" && wanted.has(idOf(r.key)) && !found.has(idOf(r.key)))
-      found.set(idOf(r.key), { key: r.key, hash: r.hash });
+  const add = (key: string, hash: string | undefined) => {
+    const list = found.get(idOf(key)) ?? [];
+    if (!list.some((r) => r.key === key)) list.push({ key, hash });
+    found.set(idOf(key), list);
+  };
+  for (const r of bodyReceipts(room)) if (r.kind === "command" && wanted.has(idOf(r.key))) add(r.key, r.hash);
   const db = database();
-  const missing = [...wanted].filter((id) => !found.has(id));
+  const ask = [...wanted];
   // D1 binds at most 100 parameters per query: code + up to 90 IDs per lookup.
-  for (let i = 0; db && i < missing.length; i += 90) {
-    const chunk = missing.slice(i, i + 90);
+  for (let i = 0; db && i < ask.length; i += 90) {
+    const chunk = ask.slice(i, i + 90);
     const rows = await db
       .prepare(
         `SELECT key, hash FROM campaign_room_receipts WHERE code=? AND kind='command' AND substr(key, instr(key, ':') + 1) IN (${chunk.map(() => "?").join(",")})`,
       )
       .bind(room.code, ...chunk)
       .all<{ key: string; hash: string | null }>();
-    for (const row of rows.results)
-      if (!found.has(idOf(row.key))) found.set(idOf(row.key), { key: row.key, hash: row.hash ?? undefined });
+    for (const row of rows.results) add(row.key, row.hash ?? undefined);
   }
   return found;
 }

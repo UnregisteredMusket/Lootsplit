@@ -354,9 +354,7 @@ test("shared room: the recap posts once, a replay changes nothing, and the serve
   assert.equal(recapEntries(again).length, 1);
   assert.deepEqual(recapEntries(again), recapEntries(first));
   const refused = await submitCommands({ code: dm.code, token: aria.token, batchId: "forge", commands: [{ ...share(session.id, "Forged"), id: recapEntryId(session.id) + "x".repeat(0), purseId: "aria" }] }).catch((e: Error) => e.message);
-  // The forged command reuses the DM's action ID, so the room refuses it as a conflicting
-  // action before the engine runs (receipts are per campaign and action ID: audit A2).
-  assert.match(String(refused), /Only the DM|already shared|conflicting changes/);
+  assert.match(String(refused), /Only the DM|already shared/);
   const playerView = (await roomState({ code: dm.code, token: aria.token })).table;
   assert.equal(recapEntries(playerView)[0]?.text, "The vault is ours.");
 });

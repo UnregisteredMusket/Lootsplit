@@ -121,3 +121,23 @@ test("a loan or payment request whose ID already exists is refused; one row stay
   assert.throws(() => applyCommand(t, dmSeat, { ...loan, purseId: "bram" }), /already identifies/);
   assert.throws(() => applyCommand(t, dmSeat, { ...request, purseId: "bram" }), /already identifies/);
 });
+
+// Review of PR 488: a receipt under another seat counts only for exactly the same action, so a
+// seat that commits something else under an ID it predicted cannot block the other seat's action.
+test("another seat's different action under the same ID never blocks or replaces this seat's", async () => {
+  const dm = await openRoom({ name: "Grief DM", table: campaign() });
+  const aria = await joinRoom({ code: dm.code, purseId: "aria", name: "Aria" });
+  const bram = await joinRoom({ code: dm.code, purseId: "bram", name: "Bram" });
+  await choosePace({ ...dm, live: true });
+  const give = (id: string, copper: number) => ({ id, kind: "give" as const, fromId: "aria", toId: "bram", copper, holdingId: null, quantity: 0 });
+  await submitCommands({ code: dm.code, token: aria.token, batchId: "a0", commands: [give("pass-x-0", 10)] });
+  // Bram sees X-0 and commits a harmless message under the next ID first.
+  await submitCommands({ code: dm.code, token: bram.token, batchId: "b1", commands: [{ id: "pass-x-1", kind: "message", to: "party", purseId: "bram", text: "Mine now" }] });
+  await submitCommands({ code: dm.code, token: aria.token, batchId: "a1", commands: [give("pass-x-1", 20)] });
+  const t = (await roomState(dm)).table;
+  assert.equal(wallet(t, "bram"), 5_030, "Aria's second action applied");
+  assert.equal(t.notes.filter((n) => n.id === "pass-x-1").length, 1, "Bram's message stays");
+  // Aria's retry of her action is still a no-op under her own receipt.
+  await submitCommands({ code: dm.code, token: aria.token, batchId: "a1-retry", commands: [give("pass-x-1", 20)] });
+  assert.equal(wallet((await roomState(dm)).table, "bram"), 5_030);
+});

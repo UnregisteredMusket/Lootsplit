@@ -463,3 +463,18 @@ test("deleting a pooled item or a character drops its open claims, on the device
   const device = await economySnapshot();
   assert.deepEqual(left(device as CloudTable), expected);
 });
+
+test("other characters' claims never show the action ID that made them; Pass-all sub IDs are unpredictable", async () => {
+  const { projectRecord } = await import("./session-records.ts");
+  const { subCommandId } = await import("./command-id.ts");
+  const t = marked(campaign(), [["potion", "aria", "need"], ["potion", "bram", "greed"]]);
+  const view = readLootClaims(projectRecord(t, seat("aria")));
+  const real = new Map(readLootClaims(t).claims.map((c) => [c.purseId, c.commandId]));
+  assert.equal(view.claims.find((c) => c.purseId === "aria")!.commandId, real.get("aria"));
+  const other = view.claims.find((c) => c.purseId === "bram")!;
+  assert.notEqual(other.commandId, real.get("bram"));
+  assert.deepEqual(readLootClaims(projectRecord(t, seat("aria"))), view, "the stand-in is stable");
+  assert.equal(subCommandId("action-1", "0"), subCommandId("action-1", "0"), "a retry reuses it");
+  assert.notEqual(subCommandId("action-1", "1"), subCommandId("action-1", "0"));
+  assert.ok(!subCommandId("action-1", "1").includes("action-1"));
+});

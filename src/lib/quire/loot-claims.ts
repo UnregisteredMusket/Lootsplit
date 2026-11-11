@@ -733,9 +733,13 @@ export function projectLoot(
     const lots = new Set(projected.holdings.filter((h) => h.pool).map((h) => h.id));
     const pointer = state.rotation?.lastPurseId;
     journal.lootClaims = {
-      claims: state.claims.filter(
-        (c) => seat.purseIds.includes(c.purseId) || (inParty && lots.has(c.holdingId) && shown(c.purseId)),
-      ),
+      // Another character's claim shows its choice, never the action ID that made it (a known ID
+      // let a seat predict and block related action IDs: review of PR 488). The stand-in is stable.
+      claims: state.claims
+        .filter(
+          (c) => seat.purseIds.includes(c.purseId) || (inParty && lots.has(c.holdingId) && shown(c.purseId)),
+        )
+        .map((c) => (seat.purseIds.includes(c.purseId) ? c : { ...c, commandId: `claim-${hash(c.commandId)}` })),
       ...(inParty && pointer && playerCharacter(table, pointer) ? { rotation: { lastPurseId: pointer } } : {}),
     };
   }
