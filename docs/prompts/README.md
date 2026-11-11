@@ -4,13 +4,14 @@ Ready-to-use prompts for future Lootsplit development sessions. Copy a prompt (G
 
 Findings and line numbers age as `main` moves. Every prompt tells the agent to re-check each item against current code before changing it. When a prompt's work is done, update its status here rather than deleting it, so the record stays.
 
-| # | Prompt | Source | Status (updated 2026-10-23) |
+| # | Prompt | Source | Status (updated 2026-11-11) |
 | --- | --- | --- | --- |
 | 1 | [Fix the bugs from the October 22 review](#1-fix-the-bugs-from-the-october-22-review) | Read-only code review of `main` at `5d77d25`, re-checked at `b325758` | Done: P1–P10 merged in #160–#185 (2026-10-22), including the estate repair #171 and P10 follow-ups #185 |
-| 2 | [Make Lootsplit split loot, then expand the item and session tools](#2-make-lootsplit-split-loot-then-expand-the-item-and-session-tools) | Feature analysis of the same review | In progress: Phase 1 even coin split (#230) and Phase 2 treasure pool and claims (#238) merged and live 2026-10-23; Phase 3 fairness ledger (#257) live. Phases 4–6 not started; they follow `docs/FOOTPRINT.md` (owner, 2026-11-01). Related, outside this prompt: map Place hub (#228, #232), journey planner (#235, #243), services wave 1 (#247, #249–#251) |
+| 2 | [Make Lootsplit split loot, then expand the item and session tools](#2-make-lootsplit-split-loot-then-expand-the-item-and-session-tools) | Feature analysis of the same review | Done: Phase 1 even coin split (#230), Phase 2 treasure pool and claims (#238), Phase 3 fairness ledger (#257), Phases 4–6 sell-and-split, attunement/identification/charges, XP, session recap and exports (#407, #408, #413–#421). Related, outside this prompt: map Place hub (#228, #232), journey planner (#235, #243), services wave 1 (#247, #249–#251), factions (#438–#441) |
 | 3 | [Implement the website design review](#3-implement-the-website-design-review) | Website design review, 2026-10-23 (Lighthouse, NN/g, Google Search Central, five comparable TTRPG sites) | In progress: W1–W8 merged (#219, #220, #222, #223, #225); W9 demo waits on the owner's decision |
+| 4 | [Fix the findings of the November 10 full audit](#4-fix-the-findings-of-the-november-10-full-audit) | Read-only full audit of `main` at `2386e62` (`docs/audit/2026-11-10-full-audit.md`) | In progress (2026-11-11): being executed; see claude/shared-status.md |
 
-Prompt 1 is complete, and prompt 2 is under way. It's kept below as the record of what was asked; line numbers in it refer to `5d77d25`.
+Prompts 1 and 2 are complete, prompt 3 waits only on the W9 decision, and prompt 4 is under way. Each is kept below as the record of what was asked; line numbers in prompt 1 refer to `5d77d25` and in prompt 4 to `2386e62`.
 
 ## 1. Fix the bugs from the October 22 review
 
@@ -676,4 +677,134 @@ Build only the approved option.
 - Paid tiers, ads or analytics scripts.
 - Google Play publishing, which needs its own plan and owner approval.
 - Changing the Android widget's website link (P2-1 in the domain audit), which ships with the next APK.
+````
+
+## 4. Fix the findings of the November 10 full audit
+
+````markdown
+# Fix the findings of the November 10, 2026 Lootsplitter audit
+
+Repo: github.com/UnregisteredMusket/Lootsplit (attach with push access and clone it).
+Live: https://lootsplitter.com (legacy host lootsplit.oliverstorie2017.workers.dev still serves the Android app and owner widget).
+
+A read-only audit of `main` at `2386e62` found the items below; the full table is `docs/audit/2026-11-10-full-audit.md`. Your job is to fix them, one topic per branch, in the order given.
+
+## Before you start
+
+1. **Read the guides.** Read `CLAUDE.md` in full; every non-negotiable rule applies. Read the project doc `claude/shared-status.md` and claim the branch you take there. Read the audit report.
+2. **Re-check against current `main`.** Line numbers refer to `2386e62`. If a finding no longer reproduces, say so in the PR and skip it.
+3. **Reproduce before fixing.** Each item gives the repro to encode as a failing test (unit or API test on the SQLite D1 stand-in, `scripts/account-dev-db.mjs`; a browser audit for what people click). Commit the test with the fix.
+4. **Money and inventory** change only through authoritative commands with revision checks and idempotent IDs. Any change to `commands.ts` gets the same change in `economy.ts` and a parity test. Amounts stay whole copper.
+5. **Privacy branches** get the `privacy-reviewer` subagent before merge.
+6. **Old clients.** Android 1.14 (protocol 11), 1.16 (19) and 1.19 (31) are in use. A new command field needs a protocol step and old-client handling in `tabletop-protocol.ts`. Old saves and backups stay readable.
+7. **Every user-visible change** gets a Help review (`content.ts`, `player-content.ts`) and a website changelog note. Answer the footprint questions when a PR stores more or adds request-path work. Migrations are additive only.
+8. **Stop and ask the owner** on every item marked OWNER DECISION, and before anything that removes, hides or reduces a feature. Never test on real campaigns; production D1 is read-only.
+
+---
+
+## Branch 1: `fix/hidden-names-privacy` (P0: B1, B2, B3)
+
+**B1 — Activity lines name hidden shops, stock and places.** `session-records.ts:596` sends a player every event without a `purseId`. `commands.ts:617-621, 665, 707, 787, 1248, 1783-1794` write such events with names and prices.
+- Repro test: room with DM and a player; a black-market shop in another city with a stock line; DM saves the shop, reprices the line, restocks, sets a schedule, saves a new place. Assert the player's `roomState` (protocols 11 and 33) and archived report contain no event text naming a shop, stock line or place absent from that same projection.
+- OWNER DECISION before coding: (a) hide the line when its shop or place is hidden from that player (recommended), (b) make all such lines DM-only, (c) keep a generic line without names.
+- Fix direction: default-deny. Events carry `shopId`/`locationId`/`npcId` or `dmOnly`; the projection checks them against the seat's projected sets. Review every `journal.events.push` site (about 30 more in estate, finance, quests, journeys, blacksmith), not only the seven cited. Mirror `economy.ts:600, 840`.
+
+**B2 — `give` names a hidden recipient and lets a player pay a purse they cannot see.** `commands.ts:1429, 1476-1477`.
+- Repro test: hidden NPC purse; DM gives 500 cp to it; assert no player note names it. Player `give` of 1 cp to that purse ID is refused with the same text as an unknown ID and moves nothing. Repeat for an exchange treasury and an item transfer.
+- Fix: recipient must be in the non-DM seat's projection; the note goes to the DM only when the recipient is unreadable (as `coin-split` `:1552` does).
+
+**B3 — Barter refusals name hidden NPCs.** `npc-barter.ts:255-256, 488`; `world.ts:649`.
+- Repro test: import three NPCs (visible, hidden, elsewhere, one with barter off). As a player, quote and offer against each ID: every non-visible one answers exactly "This NPC is no longer here."
+- Fix: generic refusal first for non-DM seats; new imported NPC IDs derived from a hash of command ID and index (existing IDs unchanged, replays stay idempotent).
+
+## Branch 2: `fix/ban-rejoin` (P0: B4) — OWNER DECISION first
+
+`cloud.server.ts:356` checks `blockedUsers` only for a signed-in account; the invitation session (`:282`) is never rotated; `cloudflare/accounts.mjs:274+` ignores `blockedUsers`.
+- Repro test: account joins a character and is banned; signed out with the same link, joining another unclaimed character must be refused; linking that seat to the banned account must be refused.
+- Options: (a) rotate the invitation link on kick and ban, seated players unaffected (recommended), (b) hold new guest joins for DM approval after a ban, (c) keep and document.
+
+## Branch 3: `fix/faction-sale-loop` (P0: A1) — OWNER DECISION first
+
+`factions.ts:383` `return 1 / factionBuyRate(effects);`, `price-breakdown.ts:354`.
+- Repro test (through `submitCommands` as a player): default faction, party Idolized, shop buy rate 0.75, unlimited stock; buy then sell one 500 cp item; assert the purse never ends above where it started. Add the two-faction case at buy rate 0.5 and a custom −90% tier.
+- Options: (1) cap a sale's unit payout at what the same shop would charge that seller now (recommended), (2) apply standing to buying only, (3) keep and warn the DM.
+- Keep `shopSale` as the one price path; update the price breakdown line and Help.
+
+## Branch 4: `fix/expected-price` (P1: C2) — OWNER DECISION first
+
+`commands.ts:269-270`: `buy` and `sell` carry no expected price.
+- Repro tests (Live room): rope shown at 100 cp, DM reprices to 3,000, the stale `buy` must be refused and charge nothing; buy rate cut 0.5 → 0.01, the stale `sell` refused; shop-list swap reusing the `lineId` for a different item, refused.
+- Options: (1) optional `expect` (unit copper, plus item name on `buy`) under a new protocol, refuse on mismatch with "The price changed. Review it again; nothing was charged." (recommended), (2) keep and document, (3) refuse only when the price moved against the player.
+- Also send `before` from the market board (`economy-context.tsx:1274`). Old clients keep today's behaviour.
+
+## Branch 5: `fix/client-lost-edits` (P0–P3: D3 first, then D1, D2, D4–D7, C4)
+
+- **D1** `campaign-gate.tsx:79-106`: demote to the Welcome screen and clear `lootsplit.offline-owner` only on a positive "no session" (200 null, 401, 403). On network error, 5xx or 429 keep device-owner access, show a notice with Retry, re-check on `online` and focus. Browser audit: abort `auth/get-session` once on reload; the campaign stays.
+- **D2** `party-inventory.tsx:876-888`: depend on `[holding?.id]`. Audit: type in the edit dialog, fire a window `focus`, text remains.
+- **D3 (P0)** `shop-content.tsx:662, 675`: controlled drafts that follow the line when not dirty; the stock edit goes through a command whose `before` is the value the field showed at focus (today the client refreshes `before` just before sending, so the stale check never fires). Tests: a room test where a stale quantity, price or name edit is refused; a browser audit with Edit open, stock sold and repriced elsewhere, tab through the row, stock and price unchanged.
+- **D4** `party.tsx:836-838`, **D6** `service-providers.tsx:686`: same dirty-guard.
+- **D5** record-keyed forms (`downtime-activities.tsx:103`, `npc-barter-desk.tsx:73`, and the 12 sites listed in the report): key by record ID so the success notice survives.
+- **D7** `npc-barter-desk.tsx:405`: show the error.
+- **C4** `cloud-client.ts`: no notifications before the first response after a resume; pass `sessionId` in `resumeAccountMembership`.
+
+## Branch 6: `fix/ci-stability` (P1–P3: G5, G3, G12, I3, G4, G14, G11)
+
+- **G5** Run `node scripts/web-changelog.mjs freeze` first, alone, in its own PR. Then automate it weekly and replace the per-pair `git merge-base` scan with a binary search (main is linear). Test: stamping 200 notes × 300 deploys spawns under 2,500 processes.
+- **G3** `dice-3d-table-browser-audit.mjs:106-108`, `dice-3d-browser-audit.mjs:43-58`: arm `settledCaption` before every click, or add a test hook that disables auto-dismiss.
+- **G12** split `returning-player` (`account.spec.mjs:905-1041`) at "reopened"; keep every assertion and both deadlines.
+- **I3** `design-tokens.mjs:38-43`: ignore `//` comments and non-colour strings in `.ts/.tsx`. Tests: `// Regression for #465`, `"see #456"`, `href="#add"` count zero.
+- **G4** four map audits: capture the Undo toast before any poll.
+- **G14** `code-health.yml`: cancel in progress only off main. **G11**: skip `cancelled` when a newer run exists; add code-health and the two performance workflows.
+- **G1** OWNER DECISION: require up-to-date branches or a merge queue.
+
+## Branch 7: `fix/signin-and-signup-abuse` (P1–P3: H3, H1, H5, H2, H10) — OWNER DECISIONS
+
+- **H3** `signin-throttle.mjs:38, 54`. Repro test: with one wrong password per expired wait from address A, a correct password from address B must succeed. Recommended: key on email plus network with a higher email-only ceiling.
+- **H1** Turnstile skipped for app origins (`accounts.mjs:338`, `turnstile.mjs:45`). Recommended: a much smaller credential allowance for app-origin requests.
+- **H5** sign-up reveals registered emails. Recommended: a low per-IP cap on duplicate-email replies.
+- **H2** no site-wide storage guard. Recommended: refuse new account backups and character uploads (never play) past a set share of the database, and alert the owner.
+- **H10** `accounts.mjs:833-838`: `Object.hasOwn`; assert `captcha.required` in `live-release-audit.mjs`.
+
+## Branch 8: `fix/money-edges` (P2–P3: A2, A4, A5, A6, A7, A9, A10, I1, I2)
+
+- **A2** key receipts by campaign and command ID; refuse a `loan`/`payment-request` whose ID exists. Test: give with ID X, end session, leave, rejoin, resubmit X: applied once.
+- **A4** `finance.ts:409` use `creditCoins`. Test: a loan credit keeps pp and ep.
+- **A5** separate "not enough coins" message. **A6** refuse `set-coins` above 1e12 cp unless lowering. **A7** integer permille in `service-core.ts`.
+- **A9** OWNER DECISION: after a swap back, should undoing a purchase raise the shelf above the list?
+- **A10** device deletes drop the item's and character's loot claims.
+- **I1** `merchant.ts:47`: delete the second formula; `projectMerchantPurse` calls `shopSale(…).unit`. Test with a market event, a faction rate and a settlement cap.
+- **I2** `service-talk.tsx:1456`: send the `message` command when joined; shared-room audit asserts a second seat receives the rumour.
+
+## Branch 9: `fix/old-clients-and-deletion` (P2–P3: C1, E6, E7, C3, C5, H7, A8)
+
+- **C1** `tabletop-protocol.ts:1416-1431`: refuse the eight missing kinds for older clients. Test derives "kinds unknown to protocol P" from a checked-in list for 11, 19, 31 and asserts each is refused. **E7**: say "unfinished actions". **E6**: Help and Downloads say what Android 1.19.0 cannot do.
+- **C3** OWNER DECISION (deletes stored data): delete `campaign_room_images` and `campaign_room_receipts` in the deletion batch; check `play_policies`, `play_rolls`, `dm_encounters`. **C5**: specific refusal messages.
+- **H7** store account backups through the parts path or refuse above the row limit with a size message. Test on a stand-in that enforces a 2 MB row.
+- **A8** OWNER DECISION: route the legacy player-link trades through the shared engine (recommended).
+
+## Branch 10: `fix/release-workflows` (P2–P3: G6, G8, G9, G10, G13, G2, H9)
+
+- **G6** wrap the second live audit in `recovery-step.mjs`. OWNER DECISION on failure: stay live and flag "live, unaudited" (recommended) or roll back.
+- **G8** look up `releases/tags/android-v<version>` directly. **G10** own concurrency group for the backup.
+- **G9** OWNER DECISION: pin the Android release to its own commit (recommended) or freeze merges.
+- **G13** validate the backup against the live commit's migrations. OWNER DECISION: a second backup store.
+- **G2** on a dice mismatch hide the dice and show the caption; add a 200-roll soak.
+- **H9** `npm ci --ignore-scripts` in `release-apk`; build in a job without the keystore.
+
+## Branch 11: `perf/queries-cron-bundle` (P2–P3: F1–F7, F11, G7)
+
+- **F1, F3, F11**: one additive migration with the indexes in the report; a `query-indexes.test.mjs` case per query.
+- **F2** stop retrying `OUTSIDE_RECOVERY_RETENTION` slots; attempt counter with backoff. **F7** register built-in logs only when the count differs. **G7** flag the 100-run gap only when runs were actually missed.
+- **F4** recount statistics in the 30-minute collector; the public route sums the cache.
+- **F5** move `APP_DESCRIPTION` out of Help; lazy `/welcome` and `/help`; load the icon catalogue on demand. Record the shell size before and after.
+- **F6** add factions, settlements, shop lists and market events to the footprint fixture and re-baseline with a reason. OWNER DECISION: a 400 KB cap on faction saves.
+
+## Branch 12: `docs/catch-up` (P2–P3: E1, E2, E3, E4, E5, E8)
+
+- **E1** add the missing features to `feature-catalog.ts`. **E2, E3** correct the prompt table, `DOMAIN-READINESS.md`, `README.md`. **E5** de-duplicate the `new-name` topic.
+- **E4** OWNER DECISION: explain on Android that the TV display opens from a browser (recommended). **E8** OWNER DECISION: rewrite old Android changelog entries or leave them.
+
+## Backlog (P3, no order): I4–I12, H4, H6, H8, F8, F10
+
+One branch each when convenient; see the report. I10 (unused files and packages) and F8 are OWNER DECISIONS.
 ````
