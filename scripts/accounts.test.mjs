@@ -388,6 +388,38 @@ test("sign-up tells one network that an email is registered only a few times a d
   }
 });
 
+test("the storage guard refuses new backups, characters and map images through the API, never reads (audit 2026-11-10 H2)", async () => {
+  const { DB, env, call, signup } = setup();
+  globalThis.__env__ = env;
+  try {
+    const dm = await signup("guard-api@example.com");
+    const kept = await call("character", { name: "Kept" }, dm.cookie);
+    assert.equal(kept.response.status, 200);
+    const now = Date.now();
+    await DB.prepare("INSERT OR IGNORE INTO owner_monitor_registry(id,body,registered_at) VALUES('cloudflare-usage','{}',0)").run();
+    await DB.prepare("INSERT INTO owner_monitor_logs(id,source,observed_at,collected_at,summary,body) VALUES('usage:guard','cloudflare-usage',?,?,'usage',?)")
+      .bind(now, now, JSON.stringify({ usage: { state: "ready", checkedAt: now, data: { metrics: [{ key: "d1StorageBytes", state: "ready", current: { value: 4_200_000_000 } }] } } }))
+      .run();
+    const payload = { kind: "quire", version: 2, purses: [], holdings: [], ledger: [], shops: [], stock: [] };
+    for (const [path, body] of [
+      ["backup", { name: "Guarded", payload }],
+      ["character", { name: "Guarded" }],
+      ["map-assets", { request: { action: "begin", manifest: { id: "x" } } }],
+    ]) {
+      const r = await call(path, body, dm.cookie);
+      assert.equal(r.response.status, 507, `${path}: ${JSON.stringify(r.data)}`);
+      assert.match(r.data.error, /online storage is nearly full/);
+    }
+    const library = await call("library", undefined, dm.cookie);
+    assert.equal(library.response.status, 200);
+    assert.deepEqual(library.data.characters.map((c) => c.name), ["Kept"]);
+    assert.equal((await call("remove", { kind: "character", id: kept.data.id }, dm.cookie)).response.status, 200);
+  } finally {
+    delete globalThis.__env__;
+    DB.close();
+  }
+});
+
 test("recovery rotates the key, revokes sessions and rejects replay", async () => {
   const { DB, call, signup } = setup();
   try {

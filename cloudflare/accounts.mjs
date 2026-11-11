@@ -597,8 +597,12 @@ export async function handleAccounts(request, env, context = null) {
       return cors(json(await saveAnnouncement(db, userId, body, session.session.id)));
     if (path === "/api/account/owner/test-mode" && request.method === "POST")
       return cors(json(await ownerTestMode(db, userId, body, session.session.id)));
-    if (path === "/api/account/map-assets" && request.method === "POST")
+    if (path === "/api/account/map-assets" && request.method === "POST") {
+      // A new map image starts a new online backup's upload: the storage guard (audit H2)
+      // refuses it before any part is stored. Reads and unfinished uploads are not affected.
+      if (body?.request?.action === "begin" && !body.record) await assertStorageOpen(db);
       return cors(json(await accountMapAsset(db, userId, body)));
+    }
     if (path === "/api/account/records" && request.method === "GET") {
       // Streamed one archived session at a time (campaign-records.mjs); refusals come first.
       const records = await campaignRecordsStream(db, userId, tabletopHeader(request));
