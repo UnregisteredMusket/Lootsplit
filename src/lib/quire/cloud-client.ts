@@ -349,7 +349,16 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
   };
   const same = sameView(previous, candidate);
   if (!same) view = candidate;
-  if (!same && previous.joined && view.joined) {
+  // Notices compare two room responses of the same room. A reload publishes the saved session
+  // with no seats before the first response (resumeTable), and an "unchanged" poll carries none:
+  // that first full response is not a join, a mode change or a new turn (audit 2026-11-10 C4).
+  if (
+    !same &&
+    previous.joined &&
+    view.joined &&
+    previous.seats.length > 0 &&
+    previous.code === view.code
+  ) {
     if (previous.live !== view.live)
       notify("Mode changed", view.live ? "Live Mode" : "Turn-based Mode", "mode");
     if (!previous.mine && view.mine && !view.live)
@@ -1679,6 +1688,9 @@ export async function resumeAccountMembership(
     remember({
       code: member.code,
       userId: member.userId,
+      // The play session too: resumeTable publishes it before the first room response, so
+      // feature screens keyed by it do not remount when that response lands (audit C4).
+      ...(remote.sessionId ? { sessionId: remote.sessionId } : {}),
       token: member.token,
       seatId: remote.seatId,
       role,

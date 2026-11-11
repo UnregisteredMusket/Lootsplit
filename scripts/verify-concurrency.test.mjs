@@ -13,3 +13,12 @@ test("main verification is never cancelled by a later merge; PR runs still resta
   assert.match(release, /workflows: \[Verify preserved functionality\]/);
   assert.match(release, /github\.event\.workflow_run\.conclusion == 'success'/);
 });
+
+// Code health scans on main were cancelled by the next merge (audit G14, 2026-11-10): each main
+// commit keeps its own scan, while a newer push still replaces a pull request's.
+test("main code-health scans are never cancelled by a later merge; PR runs still restart", () => {
+  const workflow = readFileSync(".github/workflows/code-health.yml", "utf8");
+  const block = workflow.match(/^concurrency:\n((?: {2}.*\n)+)/m)?.[1] ?? "";
+  assert.match(block, /group: code-health-\$\{\{ github\.ref \}\}/);
+  assert.match(block, /cancel-in-progress: \$\{\{ github\.ref != 'refs\/heads\/main' \}\}/);
+});

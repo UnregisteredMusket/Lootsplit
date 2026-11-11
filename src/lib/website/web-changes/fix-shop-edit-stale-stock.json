@@ -1,0 +1,10 @@
+{
+  "title": "Shop Edit no longer puts sold stock or old prices back",
+  "summary": "A shop left open on Edit while an item sold or was repriced elsewhere could write the old quantity, price or name back when you tabbed through its row. Edit's boxes now show the current values and save only what you type.",
+  "items": [
+    "The name, price and quantity boxes follow sales and price changes made on another device or tab while Edit is open.",
+    "Tabbing through a row without typing saves nothing.",
+    "If the item changed elsewhere after you started typing, your change is refused, the shop is unchanged, and the message says what the item is now. Shared rooms refuse it the same way."
+  ],
+  "audience": "dm"
+}

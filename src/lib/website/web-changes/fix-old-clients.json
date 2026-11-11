@@ -1,0 +1,10 @@
+{
+  "title": "Older Android apps ask to update instead of failing to load a shared turn",
+  "audience": "android",
+  "summary": "When the DM or a player has an unfinished turn from the website that an older Android app can't read, the app now says so and asks you to finish it on the website, instead of failing to load the campaign.",
+  "items": [
+    "Covers coin postings and edits, Make change, Sell and split, Use and Recharge, and attunement on Android 1.16.0 and earlier.",
+    "The message now says unfinished actions, not only map actions.",
+    "Downloads and Help say Android 1.19.0 has no shop lists or settlement sale and rarity limits; use the website for these."
+  ]
+}

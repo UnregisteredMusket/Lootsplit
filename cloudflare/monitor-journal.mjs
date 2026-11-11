@@ -53,6 +53,9 @@ const REPORT_SECTION_FLOOR = 25;
 // Failed report generation backs off 1, 2, 4 … 32 minutes; after this many attempts an
 // explicitly failed placeholder lets later days continue. Generate previous day retries it.
 const REPORT_MAX_ATTEMPTS = 6;
+// Provider-history retries for one slot wait 30 min × 2^n, up to 32 hours, until it is recovered or
+// passes the provider's retention (89 days), when the gap is recorded and retries stop.
+const HISTORY_BACKOFF_STEPS = 6;
 // Custom (non-built-in) registry entries; each adds work to every daily report.
 const REGISTRY_CUSTOM_LIMIT = 50;
 // Log rows stamped with a half-hour slot (window end) rather than an observation instant.
@@ -211,6 +214,18 @@ async function batches(db, statements) {
   for (let i = 0; i < statements.length; i += 40) await db.batch(statements.slice(i, i + 40));
 }
 export async function initializeMonitor(db, now = Date.now()) {
+  // Runs several times a minute (cron, collection, telemetry), so the steady state is one read:
+  // the stored settings and how many current built-in logs are registered. The writes below run
+  // only when the settings or any built-in log (a new one included) are missing (audit F7).
+  const builtinIds = [...new Set(BUILTIN_LOGS.map(([id]) => id))];
+  const stored = await db
+    .prepare(
+      "SELECT (SELECT body FROM owner_monitor_config WHERE id=1) AS body,(SELECT COUNT(*) FROM owner_monitor_registry WHERE id IN (SELECT value FROM json_each(?))) AS registered",
+    )
+    .bind(JSON.stringify(builtinIds))
+    .first();
+  if (stored?.body != null && stored.registered === builtinIds.length)
+    return config(decode(stored));
   await run(
     db,
     "INSERT OR IGNORE INTO owner_monitor_config VALUES(1,?,?)",
@@ -2422,7 +2437,9 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
     }
   const interrupted = await rows(
     db,
-    "SELECT slot FROM owner_monitor_intervals WHERE outcome IN ('collecting','failed') AND slot<? AND (lease_until IS NULL OR lease_until<?) ORDER BY slot LIMIT 2",
+    // `outcome<>'complete'` matches the partial index owner_monitor_intervals_open (audit F3), so
+    // the minute cron reads only unfinished intervals instead of the whole history.
+    "SELECT slot FROM owner_monitor_intervals WHERE outcome<>'complete' AND outcome IN ('collecting','failed') AND slot<? AND (lease_until IS NULL OR lease_until<?) ORDER BY slot LIMIT 2",
     slot,
     now,
   );
@@ -2449,11 +2466,15 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
     );
   }
   if (options.integrations !== false && env.OWNER_MONITOR_CLOUDFLARE_TOKEN) {
+    // Oldest slot whose traffic may still be recovered and whose retry is due (audit F2, F3). A
+    // slot past the provider's retention is recorded once and never asked again; other failures
+    // wait 30 minutes, then twice as long each time (capped), so a few failing slots cannot
+    // starve the rest. Rows from before the retry field wait 30 minutes after their last attempt.
     const historical = await db
       .prepare(
-        "SELECT slot,outcome,body FROM owner_monitor_intervals WHERE (outcome='missed' OR (outcome='partial' AND COALESCE(json_extract(body,'$.sources.traffic.state'),'unavailable')!='ready' AND COALESCE(json_extract(body,'$.historicalTraffic.state'),'unavailable')!='ready')) AND COALESCE(json_extract(body,'$.historyAttemptAt'),0)<? ORDER BY slot LIMIT 1",
+        "SELECT slot,outcome,body FROM owner_monitor_intervals WHERE outcome<>'complete' AND (outcome='missed' OR (outcome='partial' AND COALESCE(json_extract(body,'$.sources.traffic.state'),'unavailable')!='ready' AND COALESCE(json_extract(body,'$.historicalTraffic.state'),'unavailable')!='ready')) AND COALESCE(json_extract(body,'$.historicalTraffic.errorCode'),'')<>'OUTSIDE_RECOVERY_RETENTION' AND COALESCE(json_extract(body,'$.historyRetryAt'),COALESCE(json_extract(body,'$.historyAttemptAt'),0)+?)<=? ORDER BY slot LIMIT 1",
       )
-      .bind(now - INTERVAL)
+      .bind(INTERVAL, now)
       .first();
     if (historical) {
       const traffic =
@@ -2469,13 +2490,21 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
               end: historical.slot,
             });
       const original = decode(historical);
+      const historyAttempts = (Number(original.historyAttempts) || 0) + 1;
       const recoverySummary =
         traffic.state === "ready"
           ? `Recovered ${traffic.data.requests} requests and ${traffic.data.errors} errors for the half-hour ending ${new Date(historical.slot).toISOString()} from provider history. Other unavailable source observations remain gaps.`
-          : "Historical traffic could not be recovered; the original coverage gap remains.";
+          : traffic.errorCode === "OUTSIDE_RECOVERY_RETENTION"
+            ? "Provider history no longer covers this half-hour, so its traffic cannot be recovered; the coverage gap is permanent and recovery stopped."
+            : "Historical traffic could not be recovered; the original coverage gap remains.";
       const body = {
         ...original,
         historyAttemptAt: now,
+        historyAttempts,
+        historyRetryAt:
+          traffic.state === "ready" || traffic.errorCode === "OUTSIDE_RECOVERY_RETENTION"
+            ? null
+            : now + INTERVAL * 2 ** Math.min(historyAttempts - 1, HISTORY_BACKOFF_STEPS),
         historicalTraffic: traffic,
         originalObservationAt: original.observedAt || null,
         recoverySummary,

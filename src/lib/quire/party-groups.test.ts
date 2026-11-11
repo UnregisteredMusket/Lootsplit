@@ -476,7 +476,7 @@ test("protocol 10: older apps get one party at the main group's place and keep g
   );
   // Pending drafts with group commands ask older apps to finish on the updated website.
   const draft = JSON.stringify([{ id: "x", kind: "party-merge", before: "", groupIds: ["main", "riders"], intoLocationId: null }]);
-  assert.throws(() => tabletopResponse({ table: t, draft }, 9), /unfinished map actions/);
+  assert.throws(() => tabletopResponse({ table: t, draft }, 9), /unfinished actions/);
   assert.equal(tabletopResponse({ table: t, draft }, 10).table, t);
 });
 

@@ -161,7 +161,7 @@ test("protocol 17: followView is kept from older clients; their drafts with foll
   assert.equal(readTabletopSession(saved).followView, true);
   assert.equal(readTabletopSession(saved).tvEnabled, true);
   for (const draft of [[{ kind: "map-token-follow" }], [{ kind: "tabletop-session", session: { followView: true } }]])
-    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 16), /unfinished map actions/);
+    assert.throws(() => tabletopResponse({ table: t, draft: JSON.stringify(draft) }, 16), /unfinished actions/);
 });
 
 // Privacy review 2026-10-29 (finding B7): a client older than several session fields matches its

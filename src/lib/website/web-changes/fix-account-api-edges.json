@@ -1,0 +1,9 @@
+{
+  "title": "Online backups of large campaigns now save",
+  "audience": "dm",
+  "summary": "Saving a campaign larger than 2 MB to My account → Backups used to fail with a general error. Large backups are now stored in pieces and download and restore exactly like any other online backup.",
+  "items": [
+    "The per-campaign limit of 3 online backups and your account's backup storage apply as before; a replaced backup is removed only after the new one is completely saved.",
+    "Backups saved earlier read as before."
+  ]
+}

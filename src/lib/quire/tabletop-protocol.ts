@@ -1414,12 +1414,28 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
       // Protocol 25: the black-market markup display setting.
       if (c.kind === "black-market-markup") return true;
       if (protocol && protocol >= ITEM_IDENTITY_PROTOCOL) return false;
-      // Protocol 24: item identification commands.
-      if (c.kind === "item-identify" || c.kind === "item-unidentify") return true;
+      // Protocol 24: item identification commands. Attunement (item-attune, attunement-limit)
+      // shipped without a protocol step; 24 is the first protocol every client of which parses it.
+      if (
+        c.kind === "item-identify" ||
+        c.kind === "item-unidentify" ||
+        c.kind === "item-attune" ||
+        c.kind === "attunement-limit"
+      )
+        return true;
       if (protocol && protocol >= XP_PROTOCOL) return false;
-      // Protocol 21: XP awards, and sheet edits or purse writes that carry XP or milestones.
+      // Protocol 21: XP awards, and sheet edits or purse writes that carry XP or milestones. DM
+      // coin postings and edits, Make change, Sell and split, and item Use and Recharge shipped
+      // without a protocol step while websites declared 19 (Android 1.16.0 at 19 cannot parse
+      // them); 21 is the first protocol every client of which parses them (audit 2026-11-10, C1).
       if (
         c.kind === "xp-award" ||
+        c.kind === "post" ||
+        c.kind === "set-coins" ||
+        c.kind === "coin-exchange" ||
+        c.kind === "sale-split" ||
+        c.kind === "item-use" ||
+        c.kind === "item-recharge" ||
         (c.kind === "character" && advancementText(JSON.stringify([c.before, c.sheet]))) ||
         (c.kind === "patch" &&
           Array.isArray(c.changes) &&
@@ -1521,7 +1537,7 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     })
   )
     throw Error(
-      "This session has unfinished map actions from an updated Lootsplitter client. Finish or resolve those actions on the updated website before resuming this older app. Your saved campaign and pending work are retained.",
+      "This session has unfinished actions from an updated Lootsplitter client. Finish or resolve those actions on the updated website before resuming this older app. Your saved campaign and pending work are retained.",
     );
   // Protocol 29 reads every table field the favor market adds (stripped, kept by the server).
   if (protocol && protocol >= FACTIONS_PROTOCOL) return withImageReferences(value);

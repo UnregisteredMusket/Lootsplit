@@ -62,6 +62,15 @@ const comparison: [string, string, string][] = [
   ],
 ];
 
+/**
+ * What the published APK cannot do yet (audit 2026-11-10, E6). Shown only while that version is
+ * the published one, so it never outlives the release it describes.
+ */
+const APK_GAPS: Record<string, string> = {
+  "1.19.0":
+    "Android 1.19.0 doesn’t have shop lists or settlement sale and rarity limits. In a shared campaign, a sale a settlement’s limit pays less for is refused in that app with a request to update, and the DM doesn’t see the limit’s sale warnings there. Use the website for these.",
+};
+
 export function DownloadsPage() {
   return (
     <Website>
@@ -89,6 +98,7 @@ export function DownloadsPage() {
                 tools; shared rooms connect when you’re online.
               </p>
               <p className="ls-card-summary">{currentChanges.summary}</p>
+              {APK_GAPS[release.version] && <p className="ls-fine">{APK_GAPS[release.version]}</p>}
               <a className="ls-btn ls-btn-ink ls-self-start" href="/download/android">
                 <ArrowDownToLine size={18} aria-hidden="true" /> Download for Android
               </a>

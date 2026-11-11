@@ -241,6 +241,8 @@ export function publicQuote(q: BarterQuote): PublicBarterQuote {
  * The authoritative quote. Throws for an offer that cannot be made at all.
  * `values` are DM per-deal valuations (copper per unit) for goods without a reference price.
  */
+/** The one refusal a player gets for an NPC that is unknown, hidden or not here. */
+const NPC_GONE = "This NPC is no longer here.";
 export function quoteNpcBarter(
   t: CloudTable,
   seat: Pick<CloudSeat, "role" | "id" | "userId">,
@@ -251,9 +253,10 @@ export function quoteNpcBarter(
   const state = readNpcBarter(world);
   const rules = state.rules;
   const npc = world.npcs.find((n) => n.id === input.npcId);
-  if (!npc) throw Error("This NPC is no longer here.");
+  // A player learns nothing about an NPC they cannot see (audit 2026-11-10, B3): presence first,
+  // with one generic refusal, before any reason that names the NPC.
+  if (!npc || (seat.role !== "dm" && !npcAvailableHere(npc, t, actingGroups(t, input.purseId)))) throw Error(NPC_GONE);
   if (!npcAnswersBarter(npc)) throw Error(`${npc.name} doesn't trade on their own. Use Trading & Barter.`);
-  if (seat.role !== "dm" && !npcAvailableHere(npc, t, actingGroups(t, input.purseId))) throw Error(`${npc.name} isn't here right now.`);
   const character = t.purses.find((p) => p.id === input.purseId);
   if (!character || character.kind !== "character" || character.nonParty || character.control === "npc")
     throw Error("Choose one of the party's characters.");
@@ -413,9 +416,11 @@ export function applyNpcBarterCommand(
   };
   const npcOf = (id: string) => {
     const npc = world.npcs.find((n) => n.id === id);
-    if (!npc) throw Error("This NPC is no longer here.");
+    if (!npc) throw Error(NPC_GONE);
     return npc;
   };
+  // The DM is told which NPC is away; a player gets the same text as for an unknown NPC.
+  const notHere = (npc: Npc) => (seat.role === "dm" ? `${npc.name} isn't here right now.` : NPC_GONE);
   let attemptPurse = "";
   const line = (npc: Npc, key: BarterLineKey, vars: Parameters<typeof fillLine>[1] = {}) => ({
     key,
@@ -485,7 +490,7 @@ export function applyNpcBarterCommand(
       throw Error("Only this character's player or the DM can make this offer.");
     if (state.attempts.some((a) => a.id === cmd.id)) throw Error("This offer was already made.");
     const npc = npcOf(cmd.npcId);
-    if (!npcAvailableHere(npc, t, actingGroups(t, cmd.purseId))) throw Error(`${npc.name} isn't here right now.`);
+    if (!npcAvailableHere(npc, t, actingGroups(t, cmd.purseId))) throw Error(notHere(npc));
     barterEligible(t, { left: cmd.give, right: cmd.ask });
     const payer = t.purses.find((p) => p.id === cmd.purseId)!;
     if (toCopper(payer.coins) < cmd.give.copper) throw Error("You can't afford those coins right now.");
@@ -565,7 +570,7 @@ export function applyNpcBarterCommand(
       if (state.rules.cooldownMinutes > 0 && campaignMinute(t) > a.minute + state.rules.cooldownMinutes)
         throw Error("This counter-offer has lapsed. Make a fresh offer.");
       if (cmd.decision === "accept-counter") {
-        if (!npcAvailableHere(npc, t, actingGroups(t, a.purseId))) throw Error(`${npc.name} isn't here right now.`);
+        if (!npcAvailableHere(npc, t, actingGroups(t, a.purseId))) throw Error(notHere(npc));
         settle(a, cmd.id, a.counterCopper);
         a.lines.push(line(npc, "accept"));
       } else a.status = "declined";

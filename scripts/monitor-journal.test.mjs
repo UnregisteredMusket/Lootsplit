@@ -23,6 +23,7 @@ import {
   monitorApi,
   changeRegistryStatus,
   activeSegments,
+  BUILTIN_LOGS,
 } from "../cloudflare/monitor-journal.mjs";
 
 const instant = Date.parse("2026-10-20T12:00:00Z");
@@ -1458,5 +1459,101 @@ test("GitHub workflow coverage is a gap only when runs were actually missed betw
     assert.equal(await gapAt(instant + 3 * INTERVAL), null);
   } finally {
     DB.close();
+  }
+});
+
+test("history recovery records slots outside provider retention once and backs off failing slots (audit F2)", async () => {
+  const DB = localAccountDb();
+  try {
+    await provisionOwner(DB, instant - 1000);
+    await initializeMonitor(DB, instant);
+    const old = instant - 100 * 86400000,
+      recent = instant - INTERVAL;
+    const gap = JSON.stringify({ summary: "Missed scheduled interval.", observedAt: null });
+    for (const slot of [old, recent])
+      await DB.prepare(
+        "INSERT INTO owner_monitor_intervals(slot,outcome,collected_at,body) VALUES(?,'missed',?,?)",
+      )
+        .bind(slot, instant, gap)
+        .run();
+    // The provider fails for the recent slot's window and answers every current collection.
+    const recoveries = [];
+    const fetcher = async (_url, init) => {
+      const { until } = JSON.parse(init.body).variables;
+      if (Date.parse(until) === recent) {
+        recoveries.push(until);
+        return new Response("unavailable", { status: 503 });
+      }
+      return Response.json({
+        data: { viewer: { accounts: [{ workersInvocationsAdaptive: [{ sum: { requests: 3, errors: 0 } }] }] } },
+      });
+    };
+    const env = {
+      DB,
+      OWNER_MONITOR_CLOUDFLARE_TOKEN: "synthetic-read-token",
+      OWNER_MONITOR_CLOUDFLARE_ACCOUNT_ID: "a".repeat(32),
+    };
+    const tick = (at) => scheduledMonitor(env, at, { now: at, fetcher, collector: async () => reading() });
+    const row = async (slot) => {
+      const r = await DB.prepare("SELECT outcome,body FROM owner_monitor_intervals WHERE slot=?").bind(slot).first();
+      return { outcome: r.outcome, body: JSON.parse(r.body) };
+    };
+    await tick(instant);
+    const stopped = await row(old);
+    // Unrecoverable: an explicit gap, never zero, and the slot stays missed.
+    assert.equal(stopped.outcome, "missed");
+    assert.equal(stopped.body.historicalTraffic.errorCode, "OUTSIDE_RECOVERY_RETENTION");
+    assert.equal(stopped.body.historicalTraffic.data, null);
+    await tick(instant + 60000);
+    assert.equal(recoveries.length, 1);
+    // Half an hour later the old slot is not retried; the recoverable one gets the attempt.
+    await tick(instant + INTERVAL + 60000);
+    assert.equal(recoveries.length, 2);
+    assert.deepEqual((await row(old)).body, stopped.body);
+    // Then each failure waits twice as long: the next retry is an hour after the second attempt.
+    await tick(instant + 2 * INTERVAL + 60000);
+    assert.equal(recoveries.length, 2);
+    await tick(instant + 3 * INTERVAL + 60000);
+    assert.equal(recoveries.length, 3);
+    const retried = await row(recent);
+    assert.equal(retried.outcome, "missed");
+    assert.equal(retried.body.historyAttempts, 3);
+    assert.equal(retried.body.historyRetryAt, instant + 3 * INTERVAL + 60000 + 4 * INTERVAL);
+    assert.equal(retried.body.historicalTraffic.state, "unavailable");
+  } finally {
+    DB.close();
+  }
+});
+
+test("the minute cron registers built-in logs only when one is missing, including a new one (audit F7)", async () => {
+  const base = localAccountDb();
+  const registrations = [];
+  const DB = {
+    ...base,
+    prepare(sql) {
+      if (/INTO owner_monitor_registry/.test(sql)) registrations.push(sql);
+      return base.prepare(sql);
+    },
+    batch: base.batch,
+  };
+  const added = ["synthetic-new-log", "Synthetic new log", "event", null, "A built-in log added by a later release."];
+  try {
+    await provisionOwner(DB, instant - 1000);
+    await initializeMonitor(DB, instant);
+    const options = { integrations: false, collector: async () => reading() };
+    registrations.length = 0;
+    await scheduledMonitor({ DB }, instant, { ...options, now: instant });
+    await scheduledMonitor({ DB }, instant + 60000, { ...options, now: instant + 60000 });
+    assert.equal(registrations.length, 0, "steady-state ticks re-register nothing");
+    BUILTIN_LOGS.push(added);
+    await scheduledMonitor({ DB }, instant + 120000, { ...options, now: instant + 120000 });
+    const stored = await base.prepare("SELECT body FROM owner_monitor_registry WHERE id='synthetic-new-log'").first();
+    assert.equal(JSON.parse(stored.body).builtin, true);
+    const count = await base.prepare("SELECT COUNT(*) AS n FROM owner_monitor_registry WHERE json_extract(body,'$.builtin')=1").first();
+    assert.equal(count.n, BUILTIN_LOGS.length);
+  } finally {
+    const at = BUILTIN_LOGS.indexOf(added);
+    if (at >= 0) BUILTIN_LOGS.splice(at, 1);
+    base.close();
   }
 });

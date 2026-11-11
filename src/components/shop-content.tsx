@@ -502,7 +502,7 @@ function StockRow({
   dm: boolean;
   locked?: boolean;
 }) {
-  const { buy, updateStock, deleteStock, purses, undoPurchase, realm, journal } = useEconomy();
+  const { buy, editStock, deleteStock, purses, undoPurchase, realm, journal } = useEconomy();
   const stockSaved = useSavedTick();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
@@ -641,38 +641,47 @@ function StockRow({
     );
   }
 
+  const track = (result: Promise<boolean>) => {
+    stockSaved.track(result);
+    return result;
+  };
   return (
     <li className="flex flex-col gap-2 py-3">
       <FantasyIcon entry={line} size={32} />
-      <TextInput
-        aria-label="Good"
-        defaultValue={line.name}
-        onBlur={(event) => {
-          const name = event.target.value.trim();
-          if (name && name !== line.name) stockSaved.track(updateStock({ ...line, name }));
+      <StockText
+        ariaLabel="Good"
+        shown={line.name}
+        value={line.name}
+        save={(typed, base) => {
+          const name = typed.trim();
+          if (name && name !== base)
+            return track(editStock(line.id, { field: "name", shown: base, value: name }));
         }}
       />
       <div className="grid grid-cols-2 gap-2">
         <Field label="Price">
-          <TextInput
-            aria-label="Price"
-            defaultValue={formatCopper(line.copper)}
-            onBlur={(event) => {
-              const copper = parsePrice(event.target.value);
-              if (copper !== null && copper !== line.copper)
-                stockSaved.track(updateStock({ ...line, copper }));
+          <StockText
+            ariaLabel="Price"
+            shown={formatCopper(line.copper)}
+            value={line.copper}
+            save={(typed, base) => {
+              const copper = parsePrice(typed);
+              if (copper !== null && copper !== base)
+                return track(editStock(line.id, { field: "copper", shown: base, value: copper }));
             }}
           />
         </Field>
         <Field label="Quantity" hint="Blank if unlimited.">
-          <TextInput
-            aria-label="Quantity, blank if unlimited"
-            defaultValue={line.quantity === null ? "" : String(line.quantity)}
-            onBlur={(event) => {
-              const raw = event.target.value.trim();
+          <StockText
+            ariaLabel="Quantity, blank if unlimited"
+            shown={line.quantity === null ? "" : String(line.quantity)}
+            value={line.quantity}
+            save={(typed, base) => {
+              const raw = typed.trim();
               const quantity = raw === "" ? null : Math.max(0, Math.floor(Number(raw)));
               if (raw !== "" && Number.isNaN(quantity)) return;
-              if (quantity !== line.quantity) stockSaved.track(updateStock({ ...line, quantity }));
+              if (quantity !== base)
+                return track(editStock(line.id, { field: "quantity", shown: base, value: quantity }));
             }}
           />
         </Field>
@@ -686,6 +695,51 @@ function StockRow({
         onRemove={() => void deleteStock(line.id)}
       />
     </li>
+  );
+}
+
+/**
+ * A stock box in the shop's Edit mode (audit 2026-11-10 D3). Until the DM types it shows the
+ * stored value, so a sale or reprice from another seat appears at once; tabbing through without
+ * typing saves nothing. The first keystroke records the value the box showed, and the save sends
+ * it as the edit's baseline, so an edit made against an old value is refused rather than writing
+ * sold stock or an old price back. Derived in render, not copied in an effect (PR 465, PR 474).
+ */
+function StockText<T>({
+  ariaLabel,
+  shown,
+  value,
+  save,
+}: {
+  ariaLabel: string;
+  /** The stored value as text. */
+  shown: string;
+  /** The stored value itself, recorded as the baseline when typing starts. */
+  value: T;
+  /** Saves what was typed; a returned promise keeps the typed text shown until it settles. */
+  save: (typed: string, base: T) => Promise<unknown> | void;
+}) {
+  const [draft, setDraft] = useState<{ text: string; base: T; saving?: boolean } | null>(null);
+  return (
+    <TextInput
+      aria-label={ariaLabel}
+      value={draft ? draft.text : shown}
+      // While a save is on its way the box keeps the typed text and takes no new edit, so the next
+      // edit starts from the saved value rather than the old one.
+      readOnly={!!draft?.saving}
+      onChange={(event) => {
+        const text = event.target.value;
+        setDraft((current) => ({ text, base: current ? current.base : value }));
+      }}
+      onBlur={() => {
+        if (!draft || draft.saving) return;
+        const saving = save(draft.text, draft.base);
+        if (!saving) return setDraft(null);
+        const pending = { ...draft, saving: true };
+        setDraft(pending);
+        void saving.finally(() => setDraft((current) => (current === pending ? null : current)));
+      }}
+    />
   );
 }
 
