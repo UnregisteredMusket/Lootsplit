@@ -22,7 +22,7 @@ Maps support category filters, dungeon/property/ship layouts, free DM party plac
 
 Lootsplitter (formerly Lootsplit) is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
-Android1.9.1 is published with widget-discovery recovery. Both types are reannounced after upgrade; **Widgets → Lootsplit → Lootsplit 4×1 companion** places the compact widget, with customization available from its Settings action. **My account → Refresh widget list** safely requests a fresh list. See the [picker investigation and release status](docs/audit/2026-10-21-widget-picker.md).
+Android 1.19.0 is the current published version (see [Downloads](https://lootsplitter.com/downloads) and `src/lib/website/release.json`). Widget-discovery recovery has shipped since Android 1.9.1: both widget types are reannounced after upgrade; **Widgets → Lootsplitter → Lootsplitter 4×1 companion** places the compact widget, with customization available from its Settings action. **My account → Refresh widget list** safely requests a fresh list. See the [picker investigation and release status](docs/audit/2026-10-21-widget-picker.md).
 
 ## Private owner overview
 

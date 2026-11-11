@@ -1,17 +1,13 @@
 import { useEffect, useId, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { HELP_GROUPS, topicMatches } from "@/lib/help/content";
-import { PLAYER_HELP_GROUPS } from "@/lib/help/player-content";
+import { topicMatches } from "@/lib/help/content";
+import { HELP_GUIDE_GROUPS } from "@/lib/help/guides";
 import { guideForHash, guideFromSearch, type HelpGuide } from "@/lib/help/guide-choice";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
 import { AppLink } from "./app-link";
 import "./help-content.css";
 
-const GUIDE_SOURCES: Record<HelpGuide, typeof HELP_GROUPS> = {
-  // The player guide carries no DM setup links; only the shared install topics join it.
-  player: [...PLAYER_HELP_GROUPS, ...HELP_GROUPS.filter((g) => g.id === "install")],
-  dm: HELP_GROUPS,
-};
+const GUIDE_SOURCES = HELP_GUIDE_GROUPS;
 
 export function HelpContent({
   embedded = false,

@@ -2,7 +2,7 @@
 
 Related backlog: https://github.com/UnregisteredMusket/Lootsplit/issues/48
 
-No domain has been selected or activated. Keep the current Cloudflare Worker, D1 database, Android signing identity and legacy API endpoint. Domain registration, DNS changes, account-security settings and cutover require the owner's decisions/authorization.
+Status (updated 2026-11-11): the website moved to **lootsplitter.com** on 2026-10-22 (PR 214, merged 2026-10-23 UTC), on the same Cloudflare Worker and D1 database. `lootsplit.oliverstorie2017.workers.dev` keeps serving as the legacy host and stays the native API address for the Android app and widgets (`deploymentOrigins.nativeApi`). Keep the Worker, database, Android signing identity and legacy API endpoint. Further DNS changes, account-security settings and retiring the legacy host still require the owner's decisions/authorization. The sections below describe the preparation as built; the activation order is kept as the record of how the move was done.
 
 ## Implemented preparation in the roadmap branch
 
@@ -12,9 +12,9 @@ No domain has been selected or activated. Keep the current Cloudflare Worker, D1
 - Both session-wide and character-specific invitation controls share a URL builder and preserve session/character identifiers. Old session validation remains server-authoritative.
 - Monitoring/recovery/failure-report/backup scripts read the shared website origin. `npm run migration:check` rejects mismatches between source, Wrangler and production audit destinations. This is a configuration check, not proof of live readiness.
 - Cutover guards (domain audit P1-1, P1-2, P1-3, P1-6; 2026-10-22). `wrangler.toml` sets top-level `workers_dev = true`, so adding a custom domain or `routes` cannot switch off the workers.dev host that installed APKs, widgets and old invitations use. `migration:check`, the release artifact build (`releaseConfig` in `scripts/release-artifact.mjs`) and release preflight all assert it, including on the generated `dist/website-release/wrangler.toml`.
-- `wrangler.toml [vars]` sets `ACCOUNT_LEGACY_ORIGINS` explicitly. `migration:check` requires it to equal `legacy` minus `website` (comma-separated, order-insensitive). It is empty today because the website is still workers.dev.
+- `wrangler.toml [vars]` sets `ACCOUNT_LEGACY_ORIGINS` explicitly. `migration:check` requires it to equal `legacy` minus `website` (comma-separated, order-insensitive). Since the move it lists the workers.dev host.
 - Release preflight accepts a reviewed origin transition. The live `ACCOUNT_ORIGIN`/`ACCOUNT_LEGACY_ORIGINS` bindings must equal either this release's values, or `previousDeploymentOrigins` in `origins.mjs` when the new `legacy` list keeps the previous website. Any other mismatch fails closed. In the cutover PR, keep `previousDeploymentOrigins` at the old values. Set it to the new values in a follow-up PR once the cutover release is verified live.
-- Both live-audit workflows set `AUDIT_LEGACY_ORIGINS` next to `AUDIT_ORIGIN`. They run `live-release-audit.mjs` and `website-browser-audit.mjs` through `scripts/live-audit-origins.mjs`, which runs each audit once per approved origin. Results for extra origins go to per-host folders. `migration:check` requires both workflows to match `website` and `legacy` minus `website`. Today the list holds a single origin, so the audits run exactly as before.
+- Both live-audit workflows set `AUDIT_LEGACY_ORIGINS` next to `AUDIT_ORIGIN`. They run `live-release-audit.mjs` and `website-browser-audit.mjs` through `scripts/live-audit-origins.mjs`, which runs each audit once per approved origin. Results for extra origins go to per-host folders. `migration:check` requires both workflows to match `website` and `legacy` minus `website`. Since the move the list holds the workers.dev host, so live audits run on both addresses.
 - Settings includes a read-only readiness guide showing pending sync work and private document count. It reuses Device backups/account campaigns; it never submits a turn or transfers credentials/documents automatically.
 - Existing backup import validates a file and stores a separate backup before Load is requested; Load explicitly confirms replacement of the selected campaign. For migration, select/create a separate destination campaign first. No second backup format is introduced.
 
@@ -24,7 +24,7 @@ Focused API tests exercise two explicitly configured HTTPS origins against one d
 
 Keep authoritative server permissions, client validation, rate limiting, CSRF protections, recovery receipts, audit records and encrypted backups. They are intentional safeguards. Never solve migration by wildcard CORS, disabling origin checks, copying cookies into links or accepting arbitrary Host headers.
 
-## Activation order, when authorized
+## Activation order (followed for the October 2026 move)
 
 1. Select/approve domain, renewal cost and registrar. Verify MFA, recovery access and registrar lock; review DNSSEC with the actual provider.
 2. Record current live commit, immutable artifact, Worker/database identities and a verified encrypted backup. Preserve old migration files/source for old database backups.
@@ -36,6 +36,6 @@ Keep authoritative server permissions, client validation, rate limiting, CSRF pr
 
 Rollback triggers: wrong identity/assets, broken sign-in/invitations, server errors, failed backup validation or inaccessible legacy clients. Restore the previous verified application/configuration through the gated release workflow; keep the shared database and old host available. Do not restore an older database over newer transactions just to undo a domain binding. Reverify both endpoints after rollback.
 
-Owner-only pending items: domain/cost selection, registrar/Cloudflare security review, DNS/TLS binding, approved coexistence duration, actual cutover and eventual legacy retirement. Full two-host browser/physical-device rehearsal remains a pre-activation gate.
+Owner-only pending items after the move: registrar/Cloudflare security review, how long the legacy host is kept (Help promises at least 12 months) and its eventual retirement. `previousDeploymentOrigins` in `origins.mjs` still holds the pre-move values; the follow-up PR described above (set it to the current values once the cutover release is verified live) has not been made.
 
 Official references checked October 6, 2026: https://developers.cloudflare.com/workers/configuration/routing/custom-domains/ ; https://developers.cloudflare.com/workers/configuration/routing/workers-dev/ ; https://better-auth.com/docs/concepts/cookies ; https://better-auth.com/docs/1.6/reference/security .

@@ -1,0 +1,12 @@
+{
+  "title": "Features page lists factions, quests, XP, sell & split and more",
+  "summary": "The Features page had fallen behind the app. It now lists twenty more features, and each entry links to the Help topic that explains it.",
+  "items": [
+    "New entries: fairness ledger, sell & split, unidentified items, ledger CSV export, XP and milestones, attunement, charges and uses, and 3D dice.",
+    "Also new: merchant purses, market events, settlement sizes, Why this price?, shop lists, factions and Favor, the favor market and quests.",
+    "And: split the party, session recaps, preview as player and the What players can see page.",
+    "How it works on an entry opens its topic in the Help guide.",
+    "The player Help guide shows Lootsplit is now Lootsplitter once instead of twice."
+  ],
+  "audience": "everyone"
+}
