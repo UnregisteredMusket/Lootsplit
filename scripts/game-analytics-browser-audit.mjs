@@ -2,7 +2,21 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication } from "./title-screen-navigation.mjs";
+import { localAccountDb } from "./account-dev-db.mjs";
+import { collect } from "../cloudflare/game-analytics.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
+// The public route only reads the totals the scheduled 30-minute collection stores (audit F4,
+// 2026-11-10). The development server's SQLite file is collected here as that job would; the
+// packaged Worker's disposable D1 has no scheduled run, so it may answer "not collected yet".
+let collected = null;
+if (new URL(origin).port !== "8082") {
+  const db = localAccountDb("data/account-dev.sqlite");
+  try {
+    collected = (await collect(db)).metrics.spentCopper;
+  } finally {
+    db.close();
+  }
+}
 const output = process.env.ANALYTICS_SCREENSHOTS || "test-results/analytics";
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
@@ -16,10 +30,18 @@ try {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const response = await context.request.get(origin + "/api/account/site-analytics");
-    assert.equal(response.status(), 200);
-    const data = await response.json();
-    assert.deepEqual(Object.keys(data.metrics), ["spentCopper"]);
-    assert.equal(Number.isSafeInteger(data.metrics.spentCopper), true);
+    let data = await response.json();
+    if (collected === null && response.status() === 503) {
+      // Never collected: unavailable, never a fabricated zero.
+      assert.equal(typeof data.error, "string");
+      assert.equal(data.metrics, undefined);
+      data = { version: 1, asOf: Date.now(), scope: "current-shared-campaigns", metrics: { spentCopper: 0 } };
+    } else {
+      assert.equal(response.status(), 200);
+      assert.deepEqual(Object.keys(data.metrics), ["spentCopper"]);
+      assert.equal(Number.isSafeInteger(data.metrics.spentCopper), true);
+      if (collected !== null) assert.equal(data.metrics.spentCopper, collected);
+    }
     assert.equal(
       (await context.request.get(origin + "/api/account/owner/analytics")).status(),
       401,
@@ -41,7 +63,7 @@ try {
     await page
       .getByText(/Recorded purchases and outgoing payments across current shared campaigns/)
       .waitFor({ state: "visible" });
-    await page.getByText(/Snapshots are cached for up to a minute/).waitFor({ state: "visible" });
+    await page.getByText(/The total is recounted about every half hour/).waitFor({ state: "visible" });
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
       false,

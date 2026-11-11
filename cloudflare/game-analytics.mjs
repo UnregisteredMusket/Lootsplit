@@ -10,7 +10,8 @@ import { roleOf } from "./members.mjs";
 import { hydrateRoomReports } from "./room-reports.mjs";
 import { readRoomTables, roomRevisions } from "./room-storage.mjs";
 
-// Bound repeated homepage reads per database/isolate; failures are never cached as zero.
+// Owner reads (monitor, widget) are bounded per database/isolate; failures are never cached as zero.
+// The scheduled collection and these reads keep game_analytics_cache current for the public route.
 const snapshots = new WeakMap();
 export async function siteGameAnalytics(db) {
   const cached = snapshots.get(db);
@@ -30,6 +31,14 @@ const COUNTED = () => `COALESCE(json_extract(body, '$.testMode'), 0) = 0 AND ${n
 /** Changed campaigns are recounted in groups this size (bound parameters per query). */
 const RECOUNT_GROUP = 50;
 const metricKeys = Object.keys(emptyMetrics());
+/**
+ * Row of game_analytics_cache holding the site totals of the latest collection (`metrics`) and when
+ * it ran (`updated_at`). Room codes are letters and digits only (probe-namespace.mjs), so a code
+ * with "-" never names a campaign. The public statistics route reads only this row (audit F4,
+ * 2026-11-10): counting happens in the scheduled owner-monitor collection every 30 minutes and in
+ * owner reads, never on a public request.
+ */
+export const SITE_TOTALS_CODE = "SITE-TOTALS";
 /** Cached per-campaign figures, or null when unreadable or from another analytics version. */
 function cachedMetrics(row) {
   if (!row || Number(row.analytics_version) !== ANALYTICS_VERSION) return null;
@@ -53,7 +62,12 @@ export async function collect(db, now = Date.now()) {
   const rooms = await roomRevisions(db, { where: COUNTED() });
   const cache = new Map(
     /** @type {any[]} */ (
-      (await db.prepare("SELECT code,revision,analytics_version,metrics FROM game_analytics_cache").all()).results
+      (
+        await db
+          .prepare("SELECT code,revision,analytics_version,metrics FROM game_analytics_cache WHERE code<>?")
+          .bind(SITE_TOTALS_CODE)
+          .all()
+      ).results
     ).map((row) => [row.code, row]),
   );
   const metrics = emptyMetrics();
@@ -95,10 +109,19 @@ export async function collect(db, now = Date.now()) {
   const counted = new Set(rooms.map((room) => room.code));
   for (const code of cache.keys())
     if (!counted.has(code)) writes.push(db.prepare("DELETE FROM game_analytics_cache WHERE code=?").bind(code));
+  const asOf = Date.now();
+  // Written last, after every campaign's figures: the public route serves exactly this collection.
+  writes.push(
+    db
+      .prepare(
+        "INSERT INTO game_analytics_cache(code,revision,analytics_version,metrics,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(code) DO UPDATE SET revision=excluded.revision,analytics_version=excluded.analytics_version,metrics=excluded.metrics,updated_at=excluded.updated_at",
+      )
+      .bind(SITE_TOTALS_CODE, rooms.length, ANALYTICS_VERSION, JSON.stringify(metrics), asOf),
+  );
   for (let i = 0; i < writes.length; i += 50) await db.batch(writes.slice(i, i + 50));
   return {
     version: ANALYTICS_VERSION,
-    asOf: Date.now(),
+    asOf,
     scope: "current-shared-campaigns",
     sharedCampaigns: rooms.length,
     metrics,
@@ -106,13 +129,26 @@ export async function collect(db, now = Date.now()) {
   };
 }
 
+/**
+ * Public, unauthenticated statistics: one primary-key read of the totals the latest collection
+ * stored (at most about 30 minutes old). It never lists or reads campaigns or their history. Before
+ * the first collection, or after an analytics version change until the next one, the figure is
+ * unavailable (503), never a fabricated zero.
+ */
 export async function publicAnalytics(db) {
-  const snapshot = await siteGameAnalytics(db);
+  const row = await db
+    .prepare("SELECT analytics_version,metrics,updated_at FROM game_analytics_cache WHERE code=?")
+    .bind(SITE_TOTALS_CODE)
+    .first();
+  const metrics = cachedMetrics(row);
+  const asOf = Number(row?.updated_at);
+  if (!metrics || !Number.isSafeInteger(asOf) || asOf <= 0)
+    throw Object.assign(Error("Site statistics are not collected yet."), { status: 503 });
   return {
-    version: snapshot.version,
-    asOf: snapshot.asOf,
-    scope: snapshot.scope,
-    metrics: publicGameMetrics(snapshot.metrics),
+    version: ANALYTICS_VERSION,
+    asOf,
+    scope: "current-shared-campaigns",
+    metrics: publicGameMetrics(metrics),
   };
 }
 
