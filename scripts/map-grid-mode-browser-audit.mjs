@@ -80,12 +80,13 @@ try {
       // (a) Snap 11 tokens: one action; Undo puts them back.
       await (await layers(page)).getByRole("button", { name: "Grid mode", exact: true }).click();
       await dialog.getByRole("button", { name: "Snap 11 tokens", exact: true }).click();
-      await expect.poll(async () => (await keep(page)).tabletop.snap).toBe(true);
-      const snapped = (await keep(page)).tokens;
-      assert.ok(snapped.every((t) => t.offsetX === undefined && t.offsetY === undefined), "every token is on a square");
+      // The pointer rests on the self-clearing toast (pausing it) before any other wait (audit G4).
       const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Grid mode on · 11 tokens snapped" });
       await expect(toast).toBeVisible();
       await toast.hover();
+      await expect.poll(async () => (await keep(page)).tabletop.snap).toBe(true);
+      const snapped = (await keep(page)).tokens;
+      assert.ok(snapped.every((t) => t.offsetX === undefined && t.offsetY === undefined), "every token is on a square");
       await toast.getByRole("button", { name: "Undo", exact: true }).click();
       await expect.poll(async () => (await keep(page)).tabletop.snap).toBe(false);
       assert.deepEqual(

@@ -898,28 +898,30 @@ test("recovery", async ({ devices, baseURL: origin }) => {
 
 // Split from ownership, which had reached 59s of its 60s case limit on CI (2026-10-22).
 // Ownership keeps the legacy claim, anonymous guest memory, policy retry and revocation.
-// This case keeps the rest of that journey unchanged: a revoked anonymous guest device,
-// the reopened room's expired invitation, the same device returning with an account,
-// account resume on a second device, and a cold reload after the DM's tab closes.
-// It runs first in the second shard so it has the full suite budget.
-test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
-  const dm = devices.page;
-  // Elapsed-time marks for the per-case duration annotation (account-durations.mjs).
+// The rest of that journey was one case, returning-player, until it took 55.0s of the same
+// limit on CI (main run 42802130504, 2026-11-10). It is split at its "reopened" phase with
+// every assertion, cold entry and deadline kept:
+// - revoked-guest: a revoked anonymous guest device and the reopened room's expired invitation.
+//   It runs first in the second shard so it has the full suite budget.
+// - returning-player: rebuilds that revoked anonymous guest, then the same device returns with
+//   an account, account resume on a second device, and a cold reload after the DM's tab closes.
+//   It is the last case of the first shard (Playwright shards in file order, 8 of 15 cases), on
+//   a server that earlier cases have already compiled.
+
+/** Elapsed-time marks for the per-case duration annotation (account-durations.mjs). */
+function phaseMarks(testInfo) {
   const started = Date.now();
-  const phase = (name) =>
+  return (name) =>
     testInfo.annotations.push({
       type: "phase",
       description: `${name} ${((Date.now() - started) / 1000).toFixed(1)}s`,
     });
-  const guidePreference = () => localStorage.setItem("quire.guide.offer.v3", "seen");
-  await devices.context.addInitScript(guidePreference);
-  // A signed-in DM with a saved room: real cold account entry, app link and room creation.
-  await accountPost(devices.context, origin, "auth/sign-up/email", credentials());
-  await visitPage(dm, origin, "/account");
-  await expect(dm.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
-  await prepareDmFixture(dm, origin, { useAccountLink: true });
-  await createRoom(dm, origin, navigateAccountScenario);
-  phase("room created");
+}
+
+const guidePreference = () => localStorage.setItem("quire.guide.offer.v3", "seen");
+
+/** Captures the next join link the DM shares from Multiplayer. */
+async function shareJoinLink(dm) {
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -929,6 +931,23 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
     }),
   );
   await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+}
+
+/**
+ * A signed-in DM's saved room, an anonymous guest who joined it without persistent storage, and
+ * End session revoking that guest. Shared by revoked-guest and returning-player.
+ */
+async function revokedAnonymousGuest(devices, origin, phase) {
+  const dm = devices.page;
+  await devices.context.addInitScript(guidePreference);
+  // A signed-in DM with a saved room: real cold account entry, app link and room creation.
+  await accountPost(devices.context, origin, "auth/sign-up/email", credentials());
+  await visitPage(dm, origin, "/account");
+  await expect(dm.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+  await prepareDmFixture(dm, origin, { useAccountLink: true });
+  await createRoom(dm, origin, navigateAccountScenario);
+  phase("room created");
+  await shareJoinLink(dm);
   const link = await dm.evaluate(() => window.invitationForTest);
   expect(new URL(link).searchParams.get("session")).toBeTruthy();
   // As in ownership: the anonymous cold read runs beside the DM's membership save.
@@ -966,32 +985,21 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
   phase("session ended");
   await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
   await dm.waitForURL((u) => u.pathname === "/");
-  // Reopen has acknowledged the new session. The old anonymous invitation read
-  // and the DM's fresh invitation read can run together. Finish expiry proof
-  // before signing up the guest, and keep all cold entries/title checks.
-  await Promise.all([
-    (async () => {
-      await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
-      // The join link looks up its characters by itself (plan Q15); the expired session is
-      // reported once, without a Find characters tap.
-      await expect(
-        guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
-      ).toBeVisible();
-    })(),
-    (async () => {
-      await continueIntoApp(dm);
-      await navigateAccountScenario(dm, origin, "/share");
-      await dm.evaluate(() =>
-        Object.defineProperty(navigator, "share", {
-          configurable: true,
-          value: async (data) => {
-            window.invitationForTest = data.url;
-          },
-        }),
-      );
-      await dm.getByRole("button", { name: "Share join link", exact: true }).click();
-    })(),
-  ]);
+  return { dm, guest, link, code };
+}
+
+/** After Reopen as DM: the DM enters the app again and shares a fresh join link. */
+async function shareFreshLink(dm, origin) {
+  await continueIntoApp(dm);
+  await navigateAccountScenario(dm, origin, "/share");
+  await shareJoinLink(dm);
+}
+
+test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
+  const phase = phaseMarks(testInfo);
+  const { dm, guest, code } = await revokedAnonymousGuest(devices, origin, phase);
+  // The old invitation's expiry is revoked-guest's proof; this case needs the fresh link.
+  await shareFreshLink(dm, origin);
   phase("reopened");
   const returning = credentials();
   const { page: secondPlayer, context: playerContext } = await devices.newDevice();
@@ -1038,6 +1046,28 @@ test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
   phase("reload started");
   await continueIntoApp(secondPlayer);
   await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+});
+
+test("revoked-guest", async ({ devices, baseURL: origin }, testInfo) => {
+  const phase = phaseMarks(testInfo);
+  const { dm, guest, link } = await revokedAnonymousGuest(devices, origin, phase);
+  // Reopen has acknowledged the new session. The old anonymous invitation read
+  // and the DM's fresh invitation read can run together. Finish expiry proof
+  // before the DM's link is used, and keep all cold entries/title checks.
+  await Promise.all([
+    (async () => {
+      await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
+      // The join link looks up its characters by itself (plan Q15); the expired session is
+      // reported once, without a Find characters tap.
+      await expect(
+        guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
+      ).toBeVisible();
+    })(),
+    shareFreshLink(dm, origin),
+  ]);
+  phase("reopened");
+  const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
+  expect(freshLink.searchParams.get("session")).toBeTruthy();
 });
 
 test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {

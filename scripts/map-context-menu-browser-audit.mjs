@@ -117,9 +117,10 @@ try {
   await page.keyboard.press("Escape");
   await rightClick(20.5, 14.5);
   await menu.getByRole("menuitem", { name: /Place party here/ }).click();
-  await expect.poll(async () => (await token(page, "mira-token")).row).toBeGreaterThan(12);
+  // The pointer rests on the self-clearing toast (pausing it) before any other wait (audit G4).
   const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Placed 4 on The Old Keep" });
   await toast.hover();
+  await expect.poll(async () => (await token(page, "mira-token")).row).toBeGreaterThan(12);
   await toast.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(async () => (await token(page, "mira-token")).row).toBe(7);
   await rightClick(6.5, 12.5);
