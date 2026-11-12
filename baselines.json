@@ -71802,5 +71802,22 @@
     "finishedAt": "2026-11-11T19:20:01Z",
     "durationMs": 1000,
     "trendId": "43085991735:1:3c1a5820a8bb13d010ff738842d559a1275a07e73d3799d949d57605146c1690"
+  },
+  "[\".github/workflows/standby-backup.yml\",\"schedule\",\"main\",\"step\",\"backup / Remove encrypted runner copies\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "43271019065:1:a76e513be5ecd6ef52e2d2a72df145bc9f0ad86fafd8ca814f0ece9a371dcf8e",
+    "scope": "[\".github/workflows/standby-backup.yml\",\"schedule\",\"main\",\"step\",\"backup / Remove encrypted runner copies\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "backup / Remove encrypted runner copies",
+    "environment": "ubuntu-latest",
+    "commit": "f4295e72f95ae489d4fe7a57b516bbf443cf736b",
+    "runId": 43271019065,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43271019065/job/131367237044",
+    "outcome": "success",
+    "startedAt": "2026-11-12T17:36:46Z",
+    "finishedAt": "2026-11-12T17:36:47Z",
+    "durationMs": 1000,
+    "trendId": "43271019065:1:a76e513be5ecd6ef52e2d2a72df145bc9f0ad86fafd8ca814f0ece9a371dcf8e"
   }
 }
