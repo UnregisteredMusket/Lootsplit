@@ -974,16 +974,21 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / world / dev-map-party-move | open | 2 | 18s → 25s | +7s | +38.89% |
 | verify / Development / world / dev-map-move-approval | open | 2 | 6s → 9s | +3s | +50% |
 | verify / Development / world / dev-player-onboarding | open | 3 | 21s → 41s | +20s | +95.24% |
-| Code health and security scans / initial queue | open | 2 | 1s → 4s | +3s | +300% |
+| Code health and security scans / initial queue | open | 3 | 1s → 5s | +4s | +400% |
 | Development / gameplay / dev-encounter-xp | open | 2 | 16s → 24s | +8s | +50% |
 | Development / gameplay / dev-economy-health | open | 2 | 14s → 21s | +7s | +50% |
 | verify / Packaged Worker / economy | open | 2 | 253s → 369s | +116s | +45.85% |
+| Committed secrets (gitleaks) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 7s → 12s | +5s | +71.43% |
 | Development / gameplay / dev-settlement-tiers | open | 2 | 19s → 34s | +15s | +78.95% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-16T15:39:08Z | step: Committed secrets (gitleaks) / Run gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 | 10s → 13s | +3s | +30% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41406666801/job/125150157878) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43898542160/job/133408585553) |
+| 2026-11-16T15:38:55Z | step: Committed secrets (gitleaks) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 9s → 12s | +3s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42652146581/job/129281027927) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43898542160/job/133408585553) |
+| 2026-11-16T15:38:43Z | step: Committed secrets (gitleaks) / Set up job | 1s → 5s | +4s | +400% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41406666801/job/125150157878) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43898542160/job/133408585553) |
+| 2026-11-16T15:38:36.000Z | queue: Code health and security scans / initial queue | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42652146581) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43898542160) |
 | 2026-11-11T19:40:49Z | step: deploy / Install Chromium for Playwright | 15s → 25s | +10s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43073278444/job/130706492344) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43089230009/job/130761586264) |
 | 2026-11-11T18:21:47Z | step: verify / Packaged Worker / world / worker-shop-stock | 16s → 21s | +5s | +31.25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39742806315/job/119705299247) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43074920467/job/130715148762) |
 | 2026-11-11T18:19:26Z | step: verify / Packaged Worker / accounts / Start disposable built Worker | 15s → 18s | +3s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40849851166/job/123368923423) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43074920467/job/130715148941) |
