@@ -347,6 +347,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | rehearsal / Run npm ci --ignore-scripts | open | 2 | 13s → 52s | +39s | +300% |
 | rehearsal | open | 2 | 22s → 68s | +46s | +209.09% |
 | Verify remote standby recovery | open | 2 | 22s → 68s | +46s | +209.09% |
+| backup / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / gameplay / dev-blacksmith | open | 2 | 28s → 62s | +34s | +121.43% |
 | Packaged Worker / interface / worker-blacksmith | open | 3 | 24s → 44s | +20s | +83.33% |
 | Code checks and immutable builds / Generate current source function inventory | open | 7 | 12s → 41s | +29s | +241.67% |
@@ -964,6 +965,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Packaged Worker / world / Start disposable built Worker | open | 2 | 13s → 19s | +6s | +46.15% |
 | verify / Packaged Worker / world / worker-downtime | open | 2 | 44s → 67s | +23s | +52.27% |
 | verify / Packaged Worker / economy / Install Chromium for Playwright | open | 3 | 26s → 102s | +76s | +292.31% |
+| backup / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 6s → 10s | +4s | +66.67% |
 | Development / world / dev-map-player-move | open | 2 | 19s → 29s | +10s | +52.63% |
 | Development / gameplay / dev-history-on-demand | open | 2 | 27s → 43s | +16s | +59.26% |
 | Development / world / dev-map-follow-view | open | 2 | 22s → 34s | +12s | +54.55% |
@@ -985,6 +987,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-21T16:47:11Z | step: backup / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 7s → 10s | +3s | +42.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40853768063/job/123379474309) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/44926419605/job/136913391316) |
+| 2026-11-21T16:46:55Z | step: backup / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38230851313/job/114749666827) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/44926419605/job/136913391316) |
 | 2026-11-16T15:39:08Z | step: Committed secrets (gitleaks) / Run gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 | 10s → 13s | +3s | +30% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41406666801/job/125150157878) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43898542160/job/133408585553) |
 | 2026-11-16T15:38:55Z | step: Committed secrets (gitleaks) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 9s → 12s | +3s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/42652146581/job/129281027927) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43898542160/job/133408585553) |
 | 2026-11-16T15:38:43Z | step: Committed secrets (gitleaks) / Set up job | 1s → 5s | +4s | +400% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41406666801/job/125150157878) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/43898542160/job/133408585553) |
