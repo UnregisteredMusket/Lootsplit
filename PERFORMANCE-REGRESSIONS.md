@@ -882,7 +882,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Packaged Worker / economy / worker-game-analytics | open | 2 | 4s → 9s | +5s | +125% |
 | verify / Packaged Worker / features / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 2 | 2s → 6s | +4s | +200% |
 | verify / Packaged Worker / features / worker-website | open | 2 | 38s → 80s | +42s | +110.53% |
-| backup / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 6s | +4s | +200% |
+| backup / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 2s → 7s | +5s | +250% |
 | Website changelog note / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 4 | 1s → 14s | +13s | +1300% |
 | Website changelog note / initial queue | open | 8 | 92s → 1301s | +1209s | +1314.13% |
 | verify / Packaged standby / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 4s | +2s | +100% |
@@ -987,6 +987,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-11-24T20:09:27Z | step: backup / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/41680219124/job/126071584101) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/45477753361/job/138742383472) |
 | 2026-11-23T20:31:21Z | step: rehearsal / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 4s → 9s | +5s | +125% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40298814591/job/121491361710) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/45260158874/job/137992453385) |
 | 2026-11-23T20:31:12Z | step: rehearsal / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 2s → 5s | +3s | +150% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40298814591/job/121491361710) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/45260158874/job/137992453385) |
 | 2026-11-23T20:31:07Z | step: rehearsal / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401/job/114735819394) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/45260158874/job/137992453385) |
